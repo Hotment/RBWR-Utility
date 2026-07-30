@@ -271,6 +271,8 @@ def admin_required(f):
         username = get_authenticated_user()
         if not username:
             if request.path.startswith("/admin/suggestions/status") or \
+               request.path.startswith("/admin/suggestions/comment") or \
+               request.path.startswith("/admin/suggestions/delete") or \
                request.path.startswith("/admin/suggestions/ban") or \
                request.path.startswith("/admin/suggestions/unban"):
                 return Response(
@@ -352,7 +354,10 @@ def get_public_suggestions():
             "name": s.get("name", "Anonymous"),
             "suggestion": s.get("suggestion", ""),
             "timestamp": s.get("timestamp", ""),
-            "status": s.get("status", "pending")
+            "status": s.get("status", "pending"),
+            "admin_comment": s.get("admin_comment", ""),
+            "comment_by": s.get("comment_by", ""),
+            "comment_timestamp": s.get("comment_timestamp", "")
         })
     return public_list
 
@@ -423,6 +428,13 @@ class CrashPayload(BaseModel):
 class StatusUpdatePayload(BaseModel):
     id: int
     status: str
+
+class CommentPayload(BaseModel):
+    id: int
+    comment: str = Field(default="", max_length=2000)
+
+class DeleteSuggestionPayload(BaseModel):
+    id: int
 
 class BanPayload(BaseModel):
     ip: str
@@ -666,6 +678,55 @@ def update_suggestion_status(username):
             save_suggestions(data)
             broadcast_update("dashboard")
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
+    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+
+@app.route("/admin/suggestions/comment", methods=["POST"])
+@admin_required
+def update_suggestion_comment(username):
+    try:
+        req_json = request.get_json() or {}
+        payload = CommentPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    for s in suggestions:
+        if s.get("id") == payload.id:
+            comment_str = payload.comment.strip()
+            s["admin_comment"] = comment_str
+            s["comment_by"] = username if comment_str else ""
+            s["comment_timestamp"] = datetime.now(timezone.utc).isoformat() if comment_str else ""
+            save_suggestions(data)
+            broadcast_update("dashboard")
+            return jsonify({
+                "message": "Comment updated successfully.",
+                "id": payload.id,
+                "admin_comment": comment_str,
+                "comment_by": s.get("comment_by", ""),
+                "comment_timestamp": s.get("comment_timestamp", "")
+            })
+    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+
+@app.route("/admin/suggestions/delete", methods=["POST"])
+@admin_required
+def delete_suggestion(username):
+    try:
+        req_json = request.get_json() or {}
+        payload = DeleteSuggestionPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    initial_len = len(suggestions)
+    data["suggestions"] = [s for s in suggestions if s.get("id") != payload.id]
+
+    if len(data["suggestions"]) < initial_len:
+        save_suggestions(data)
+        broadcast_update("dashboard")
+        return jsonify({"message": f"Suggestion #{payload.id} deleted successfully.", "id": payload.id})
+
     return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
 
 @app.route("/admin/suggestions/ban", methods=["POST"])

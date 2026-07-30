@@ -707,6 +707,7 @@
             for (const s of suggestions) {
                 const timeStr = (s.timestamp || '').substring(0, 19).replace('T', ' ');
                 const isBanned = s.ip in bannedIps;
+                const hasComment = Boolean(s.admin_comment && s.admin_comment.trim());
 
                 let badgeClass = '';
                 if (s.status === 'pending') badgeClass = 'bg-amber-950/40 text-amber-400 border border-amber-500/20';
@@ -722,6 +723,16 @@
                     ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
                     : '';
 
+                const commentDisplay = hasComment ? `
+                    <div class="bg-blue-950/20 border border-blue-500/20 rounded-lg p-3 text-xs font-mono text-blue-200 flex flex-col gap-1">
+                        <div class="flex justify-between items-center text-[10px] text-blue-400 font-bold uppercase">
+                            <span>💬 Admin Response (${escapeHtml(s.comment_by || 'Admin')})</span>
+                            <span>${s.comment_timestamp ? s.comment_timestamp.substring(0, 16).replace('T', ' ') : ''}</span>
+                        </div>
+                        <p class="text-xs text-slate-300 whitespace-pre-wrap">${escapeHtml(s.admin_comment)}</p>
+                    </div>
+                ` : '';
+
                 html += `
                     <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -736,14 +747,30 @@
                         </div>
                         <p class="text-sm text-slate-300 bg-black/20 p-4 rounded-lg border border-white/5 leading-relaxed font-mono whitespace-pre-wrap">${escapeHtml(s.suggestion)}</p>
                         
+                        ${commentDisplay}
+
+                        <div id="comment-box-${s.id}" class="hidden flex flex-col gap-2 bg-black/30 p-3 rounded-lg border border-white/5 font-mono">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Admin Comment / Response</label>
+                            <textarea id="comment-input-${s.id}" rows="2" placeholder="Write response to user suggestion..." class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none">${escapeHtml(s.admin_comment || '')}</textarea>
+                            <div class="flex justify-end gap-2 text-xs">
+                                <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg font-medium uppercase border border-zinc-700">Cancel</button>
+                                ${hasComment ? `<button onclick="saveAdminComment(${s.id}, '')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg font-medium uppercase border border-rose-500/20">Delete</button>` : ''}
+                                <button onclick="submitCommentFromCard(${s.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium uppercase transition">Save Comment</button>
+                            </div>
+                        </div>
+
                         <div class="flex flex-wrap justify-between items-center gap-4 mt-1 border-t border-white/5 pt-3 font-mono">
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap gap-2">
                                 <button onclick="updateStatus(${s.id}, 'accepted')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Accept</button>
                                 <button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Consider</button>
                                 <button onclick="updateStatus(${s.id}, 'declined')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Decline</button>
                                 <button onclick="updateStatus(${s.id}, 'pending')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Pending</button>
+                                <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-indigo-500/20 transition flex items-center gap-1">
+                                    <span>💬</span> ${hasComment ? 'Edit Comment' : 'Add Comment'}
+                                </button>
                             </div>
-                            <div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Entry</button>
                                 ${banBtn}
                             </div>
                         </div>
@@ -752,6 +779,53 @@
             }
             container.innerHTML = html;
             applyFilter();
+        }
+
+        async function deleteSuggestion(id) {
+            if (!confirm(`Are you sure you want to permanently delete suggestion #${id}?`)) {
+                return;
+            }
+            try {
+                const response = await fetch('/admin/suggestions/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert(data.detail || 'Failed to delete suggestion.');
+                }
+            } catch (err) {
+                alert('Network error deleting suggestion.');
+            }
+        }
+
+        function toggleCommentBox(id) {
+            const box = document.getElementById('comment-box-' + id);
+            if (box) box.classList.toggle('hidden');
+        }
+
+        async function submitCommentFromCard(id) {
+            const input = document.getElementById('comment-input-' + id);
+            if (!input) return;
+            const text = input.value;
+            await saveAdminComment(id, text);
+        }
+
+        async function saveAdminComment(id, text) {
+            try {
+                const response = await fetch('/admin/suggestions/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, comment: text })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    alert(data.detail || 'Failed to save comment.');
+                }
+            } catch (err) {
+                alert('Network error saving comment.');
+            }
         }
 
         function renderCrashes(crashes) {
