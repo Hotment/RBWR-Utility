@@ -35,12 +35,42 @@
         }
     </script>
     <style>
+        html {
+            scrollbar-gutter: stable;
+            scroll-behavior: smooth;
+        }
+
         body {
             background-color: #0a0a0c;
             color: #f3f4f6;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Custom Sleek Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0c;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.25);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.5);
+        }
+
+        /* Firefox Scrollbar */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(59, 130, 246, 0.25) #0a0a0c;
         }
 
         .premium-glass {
@@ -150,10 +180,25 @@
                 </div>
             </a>
             <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-400">
-                {% block nav %}{% endblock %}
+                {% block nav %}
+                <a href="/" class="{% if request.path == '/' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Home</a>
+                <a href="/calculator" class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Web Calculator</a>
+                <a href="/points" class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Points Calculator</a>
+                <a href="/suggestions" class="{% if request.path == '/suggestions' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Suggestions</a>
+                <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest" target="_blank"
+                    class="hover:text-white transition-colors">Download App</a>
+                <a href="/admin/suggestions"
+                    class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-medium border border-white/5">Admin</a>
+                {% endblock %}
             </nav>
-            <div class="md:hidden">
-                {% block mobile_nav %}{% endblock %}
+            <div class="md:hidden flex items-center gap-1">
+                {% block mobile_nav %}
+                <a href="/" class="px-2 py-1.5 {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
+                <a href="/calculator" class="px-2 py-1.5 {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web Calc</a>
+                <a href="/points" class="px-2 py-1.5 {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
+                <a href="/suggestions" class="px-2 py-1.5 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
+                <a href="/admin/suggestions" class="px-2 py-1.5 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
+                {% endblock %}
             </div>
         </div>
     </header>
@@ -168,6 +213,7 @@
             <div class="flex gap-6 font-medium">
                 <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
                     class="hover:text-gray-300 transition-colors">Github</a>
+                <a href="/suggestions" class="hover:text-gray-300 transition-colors">Suggestions</a>
                 {% block footer_links %}{% endblock %}
             </div>
         </div>

@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Suggestions & Feedback - RBWR APRM Calculator{% endblock %}
+
+
+
+{% block content %}
+<main class="flex-grow max-w-6xl mx-auto px-6 py-10 w-full flex flex-col gap-10">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
+        <div class="flex flex-col gap-2 max-w-2xl">
+            <div
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-medium text-blue-400 w-fit">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.95 2.68 3.22 1.24.22 2.5.34 3.79.34 1.29 0 2.55-.12 3.79-.34 1.56-.27 2.68-1.63 2.68-3.22V8.25A3.75 3.75 0 0012.75 4.5h-1.5a3.75 3.75 0 00-3.75 3.75v5.27h-.001z">
+                    </path>
+                </svg>
+                Community Feedback
+            </div>
+            <h1 class="text-3xl md:text-5xl font-display font-semibold tracking-tight text-white">
+                Suggestions & Status
+            </h1>
+            <p class="text-gray-400 text-sm md:text-base leading-relaxed">
+                Browse user proposals, track resolution status, or submit your own ideas for the RBWR APRM Overlay.
+            </p>
+        </div>
+
+        <a href="#submit-section"
+            class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-sm tracking-wide shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+            </svg>
+            Submit Suggestion
+        </a>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-gray-500">Total Entries</span>
+            <span id="stat-total" class="text-2xl font-bold font-display text-white">0</span>
+        </div>
+        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80">Pending Review</span>
+            <span id="stat-pending" class="text-2xl font-bold font-display text-amber-400">0</span>
+        </div>
+        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80">Considering</span>
+            <span id="stat-considering" class="text-2xl font-bold font-display text-indigo-400">0</span>
+        </div>
+        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80">Accepted</span>
+            <span id="stat-accepted" class="text-2xl font-bold font-display text-emerald-400">0</span>
+        </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div class="premium-glass p-1.5 rounded-xl flex flex-wrap gap-1 text-xs font-medium border border-white/5">
+            <button onclick="filterStatus('all')" id="tab-all"
+                class="px-4 py-2 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white">All</button>
+            <button onclick="filterStatus('pending')" id="tab-pending"
+                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Pending</button>
+            <button onclick="filterStatus('considering')" id="tab-considering"
+                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Considering</button>
+            <button onclick="filterStatus('accepted')" id="tab-accepted"
+                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Accepted</button>
+            <button onclick="filterStatus('declined')" id="tab-declined"
+                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Declined</button>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="relative flex-1 sm:w-64">
+                <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
+                </svg>
+                <input type="text" id="search-input" oninput="handleSearch()" placeholder="Search suggestions..."
+                    class="premium-input pl-9 pr-4 py-2 rounded-xl text-xs w-full font-mono outline-none">
+            </div>
+
+            <select id="sort-select" onchange="handleSortChange()"
+                class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none cursor-pointer">
+                <option value="desc">Newest First</option>
+                <option value="asc">Oldest First</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="suggestions-feed" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+    <div id="empty-state"
+        class="hidden text-center py-16 flex flex-col items-center gap-3 border border-white/5 rounded-2xl bg-surface/50">
+        <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
+        </svg>
+        <p class="text-sm text-gray-400 font-mono">No suggestions found matching the current filter.</p>
+    </div>
+
+    <div id="submit-section" class="mt-8 border-t border-white/5 pt-12 flex flex-col gap-6">
+        <div class="flex flex-col gap-1">
+            <h2 class="text-2xl font-display font-semibold text-white">Have a feature request or feedback?</h2>
+            <p class="text-sm text-gray-400">Submit your suggestion directly to our project backlog.</p>
+        </div>
+
+        <div class="premium-glass p-6 md:p-8 rounded-2xl border border-white/5">
+            <form id="public-suggestion-form" class="flex flex-col gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div class="flex flex-col gap-2 group">
+                        <label for="submit-name"
+                            class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">Your
+                            Name / Handle (Optional)</label>
+                        <input type="text" id="submit-name" placeholder="Leave blank for Anonymous"
+                            class="premium-input px-4 py-3 rounded-xl text-sm font-mono h-11">
+                    </div>
+                    <div class="flex items-center pt-2 md:pt-6">
+                        <label
+                            class="flex items-center gap-3 cursor-pointer group text-sm font-medium text-gray-400 hover:text-gray-300 transition-colors">
+                            <input type="checkbox" id="submit-anonymous" class="premium-checkbox">
+                            <span>Submit as Anonymous</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2 group">
+                    <label for="submit-suggestion"
+                        class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">Suggestion
+                        Details</label>
+                    <textarea id="submit-suggestion" required rows="4"
+                        placeholder="Describe your suggestion or feature idea..."
+                        class="premium-input px-4 py-3 rounded-xl text-sm font-mono resize-none"></textarea>
+                </div>
+
+                <div id="submit-form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
+
+                <div class="flex justify-end">
+                    <button type="submit" id="submit-form-btn"
+                        class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm tracking-wide shadow-lg shadow-blue-500/10">
+                        Submit Feedback
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allSuggestions = {{ suggestions | tojson | safe }};
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let sortOrder = 'desc';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateStats();
+        renderSuggestions();
+
+        document.getElementById('public-suggestion-form').addEventListener('submit', handleFormSubmit);
+    });
+
+    function updateStats() {
+        document.getElementById('stat-total').innerText = allSuggestions.length;
+        document.getElementById('stat-pending').innerText = allSuggestions.filter(s => (s.status || 'pending').toLowerCase() === 'pending').length;
+        document.getElementById('stat-considering').innerText = allSuggestions.filter(s => (s.status || '').toLowerCase() === 'considering').length;
+        document.getElementById('stat-accepted').innerText = allSuggestions.filter(s => ['accepted', 'in-progress', 'completed'].includes((s.status || '').toLowerCase())).length;
+    }
+
+    function filterStatus(status) {
+        currentFilter = status;
+
+        ['all', 'pending', 'considering', 'accepted', 'declined'].forEach(tab => {
+            const btn = document.getElementById('tab-' + tab);
+            if (!btn) return;
+            if (tab === status) {
+                btn.className = 'px-4 py-2 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white';
+            } else {
+                btn.className = 'px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5';
+            }
+        });
+
+        renderSuggestions();
+    }
+
+    function handleSearch() {
+        searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+        renderSuggestions();
+    }
+
+    function handleSortChange() {
+        sortOrder = document.getElementById('sort-select').value;
+        renderSuggestions();
+    }
+
+    function formatTimestamp(isoStr) {
+        if (!isoStr) return 'Recently';
+        try {
+            const date = new Date(isoStr);
+            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            return isoStr;
+        }
+    }
+
+    function getStatusBadge(statusStr) {
+        const s = (statusStr || 'pending').toLowerCase();
+        if (s === 'accepted' || s === 'completed' || s === 'in-progress') {
+            return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Accepted
+            </span>`;
+        } else if (s === 'considering') {
+            return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Considering
+            </span>`;
+        } else if (s === 'declined' || s === 'rejected') {
+            return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Declined
+            </span>`;
+        } else {
+            return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pending Review
+            </span>`;
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderSuggestions() {
+        const feed = document.getElementById('suggestions-feed');
+        const emptyState = document.getElementById('empty-state');
+
+        let filtered = allSuggestions.filter(item => {
+            const status = (item.status || 'pending').toLowerCase();
+            if (currentFilter !== 'all') {
+                if (currentFilter === 'accepted') {
+                    if (!['accepted', 'completed', 'in-progress'].includes(status)) return false;
+                } else if (status !== currentFilter) {
+                    return false;
+                }
+            }
+
+            if (searchQuery) {
+                const nameMatch = (item.name || '').toLowerCase().includes(searchQuery);
+                const textMatch = (item.suggestion || '').toLowerCase().includes(searchQuery);
+                if (!nameMatch && !textMatch) return false;
+            }
+
+            return true;
+        });
+
+        filtered.sort((a, b) => {
+            const tA = new Date(a.timestamp || 0).getTime();
+            const tB = new Date(b.timestamp || 0).getTime();
+            return sortOrder === 'asc' ? tA - tB : tB - tA;
+        });
+
+        if (filtered.length === 0) {
+            feed.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        feed.innerHTML = filtered.map(item => `
+            <div class="premium-glass interactive-card p-6 rounded-2xl flex flex-col justify-between gap-4 border border-white/5">
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono text-gray-300 font-bold">
+                                ${escapeHtml(item.name.charAt(0).toUpperCase())}
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-sm font-semibold text-white tracking-wide">${escapeHtml(item.name)}</span>
+                                <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
+                            </div>
+                        </div>
+                        ${getStatusBadge(item.status)}
+                    </div>
+                    <p class="text-sm text-gray-300 font-mono leading-relaxed bg-black/20 p-4 rounded-xl border border-white/5 whitespace-pre-wrap">${escapeHtml(item.suggestion)}</p>
+                </div>
+                <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
+                    <span>ID: #${item.id}</span>
+                    <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+
+        const nameInput = document.getElementById('submit-name');
+        const anonCheckbox = document.getElementById('submit-anonymous');
+        const sugInput = document.getElementById('submit-suggestion');
+        const statusDiv = document.getElementById('submit-form-status');
+        const submitBtn = document.getElementById('submit-form-btn');
+
+        const payload = {
+            name: anonCheckbox.checked ? "Anonymous" : nameInput.value.trim(),
+            suggestion: sugInput.value.trim(),
+            anonymous: anonCheckbox.checked
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Submitting...";
+        statusDiv.classList.add('hidden');
+
+        try {
+            const res = await fetch('/suggestions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-emerald-950/20 text-emerald-400 border border-emerald-500/20';
+                statusDiv.innerText = "Success: Suggestion submitted successfully!";
+                statusDiv.classList.remove('hidden');
+
+                nameInput.value = '';
+                sugInput.value = '';
+                anonCheckbox.checked = false;
+
+                const refreshRes = await fetch('/api/suggestions');
+                if (refreshRes.ok) {
+                    const freshData = await refreshRes.json();
+                    allSuggestions = freshData.suggestions || [];
+                    updateStats();
+                    renderSuggestions();
+                }
+            } else {
+                const errorMsg = data.detail || "Server error while processing suggestion.";
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-red-950/20 text-red-400 border border-red-500/20';
+                statusDiv.innerText = `Error: ${errorMsg}`;
+                statusDiv.classList.remove('hidden');
+            }
+        } catch (err) {
+            statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-red-950/20 text-red-400 border border-red-500/20';
+            statusDiv.innerText = "Error: Failed to connect to server.";
+            statusDiv.classList.remove('hidden');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Submit Feedback";
+        }
+    }
+</script>
+{% endblock %}

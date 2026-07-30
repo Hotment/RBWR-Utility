@@ -342,6 +342,21 @@ def save_suggestions(data):
     with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
+def get_public_suggestions():
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    public_list = []
+    for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
+        public_list.append({
+            "id": s.get("id"),
+            "name": s.get("name", "Anonymous"),
+            "suggestion": s.get("suggestion", ""),
+            "timestamp": s.get("timestamp", ""),
+            "status": s.get("status", "pending")
+        })
+    return public_list
+
+
 def load_crashes():
     if not os.path.exists(CRASHES_FILE):
         return {"crashes": []}
@@ -523,7 +538,22 @@ def download_version_file(version):
         
     return send_from_directory(FILES_DIR, filename, as_attachment=True)
 
-@app.route("/suggestions", methods=["POST"])
+@app.route("/suggestions", methods=["GET", "POST"])
+def suggestions_route():
+    if request.method == "POST":
+        return submit_suggestion()
+    
+    if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
+        return jsonify({"suggestions": get_public_suggestions()})
+        
+    data = load_versions()
+    latest_ver = data.get("latest", "1.5.5")
+    return render_template("suggestions.html", latest_version=latest_ver, suggestions=get_public_suggestions())
+
+@app.route("/api/suggestions", methods=["GET"])
+def get_suggestions_api():
+    return jsonify({"suggestions": get_public_suggestions()})
+
 def submit_suggestion():
     ip = request.remote_addr or "unknown"
     forwarded = request.headers.get("X-Forwarded-For")

@@ -34,6 +34,11 @@
         }
     </script>
     <style>
+        html {
+            scrollbar-gutter: stable;
+            scroll-behavior: smooth;
+        }
+
         body {
             background-color: #0a0a0c;
             color: #f3f4f6;
@@ -104,16 +109,21 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: rgba(11, 13, 18, 0.5);
+            background: #0a0a0c;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: rgba(59, 130, 246, 0.2);
+            background: rgba(59, 130, 246, 0.25);
             border-radius: 3px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.5);
+        }
+
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(59, 130, 246, 0.25) #0a0a0c;
         }
     </style>
 </head>
@@ -183,6 +193,19 @@
                 <span>Manage Admins</span>
             </a>
             {% endif %}
+
+            <div class="h-px bg-white/5 my-2"></div>
+
+            <a href="/"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group text-slate-400 hover:text-white hover:bg-white/5 border border-transparent">
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition" fill="none"
+                    stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h7.5">
+                    </path>
+                </svg>
+                <span>Main Site</span>
+            </a>
         </nav>
 
         <div class="p-4 border-t border-white/5 bg-background flex flex-col gap-2">
@@ -194,8 +217,15 @@
                 </span>
             </div>
             <div class="text-xs font-mono text-slate-300 font-bold truncate">{{ username }}</div>
+            <a href="/"
+                class="mt-2 text-center py-2 border border-white/10 hover:border-blue-500/50 hover:bg-blue-950/20 text-slate-300 hover:text-white rounded text-[10px] font-mono tracking-wider uppercase transition flex items-center justify-center gap-1.5">
+                <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path>
+                </svg>
+                Return to Main Site
+            </a>
             <a href="/admin/logout"
-                class="mt-2 text-center py-2 border border-red-950/40 hover:border-red-500 hover:bg-red-950/10 text-red-500 rounded text-[10px] font-mono tracking-wider uppercase transition">
+                class="text-center py-2 border border-red-950/40 hover:border-red-500 hover:bg-red-950/10 text-red-500 rounded text-[10px] font-mono tracking-wider uppercase transition">
                 Logout Session
             </a>
         </div>
@@ -271,11 +301,15 @@
                     <h2 class="text-xl font-bold tracking-wide text-white font-display">Suggestions</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Review feedback and manage user requests.</p>
                 </div>
-                <div
-                    class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
-                    <div>ACTIVE BANS: <span id="sug-stat-active-bans" class="text-rose-400">0</span></div>
-                    <div class="w-px bg-white/5 self-stretch"></div>
-                    <div>TOTAL ENTRIES: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        <div>ACTIVE BANS: <span id="sug-stat-active-bans" class="text-rose-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>TOTAL ENTRIES: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
+                    </div>
+                    <a href="/"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
                 </div>
             </header>
 
@@ -321,11 +355,15 @@
                     <h2 class="text-xl font-bold tracking-wide text-rose-500 font-display">Crash Reports</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">View error tracebacks and diagnostic logs.</p>
                 </div>
-                <div
-                    class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
-                    <div>ACTIVE BANS: <span id="crash-stat-active-bans" class="text-rose-400">0</span></div>
-                    <div class="w-px bg-white/5 self-stretch"></div>
-                    <div>TOTAL REPORTS: <span id="crash-stat-total-entries" class="text-blue-400">0</span></div>
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        <div>ACTIVE BANS: <span id="crash-stat-active-bans" class="text-rose-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>TOTAL REPORTS: <span id="crash-stat-total-entries" class="text-blue-400">0</span></div>
+                    </div>
+                    <a href="/"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
                 </div>
             </header>
 
@@ -342,6 +380,10 @@
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-white font-display">Admin Accounts</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Manage administrator accounts and permissions.</p>
+                </div>
+                <div class="flex gap-4 font-mono text-xs">
+                    <a href="/"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition">Home Site</a>
                 </div>
             </header>
 
