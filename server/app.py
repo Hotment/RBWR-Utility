@@ -27,39 +27,44 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 os.makedirs(FILES_DIR, exist_ok=True)
 load_dotenv()
 
+import sys
 import logging
+from logging.handlers import RotatingFileHandler
+from logger import CustomConsoleFormatter, PlainTextFormatter
 
-class CustomFormatter(logging.Formatter):
-    LEVEL_COLORS = {
-        logging.DEBUG: "\033[34m",
-        logging.INFO: "\033[0m",
-        logging.WARNING: "\033[33m",
-        logging.ERROR: "\033[31m",
-        logging.CRITICAL: "\033[37;41m",
-    }
-
-    def format(self, record):
-        log_color = self.LEVEL_COLORS.get(record.levelno, "\033[0m")
-        log_message = super().format(record)
-        return f"{log_color}{log_message.encode(errors='replace').decode()}\033[0m"
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "server.log")
 
 log_format = '[%(asctime)s | %(levelname)s | %(name)s]: %(message)s'
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(CustomFormatter(log_format))
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setFormatter(CustomConsoleFormatter(log_format))
 
-gunicorn_error_logger = logging.getLogger('gunicorn.error')
+file_handler = RotatingFileHandler(
+    LOG_FILE,
+    maxBytes=5 * 1024 * 1024,  # 5 MB limit per log file
+    backupCount=5,              # 5 backup log files
+    encoding='utf-8'
+)
+file_handler.setFormatter(PlainTextFormatter(log_format))
+file_handler.setLevel(logging.INFO)
 
 app = Flask(
     __name__,
     template_folder="templates"
 )
-app.logger.handlers = [stream_handler]
+app.logger.handlers = [stream_handler, file_handler]
 app.logger.propagate = False
 app.logger.setLevel(logging.INFO)
 
+gunicorn_error_logger = logging.getLogger('gunicorn.error')
+if gunicorn_error_logger.handlers:
+    gunicorn_error_logger.addHandler(file_handler)
+
 werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.handlers = []
+werkzeug_logger.handlers = [stream_handler, file_handler]
+werkzeug_logger.setLevel(logging.INFO)
 
 logger = app.logger.getChild("main")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
