@@ -668,6 +668,21 @@
             if (crashTotal) crashTotal.innerText = data.crashes.length;
         }
 
+        function formatTimestamp(isoStr) {
+            if (!isoStr) return 'N/A';
+            try {
+                let cleanStr = String(isoStr).trim();
+                if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.match(/-\d{2}:?\d{2}$/)) {
+                    cleanStr += 'Z';
+                }
+                const date = new Date(cleanStr);
+                if (isNaN(date.getTime())) return isoStr;
+                return date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return isoStr;
+            }
+        }
+
         function renderBannedIps(bans) {
             const container = document.getElementById('banned-ips-container');
             if (!container) return;
@@ -680,7 +695,7 @@
             let html = '';
             for (const ip of ipList) {
                 const info = bans[ip];
-                const expires = info.expires_at ? info.expires_at.replace('T', ' ').substring(0, 16) : "Permanent";
+                const expires = info.expires_at ? formatTimestamp(info.expires_at) : "Permanent";
                 html += `
                     <div class="bg-rose-950/10 p-3 rounded-lg border border-rose-500/10 text-xs font-mono">
                         <div class="flex justify-between items-center mb-1">
@@ -705,7 +720,7 @@
 
             let html = '';
             for (const s of suggestions) {
-                const timeStr = (s.timestamp || '').substring(0, 19).replace('T', ' ');
+                const timeStr = formatTimestamp(s.timestamp);
                 const isBanned = s.ip in bannedIps;
                 const hasComment = Boolean(s.admin_comment && s.admin_comment.trim());
 
@@ -727,7 +742,7 @@
                     <div class="bg-blue-950/20 border border-blue-500/20 rounded-lg p-3 text-xs font-mono text-blue-200 flex flex-col gap-1">
                         <div class="flex justify-between items-center text-[10px] text-blue-400 font-bold uppercase">
                             <span>💬 Admin Response (${escapeHtml(s.comment_by || 'Admin')})</span>
-                            <span>${s.comment_timestamp ? s.comment_timestamp.substring(0, 16).replace('T', ' ') : ''}</span>
+                            <span>${formatTimestamp(s.comment_timestamp)}</span>
                         </div>
                         <p class="text-xs text-slate-300 whitespace-pre-wrap">${escapeHtml(s.admin_comment)}</p>
                     </div>
@@ -838,7 +853,7 @@
 
             let html = '';
             for (const c of crashes) {
-                const timeStr = (c.timestamp || '').substring(0, 19).replace('T', ' ');
+                const timeStr = formatTimestamp(c.timestamp);
                 const isBanned = c.ip in bannedIps;
 
                 const banBtn = isBanned
@@ -971,7 +986,7 @@
 
                 let html = '';
                 for (const admin of admins) {
-                    const timeStr = admin.created_at ? admin.created_at.substring(0, 19).replace('T', ' ') : "N/A";
+                    const timeStr = formatTimestamp(admin.created_at);
                     html += `
                         <div class="bg-black/20 p-4 rounded-lg border border-white/5 flex justify-between items-center text-xs font-mono">
                             <div>

@@ -208,8 +208,13 @@
     function formatTimestamp(isoStr) {
         if (!isoStr) return 'Recently';
         try {
-            const date = new Date(isoStr);
-            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            let cleanStr = String(isoStr).trim();
+            if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.match(/-\d{2}:?\d{2}$/)) {
+                cleanStr += 'Z';
+            }
+            const date = new Date(cleanStr);
+            if (isNaN(date.getTime())) return isoStr;
+            return date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         } catch (e) {
             return isoStr;
         }
