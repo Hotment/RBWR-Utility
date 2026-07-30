@@ -951,13 +951,25 @@ def admin_logout():
 
 _singleton_socket = None
 
+def close_singleton_socket():
+    global _singleton_socket
+    if _singleton_socket:
+        try:
+            _singleton_socket.close()
+        except Exception:
+            pass
+        _singleton_socket = None
+
 def is_singleton():
+    global _singleton_socket
+    if _singleton_socket is not None:
+        return True
     try:
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('127.0.0.1', 8405))
         s.listen(1)
-        global _singleton_socket
         _singleton_socket = s
         return True
     except Exception:
@@ -972,6 +984,7 @@ def start_console_handler():
         import subprocess
         import signal
         import sys
+        import time
         
         handler = InputHandler(logger=app.logger)
         
@@ -996,11 +1009,13 @@ def start_console_handler():
                 
             try:
                 is_gunicorn = "gunicorn" in os.environ.get("SERVER_SOFTWARE", "").lower()
+                close_singleton_socket()
                 if is_gunicorn:
                     safe_print("Sending SIGHUP to Gunicorn master process...")
                     os.kill(os.getppid(), signal.SIGHUP)
                 else:
                     safe_print("Restarting local Flask server via execv...")
+                    time.sleep(0.2)
                     os.execv(sys.executable, [sys.executable] + sys.argv)
             except Exception as e:
                 safe_print(f"Error restarting server: {e}")
