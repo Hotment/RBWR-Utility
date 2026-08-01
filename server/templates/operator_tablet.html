@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Operator Tablet - Telemetry & Monitoring{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Tablet Outer Frame Styling */
+    .tablet-bezel {
+        background: #0f1013;
+        border: 14px solid #1a1b20;
+        border-radius: 36px;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9),
+            inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+            0 0 40px rgba(0, 0, 0, 0.8);
+        position: relative;
+    }
+
+    /* Tablet Camera/Sensor Notch on Left */
+    .tablet-camera-notch {
+        position: absolute;
+        left: -12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 10px;
+        height: 48px;
+        background: #090a0d;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .tablet-lens {
+        position: absolute;
+        left: -8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 6px;
+        height: 6px;
+        background: #111a2e;
+        border: 1px solid #1e293b;
+        border-radius: 50%;
+    }
+
+    /* Tablet Display Screen */
+    .tablet-screen {
+        background-color: #8c8c8c;
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Tablet Header & Tabs */
+    .tablet-header {
+        background-color: #000000;
+        color: #ffffff;
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 800;
+        font-size: 1.25rem;
+        letter-spacing: 1px;
+    }
+
+    .tablet-tab-bar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        background-color: #000000;
+        padding: 4px;
+        border-bottom: 3px solid #000000;
+    }
+
+    .tablet-tab {
+        background-color: #b0b0b0;
+        color: #1a1a1a;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 10px 4px;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s ease;
+        border: 2px solid #5a5a5a;
+        border-bottom: none;
+        border-radius: 2px 2px 0 0;
+    }
+
+    .tablet-tab:hover {
+        background-color: #c5c5c5;
+    }
+
+    .tablet-tab.active {
+        background-color: #e2e2e2;
+        color: #000000;
+        border-color: #000000;
+        border-bottom: 2px solid #e2e2e2;
+        box-shadow: inset 0 2px 0 #ffffff;
+    }
+
+    /* Search Box */
+    .tablet-search-container {
+        background-color: #8c8c8c;
+        padding: 12px 14px;
+        border-bottom: 3px solid #000000;
+    }
+
+    .tablet-search-input {
+        width: 100%;
+        background-color: #ffffff;
+        border: 3px solid #4a4a4a;
+        padding: 8px 16px;
+        font-size: 1.4rem;
+        font-weight: 400;
+        color: #333333;
+        text-align: center;
+        outline: none;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .tablet-search-input::placeholder {
+        color: #777777;
+        font-style: italic;
+    }
+
+    /* Item Parameter Table Rows */
+    .tablet-rows-container {
+        background-color: #8c8c8c;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 320px;
+        overflow-y: auto;
+    }
+
+    .tablet-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #bebebe;
+        border: 2px solid #000000;
+        padding: 6px 12px;
+        border-radius: 2px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .tablet-row-label {
+        font-weight: 700;
+        color: #000000;
+        font-size: 1.05rem;
+        letter-spacing: 0.2px;
+    }
+
+    .tablet-row-value-box {
+        background-color: #ffffff;
+        border: 2px solid #666666;
+        min-width: 180px;
+        max-width: 280px;
+        padding: 4px 16px;
+        text-align: center;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .tablet-row-value {
+        font-weight: 800;
+        color: #0000d6;
+        font-size: 1.15rem;
+        font-family: 'Segoe UI', Tahoma, monospace;
+        word-break: break-all;
+    }
+
+    /* Custom Scrollbar for Tablet Container */
+    .tablet-rows-container::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .tablet-rows-container::-webkit-scrollbar-track {
+        background: #757575;
+    }
+
+    .tablet-rows-container::-webkit-scrollbar-thumb {
+        background: #404040;
+        border-radius: 4px;
+        border: 2px solid #757575;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- Top Server Selector & Help Card -->
+    <div class="mb-6 bg-surfaceElevated border border-border p-5 rounded-2xl shadow-xl backdrop-blur-md">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
+                    <span class="inline-block w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    RBWR Operator Tablet Telemetry
+                </h1>
+                <p class="text-xs text-gray-400 mt-1">
+                    Enter your server's <code
+                        class="text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40">Job ID</code>
+                    (available by running <span class="text-amber-300 font-mono">!serverinfo</span> in Roblox game).
+                </p>
+            </div>
+
+            <!-- Job ID Input & Autocomplete Combobox -->
+            <div class="w-full md:w-96 relative">
+                <label for="jobIdInput"
+                    class="block text-[11px] font-medium text-gray-400 mb-1 tracking-wider uppercase">Select / Enter Job
+                    ID</label>
+                <div class="relative">
+                    <input type="text" id="jobIdInput" list="jobIdDatalist" autocomplete="off"
+                        placeholder="Paste or select Job ID..."
+                        class="w-full bg-background border border-white/15 focus:border-blue-500 text-white text-sm rounded-xl px-3.5 py-2.5 outline-none font-mono transition-all">
+                    <button id="refreshApiBtn" title="Refresh Servers API"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+                <datalist id="jobIdDatalist">
+                    <!-- Populated dynamically from API -->
+                </datalist>
+            </div>
+        </div>
+
+        <!-- Connection / Status Info Bar -->
+        <div
+            class="mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between text-xs text-gray-400 gap-2">
+            <div class="flex items-center gap-4">
+                <span id="activeServersCount" class="font-mono text-zinc-300">Servers Active: --</span>
+                <span id="lastHeartbeatText" class="font-mono text-zinc-400">Last Heartbeat: --</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="statusIndicator" class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live Auto-syncing
+                </span>
+                <span class="text-zinc-600">|</span>
+                <span class="text-zinc-400">Refreshes every 1 min</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLET HARDWARE CASING ENCLOSURE -->
+    <div class="tablet-bezel p-3 md:p-5">
+        <div class="tablet-camera-notch"></div>
+        <div class="tablet-lens"></div>
+
+        <!-- TABLET DISPLAY SCREEN -->
+        <div class="tablet-screen">
+
+            <!-- HEADER -->
+            <div class="tablet-header">
+                <svg class="w-6 h-6 text-white shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                </svg>
+                <span>RBWR</span>
+            </div>
+
+            <!-- TAB BAR -->
+            <div class="tablet-tab-bar">
+                <div class="tablet-tab active" data-tab="u1" onclick="switchTab('u1')">Unit 1</div>
+                <div class="tablet-tab" data-tab="u2" onclick="switchTab('u2')">Unit 2</div>
+                <div class="tablet-tab" data-tab="misc" onclick="switchTab('misc')">Misc</div>
+            </div>
+
+            <!-- SEARCH VALUES BAR -->
+            <div class="tablet-search-container">
+                <input type="text" id="tabletSearchInput" placeholder="Search values..." class="tablet-search-input"
+                    oninput="filterTabletRows()">
+            </div>
+
+            <!-- PARAMETERS LIST CONTENT CONTAINER -->
+            <div id="tabletRowsContainer" class="tablet-rows-container">
+                <div class="py-12 text-center text-gray-700 font-bold text-lg">
+                    Loading telemetry data from server...
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // Server & Telemetry State
+    let serversData = [];
+    let currentJobId = localStorage.getItem('rbwr_job_id') || '';
+    let currentTab = 'u1';
+
+    // Unit 1 Field Map (Exact requested order)
+    const UNIT1_FIELDS = [
+        { label: 'APRM', key: 'APRM', type: 'number', dp: 2 },
+        { label: 'APRM Setpoint', key: 'APRM Setpoint', type: 'number', dp: 2 },
+        { label: 'Avg. Rod', key: 'Avg. Rod', type: 'number', dp: 2 },
+        { label: 'Reactor Temp', key: 'Reactor Temp', type: 'number', dp: 2 },
+        { label: 'Reactor Level', key: 'ReactorLevel', type: 'number', dp: 2 },
+        { label: 'Dea Level', key: 'Deareator Level', type: 'number', dp: 2 },
+        { label: 'Hotwell Level', key: 'Hotwell Level', type: 'number', dp: 2 },
+        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2 },
+        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2 },
+        { label: 'Vibrations', key: 'Vibrations', type: 'number', dp: 2 },
+        { label: 'Pressure', key: 'Pressure', type: 'number', dp: 2 },
+        { label: 'Turbine RPM', key: 'Turbine RPM', type: 'number', dp: 0 },
+        { label: 'Demand', key: 'DemandU1', type: 'number', dp: 0 },
+        { label: 'Next Demand', key: 'NextDemandU1', type: 'number', dp: 0 },
+        { label: 'Demand Time Left', key: 'Demand Time Left', type: 'number', dp: 0 },
+        { label: 'Scram Reason', key: 'SCRAMreason', type: 'string' },
+        { label: 'Trip Reason', key: 'TRIPreason', type: 'string' },
+        { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
+    ];
+
+    // Unit 2 Field Map (Exact requested order: FWP 1 & 2 temp between temp & level, Disc Ruptured between Iodine & Vibrations, Generator Temp / Casing Temp / Diff Pressure / Diesel RPM after Turbine RPM)
+    const UNIT2_FIELDS = [
+        { label: 'APRM', key: 'APRM', type: 'number', dp: 2 },
+        { label: 'APRM Setpoint', key: 'APRM Setpoint', type: 'number', dp: 2 },
+        { label: 'Avg. Rod', key: 'Avg. Rod', type: 'number', dp: 2 },
+        { label: 'Reactor Temp', key: 'Reactor Temp', type: 'number', dp: 2 },
+        { label: 'FWP 1 Temp', key: 'FWP1 Temp', type: 'number', dp: 2 },
+        { label: 'FWP 2 Temp', key: 'FWP2 Temp', type: 'number', dp: 2 },
+        { label: 'Reactor Level', key: 'ReactorLevel', type: 'number', dp: 2 },
+        { label: 'Dea Level', key: 'Deareator Level', type: 'number', dp: 2 },
+        { label: 'Hotwell Level', key: 'Hotwell Level', type: 'number', dp: 2 },
+        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2 },
+        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2 },
+        { label: 'Disc Ruptured', key: 'Disk Ruptured', type: 'bool' },
+        { label: 'Vibrations', key: 'Vibrations', type: 'number', dp: 2 },
+        { label: 'Pressure', key: 'Pressure', type: 'number', dp: 2 },
+        { label: 'Turbine RPM', key: 'Turbine RPM', type: 'number', dp: 0 },
+        { label: 'Generator Temp', key: 'GeneratorTemperature', type: 'number', dp: 2 },
+        { label: 'Casing Temp', key: 'CasingTemperature', type: 'number', dp: 2 },
+        { label: 'Diff Pressure', key: 'DiffPressure', type: 'number', dp: 4 },
+        { label: 'Diesel RPM', key: 'DieselRPM', type: 'number', dp: 0 },
+        { label: 'Demand', key: 'DemandU2', type: 'number', dp: 0 },
+        { label: 'Next Demand', key: 'NextDemandU2', type: 'number', dp: 0 },
+        { label: 'Demand Time Left', key: 'Demand Time Left', type: 'number', dp: 0 },
+        { label: 'Scram Reason', key: 'SCRAMreason', type: 'string' },
+        { label: 'Trip Reason', key: 'TRIPreason', type: 'string' },
+        { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
+    ];
+
+    // Misc Fields Map
+    const MISC_FIELDS = [
+        { label: 'Outside Temperature', key: 'Outside Temperature', type: 'number', dp: 1 },
+        { label: 'EDG Diesel Storage', key: 'EDG Diesel Storage', type: 'number', dp: 0 },
+        { label: 'Evacuation Cooldown', key: 'Evacuation Cooldown', type: 'number', dp: 0 },
+        { label: 'FSS Smoke Detected', key: 'FSS Smoke Detected', type: 'bool' },
+        { label: 'U2 FSS Force Repair', key: 'U2 FSS Force Repair', type: 'bool' },
+        { label: 'Total points/second', key: 'Total points/second', type: 'number', dp: 3 }
+    ];
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', () => {
+        const inputEl = document.getElementById('jobIdInput');
+        if (currentJobId) {
+            inputEl.value = currentJobId;
+        }
+
+        inputEl.addEventListener('input', (e) => {
+            currentJobId = e.target.value.trim();
+            localStorage.setItem('rbwr_job_id', currentJobId);
+            renderTabletData();
+        });
+
+        document.getElementById('refreshApiBtn').addEventListener('click', fetchApiData);
+
+        // Initial Fetch and start polling
+        fetchApiData();
+        setInterval(fetchApiData, 60000);
+    });
+
+    async function fetchApiData() {
+        const statusEl = document.getElementById('statusIndicator');
+        try {
+            const res = await fetch('/api/public-servers');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const json = await res.json();
+
+            if (json.success && json.data && json.data.servers) {
+                serversData = json.data.servers.filter(s => s && s.state);
+                updateDatalist();
+
+                // If no jobId selected yet, pick first server
+                if (!currentJobId && serversData.length > 0) {
+                    currentJobId = serversData[0].jobId;
+                    document.getElementById('jobIdInput').value = currentJobId;
+                    localStorage.setItem('rbwr_job_id', currentJobId);
+                }
+
+                document.getElementById('activeServersCount').innerText = `Servers Active: ${serversData.length}`;
+                statusEl.className = 'inline-flex items-center gap-1.5 text-emerald-400 font-medium';
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Auto-syncing';
+
+                renderTabletData();
+            }
+        } catch (err) {
+            console.error('Failed to fetch servers API:', err);
+            statusEl.className = 'inline-flex items-center gap-1.5 text-rose-400 font-medium';
+            statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> API Sync Error';
+        }
+    }
+
+    function updateDatalist() {
+        const datalist = document.getElementById('jobIdDatalist');
+        datalist.innerHTML = '';
+        serversData.forEach(srv => {
+            const opt = document.createElement('option');
+            opt.value = srv.jobId;
+            const u1P = srv.state?.Unit1?.APRM ? srv.state.Unit1.APRM.toFixed(1) : '0';
+            const u2P = srv.state?.Unit2?.APRM ? srv.state.Unit2.APRM.toFixed(1) : '0';
+            opt.label = `Job: ${srv.jobId.slice(0, 8)}... | U1 APRM: ${u1P}% | U2 APRM: ${u2P}%`;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function switchTab(tabName) {
+        currentTab = tabName;
+        document.querySelectorAll('.tablet-tab').forEach(el => {
+            if (el.getAttribute('data-tab') === tabName) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+        document.getElementById('tabletSearchInput').value = '';
+        renderTabletData();
+    }
+
+    function getSelectedServer() {
+        if (!currentJobId) return serversData[0] || null;
+        return serversData.find(s => s.jobId === currentJobId || s.id === currentJobId) || serversData[0] || null;
+    }
+
+    function formatFieldValue(def, rawVal, unitState) {
+        if (rawVal === undefined || rawVal === null) return 'N/A';
+
+        if (def.type === 'number') {
+            const num = parseFloat(rawVal);
+            if (isNaN(num)) return 'N/A';
+            return num.toFixed(def.dp !== undefined ? def.dp : 2);
+        }
+
+        if (def.type === 'bool') {
+            return rawVal ? 'TRUE' : 'FALSE';
+        }
+
+        if (def.type === 'string') {
+            const str = String(rawVal).trim();
+            if (!str || str === 'No Reason Given') return 'None';
+            return str;
+        }
+
+        return String(rawVal);
+    }
+
+    function renderTabletData() {
+        const container = document.getElementById('tabletRowsContainer');
+        const srv = getSelectedServer();
+
+        if (!srv) {
+            container.innerHTML = `
+                <div class="py-12 text-center text-gray-800 font-bold text-lg">
+                    No active server matching Job ID found. Select a valid Job ID from autocomplete above.
+                </div>`;
+            document.getElementById('lastHeartbeatText').innerText = 'Last Heartbeat: N/A';
+            return;
+        }
+
+        // Update Heartbeat
+        if (srv.lastHeartbeat) {
+            const date = new Date(srv.lastHeartbeat);
+            document.getElementById('lastHeartbeatText').innerText = `Last Heartbeat: ${date.toLocaleTimeString()}`;
+        }
+
+        let fieldsMap = [];
+        let unitData = {};
+
+        if (currentTab === 'u1') {
+            fieldsMap = UNIT1_FIELDS;
+            unitData = srv.state?.Unit1 || {};
+        } else if (currentTab === 'u2') {
+            fieldsMap = UNIT2_FIELDS;
+            unitData = srv.state?.Unit2 || {};
+        } else if (currentTab === 'misc') {
+            fieldsMap = MISC_FIELDS;
+            unitData = srv.state?.Misc || {};
+        }
+
+        const filterQuery = (document.getElementById('tabletSearchInput').value || '').toLowerCase().trim();
+
+        let html = '';
+        let matchCount = 0;
+
+        fieldsMap.forEach(field => {
+            if (filterQuery && !field.label.toLowerCase().includes(filterQuery) && !field.key.toLowerCase().includes(filterQuery)) {
+                return;
+            }
+            matchCount++;
+            const rawVal = unitData[field.key];
+            const displayVal = formatFieldValue(field, rawVal, unitData);
+
+            html += `
+                <div class="tablet-row" data-label="${field.label.toLowerCase()}">
+                    <div class="tablet-row-label">${field.label}</div>
+                    <div class="tablet-row-value-box">
+                        <div class="tablet-row-value">${displayVal}</div>
+                    </div>
+                </div>`;
+        });
+
+        if (matchCount === 0) {
+            html = `<div class="py-8 text-center text-gray-800 font-bold text-base">No parameters match "${filterQuery}"</div>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function filterTabletRows() {
+        renderTabletData();
+    }
+</script>
+{% endblock %}

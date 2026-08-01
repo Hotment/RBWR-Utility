@@ -190,6 +190,7 @@
                 <a href="/" class="{% if request.path == '/' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Home</a>
                 <a href="/calculator" class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Web Calculator</a>
                 <a href="/points" class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Points Calculator</a>
+                <a href="/tablet" class="{% if request.path in ['/tablet', '/operator-tablet'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Operator Tablet</a>
                 <a href="/suggestions" class="{% if request.path == '/suggestions' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Suggestions</a>
                 <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest" target="_blank"
                     class="hover:text-white transition-colors">Download App</a>
@@ -202,6 +203,7 @@
                 <a href="/" class="px-2 py-1.5 {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
                 <a href="/calculator" class="px-2 py-1.5 {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web Calc</a>
                 <a href="/points" class="px-2 py-1.5 {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
+                <a href="/tablet" class="px-2 py-1.5 {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
                 <a href="/suggestions" class="px-2 py-1.5 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
                 <a href="/admin/suggestions" class="px-2 py-1.5 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
                 {% endblock %}

@@ -507,6 +507,23 @@ def points_page():
     latest_ver = data.get("latest", "1.5.5")
     return render_template("points.html", latest_version=latest_ver)
 
+@app.route("/tablet", methods=["GET"])
+@app.route("/operator-tablet", methods=["GET"])
+def operator_tablet_page():
+    data = load_versions()
+    latest_ver = data.get("latest", "1.5.5")
+    return render_template("operator_tablet.html", latest_version=latest_ver)
+
+@app.route("/api/public-servers", methods=["GET"])
+def proxy_public_servers():
+    try:
+        resp = requests.get("https://realisticbwr.org/api/public/servers", headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"}, timeout=10)
+        return Response(resp.content, status=resp.status_code, content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        logger.error(f"Error fetching public servers API: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/version/latest", methods=["GET"])
 def get_latest_version():
     data = load_versions()
