@@ -7,6 +7,8 @@ import requests
 import hashlib
 import binascii
 from dotenv import load_dotenv
+import time
+import threading
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 from urllib.parse import quote
@@ -514,15 +516,45 @@ def operator_tablet_page():
     latest_ver = data.get("latest", "1.5.5")
     return render_template("operator_tablet.html", latest_version=latest_ver)
 
+_servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
+_cache_lock = threading.Lock()
+
 @app.route("/api/public-servers", methods=["GET"])
+@app.route("/public-servers", methods=["GET"])
 def proxy_public_servers():
+    now = time.time()
+    with _cache_lock:
+        if _servers_cache["data"] is not None and (now - _servers_cache["timestamp"]) < 120:
+            return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
+
     try:
-        resp = requests.get("https://realisticbwr.org/api/public/servers", headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"}, timeout=10)
-        return Response(resp.content, status=resp.status_code, content_type=resp.headers.get("Content-Type", "application/json"))
+        resp = requests.get(
+            "https://realisticbwr.org/api/public/servers",
+            headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"},
+            timeout=10
+        )
+        content = resp.content
+        status_code = resp.status_code
+        content_type = resp.headers.get("Content-Type", "application/json")
+
+        if status_code == 200:
+            with _cache_lock:
+                _servers_cache["data"] = content
+                _servers_cache["timestamp"] = time.time()
+                _servers_cache["content_type"] = content_type
+                _servers_cache["status_code"] = status_code
+            return Response(content, status=status_code, content_type=content_type)
+        else:
+            with _cache_lock:
+                if _servers_cache["data"] is not None:
+                    return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
+            return Response(content, status=status_code, content_type=content_type)
     except Exception as e:
         logger.error(f"Error fetching public servers API: {e}")
+        with _cache_lock:
+            if _servers_cache["data"] is not None:
+                return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @app.route("/version/latest", methods=["GET"])
 def get_latest_version():
