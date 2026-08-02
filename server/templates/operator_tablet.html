@@ -190,8 +190,6 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 py-8">
-
-    <!-- Top Server Selector & Help Card -->
     <div class="mb-6 bg-surfaceElevated border border-border p-5 rounded-2xl shadow-xl backdrop-blur-md">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -206,7 +204,6 @@
                 </p>
             </div>
 
-            <!-- Job ID Input & Autocomplete Combobox -->
             <div class="w-full md:w-96 relative">
                 <label for="jobIdInput"
                     class="block text-[11px] font-medium text-gray-400 mb-1 tracking-wider uppercase">Select / Enter Job
@@ -224,13 +221,10 @@
                         </svg>
                     </button>
                 </div>
-                <datalist id="jobIdDatalist">
-                    <!-- Populated dynamically from API -->
-                </datalist>
+                <datalist id="jobIdDatalist"></datalist>
             </div>
         </div>
 
-        <!-- Connection / Status Info Bar -->
         <div
             class="mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between text-xs text-gray-400 gap-2">
             <div class="flex items-center gap-4">
@@ -247,15 +241,11 @@
         </div>
     </div>
 
-    <!-- TABLET HARDWARE CASING ENCLOSURE -->
     <div class="tablet-bezel p-3 md:p-5">
         <div class="tablet-camera-notch"></div>
         <div class="tablet-lens"></div>
 
-        <!-- TABLET DISPLAY SCREEN -->
         <div class="tablet-screen">
-
-            <!-- HEADER -->
             <div class="tablet-header">
                 <svg class="w-6 h-6 text-white shrink-0" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
@@ -263,20 +253,17 @@
                 <span>RBWR</span>
             </div>
 
-            <!-- TAB BAR -->
             <div class="tablet-tab-bar">
                 <div class="tablet-tab active" data-tab="u1" onclick="switchTab('u1')">Unit 1</div>
                 <div class="tablet-tab" data-tab="u2" onclick="switchTab('u2')">Unit 2</div>
                 <div class="tablet-tab" data-tab="misc" onclick="switchTab('misc')">Misc</div>
             </div>
 
-            <!-- SEARCH VALUES BAR -->
             <div class="tablet-search-container">
                 <input type="text" id="tabletSearchInput" placeholder="Search values..." class="tablet-search-input"
                     oninput="filterTabletRows()">
             </div>
 
-            <!-- PARAMETERS LIST CONTENT CONTAINER -->
             <div id="tabletRowsContainer" class="tablet-rows-container">
                 <div class="py-12 text-center text-gray-700 font-bold text-lg">
                     Loading telemetry data from server...
@@ -288,12 +275,10 @@
 </div>
 
 <script>
-    // Server & Telemetry State
     let serversData = [];
     let currentJobId = localStorage.getItem('rbwr_job_id') || '';
     let currentTab = 'u1';
 
-    // Unit 1 Field Map (Exact requested order)
     const UNIT1_FIELDS = [
         { label: 'APRM', key: 'APRM', type: 'number', dp: 2 },
         { label: 'APRM Setpoint', key: 'APRM Setpoint', type: 'number', dp: 2 },
@@ -315,7 +300,6 @@
         { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
     ];
 
-    // Unit 2 Field Map (Exact requested order: FWP 1 & 2 temp between temp & level, Disc Ruptured between Iodine & Vibrations, Generator Temp / Casing Temp / Diff Pressure / Diesel RPM after Turbine RPM)
     const UNIT2_FIELDS = [
         { label: 'APRM', key: 'APRM', type: 'number', dp: 2 },
         { label: 'APRM Setpoint', key: 'APRM Setpoint', type: 'number', dp: 2 },
@@ -332,6 +316,7 @@
         { label: 'Vibrations', key: 'Vibrations', type: 'number', dp: 2 },
         { label: 'Pressure', key: 'Pressure', type: 'number', dp: 2 },
         { label: 'Turbine RPM', key: 'Turbine RPM', type: 'number', dp: 0 },
+        { label: 'Turbine Health', key: 'TurbineHealth', type: 'number', dp: 0, suffix: '%' },
         { label: 'Generator Temp', key: 'GeneratorTemperature', type: 'number', dp: 2 },
         { label: 'Casing Temp', key: 'CasingTemperature', type: 'number', dp: 2 },
         { label: 'Diff Pressure', key: 'DiffPressure', type: 'number', dp: 4 },
@@ -344,7 +329,6 @@
         { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
     ];
 
-    // Misc Fields Map
     const MISC_FIELDS = [
         { label: 'Outside Temperature', key: 'Outside Temperature', type: 'number', dp: 1 },
         { label: 'EDG Diesel Storage', key: 'EDG Diesel Storage', type: 'number', dp: 0 },
@@ -354,7 +338,6 @@
         { label: 'Total points/second', key: 'Total points/second', type: 'number', dp: 3 }
     ];
 
-    // Initialize Page
     document.addEventListener('DOMContentLoaded', () => {
         const inputEl = document.getElementById('jobIdInput');
         if (currentJobId) {
@@ -369,7 +352,6 @@
 
         document.getElementById('refreshApiBtn').addEventListener('click', fetchApiData);
 
-        // Initial Fetch and start polling
         fetchApiData();
         setInterval(fetchApiData, 60000);
     });
@@ -385,7 +367,6 @@
                 serversData = json.data.servers.filter(s => s && s.state);
                 updateDatalist();
 
-                // If no jobId selected yet, pick first server
                 if (!currentJobId && serversData.length > 0) {
                     currentJobId = serversData[0].jobId;
                     document.getElementById('jobIdInput').value = currentJobId;
@@ -442,7 +423,8 @@
         if (def.type === 'number') {
             const num = parseFloat(rawVal);
             if (isNaN(num)) return 'N/A';
-            return num.toFixed(def.dp !== undefined ? def.dp : 2);
+            const formatted = num.toFixed(def.dp !== undefined ? def.dp : 2);
+            return def.suffix ? `${formatted}${def.suffix}` : formatted;
         }
 
         if (def.type === 'bool') {
@@ -471,7 +453,6 @@
             return;
         }
 
-        // Update Heartbeat
         if (srv.lastHeartbeat) {
             const date = new Date(srv.lastHeartbeat);
             document.getElementById('lastHeartbeatText').innerText = `Last Heartbeat: ${date.toLocaleTimeString()}`;
@@ -501,7 +482,15 @@
                 return;
             }
             matchCount++;
-            const rawVal = unitData[field.key];
+            let rawVal = field.key in unitData ? unitData[field.key] : undefined;
+            if ((rawVal === undefined || rawVal === null) && field.fallbackKeys) {
+                for (let fk of field.fallbackKeys) {
+                    if (fk in unitData && unitData[fk] !== undefined && unitData[fk] !== null) {
+                        rawVal = unitData[fk];
+                        break;
+                    }
+                }
+            }
             const displayVal = formatFieldValue(field, rawVal, unitData);
 
             html += `
