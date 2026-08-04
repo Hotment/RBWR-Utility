@@ -150,7 +150,7 @@
     .tablet-row-value-box {
         background-color: #ffffff;
         border: 2px solid #666666;
-        min-width: 180px;
+        min-width: 280px;
         max-width: 280px;
         padding: 4px 16px;
         text-align: center;
@@ -201,12 +201,12 @@
             <label for="jobIdInput"
                 class="block text-[11px] font-medium text-gray-400 mb-1 tracking-wider uppercase">Select / Enter Job ID
                 or Server ID</label>
-            <div class="relative">
+            <div class="flex gap-2 items-center">
                 <input type="text" id="jobIdInput" list="jobIdDatalist" autocomplete="off"
                     placeholder="Paste or select Job ID or Server ID..."
-                    class="w-full bg-background border border-white/15 focus:border-blue-500 text-white text-sm rounded-xl px-3.5 py-2.5 outline-none font-mono transition-all">
+                    class="flex-1 min-w-0 bg-background border border-white/15 focus:border-blue-500 text-white text-sm rounded-xl px-3.5 py-2.5 outline-none font-mono transition-all">
                 <button id="refreshApiBtn" title="Refresh Servers API"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                    class="p-2.5 bg-white/5 hover:bg-white/10 border border-white/15 text-gray-300 hover:text-white rounded-xl transition-all shrink-0 flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
@@ -492,6 +492,12 @@
         if (def.type === 'number') {
             const num = parseFloat(rawVal);
             if (isNaN(num)) return 'N/A';
+            if ((def.label && def.label.includes('Demand')) || (def.key && def.key.includes('Demand'))) {
+                if (num === -4) return 'Evacuation';
+                if (num === -3) return 'RST';
+                if (num === -2) return 'LOOP';
+                if (num === -1) return 'Maintenace';
+            }
             const formatted = num.toFixed(def.dp !== undefined ? def.dp : 2);
             return def.suffix ? `${formatted}${def.suffix}` : formatted;
         }
