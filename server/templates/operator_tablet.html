@@ -281,11 +281,22 @@
     let serversData = [];
     let cachedServersData = [];
 
+    function updateUrlQueryParam(val) {
+        const url = new URL(window.location.href);
+        if (val && val.trim()) {
+            url.searchParams.set('jobId', val.trim());
+        } else {
+            url.searchParams.delete('jobId');
+        }
+        window.history.replaceState({}, '', url.toString());
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const queryJobId = urlParams.get('jobId');
     let currentJobId = (queryJobId && queryJobId.trim()) ? queryJobId.trim() : (localStorage.getItem('rbwr_job_id') || '');
-    if (queryJobId && queryJobId.trim()) {
+    if (currentJobId) {
         localStorage.setItem('rbwr_job_id', currentJobId);
+        updateUrlQueryParam(currentJobId);
     }
 
     let currentTab = 'u1';
@@ -410,6 +421,7 @@
         inputEl.addEventListener('input', (e) => {
             currentJobId = e.target.value.trim();
             localStorage.setItem('rbwr_job_id', currentJobId);
+            updateUrlQueryParam(currentJobId);
             renderTabletData();
         });
 
@@ -440,6 +452,7 @@
                     currentJobId = serversData[0].jobId;
                     document.getElementById('jobIdInput').value = currentJobId;
                     localStorage.setItem('rbwr_job_id', currentJobId);
+                    updateUrlQueryParam(currentJobId);
                 }
 
                 document.getElementById('activeServersCount').innerText = `Servers Active: ${serversData.length}`;
