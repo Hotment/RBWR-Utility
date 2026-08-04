@@ -280,7 +280,14 @@
 <script>
     let serversData = [];
     let cachedServersData = [];
-    let currentJobId = localStorage.getItem('rbwr_job_id') || '';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryJobId = urlParams.get('jobId');
+    let currentJobId = (queryJobId && queryJobId.trim()) ? queryJobId.trim() : (localStorage.getItem('rbwr_job_id') || '');
+    if (queryJobId && queryJobId.trim()) {
+        localStorage.setItem('rbwr_job_id', currentJobId);
+    }
+
     let currentTab = 'u1';
     let isTabFocused = true;
 
