@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy - RBWR Utilities{% endblock %}
+
+{% block extra_head %}
+<meta name="description"
+    content="Privacy Policy for RBWR Utilities. Details on data handling, telemetry, user suggestions, and crash reports.">
+{% endblock %}
+
+{% block content %}
+<main class="max-w-4xl mx-auto px-4 py-10">
+
+    <div class="bg-surfaceElevated border border-border p-6 sm:p-10 rounded-2xl shadow-xl backdrop-blur-md">
+        <div class="border-b border-white/10 pb-6 mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                Privacy Policy
+            </h1>
+            <p class="text-xs font-mono text-zinc-400 mt-2">
+                RBWR Utilities &bull; Last updated: {{ last_updated or 'August 2026' }}
+            </p>
+        </div>
+
+        <div class="space-y-8 text-sm text-gray-300 leading-relaxed">
+            <div>
+                <p>
+                    I am the sole developer of RBWR Utilities (<a
+                        href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
+                        class="text-blue-400 hover:underline">RBWR Thermal Calculator</a>). This Privacy Policy explains
+                    what data is collected when you use the RBWR Utilities website, Web Calculator, Operator Tablet, and
+                    Desktop Application, how that data is used, and how your privacy is protected.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    1. Information Collected & Processed
+                </h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Public Game Server Telemetry</h3>
+                        <p class="text-zinc-400">
+                            The Operator Tablet, Web Calculator, and Desktop Overlay fetch in-game telemetry data from
+                            public RBWR server endpoints (<code
+                                class="text-blue-300 font-mono">realisticbwr.org/api/public/servers</code>). This data
+                            consists strictly of public plant parameters (such as APRM setpoints, reactor temperature,
+                            turbine RPM, and demand timer values) and contains no personal user data or Roblox account
+                            identifiers.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Suggestions & Feedback Submissions</h3>
+                        <p class="text-zinc-400">
+                            When you submit a suggestion or bug report, the system saves your submission details (title,
+                            description, category), an optional contact handle/Discord username if provided voluntarily,
+                            and an anonymized hash of your IP address. The hashed IP address is used solely for rate
+                            limiting to prevent spam and cannot be linked back to your identity.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Desktop Application Error Reports</h3>
+                        <p class="text-zinc-400">
+                            If the desktop overlay application encounters an unhandled crash and you explicitly choose
+                            to click <strong class="text-white">"Send Report"</strong>, an anonymous error payload
+                            containing the application version, python runtime exception traceback, and sanitized log
+                            output is submitted. Reports contain no personal files or private system data and are used
+                            exclusively to fix software bugs.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Browser Local Storage</h3>
+                        <p class="text-zinc-400">
+                            The web applications use browser <code class="text-cyan-300 font-mono">localStorage</code>
+                            to remember preferences locally on your device (such as your last entered Job ID or selected
+                            reactor unit). This data remains on your device and is never transmitted to tracking
+                            servers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    2. Cookies & Third-Party Analytics
+                </h2>
+                <p class="text-zinc-400">
+                    I do not use tracking cookies, advertising networks, or third-party web analytics tools (such as
+                    Google Analytics). The site and tools are designed purely as functional utilities without user
+                    tracking.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    3. Data Security & Disclosure
+                </h2>
+                <p class="text-zinc-400">
+                    Submitted suggestions and crash reports are stored in secure internal data files on the server. I do
+                    not sell, trade, or share any user data with third parties.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    4. Data Deletion & Private Contact
+                </h2>
+                <p class="text-zinc-400 mb-4">
+                    If you have submitted a suggestion or report and would like it removed, or if you have questions
+                    regarding privacy, you can send a confidential message directly through the <a href="/contact"
+                        class="text-blue-400 hover:underline">Private Contact Form</a> or contact me via the <a
+                        href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
+                        class="text-blue-400 hover:underline">GitHub repository</a>.
+                </p>
+
+                <div class="flex flex-wrap gap-3 pt-2">
+                    <a href="/contact"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold font-display transition-all">
+                        Private Contact Form
+                    </a>
+                    <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
+                        class="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 rounded-xl text-xs font-semibold font-display transition-all">
+                        GitHub Repository
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</main>
+{% endblock %}

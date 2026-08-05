@@ -19,6 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR = os.path.join(BASE_DIR, "files")
 VERSIONS_FILE = os.path.join(BASE_DIR, "versions.json")
 SUGGESTIONS_FILE = os.path.join(BASE_DIR, "suggestions.json")
+CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
 BANNED_FILE = os.path.join(BASE_DIR, "banned_ips.json")
 CRASHES_FILE = os.path.join(BASE_DIR, "crashes.json")
 ADMINS_FILE = os.path.join(BASE_DIR, "admins.json")
@@ -86,10 +87,15 @@ def get_dashboard_payload_data():
     crashes = crash_data.get("crashes", [])
     crashes = sorted(crashes, key=lambda c: c.get("timestamp", ""), reverse=True)
     
+    contact_data = load_contact_messages()
+    contact_messages = contact_data.get("messages", [])
+    contact_messages = sorted(contact_messages, key=lambda m: m.get("timestamp", ""), reverse=True)
+    
     return {
         "suggestions": suggestions,
         "banned_ips": banned_ips,
-        "crashes": crashes
+        "crashes": crashes,
+        "contact_messages": contact_messages
     }
 
 def get_accounts_payload_data():
@@ -351,6 +357,19 @@ def save_suggestions(data):
     with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
+def load_contact_messages():
+    if not os.path.exists(CONTACT_MESSAGES_FILE):
+        return {"messages": []}
+    with open(CONTACT_MESSAGES_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except Exception:
+            return {"messages": []}
+
+def save_contact_messages(data):
+    with open(CONTACT_MESSAGES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
 def get_public_suggestions():
     data = load_suggestions()
     suggestions = data.get("suggestions", [])
@@ -515,6 +534,82 @@ def operator_tablet_page():
     data = load_versions()
     latest_ver = data.get("latest", "1.5.5")
     return render_template("operator_tablet.html", latest_version=latest_ver)
+
+@app.route("/privacy", methods=["GET"])
+@app.route("/privacy-policy", methods=["GET"])
+def privacy_page():
+    data = load_versions()
+    latest_ver = data.get("latest", "1.5.5")
+    privacy_file = os.path.join(TEMPLATES_DIR, "privacy.html")
+    if os.path.exists(privacy_file):
+        mtime = os.path.getmtime(privacy_file)
+        last_updated = datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%B %d, %Y")
+    else:
+        last_updated = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    return render_template("privacy.html", latest_version=latest_ver, last_updated=last_updated)
+
+@app.route("/contact", methods=["GET"])
+def contact_page():
+    data = load_versions()
+    latest_ver = data.get("latest", "1.5.5")
+    return render_template("contact.html", latest_version=latest_ver)
+
+@app.route("/api/contact", methods=["POST"])
+def submit_contact_message():
+    ip = request.remote_addr or "unknown"
+    ip_hash = hashlib.sha256(ip.encode('utf-8')).hexdigest()
+    
+    ban_data = load_banned_ips()
+    if ip_hash in ban_data.get("banned", {}):
+        return jsonify({"detail": "Access restricted."}), 403
+
+    payload = request.get_json() or {}
+    message_text = payload.get("message", "").strip()
+    if not message_text:
+        return jsonify({"detail": "Message body cannot be empty."}), 400
+
+    if len(message_text) > 2000:
+        return jsonify({"detail": "Message text exceeds maximum length of 2000 characters."}), 400
+
+    name = payload.get("name", "").strip() or "Anonymous"
+    contact_info = payload.get("contact_info", "").strip() or "N/A"
+    subject = payload.get("subject", "").strip() or "General Inquiry"
+
+    contact_data = load_contact_messages()
+    messages = contact_data.get("messages", [])
+    now_dt = datetime.now(timezone.utc)
+    one_hour_ago = now_dt - timedelta(hours=1)
+    
+    recent_count = 0
+    for m in messages:
+        if m.get("ip_hash") == ip_hash:
+            try:
+                m_dt = datetime.fromisoformat(m.get("timestamp"))
+                if m_dt > one_hour_ago:
+                    recent_count += 1
+            except Exception:
+                pass
+                
+    if recent_count >= 5:
+        return jsonify({"detail": "Rate limit exceeded. Please wait before sending another message."}), 429
+
+    msg_id = secrets.token_hex(8)
+    new_msg = {
+        "id": msg_id,
+        "timestamp": now_dt.isoformat(),
+        "name": name[:60],
+        "contact_info": contact_info[:100],
+        "subject": subject[:50],
+        "message": message_text,
+        "ip_hash": ip_hash,
+        "read": False
+    }
+
+    messages.append(new_msg)
+    save_contact_messages({"messages": messages})
+    broadcast_update("dashboard")
+
+    return jsonify({"success": True, "id": msg_id})
 
 _servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
 _cache_lock = threading.Lock()
@@ -836,6 +931,11 @@ def view_suggestions_dashboard(username):
 def view_crashes_dashboard(username):
     return render_template("admin_panel.html", username=username, active_view="crashes", is_root=is_root_user(username))
 
+@app.route("/admin/contact", methods=["GET"])
+@admin_required
+def view_contact_dashboard(username):
+    return render_template("admin_panel.html", username=username, active_view="contact", is_root=is_root_user(username))
+
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_root(username):
@@ -904,6 +1004,35 @@ def delete_admin_account(username):
         broadcast_update("accounts")
         return jsonify({"message": f"Admin account '{target_user}' removed successfully."})
     return jsonify({"detail": f"Admin account '{target_user}' not found."}), 404
+
+@app.route("/admin/contact/delete/<msg_id>", methods=["POST"])
+@admin_required
+def delete_contact_message(username, msg_id):
+    contact_data = load_contact_messages()
+    messages = contact_data.get("messages", [])
+    filtered = [m for m in messages if m.get("id") != msg_id]
+    if len(filtered) == len(messages):
+        return jsonify({"detail": "Message not found"}), 404
+    save_contact_messages({"messages": filtered})
+    broadcast_update("dashboard")
+    return jsonify({"success": True})
+
+@app.route("/admin/contact/read/<msg_id>", methods=["POST"])
+@admin_required
+def toggle_read_contact_message(username, msg_id):
+    contact_data = load_contact_messages()
+    messages = contact_data.get("messages", [])
+    found = False
+    for m in messages:
+        if m.get("id") == msg_id:
+            m["read"] = not m.get("read", False)
+            found = True
+            break
+    if not found:
+        return jsonify({"detail": "Message not found"}), 404
+    save_contact_messages({"messages": messages})
+    broadcast_update("dashboard")
+    return jsonify({"success": True})
 
 _login_attempts = {}
 

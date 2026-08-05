@@ -200,6 +200,8 @@
                     Tablet</a>
                 <a href="/suggestions"
                     class="{% if request.path == '/suggestions' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Suggestions</a>
+                <a href="/contact"
+                    class="{% if request.path == '/contact' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Contact</a>
                 <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest" target="_blank"
                     class="hover:text-white transition-colors">Download App</a>
                 <a href="/admin/suggestions"
@@ -219,6 +221,8 @@
                     class="px-2 py-1.5 {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
                 <a href="/suggestions"
                     class="px-2 py-1.5 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
+                <a href="/contact"
+                    class="px-2 py-1.5 {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
                 <a href="/admin/suggestions"
                     class="px-2 py-1.5 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
                 {% endblock %}
@@ -237,6 +241,8 @@
                 <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
                     class="hover:text-gray-300 transition-colors">Github</a>
                 <a href="/suggestions" class="hover:text-gray-300 transition-colors">Suggestions</a>
+                <a href="/contact" class="hover:text-gray-300 transition-colors">Contact</a>
+                <a href="/privacy" class="hover:text-gray-300 transition-colors">Privacy Policy</a>
                 {% block footer_links %}{% endblock %}
             </div>
         </div>
