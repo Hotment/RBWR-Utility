@@ -35,7 +35,7 @@ compile.bat
 ```
 
 ### Linux Support
-While the compiled Windows executable should run on Linux via Wine, running the application **natively from source** is highly recommended. Running under Wine can result in issues with window transparency, topmost layering (Z-ordering) transitions, or screen-capturing (OCR) features (especially under Wayland compositors).
+While the compiled Windows executable should run on Linux via Wine,this is not posible as the app uses windows only apis patch incoming ~~running the application **natively from source** is highly recommended. Running under Wine can result in issues with window transparency, topmost layering (Z-ordering) transitions, or screen-capturing (OCR) features (especially under Wayland compositors)~~.
 
 To run natively on Linux, simply clone the repository, install the dependencies using `pip install -r requirements.txt`, and run `python rbwr_overlay.py`.
 
