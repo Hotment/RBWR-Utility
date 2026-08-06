@@ -262,7 +262,7 @@
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 grow-0">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 grow-0">
                 <a href="/admin/suggestions" id="card-link-suggestions"
                     class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
@@ -302,6 +302,27 @@
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
                         View diagnostic variables, application tracebacks, logs, and system details for crashes.
+                    </p>
+                </a>
+
+                <a href="/admin/contact" id="card-link-contact"
+                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div
+                        class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20 transition duration-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-purple-400 transition duration-300">
+                            Private Messages</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed mt-2">
+                        Read confidential messages, data removal requests, and private feedback sent directly to admin.
                     </p>
                 </a>
             </div>
@@ -385,6 +406,31 @@
 
             <div id="crashes-container" class="flex flex-col gap-4">
                 <p class="text-sm text-slate-500 italic font-mono">Loading crash reports...</p>
+            </div>
+        </main>
+
+        <main id="view-contact"
+            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'contact' %}hidden{% endif %}">
+            <header
+                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display">Private Messages</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Confidential messages sent directly to the administrator.</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        <div>UNREAD: <span id="contact-stat-unread" class="text-purple-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>TOTAL MESSAGES: <span id="contact-stat-total" class="text-blue-400">0</span></div>
+                    </div>
+                    <a href="/"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
+                </div>
+            </header>
+
+            <div id="contact-messages-container" class="flex flex-col gap-4">
+                <p class="text-sm text-slate-500 italic font-mono">Loading private messages...</p>
             </div>
         </main>
 
@@ -484,6 +530,7 @@
             bindNavLink('nav-overview', 'overview', '/admin');
             bindNavLink('nav-suggestions', 'suggestions', '/admin/suggestions');
             bindNavLink('nav-crashes', 'crashes', '/admin/crashes');
+            bindNavLink('nav-contact', 'contact', '/admin/contact');
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
             }
@@ -500,6 +547,13 @@
                 cardCrash.addEventListener('click', (e) => {
                     e.preventDefault();
                     navigateToView('crashes', '/admin/crashes');
+                });
+            }
+            const cardContact = document.getElementById('card-link-contact');
+            if (cardContact) {
+                cardContact.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateToView('contact', '/admin/contact');
                 });
             }
 
@@ -529,6 +583,8 @@
                 navigateToView('crashes', path, false);
             } else if (path === '/admin/suggestions') {
                 navigateToView('suggestions', path, false);
+            } else if (path === '/admin/contact') {
+                navigateToView('contact', path, false);
             } else if (path === '/admin/accounts') {
                 if (IS_ROOT) {
                     navigateToView('accounts', path, false);
@@ -557,6 +613,8 @@
             if (activeLink) {
                 if (viewName === 'crashes') {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-rose-600/10 text-rose-500 border border-rose-500/20 transition group";
+                } else if (viewName === 'contact') {
+                    activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-purple-600/10 text-purple-400 border border-purple-500/20 transition group";
                 } else {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-blue-600/10 text-blue-500 border border-blue-500/20 transition group";
                 }
@@ -568,7 +626,7 @@
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'accounts'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'accounts'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -632,6 +690,7 @@
                         renderBannedIps(message.dashboard.banned_ips);
                         renderSuggestions(message.dashboard.suggestions);
                         renderCrashes(message.dashboard.crashes);
+                        renderContactMessages(message.dashboard.contact_messages);
 
                         if (IS_ROOT && message.accounts) {
                             renderAccounts(message.accounts.admins);
@@ -643,6 +702,7 @@
                         renderBannedIps(message.data.banned_ips);
                         renderSuggestions(message.data.suggestions);
                         renderCrashes(message.data.crashes);
+                        renderContactMessages(message.data.contact_messages);
                     } else if (message.type === 'accounts') {
                         if (IS_ROOT && message.data) {
                             renderAccounts(message.data.admins);
@@ -670,7 +730,7 @@
         }
 
         function updateStats(data) {
-            const activeBans = Object.keys(data.banned_ips).length;
+            const activeBans = Object.keys(data.banned_ips || {}).length;
 
             const sugActiveBans = document.getElementById('sug-stat-active-bans');
             if (sugActiveBans) sugActiveBans.innerText = activeBans;
@@ -679,10 +739,29 @@
             if (crashActiveBans) crashActiveBans.innerText = activeBans;
 
             const sugTotal = document.getElementById('sug-stat-total-entries');
-            if (sugTotal) sugTotal.innerText = data.suggestions.length;
+            if (sugTotal) sugTotal.innerText = (data.suggestions || []).length;
 
             const crashTotal = document.getElementById('crash-stat-total-entries');
-            if (crashTotal) crashTotal.innerText = data.crashes.length;
+            if (crashTotal) crashTotal.innerText = (data.crashes || []).length;
+
+            const contactMsgs = data.contact_messages || [];
+            const unreadCount = contactMsgs.filter(m => !m.read).length;
+
+            const contactUnreadEl = document.getElementById('contact-stat-unread');
+            if (contactUnreadEl) contactUnreadEl.innerText = unreadCount;
+
+            const contactTotalEl = document.getElementById('contact-stat-total');
+            if (contactTotalEl) contactTotalEl.innerText = contactMsgs.length;
+
+            const unreadBadge = document.getElementById('unreadContactBadge');
+            if (unreadBadge) {
+                if (unreadCount > 0) {
+                    unreadBadge.innerText = unreadCount;
+                    unreadBadge.classList.remove('hidden');
+                } else {
+                    unreadBadge.classList.add('hidden');
+                }
+            }
         }
 
         function formatTimestamp(isoStr) {
@@ -989,6 +1068,81 @@
                 }
             } catch (err) {
                 alert('Network error performing IP ban.');
+            }
+        }
+
+        function renderContactMessages(messages) {
+            const container = document.getElementById('contact-messages-container');
+            if (!container) return;
+
+            if (!messages || messages.length === 0) {
+                container.innerHTML = `<div class="cyber-panel p-8 rounded-xl text-center text-slate-500 font-mono text-sm">No private messages received yet.</div>`;
+                return;
+            }
+
+            container.innerHTML = messages.map(msg => {
+                const isRead = msg.read || false;
+                const formattedTime = formatTimestamp(msg.timestamp);
+
+                return `
+                    <div class="cyber-panel p-4 md:p-5 rounded-xl border ${isRead ? 'border-white/5 bg-surface/40 opacity-75' : 'border-purple-500/30 bg-purple-950/20'} flex flex-col gap-3 transition-all">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <span class="px-2 py-0.5 rounded ${isRead ? 'bg-zinc-800 text-zinc-400' : 'bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30'} text-[10px] font-mono uppercase tracking-wider">
+                                    ${isRead ? 'READ' : 'UNREAD'}
+                                </span>
+                                <span class="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-500/20 text-[10px] font-mono uppercase font-bold">
+                                    ${escapeHtml(msg.subject || 'General Inquiry')}
+                                </span>
+                                <span class="text-sm font-bold text-slate-200 font-display">${escapeHtml(msg.name || 'Anonymous')}</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                                <span>Contact: <strong class="text-slate-200">${escapeHtml(msg.contact_info || 'N/A')}</strong></span>
+                                <span class="text-slate-600">•</span>
+                                <span class="text-slate-500">${formattedTime}</span>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-slate-300 bg-black/25 p-3.5 rounded-lg border border-white/5 leading-relaxed font-sans whitespace-pre-wrap">${escapeHtml(msg.message || '')}</p>
+
+                        <div class="flex items-center justify-between border-t border-white/5 pt-2.5 text-xs font-mono">
+                            <div class="text-[11px] text-slate-500">ID: ${msg.id}</div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleReadContactMessage('${msg.id}')"
+                                    class="px-3 py-1 text-xs rounded-lg border ${isRead ? 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'} transition font-medium">
+                                    ${isRead ? 'Mark as Unread' : 'Mark as Read'}
+                                </button>
+                                <button onclick="deleteContactMessage('${msg.id}')"
+                                    class="px-3 py-1 text-xs rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition font-medium">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleReadContactMessage(msgId) {
+            try {
+                const res = await fetch(`/admin/contact/read/${msgId}`, { method: 'POST' });
+                if (!res.ok) {
+                    alert('Failed to toggle message status.');
+                }
+            } catch (e) {
+                console.error('Error toggling read status:', e);
+            }
+        }
+
+        async function deleteContactMessage(msgId) {
+            if (!confirm('Are you sure you want to delete this private message?')) return;
+            try {
+                const res = await fetch(`/admin/contact/delete/${msgId}`, { method: 'POST' });
+                if (!res.ok) {
+                    alert('Failed to delete message.');
+                }
+            } catch (e) {
+                console.error('Error deleting contact message:', e);
             }
         }
 
