@@ -194,6 +194,17 @@
                     class="hidden ml-auto px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold">0</span>
             </a>
 
+            <a href="/admin/bans" id="nav-bans"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'bans' %}bg-amber-600/10 text-amber-400 border border-amber-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition" fill="none"
+                    stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636">
+                    </path>
+                </svg>
+                <span>Banned IPs</span>
+            </a>
+
             {% if is_root %}
             <a href="/admin/accounts" id="nav-accounts"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'accounts' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
@@ -325,6 +336,27 @@
                         Read confidential messages, data removal requests, and private feedback sent directly to admin.
                     </p>
                 </a>
+
+                <a href="/admin/bans" id="card-link-bans"
+                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div
+                        class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition duration-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-amber-400 transition duration-300">
+                            Banned IPs</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed mt-2">
+                        View, enforce, and manage prohibited client IP addresses, durations, and prohibition reasons.
+                    </p>
+                </a>
             </div>
         </main>
 
@@ -339,8 +371,6 @@
                 <div class="flex items-center gap-4">
                     <div
                         class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
-                        <div>ACTIVE BANS: <span id="sug-stat-active-bans" class="text-rose-400">0</span></div>
-                        <div class="w-px bg-white/5 self-stretch"></div>
                         <div>TOTAL ENTRIES: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
@@ -349,36 +379,23 @@
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-                <div class="lg:col-span-1 flex flex-col gap-4">
-                    <div class="cyber-panel p-5 rounded-xl border border-white/5">
-                        <h3 class="text-xs font-bold tracking-wider text-amber-400 font-display mb-4 uppercase">Banned
-                            IPs
-                        </h3>
-                        <div id="banned-ips-container" class="flex flex-col gap-3 max-h-[450px] overflow-y-auto pr-1">
-                            <p class="text-xs text-slate-500 italic font-mono">Loading bans...</p>
-                        </div>
-                    </div>
+            <div class="flex flex-col gap-4">
+                <div
+                    class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                    <button onclick="filterStatus('all')" id="tab-all"
+                        class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase">All</button>
+                    <button onclick="filterStatus('pending')" id="tab-pending"
+                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Pending</button>
+                    <button onclick="filterStatus('considering')" id="tab-considering"
+                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Considering</button>
+                    <button onclick="filterStatus('accepted')" id="tab-accepted"
+                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Accepted</button>
+                    <button onclick="filterStatus('declined')" id="tab-declined"
+                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Declined</button>
                 </div>
 
-                <div class="lg:col-span-3 flex flex-col gap-4">
-                    <div
-                        class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
-                        <button onclick="filterStatus('all')" id="tab-all"
-                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase">All</button>
-                        <button onclick="filterStatus('pending')" id="tab-pending"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Pending</button>
-                        <button onclick="filterStatus('considering')" id="tab-considering"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Considering</button>
-                        <button onclick="filterStatus('accepted')" id="tab-accepted"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Accepted</button>
-                        <button onclick="filterStatus('declined')" id="tab-declined"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Declined</button>
-                    </div>
-
-                    <div id="feed-container" class="flex flex-col gap-4">
-                        <p class="text-sm text-slate-500 italic font-mono">Loading suggestions...</p>
-                    </div>
+                <div id="feed-container" class="flex flex-col gap-4">
+                    <p class="text-sm text-slate-500 italic font-mono">Loading suggestions...</p>
                 </div>
             </div>
         </main>
@@ -394,9 +411,11 @@
                 <div class="flex items-center gap-4">
                     <div
                         class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
-                        <div>ACTIVE BANS: <span id="crash-stat-active-bans" class="text-rose-400">0</span></div>
+                        <div>OPEN: <span id="crash-stat-open" class="text-rose-400">0</span></div>
                         <div class="w-px bg-white/5 self-stretch"></div>
-                        <div>TOTAL REPORTS: <span id="crash-stat-total-entries" class="text-blue-400">0</span></div>
+                        <div>FIXED: <span id="crash-stat-fixed" class="text-emerald-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>TOTAL: <span id="crash-stat-total-entries" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
                         class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
@@ -431,6 +450,36 @@
 
             <div id="contact-messages-container" class="flex flex-col gap-4">
                 <p class="text-sm text-slate-500 italic font-mono">Loading private messages...</p>
+            </div>
+        </main>
+
+        <main id="view-bans"
+            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'bans' %}hidden{% endif %}">
+            <header
+                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display">Banned IP Addresses</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Manage prohibited client IPs, view expiration dates, and enforce new bans.</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        <div>ACTIVE BANS: <span id="ban-stat-total" class="text-amber-400">0</span></div>
+                    </div>
+                    <button onclick="openBanModal('')"
+                        class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/30 tracking-wide font-mono font-medium text-xs transition flex items-center gap-2 shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Ban New IP
+                    </button>
+                    <a href="/"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
+                </div>
+            </header>
+
+            <div id="full-banned-ips-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <p class="text-sm text-slate-500 italic font-mono col-span-full">Loading banned IPs...</p>
             </div>
         </main>
 
@@ -531,6 +580,7 @@
             bindNavLink('nav-suggestions', 'suggestions', '/admin/suggestions');
             bindNavLink('nav-crashes', 'crashes', '/admin/crashes');
             bindNavLink('nav-contact', 'contact', '/admin/contact');
+            bindNavLink('nav-bans', 'bans', '/admin/bans');
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
             }
@@ -554,6 +604,13 @@
                 cardContact.addEventListener('click', (e) => {
                     e.preventDefault();
                     navigateToView('contact', '/admin/contact');
+                });
+            }
+            const cardBans = document.getElementById('card-link-bans');
+            if (cardBans) {
+                cardBans.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateToView('bans', '/admin/bans');
                 });
             }
 
@@ -585,6 +642,8 @@
                 navigateToView('suggestions', path, false);
             } else if (path === '/admin/contact') {
                 navigateToView('contact', path, false);
+            } else if (path === '/admin/bans') {
+                navigateToView('bans', path, false);
             } else if (path === '/admin/accounts') {
                 if (IS_ROOT) {
                     navigateToView('accounts', path, false);
@@ -615,6 +674,8 @@
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-rose-600/10 text-rose-500 border border-rose-500/20 transition group";
                 } else if (viewName === 'contact') {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-purple-600/10 text-purple-400 border border-purple-500/20 transition group";
+                } else if (viewName === 'bans') {
+                    activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-amber-600/10 text-amber-400 border border-amber-500/20 transition group";
                 } else {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-blue-600/10 text-blue-500 border border-blue-500/20 transition group";
                 }
@@ -626,7 +687,7 @@
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'accounts'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'accounts'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -735,14 +796,21 @@
             const sugActiveBans = document.getElementById('sug-stat-active-bans');
             if (sugActiveBans) sugActiveBans.innerText = activeBans;
 
-            const crashActiveBans = document.getElementById('crash-stat-active-bans');
-            if (crashActiveBans) crashActiveBans.innerText = activeBans;
-
             const sugTotal = document.getElementById('sug-stat-total-entries');
             if (sugTotal) sugTotal.innerText = (data.suggestions || []).length;
 
+            const crashes = data.crashes || [];
+            const openCrashes = crashes.filter(c => (c.status || '').toUpperCase() !== 'FIXED').length;
+            const fixedCrashes = crashes.filter(c => (c.status || '').toUpperCase() === 'FIXED').length;
+
+            const crashOpenEl = document.getElementById('crash-stat-open');
+            if (crashOpenEl) crashOpenEl.innerText = openCrashes;
+
+            const crashFixedEl = document.getElementById('crash-stat-fixed');
+            if (crashFixedEl) crashFixedEl.innerText = fixedCrashes;
+
             const crashTotal = document.getElementById('crash-stat-total-entries');
-            if (crashTotal) crashTotal.innerText = (data.crashes || []).length;
+            if (crashTotal) crashTotal.innerText = crashes.length;
 
             const contactMsgs = data.contact_messages || [];
             const unreadCount = contactMsgs.filter(m => !m.read).length;
@@ -780,30 +848,54 @@
         }
 
         function renderBannedIps(bans) {
-            const container = document.getElementById('banned-ips-container');
-            if (!container) return;
-            const ipList = Object.keys(bans);
-            if (ipList.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-500 italic">No IPs currently banned.</p>';
-                return;
-            }
+            const fullContainer = document.getElementById('full-banned-ips-container');
+            const ipList = Object.keys(bans || {});
 
-            let html = '';
-            for (const ip of ipList) {
-                const info = bans[ip];
-                const expires = info.expires_at ? formatTimestamp(info.expires_at) : "Permanent";
-                html += `
-                    <div class="bg-rose-950/10 p-3 rounded-lg border border-rose-500/10 text-xs font-mono">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="bg-rose-950/40 text-transparent hover:text-rose-400 cursor-pointer px-1.5 py-0.5 rounded border border-rose-500/20 transition select-none hover:select-text font-bold" onclick="this.classList.toggle('text-transparent')" title="Click to reveal IP">${ip}</span>
-                            <button onclick="unbanIP('${ip}')" class="text-slate-400 hover:text-white underline transition">Unban</button>
-                        </div>
-                        <div class="text-slate-500 mt-1 break-words">Reason: ${escapeHtml(info.reason || "N/A")}</div>
-                        <div class="text-[10px] text-slate-600 mt-1">Expires: ${expires}</div>
-                    </div>
-                `;
+            const totalBanStat = document.getElementById('ban-stat-total');
+            if (totalBanStat) totalBanStat.innerText = ipList.length;
+
+            if (fullContainer) {
+                if (ipList.length === 0) {
+                    fullContainer.innerHTML = '<p class="text-sm text-slate-500 italic font-mono col-span-full">No IP addresses are currently banned.</p>';
+                } else {
+                    let html = '';
+                    for (const ip of ipList) {
+                        const info = bans[ip];
+                        const bannedAtStr = info.banned_at ? formatTimestamp(info.banned_at) : 'Unknown';
+                        const expiresAtStr = info.expires_at ? formatTimestamp(info.expires_at) : 'Permanent';
+                        const isTemp = !!info.expires_at;
+
+                        html += `
+                            <div class="premium-glass p-5 rounded-xl border border-white/5 flex flex-col justify-between gap-4">
+                                <div class="flex flex-col gap-2 font-mono">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-base font-bold text-rose-400 font-display">${escapeHtml(ip)}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${isTemp ? 'bg-amber-950/50 text-amber-400 border border-amber-500/20' : 'bg-rose-950/50 text-rose-400 border border-rose-500/20'} font-mono">${isTemp ? 'TEMPORARY' : 'PERMANENT'}</span>
+                                    </div>
+                                    <div class="text-xs text-slate-300 bg-black/30 p-2.5 rounded-lg border border-white/5">
+                                        <span class="text-slate-500 text-[10px] uppercase block font-bold">Reason:</span>
+                                        ${escapeHtml(info.reason || 'No reason provided')}
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                                        <div>
+                                            <span class="text-slate-500 block text-[9px] uppercase font-bold">Banned Date:</span>
+                                            ${bannedAtStr}
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-500 block text-[9px] uppercase font-bold">Expiration:</span>
+                                            ${expiresAtStr}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end border-t border-white/5 pt-3">
+                                    <button onclick="unbanIP('${ip}')" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded-lg font-bold font-mono uppercase border border-zinc-700 transition">Remove Ban</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    fullContainer.innerHTML = html;
+                }
             }
-            container.innerHTML = html;
         }
 
         function renderSuggestions(suggestions) {
@@ -951,10 +1043,25 @@
             for (const c of crashes) {
                 const timeStr = formatTimestamp(c.timestamp);
                 const isBanned = c.ip in bannedIps;
+                const isFixed = (c.status || '').toUpperCase() === 'FIXED';
+
+                const statusBadge = isFixed
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-950/50 text-emerald-400 border border-emerald-500/20 font-mono">FIXED</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">OPEN</span>`;
+
+                const osBadge = c.os_info
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/50 text-cyan-400 border border-cyan-500/20 font-mono" title="Operating System">${escapeHtml(c.os_info)}</span>`
+                    : '';
 
                 const banBtn = isBanned
                     ? `<button onclick="unbanIP('${c.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
                     : `<button onclick="openBanModal('${c.ip}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Ban IP</button>`;
+
+                const toggleFixedBtn = isFixed
+                    ? `<button onclick="updateCrashStatus(${c.id}, 'OPEN')" class="px-3 py-1 bg-amber-600/10 hover:bg-amber-600 text-amber-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-amber-500/20 transition">Reopen</button>`
+                    : `<button onclick="updateCrashStatus(${c.id}, 'FIXED')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Mark Fixed</button>`;
+
+                const deleteBtn = `<button onclick="deleteCrash(${c.id})" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Delete</button>`;
 
                 const bannedTag = isBanned
                     ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
@@ -963,10 +1070,12 @@
                 html += `
                     <div class="premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div class="flex items-center gap-3">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <span class="text-sm font-bold text-rose-500 font-display">[ CRASH #${c.id} ]</span>
+                                ${statusBadge}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">v${escapeHtml(c.version)}</span>
+                                ${osBadge}
                             </div>
                             <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
                                 ${bannedTag}
@@ -985,15 +1094,48 @@
                             </details>
                         </div>
                         
-                        <div class="flex justify-end items-center gap-4 mt-1 border-t border-white/5 pt-3 font-mono">
-                            <div>
-                                ${banBtn}
-                            </div>
+                        <div class="flex flex-wrap justify-end items-center gap-2 mt-1 border-t border-white/5 pt-3 font-mono">
+                            ${toggleFixedBtn}
+                            ${deleteBtn}
+                            ${banBtn}
                         </div>
                     </div>
                 `;
             }
             container.innerHTML = html;
+        }
+
+        async function updateCrashStatus(id, status) {
+            try {
+                const response = await fetch('/admin/crashes/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, status })
+                });
+                if (!response.ok) {
+                    alert('Failed to update crash status.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error updating crash status.');
+            }
+        }
+
+        async function deleteCrash(id) {
+            if (!confirm(`Are you sure you want to delete Crash Report #${id}?`)) return;
+            try {
+                const response = await fetch('/admin/crashes/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                if (!response.ok) {
+                    alert('Failed to delete crash report.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error deleting crash report.');
+            }
         }
 
         function escapeHtml(text) {
@@ -1038,8 +1180,17 @@
             }
         }
 
-        function openBanModal(ip) {
-            document.getElementById('ban-ip-field').value = ip;
+        function openBanModal(ip = '') {
+            const input = document.getElementById('ban-ip-field');
+            input.value = ip;
+            if (ip) {
+                input.readOnly = true;
+                input.classList.add('opacity-60', 'blur-sm');
+            } else {
+                input.readOnly = false;
+                input.classList.remove('opacity-60', 'blur-sm');
+                setTimeout(() => input.focus(), 50);
+            }
             document.getElementById('ban-modal').classList.remove('hidden');
         }
 

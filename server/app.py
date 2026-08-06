@@ -450,6 +450,14 @@ class CrashPayload(BaseModel):
     version: str = Field(..., max_length=20)
     traceback: str = Field(..., max_length=20000)
     log_data: str = Field(default="", max_length=50000)
+    os_info: str = Field(default="Unknown OS", max_length=100)
+
+class DeleteCrashPayload(BaseModel):
+    id: int
+
+class CrashStatusPayload(BaseModel):
+    id: int
+    status: str
 
 class StatusUpdatePayload(BaseModel):
     id: int
@@ -800,6 +808,8 @@ def submit_crash():
         "version": payload.version.strip(),
         "traceback": payload.traceback.strip(),
         "log_data": payload.log_data.strip(),
+        "os_info": payload.os_info.strip(),
+        "status": "OPEN",
         "ip": ip,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -807,6 +817,46 @@ def submit_crash():
     save_crashes(data)
     broadcast_update("dashboard")
     return jsonify({"message": "Crash report submitted successfully.", "id": new_id})
+
+@app.route("/admin/crashes/status", methods=["POST"])
+@admin_required
+def update_crash_status(username):
+    try:
+        req_json = request.get_json() or {}
+        payload = CrashStatusPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_crashes()
+    crashes = data.get("crashes", [])
+    for c in crashes:
+        if c.get("id") == payload.id:
+            c["status"] = payload.status
+            save_crashes(data)
+            broadcast_update("dashboard")
+            return jsonify({"message": f"Crash #{payload.id} status updated to {payload.status}.", "id": payload.id, "status": payload.status})
+    return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
+
+@app.route("/admin/crashes/delete", methods=["POST"])
+@admin_required
+def delete_crash(username):
+    try:
+        req_json = request.get_json() or {}
+        payload = DeleteCrashPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_crashes()
+    crashes = data.get("crashes", [])
+    initial_len = len(crashes)
+    data["crashes"] = [c for c in crashes if c.get("id") != payload.id]
+
+    if len(data["crashes"]) < initial_len:
+        save_crashes(data)
+        broadcast_update("dashboard")
+        return jsonify({"message": f"Crash report #{payload.id} deleted successfully.", "id": payload.id})
+
+    return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
 
 # --- Admin API / Dashboard ---
 
@@ -935,6 +985,11 @@ def view_crashes_dashboard(username):
 @admin_required
 def view_contact_dashboard(username):
     return render_template("admin_panel.html", username=username, active_view="contact", is_root=is_root_user(username))
+
+@app.route("/admin/bans", methods=["GET"])
+@admin_required
+def view_bans_dashboard(username):
+    return render_template("admin_panel.html", username=username, active_view="bans", is_root=is_root_user(username))
 
 @app.route("/admin", methods=["GET"])
 @admin_required
