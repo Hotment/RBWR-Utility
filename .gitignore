@@ -10,6 +10,7 @@ verify_calculations.py
 server/files
 server/crashes.json
 server/suggestions.json
+server/contact_messages.json
 server/banned_ips.json
 server/admins.json
 server/gunicorn.conf.py
