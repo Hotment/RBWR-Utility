@@ -630,9 +630,38 @@ def proxy_public_servers():
         if _servers_cache["data"] is not None and (now - _servers_cache["timestamp"]) < 120:
             return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
 
+    api_key = os.environ.get("SERVER_CHECKER_API_KEY", "")
+    primary_url = "https://rbwr.scatterbox.dev/api/servers/latest"
+    fallback_url = "https://realisticbwr.org/api/public/servers"
+
+    if api_key:
+        try:
+            resp = requests.get(
+                primary_url,
+                headers={
+                    "User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)",
+                    "X-API-KEY": api_key
+                },
+                timeout=5
+            )
+            if resp.status_code == 200:
+                res_json = resp.json()
+                if res_json.get("success") and res_json.get("data"):
+                    content = json.dumps(res_json.get("data")).encode("utf-8")
+                    status_code = 200
+                    content_type = "application/json"
+                    with _cache_lock:
+                        _servers_cache["data"] = content
+                        _servers_cache["timestamp"] = time.time()
+                        _servers_cache["content_type"] = content_type
+                        _servers_cache["status_code"] = status_code
+                    return Response(content, status=status_code, content_type=content_type)
+        except Exception as e:
+            logger.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
+
     try:
         resp = requests.get(
-            "https://realisticbwr.org/api/public/servers",
+            fallback_url,
             headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"},
             timeout=10
         )
