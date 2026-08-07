@@ -75,22 +75,44 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
 sock = Sock(app)
 active_connections = set()
 
-def get_dashboard_payload_data():
-    sug_data = load_suggestions()
-    suggestions = sug_data.get("suggestions", [])
-    suggestions = sorted(suggestions, key=lambda s: s.get("timestamp", ""), reverse=True)
+def get_dashboard_payload_data(username=None):
+    perms = get_user_permissions(username) if username else {"suggestions": True, "crashes": True, "contact": True, "bans": True}
     
-    ban_data = load_banned_ips()
-    banned_ips = ban_data.get("banned", {})
-    
-    crash_data = load_crashes()
-    crashes = crash_data.get("crashes", [])
-    crashes = sorted(crashes, key=lambda c: c.get("timestamp", ""), reverse=True)
-    
-    contact_data = load_contact_messages()
-    contact_messages = contact_data.get("messages", [])
-    contact_messages = sorted(contact_messages, key=lambda m: m.get("timestamp", ""), reverse=True)
-    
+    suggestions = []
+    if perms.get("suggestions", True):
+        sug_data = load_suggestions()
+        raw_sugs = sug_data.get("suggestions", [])
+        for s in sorted(raw_sugs, key=lambda x: x.get("timestamp", ""), reverse=True):
+            suggestions.append({
+                "id": s.get("id"),
+                "name": s.get("name", "Anonymous"),
+                "suggestion": s.get("suggestion", ""),
+                "ip": s.get("ip", ""),
+                "timestamp": s.get("timestamp", ""),
+                "status": s.get("status", "pending"),
+                "admin_comment": s.get("admin_comment", ""),
+                "comment_by": s.get("comment_by", ""),
+                "comment_timestamp": s.get("comment_timestamp", ""),
+                "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
+                "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
+                "hidden": bool(s.get("hidden", False))
+            })
+
+    banned_ips = {}
+    if perms.get("bans", True):
+        ban_data = load_banned_ips()
+        banned_ips = ban_data.get("banned", {})
+
+    crashes = []
+    if perms.get("crashes", True):
+        crash_data = load_crashes()
+        crashes = sorted(crash_data.get("crashes", []), key=lambda c: c.get("timestamp", ""), reverse=True)
+
+    contact_messages = []
+    if perms.get("contact", True):
+        contact_data = load_contact_messages()
+        contact_messages = sorted(contact_data.get("messages", []), key=lambda m: m.get("timestamp", ""), reverse=True)
+
     return {
         "suggestions": suggestions,
         "banned_ips": banned_ips,
@@ -104,48 +126,58 @@ def get_accounts_payload_data():
     for u, info in admins_data.get("admins", {}).items():
         admins_list.append({
             "username": u,
-            "created_at": info.get("created_at")
+            "created_at": info.get("created_at"),
+            "permissions": info.get("permissions") or {
+                "suggestions": True,
+                "crashes": True,
+                "contact": True,
+                "bans": True
+            }
         })
     return {"admins": admins_list}
 
 def broadcast_update(data_type):
-    if data_type == "dashboard":
-        payload = {
-            "type": "dashboard",
-            "data": get_dashboard_payload_data()
-        }
-    elif data_type == "accounts":
-        payload = {
-            "type": "accounts",
-            "data": get_accounts_payload_data()
-        }
-    else:
-        return
-        
-    message = json.dumps(payload)
-    for ws in list(active_connections):
+    for conn in list(active_connections):
+        ws = conn[0] if isinstance(conn, tuple) else conn
+        uname = conn[1] if isinstance(conn, tuple) else ""
         try:
-            ws.send(message)
+            if data_type == "dashboard":
+                payload = {
+                    "type": "dashboard",
+                    "data": get_dashboard_payload_data(uname)
+                }
+            elif data_type == "accounts":
+                if uname and not is_root_user(uname):
+                    continue
+                payload = {
+                    "type": "accounts",
+                    "data": get_accounts_payload_data()
+                }
+            else:
+                continue
+            ws.send(json.dumps(payload))
         except Exception:
-            active_connections.discard(ws)
+            active_connections.discard(conn)
 
 @sock.route('/admin/ws')
 def admin_ws(ws):
+    username = session.get("username") or ""
     if not session.get("admin_logged_in"):
         ws.close(1008)
         return
         
-    active_connections.add(ws)
+    conn_tuple = (ws, username)
+    active_connections.add(conn_tuple)
     
     try:
         initial_payload = {
             "type": "all",
-            "dashboard": get_dashboard_payload_data(),
-            "accounts": get_accounts_payload_data() if is_root_user(session.get("username") or "") else None
+            "dashboard": get_dashboard_payload_data(username),
+            "accounts": get_accounts_payload_data() if is_root_user(username) else None
         }
         ws.send(json.dumps(initial_payload))
     except Exception:
-        active_connections.discard(ws)
+        active_connections.discard(conn_tuple)
         return
         
     try:
@@ -162,7 +194,7 @@ def admin_ws(ws):
     except Exception:
         pass
     finally:
-        active_connections.discard(ws)
+        active_connections.discard(conn_tuple)
 
 _secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not _secret_key:
@@ -241,6 +273,30 @@ def save_admins(data):
 def is_root_user(username: str) -> bool:
     root_user, _ = get_admin_credentials()
     return secrets.compare_digest(username, root_user)
+
+def get_user_permissions(username: str) -> dict:
+    if not username:
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+    if is_root_user(username):
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+    admins_data = load_admins()
+    admin_info = admins_data.get("admins", {}).get(username, {})
+    perms = admin_info.get("permissions")
+    if perms is None:
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+    return {
+        "suggestions": bool(perms.get("suggestions", True)),
+        "crashes": bool(perms.get("crashes", True)),
+        "contact": bool(perms.get("contact", True)),
+        "bans": bool(perms.get("bans", True))
+    }
+
+def has_permission(username: str, section: str) -> bool:
+    if not username:
+        return False
+    if is_root_user(username):
+        return True
+    return get_user_permissions(username).get(section, True)
 
 def get_authenticated_user():
     username = session.get("username")
@@ -375,6 +431,8 @@ def get_public_suggestions():
     suggestions = data.get("suggestions", [])
     public_list = []
     for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
+        if s.get("hidden"):
+            continue
         public_list.append({
             "id": s.get("id"),
             "name": s.get("name", "Anonymous"),
@@ -383,7 +441,9 @@ def get_public_suggestions():
             "status": s.get("status", "pending"),
             "admin_comment": s.get("admin_comment", ""),
             "comment_by": s.get("comment_by", ""),
-            "comment_timestamp": s.get("comment_timestamp", "")
+            "comment_timestamp": s.get("comment_timestamp", ""),
+            "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
+            "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker"))
         })
     return public_list
 
@@ -445,6 +505,8 @@ class SuggestionPayload(BaseModel):
     name: str = Field(default="", max_length=50)
     suggestion: str = Field(..., max_length=2000)
     anonymous: bool
+    target: str = Field(default="overlay", max_length=50)
+    is_server_checker: bool = Field(default=False)
 
 class CrashPayload(BaseModel):
     version: str = Field(..., max_length=20)
@@ -795,6 +857,7 @@ def submit_suggestion():
         new_id = max(s.get("id", 0) for s in suggestions) + 1
         
     name = "Anonymous" if payload.anonymous or not payload.name.strip() else payload.name.strip()
+    target_val = "server_checker" if (payload.target == "server_checker" or payload.is_server_checker) else "overlay"
     
     new_sug = {
         "id": new_id,
@@ -802,7 +865,9 @@ def submit_suggestion():
         "suggestion": payload.suggestion.strip(),
         "ip": ip,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": "pending"
+        "status": "pending",
+        "target": target_val,
+        "is_server_checker": target_val == "server_checker"
     }
     suggestions.append(new_sug)
     save_suggestions(data)
@@ -847,9 +912,19 @@ def submit_crash():
     broadcast_update("dashboard")
     return jsonify({"message": "Crash report submitted successfully.", "id": new_id})
 
+class VisibilitySuggestionPayload(BaseModel):
+    id: int
+    hidden: bool
+
+class UpdateAdminPermissionsPayload(BaseModel):
+    username: str
+    permissions: dict[str, bool]
+
 @app.route("/admin/crashes/status", methods=["POST"])
 @admin_required
 def update_crash_status(username):
+    if not has_permission(username, "crashes"):
+        return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = CrashStatusPayload(**req_json)
@@ -869,6 +944,8 @@ def update_crash_status(username):
 @app.route("/admin/crashes/delete", methods=["POST"])
 @admin_required
 def delete_crash(username):
+    if not has_permission(username, "crashes"):
+        return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = DeleteCrashPayload(**req_json)
@@ -892,6 +969,8 @@ def delete_crash(username):
 @app.route("/admin/suggestions/status", methods=["POST"])
 @admin_required
 def update_suggestion_status(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = StatusUpdatePayload(**req_json)
@@ -911,6 +990,8 @@ def update_suggestion_status(username):
 @app.route("/admin/suggestions/comment", methods=["POST"])
 @admin_required
 def update_suggestion_comment(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = CommentPayload(**req_json)
@@ -936,9 +1017,32 @@ def update_suggestion_comment(username):
             })
     return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
 
+@app.route("/admin/suggestions/visibility", methods=["POST"])
+@admin_required
+def update_suggestion_visibility(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        payload = VisibilitySuggestionPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    for s in suggestions:
+        if s.get("id") == payload.id:
+            s["hidden"] = payload.hidden
+            save_suggestions(data)
+            broadcast_update("dashboard")
+            return jsonify({"message": f"Suggestion #{payload.id} visibility updated.", "id": payload.id, "hidden": payload.hidden})
+    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+
 @app.route("/admin/suggestions/delete", methods=["POST"])
 @admin_required
 def delete_suggestion(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = DeleteSuggestionPayload(**req_json)
@@ -960,6 +1064,8 @@ def delete_suggestion(username):
 @app.route("/admin/suggestions/ban", methods=["POST"])
 @admin_required
 def ban_ip(username):
+    if not has_permission(username, "bans"):
+        return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = BanPayload(**req_json)
@@ -985,6 +1091,8 @@ def ban_ip(username):
 @app.route("/admin/suggestions/unban", methods=["POST"])
 @admin_required
 def unban_ip(username):
+    if not has_permission(username, "bans"):
+        return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = UnbanPayload(**req_json)
@@ -1003,34 +1111,42 @@ def unban_ip(username):
 @app.route("/admin/suggestions", methods=["GET"])
 @admin_required
 def view_suggestions_dashboard(username):
-    return render_template("admin_panel.html", username=username, active_view="suggestions", is_root=is_root_user(username))
+    if not has_permission(username, "suggestions"):
+        return redirect("/admin")
+    return render_template("admin_panel.html", username=username, active_view="suggestions", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
 @app.route("/admin/crashes", methods=["GET"])
 @admin_required
 def view_crashes_dashboard(username):
-    return render_template("admin_panel.html", username=username, active_view="crashes", is_root=is_root_user(username))
+    if not has_permission(username, "crashes"):
+        return redirect("/admin")
+    return render_template("admin_panel.html", username=username, active_view="crashes", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
 @app.route("/admin/contact", methods=["GET"])
 @admin_required
 def view_contact_dashboard(username):
-    return render_template("admin_panel.html", username=username, active_view="contact", is_root=is_root_user(username))
+    if not has_permission(username, "contact"):
+        return redirect("/admin")
+    return render_template("admin_panel.html", username=username, active_view="contact", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
 @app.route("/admin/bans", methods=["GET"])
 @admin_required
 def view_bans_dashboard(username):
-    return render_template("admin_panel.html", username=username, active_view="bans", is_root=is_root_user(username))
+    if not has_permission(username, "bans"):
+        return redirect("/admin")
+    return render_template("admin_panel.html", username=username, active_view="bans", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_root(username):
-    return render_template("admin_panel.html", username=username, active_view="overview", is_root=is_root_user(username))
+    return render_template("admin_panel.html", username=username, active_view="overview", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
 @app.route("/admin/accounts", methods=["GET"])
 @admin_required
 def view_accounts_dashboard(username):
     if not is_root_user(username):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="accounts", is_root=True)
+    return render_template("admin_panel.html", username=username, active_view="accounts", is_root=True, permissions=get_user_permissions(username))
 
 class CreateAdminPayload(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
@@ -1062,11 +1178,45 @@ def create_admin_account(username):
 
     admins[new_user] = {
         "password_hash": hash_password(payload.password),
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "permissions": {
+            "suggestions": True,
+            "crashes": True,
+            "contact": True,
+            "bans": True
+        }
     }
     save_admins(admins_data)
     broadcast_update("accounts")
     return jsonify({"message": f"Admin account '{new_user}' created successfully."})
+
+@app.route("/admin/accounts/permissions", methods=["POST"])
+@admin_required
+def update_admin_permissions(username):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    try:
+        req_json = request.get_json() or {}
+        payload = UpdateAdminPermissionsPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    target_user = payload.username.strip()
+    admins_data = load_admins()
+    admins = admins_data.get("admins", {})
+    if target_user not in admins:
+        return jsonify({"detail": f"Admin account '{target_user}' not found."}), 404
+
+    admins[target_user]["permissions"] = {
+        "suggestions": bool(payload.permissions.get("suggestions", True)),
+        "crashes": bool(payload.permissions.get("crashes", True)),
+        "contact": bool(payload.permissions.get("contact", True)),
+        "bans": bool(payload.permissions.get("bans", True))
+    }
+    save_admins(admins_data)
+    broadcast_update("accounts")
+    broadcast_update("dashboard")
+    return jsonify({"message": f"Permissions for '{target_user}' updated successfully."})
 
 @app.route("/admin/accounts/delete", methods=["POST"])
 @admin_required
@@ -1092,6 +1242,8 @@ def delete_admin_account(username):
 @app.route("/admin/contact/delete/<msg_id>", methods=["POST"])
 @admin_required
 def delete_contact_message(username, msg_id):
+    if not has_permission(username, "contact"):
+        return jsonify({"detail": "Permission denied for contact messages section"}), 403
     contact_data = load_contact_messages()
     messages = contact_data.get("messages", [])
     filtered = [m for m in messages if m.get("id") != msg_id]
@@ -1104,6 +1256,8 @@ def delete_contact_message(username, msg_id):
 @app.route("/admin/contact/read/<msg_id>", methods=["POST"])
 @admin_required
 def toggle_read_contact_message(username, msg_id):
+    if not has_permission(username, "contact"):
+        return jsonify({"detail": "Permission denied for contact messages section"}), 403
     contact_data = load_contact_messages()
     messages = contact_data.get("messages", [])
     found = False

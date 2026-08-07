@@ -5,9 +5,9 @@
 
 
 {% block content %}
-<main class="flex-grow max-w-6xl mx-auto px-6 py-10 w-full flex flex-col gap-10">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
-        <div class="flex flex-col gap-2 max-w-2xl">
+<main class="flex-grow max-w-6xl mx-auto px-6 py-6 w-full flex flex-col gap-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
+        <div class="flex flex-col gap-1.5 max-w-2xl">
             <div
                 class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-medium text-blue-400 w-fit">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
@@ -18,16 +18,16 @@
                 </svg>
                 Community Feedback
             </div>
-            <h1 class="text-3xl md:text-5xl font-display font-semibold tracking-tight text-white">
+            <h1 class="text-3xl md:text-4xl font-display font-semibold tracking-tight text-white">
                 Suggestions & Status
             </h1>
-            <p class="text-gray-400 text-sm md:text-base leading-relaxed">
+            <p class="text-gray-400 text-sm leading-relaxed">
                 Browse user proposals, track resolution status, or submit your own ideas for the RBWR APRM Overlay.
             </p>
         </div>
 
         <a href="#submit-section"
-            class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-sm tracking-wide shrink-0">
+            class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-xs tracking-wide shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
@@ -37,7 +37,7 @@
     </div>
 
     <div
-        class="mb-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        class="mb-2 p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -47,45 +47,45 @@
             <span>Need to send a confidential message, security report, or data deletion request?</span>
         </div>
         <a href="/contact"
-            class="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 rounded-lg font-medium transition shrink-0">
+            class="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 rounded-lg font-medium transition shrink-0 text-xs">
             Private Contact Form &rarr;
         </a>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
             <span class="text-[10px] font-mono uppercase tracking-wider text-gray-500">Total Entries</span>
-            <span id="stat-total" class="text-2xl font-bold font-display text-white">0</span>
+            <span id="stat-total" class="text-xl font-bold font-display text-white">0</span>
         </div>
-        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
             <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80">Pending Review</span>
-            <span id="stat-pending" class="text-2xl font-bold font-display text-amber-400">0</span>
+            <span id="stat-pending" class="text-xl font-bold font-display text-amber-400">0</span>
         </div>
-        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
             <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80">Considering</span>
-            <span id="stat-considering" class="text-2xl font-bold font-display text-indigo-400">0</span>
+            <span id="stat-considering" class="text-xl font-bold font-display text-indigo-400">0</span>
         </div>
-        <div class="premium-glass p-4 rounded-xl flex flex-col gap-1 border border-white/5">
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
             <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80">Accepted</span>
-            <span id="stat-accepted" class="text-2xl font-bold font-display text-emerald-400">0</span>
+            <span id="stat-accepted" class="text-xl font-bold font-display text-emerald-400">0</span>
         </div>
     </div>
 
-    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        <div class="premium-glass p-1.5 rounded-xl flex flex-wrap gap-1 text-xs font-medium border border-white/5">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div class="premium-glass p-1 rounded-xl flex flex-wrap gap-1 text-xs font-medium border border-white/5">
             <button onclick="filterStatus('all')" id="tab-all"
-                class="px-4 py-2 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white">All</button>
+                class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white">All</button>
             <button onclick="filterStatus('pending')" id="tab-pending"
-                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Pending</button>
+                class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Pending</button>
             <button onclick="filterStatus('considering')" id="tab-considering"
-                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Considering</button>
+                class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Considering</button>
             <button onclick="filterStatus('accepted')" id="tab-accepted"
-                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Accepted</button>
+                class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Accepted</button>
             <button onclick="filterStatus('declined')" id="tab-declined"
-                class="px-4 py-2 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Declined</button>
+                class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5">Declined</button>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
             <div class="relative flex-1 sm:w-64">
                 <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                     fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
@@ -94,16 +94,16 @@
                         d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
                 </svg>
                 <input type="text" id="search-input" oninput="handleSearch()" placeholder="Search suggestions..."
-                    class="premium-input pl-9 pr-4 py-2 rounded-xl text-xs w-full font-mono outline-none">
+                    class="premium-input pl-9 pr-4 py-1.5 rounded-xl text-xs w-full font-mono outline-none">
             </div>
 
-            <div class="relative shrink-0 min-w-[145px]">
+            <div class="relative shrink-0 min-w-[140px]">
                 <select id="sort-select" onchange="handleSortChange()"
-                    class="premium-input appearance-none -webkit-appearance-none pl-4 pr-10 py-2 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
+                    class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="desc" class="bg-[#121217] text-gray-200">Newest First</option>
                     <option value="asc" class="bg-[#121217] text-gray-200">Oldest First</option>
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-blue-400">
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
@@ -125,45 +125,53 @@
         <p class="text-sm text-gray-400 font-mono">No suggestions found matching the current filter.</p>
     </div>
 
-    <div id="submit-section" class="mt-8 border-t border-white/5 pt-12 flex flex-col gap-6">
+    <div id="submit-section" class="mt-4 border-t border-white/5 pt-6 flex flex-col gap-4">
         <div class="flex flex-col gap-1">
-            <h2 class="text-2xl font-display font-semibold text-white">Have a feature request or feedback?</h2>
-            <p class="text-sm text-gray-400">Submit your suggestion directly to our project backlog.</p>
+            <h2 class="text-xl font-display font-semibold text-white">Have a feature request or feedback?</h2>
+            <p class="text-xs text-gray-400">Submit your suggestion directly to our project backlog.</p>
         </div>
 
-        <div class="premium-glass p-6 md:p-8 rounded-2xl border border-white/5">
-            <form id="public-suggestion-form" class="flex flex-col gap-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                    <div class="flex flex-col gap-2 group">
+        <div class="premium-glass p-5 md:p-6 rounded-2xl border border-white/5">
+            <form id="public-suggestion-form" class="flex flex-col gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div class="flex flex-col gap-1.5 group">
                         <label for="submit-name"
                             class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">Your
                             Name / Handle (Optional)</label>
                         <input type="text" id="submit-name" placeholder="Leave blank for Anonymous"
-                            class="premium-input px-4 py-3 rounded-xl text-sm font-mono h-11">
+                            class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono h-10">
                     </div>
-                    <div class="flex items-center pt-2 md:pt-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-4 pt-1 md:pt-4">
                         <label
-                            class="flex items-center gap-3 cursor-pointer group text-sm font-medium text-gray-400 hover:text-gray-300 transition-colors">
+                            class="flex items-center gap-2.5 cursor-pointer group text-xs font-medium text-gray-400 hover:text-gray-300 transition-colors">
                             <input type="checkbox" id="submit-anonymous" class="premium-checkbox">
                             <span>Submit as Anonymous</span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2.5 cursor-pointer group text-xs font-medium text-amber-400/90 hover:text-amber-300 transition-colors">
+                            <input type="checkbox" id="submit-server-checker" class="premium-checkbox accent-amber-500">
+                            <span class="inline-flex items-center gap-1.5 font-mono text-xs">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                For RBWR Server Checker
+                            </span>
                         </label>
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-2 group">
+                <div class="flex flex-col gap-1.5 group">
                     <label for="submit-suggestion"
                         class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">Suggestion
                         Details</label>
-                    <textarea id="submit-suggestion" required rows="4"
+                    <textarea id="submit-suggestion" required rows="3"
                         placeholder="Describe your suggestion or feature idea..."
-                        class="premium-input px-4 py-3 rounded-xl text-sm font-mono resize-none"></textarea>
+                        class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono resize-none"></textarea>
                 </div>
 
-                <div id="submit-form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
+                <div id="submit-form-status" class="hidden text-xs font-mono p-2.5 rounded-xl"></div>
 
                 <div class="flex justify-end">
                     <button type="submit" id="submit-form-btn"
-                        class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm tracking-wide shadow-lg shadow-blue-500/10">
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-xs tracking-wide shadow-lg shadow-blue-500/10">
                         Submit Feedback
                     </button>
                 </div>
@@ -284,7 +292,9 @@
             if (searchQuery) {
                 const nameMatch = (item.name || '').toLowerCase().includes(searchQuery);
                 const textMatch = (item.suggestion || '').toLowerCase().includes(searchQuery);
-                if (!nameMatch && !textMatch) return false;
+                const targetStr = (item.target === 'server_checker' || item.is_server_checker) ? 'server checker' : 'aprm overlay';
+                const targetMatch = targetStr.includes(searchQuery);
+                if (!nameMatch && !textMatch && !targetMatch) return false;
             }
 
             return true;
@@ -305,6 +315,17 @@
         emptyState.classList.add('hidden');
 
         feed.innerHTML = filtered.map(item => {
+            const isServerChecker = item.target === 'server_checker' || item.is_server_checker;
+            const targetBadge = isServerChecker ? `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Server Checker
+                </span>
+            ` : `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> APRM Overlay
+                </span>
+            `;
+
             const adminResponseBlock = item.admin_comment ? `
                 <div class="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex flex-col gap-1.5">
                     <div class="flex items-center justify-between text-xs font-semibold text-blue-400">
@@ -328,8 +349,11 @@
                                 <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono text-gray-300 font-bold">
                                     ${escapeHtml(item.name.charAt(0).toUpperCase())}
                                 </div>
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-semibold text-white tracking-wide">${escapeHtml(item.name)}</span>
+                                <div class="flex flex-col gap-0.5">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-sm font-semibold text-white tracking-wide">${escapeHtml(item.name)}</span>
+                                        ${targetBadge}
+                                    </div>
                                     <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
                                 </div>
                             </div>
@@ -340,6 +364,7 @@
                     </div>
                     <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
                         <span>ID: #${item.id}</span>
+                        <span>Target: ${isServerChecker ? 'Server Checker' : 'APRM Overlay'}</span>
                         <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
                     </div>
                 </div>
@@ -352,14 +377,19 @@
 
         const nameInput = document.getElementById('submit-name');
         const anonCheckbox = document.getElementById('submit-anonymous');
+        const serverCheckerCheckbox = document.getElementById('submit-server-checker');
         const sugInput = document.getElementById('submit-suggestion');
         const statusDiv = document.getElementById('submit-form-status');
         const submitBtn = document.getElementById('submit-form-btn');
 
+        const isServerChecker = serverCheckerCheckbox ? serverCheckerCheckbox.checked : false;
+
         const payload = {
             name: anonCheckbox.checked ? "Anonymous" : nameInput.value.trim(),
             suggestion: sugInput.value.trim(),
-            anonymous: anonCheckbox.checked
+            anonymous: anonCheckbox.checked,
+            target: isServerChecker ? "server_checker" : "overlay",
+            is_server_checker: isServerChecker
         };
 
         submitBtn.disabled = true;
@@ -383,6 +413,7 @@
                 nameInput.value = '';
                 sugInput.value = '';
                 anonCheckbox.checked = false;
+                if (serverCheckerCheckbox) serverCheckerCheckbox.checked = false;
 
                 const refreshRes = await fetch('/api/suggestions');
                 if (refreshRes.ok) {

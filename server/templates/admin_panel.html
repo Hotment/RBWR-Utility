@@ -159,6 +159,7 @@
                 <span>Overview</span>
             </a>
 
+            {% if permissions.suggestions %}
             <a href="/admin/suggestions" id="nav-suggestions"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'suggestions' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition" fill="none"
@@ -169,7 +170,9 @@
                 </svg>
                 <span>Suggestions</span>
             </a>
+            {% endif %}
 
+            {% if permissions.crashes %}
             <a href="/admin/crashes" id="nav-crashes"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'crashes' %}bg-rose-600/10 text-rose-500 border border-rose-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-rose-500 transition" fill="none"
@@ -180,7 +183,9 @@
                 </svg>
                 <span>Crash Logs</span>
             </a>
+            {% endif %}
 
+            {% if permissions.contact %}
             <a href="/admin/contact" id="nav-contact"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'contact' %}bg-purple-600/10 text-purple-400 border border-purple-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition" fill="none"
@@ -193,7 +198,9 @@
                 <span id="unreadContactBadge"
                     class="hidden ml-auto px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold">0</span>
             </a>
+            {% endif %}
 
+            {% if permissions.bans %}
             <a href="/admin/bans" id="nav-bans"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'bans' %}bg-amber-600/10 text-amber-400 border border-amber-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition" fill="none"
@@ -204,6 +211,7 @@
                 </svg>
                 <span>Banned IPs</span>
             </a>
+            {% endif %}
 
             {% if is_root %}
             <a href="/admin/accounts" id="nav-accounts"
@@ -274,6 +282,7 @@
             </header>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 grow-0">
+                {% if permissions.suggestions %}
                 <a href="/admin/suggestions" id="card-link-suggestions"
                     class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
@@ -294,7 +303,9 @@
                         Review incoming user suggestions, accept or decline proposals, and ban or unban user IPs.
                     </p>
                 </a>
+                {% endif %}
 
+                {% if permissions.crashes %}
                 <a href="/admin/crashes" id="card-link-crashes"
                     class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
@@ -315,7 +326,9 @@
                         View diagnostic variables, application tracebacks, logs, and system details for crashes.
                     </p>
                 </a>
+                {% endif %}
 
+                {% if permissions.contact %}
                 <a href="/admin/contact" id="card-link-contact"
                     class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
@@ -336,7 +349,9 @@
                         Read confidential messages, data removal requests, and private feedback sent directly to admin.
                     </p>
                 </a>
+                {% endif %}
 
+                {% if permissions.bans %}
                 <a href="/admin/bans" id="card-link-bans"
                     class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
@@ -357,6 +372,7 @@
                         View, enforce, and manage prohibited client IP addresses, durations, and prohibition reasons.
                     </p>
                 </a>
+                {% endif %}
             </div>
         </main>
 
@@ -380,18 +396,30 @@
             </header>
 
             <div class="flex flex-col gap-4">
-                <div
-                    class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
-                    <button onclick="filterStatus('all')" id="tab-all"
-                        class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase">All</button>
-                    <button onclick="filterStatus('pending')" id="tab-pending"
-                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Pending</button>
-                    <button onclick="filterStatus('considering')" id="tab-considering"
-                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Considering</button>
-                    <button onclick="filterStatus('accepted')" id="tab-accepted"
-                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Accepted</button>
-                    <button onclick="filterStatus('declined')" id="tab-declined"
-                        class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Declined</button>
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div
+                        class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        <button onclick="filterTarget('all')" id="target-tab-all"
+                            class="px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase">All Types</button>
+                        <button onclick="filterTarget('overlay')" id="target-tab-overlay"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Overlay</button>
+                        <button onclick="filterTarget('server_checker')" id="target-tab-server_checker"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Server Checker</button>
+                    </div>
+
+                    <div
+                        class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        <button onclick="filterStatus('all')" id="tab-all"
+                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase">All Status</button>
+                        <button onclick="filterStatus('pending')" id="tab-pending"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Pending</button>
+                        <button onclick="filterStatus('considering')" id="tab-considering"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Considering</button>
+                        <button onclick="filterStatus('accepted')" id="tab-accepted"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Accepted</button>
+                        <button onclick="filterStatus('declined')" id="tab-declined"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Declined</button>
+                    </div>
                 </div>
 
                 <div id="feed-container" class="flex flex-col gap-4">
@@ -570,8 +598,10 @@
 
     <script>
         const IS_ROOT = document.body.dataset.isRoot === 'true';
+        const PERMISSIONS = {{ permissions | tojson | safe }};
         let latestData = null;
         let currentFilter = 'all';
+        let currentTargetFilter = 'all';
         let bannedIps = {};
         let activeView = '{{ active_view }}';
 
@@ -696,24 +726,42 @@
             });
         }
 
+        function filterTarget(target) {
+            currentTargetFilter = target;
+            ['all', 'overlay', 'server_checker'].forEach(t => {
+                const btn = document.getElementById('target-tab-' + t);
+                if (btn) {
+                    btn.className = (t === target)
+                        ? "px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase"
+                        : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+                }
+            });
+            applyFilter();
+        }
+
         function filterStatus(status) {
             currentFilter = status;
-            const tabs = document.querySelectorAll('button[id^="tab-"]');
-            tabs.forEach(tab => {
-                tab.className = "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+            ['all', 'pending', 'considering', 'accepted', 'declined'].forEach(s => {
+                const tab = document.getElementById('tab-' + s);
+                if (tab) {
+                    tab.className = (s === status)
+                        ? "px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase"
+                        : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+                }
             });
-            const activeTab = document.getElementById('tab-' + status);
-            if (activeTab) {
-                activeTab.className = "px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase";
-            }
-
             applyFilter();
         }
 
         function applyFilter() {
             const cards = document.querySelectorAll('.suggestion-card');
             cards.forEach(card => {
-                if (currentFilter === 'all' || card.getAttribute('data-status') === currentFilter) {
+                const cardStatus = card.getAttribute('data-status');
+                const cardTarget = card.getAttribute('data-target');
+
+                const statusMatch = (currentFilter === 'all' || cardStatus === currentFilter);
+                const targetMatch = (currentTargetFilter === 'all' || cardTarget === currentTargetFilter);
+
+                if (statusMatch && targetMatch) {
                     card.style.display = 'flex';
                 } else {
                     card.style.display = 'none';
@@ -902,7 +950,7 @@
             const container = document.getElementById('feed-container');
             if (!container) return;
             if (suggestions.length === 0) {
-                container.innerHTML = '<p class="text-sm text-slate-500 italic">No feedback or suggestions submitted yet.</p>';
+                container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No feedback or suggestions submitted yet.</p>';
                 return;
             }
 
@@ -918,13 +966,26 @@
                 else if (s.status === 'accepted') badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
                 else if (s.status === 'declined') badgeClass = 'bg-rose-950/40 text-rose-400 border border-rose-500/20';
 
-                const banBtn = isBanned
-                    ? `<button onclick="unbanIP('${s.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
-                    : `<button onclick="openBanModal('${s.ip}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Ban IP</button>`;
+                const isServerChecker = s.target === 'server_checker' || s.is_server_checker;
+                const targetTag = isServerChecker
+                    ? '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Checker</span>'
+                    : '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold uppercase border border-blue-500/20">Overlay</span>';
 
                 const bannedTag = isBanned
                     ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
                     : '';
+
+                const hiddenTag = s.hidden
+                    ? '<span class="px-2 py-0.5 bg-purple-950/50 text-purple-300 text-[10px] rounded font-bold uppercase border border-purple-500/30 font-mono">Hidden</span>'
+                    : '';
+
+                const visibilityBtn = s.hidden
+                    ? `<button onclick="toggleVisibility(${s.id}, false)" class="px-3 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-purple-500/30 transition">Unhide</button>`
+                    : `<button onclick="toggleVisibility(${s.id}, true)" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Hide</button>`;
+
+                const banBtn = isBanned
+                    ? `<button onclick="unbanIP('${s.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
+                    : `<button onclick="openBanModal('${s.ip}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Ban IP</button>`;
 
                 const commentDisplay = hasComment ? `
                     <div class="bg-blue-950/20 border border-blue-500/20 rounded-lg p-3 text-xs font-mono text-blue-200 flex flex-col gap-1">
@@ -937,10 +998,12 @@
                 ` : '';
 
                 html += `
-                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}">
+                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}" data-target="${isServerChecker ? 'server_checker' : 'overlay'}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2.5 flex-wrap">
                                 <span class="text-sm font-bold text-slate-200">${escapeHtml(s.name || 'Anonymous')}</span>
+                                ${targetTag}
+                                ${hiddenTag}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${badgeClass}">${s.status}</span>
                             </div>
@@ -971,6 +1034,7 @@
                                 <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-indigo-500/20 transition flex items-center gap-1">
                                     <span>💬</span> ${hasComment ? 'Edit Comment' : 'Add Comment'}
                                 </button>
+                                ${visibilityBtn}
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Entry</button>
@@ -982,6 +1046,22 @@
             }
             container.innerHTML = html;
             applyFilter();
+        }
+
+        async function toggleVisibility(id, hidden) {
+            try {
+                const response = await fetch('/admin/suggestions/visibility', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, hidden })
+                });
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert(data.detail || 'Failed to update suggestion visibility.');
+                }
+            } catch (err) {
+                alert('Network error updating suggestion visibility.');
+            }
         }
 
         async function deleteSuggestion(id) {
@@ -1302,25 +1382,87 @@
                 const container = document.getElementById('accounts-list-container');
                 if (!container) return;
                 if (admins.length === 0) {
-                    container.innerHTML = '<p class="text-xs text-slate-500 italic">No custom administrator accounts configured.</p>';
+                    container.innerHTML = '<p class="text-xs text-slate-500 italic font-mono">No custom administrator accounts configured.</p>';
                     return;
                 }
 
                 let html = '';
                 for (const admin of admins) {
                     const timeStr = formatTimestamp(admin.created_at);
+                    const perms = admin.permissions || { suggestions: true, crashes: true, contact: true, bans: true };
+                    const u = escapeHtml(admin.username);
+
                     html += `
-                        <div class="bg-black/20 p-4 rounded-lg border border-white/5 flex justify-between items-center text-xs font-mono">
-                            <div>
-                                <span class="font-bold text-slate-200">${escapeHtml(admin.username)}</span>
-                                <div class="text-[10px] text-slate-600 mt-1">Created: ${timeStr}</div>
+                        <div class="bg-black/20 p-4 rounded-lg border border-white/5 flex flex-col gap-3 text-xs font-mono">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <span class="font-bold text-slate-200 text-sm">${u}</span>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">Created: ${timeStr}</div>
+                                </div>
+                                <button onclick="deleteAdmin('${u}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg uppercase border border-rose-500/20 font-bold transition text-[11px]">Delete Account</button>
                             </div>
-                            <button onclick="deleteAdmin('${escapeHtml(admin.username)}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg uppercase border border-rose-500/20 font-bold transition">Delete</button>
+                            <div class="border-t border-white/5 pt-3">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Section View Permissions:</span>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-sug-${u}" ${perms.suggestions ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Suggestions</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-crash-${u}" ${perms.crashes ? 'checked' : ''} class="accent-rose-500">
+                                        <span>Crash Logs</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-contact-${u}" ${perms.contact ? 'checked' : ''} class="accent-purple-500">
+                                        <span>Private Messages</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-bans-${u}" ${perms.bans ? 'checked' : ''} class="accent-amber-500">
+                                        <span>Banned IPs</span>
+                                    </label>
+                                </div>
+                                <div class="flex justify-end mt-2.5">
+                                    <button onclick="saveAdminPermissions('${u}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg uppercase font-bold text-[11px] transition shadow-md">Save Permissions</button>
+                                </div>
+                            </div>
                         </div>
                     `;
                 }
                 container.innerHTML = html;
             }
+
+            window.saveAdminPermissions = async function (username) {
+                const sugEl = document.getElementById(`perm-sug-${username}`);
+                const crashEl = document.getElementById(`perm-crash-${username}`);
+                const contactEl = document.getElementById(`perm-contact-${username}`);
+                const bansEl = document.getElementById(`perm-bans-${username}`);
+
+                const payload = {
+                    username: username,
+                    permissions: {
+                        suggestions: sugEl ? sugEl.checked : true,
+                        crashes: crashEl ? crashEl.checked : true,
+                        contact: contactEl ? contactEl.checked : true,
+                        bans: bansEl ? bansEl.checked : true
+                    }
+                };
+
+                try {
+                    const response = await fetch('/admin/accounts/permissions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const resData = await response.json();
+                    if (response.ok) {
+                        alert(resData.message || 'Permissions updated successfully.');
+                    } else {
+                        alert(resData.detail || 'Failed to update permissions.');
+                    }
+                } catch (err) {
+                    alert('Network error saving admin permissions.');
+                }
+            };
 
             window.handleCreateAdmin = async function (e) {
                 e.preventDefault();
