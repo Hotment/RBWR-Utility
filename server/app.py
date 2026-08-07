@@ -853,7 +853,7 @@ def submit_suggestion():
     # Enforce rate limiting: 1 feedback entry per 12 hours per IP
     if ip != "unknown":
         now = datetime.now(timezone.utc)
-        limit_period = timedelta(hours=12)
+        limit_period = timedelta(minutes=30)
         for s in suggestions:
             if s.get("ip") == ip:
                 try:
@@ -862,7 +862,7 @@ def submit_suggestion():
                         time_left = limit_period - (now - s_time)
                         hours_left = int(time_left.total_seconds() // 3600)
                         mins_left = int((time_left.total_seconds() % 3600) // 60)
-                        msg = f"Rate limit: Try again in {hours_left}h {mins_left}m."
+                        msg = f"Rate limit: Try again in {f"{hours_left}h " if hours_left > 0 else ""}{mins_left}m."
                         return jsonify({"detail": msg}), 429
                 except (ValueError, TypeError):
                     continue
