@@ -146,7 +146,7 @@ if "%DRY_RUN%"=="1" (
     echo       - Console: Attach (runs silently in GUI mode)
     echo       - CPU cores: Utilizing ALL threads (--jobs=%NUMBER_OF_PROCESSORS%)
     echo.
-    python -m nuitka %NUITKA_PARAMS% --windows-console-mode=attach --windows-icon-from-ico=icon.ico --windows-company-name="Hotment" --windows-product-name="RBWR APRM Calculator" --windows-file-description="RBWR APRM Calculator Overlay" --windows-file-version=%VERSION% --windows-product-version=%VERSION% --jobs=%NUMBER_OF_PROCESSORS% --enable-plugin=tk-inter --include-package=rapidocr_onnxruntime --include-package-data=rapidocr_onnxruntime %OUTPUT_PARAM% rbwr_overlay.py
+    python -m nuitka %NUITKA_PARAMS% --windows-console-mode=attach --windows-icon-from-ico=icon.ico --windows-company-name="Hotment" --windows-product-name="RBWR APRM Calculator" --windows-file-description="RBWR APRM Calculator Overlay" --windows-file-version=%VERSION% --windows-product-version=%VERSION% --jobs=%NUMBER_OF_PROCESSORS% --enable-plugin=tk-inter %OUTPUT_PARAM% rbwr_overlay.py
 )
 
 if %ERRORLEVEL% neq 0 exit /b 1

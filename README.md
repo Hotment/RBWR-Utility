@@ -7,8 +7,8 @@ A transparent desktop overlay tool designed for the Roblox **Realistic Boiling W
 ## Features
 
 *   **Transparent Overlay:** Borderless, always-on-top window that sits on top of your Roblox game. Opacity is adjustable (from 30% to 100%) via a configuration slider.
-*   **Dual UI Modes:** Toggle between a detailed telemetry view and a compact bar mode (360x60 px) that acts as a minimal in-game HUD.
-*   **Automatic Screen Scanning (OCR):** Integrates RapidOCR to scan active window text, allowing you to grab target demand values directly from your game window via hotkey (default: `F7`).
+*   **Dual UI Modes:** Toggle between a detailed telemetry view and a compact bar mode (465x60 px) that acts as a minimal in-game HUD.
+*   **Automatic Updates via Official API:** Automatically synchronizes target demand values, server telemetry, and demand time left countdowns in real-time directly via official server checker API integration.
 *   **Dynamic Usage Solver:** Runs a 5-step iterative solver to calculate thermal requirements while dynamically accounting for current auxiliary site usage (recirculation pumps, feedwater pumps, condenser pumps, etc.).
 *   **Overpower Safe Limit Alert:** Flashes a red warning indicator if the calculated core power goes above safe limits (108% for both units).
 *   **Multi-Unit Layouts:** Dedicated calculations and settings for both Unit 1 and Unit 2.
@@ -17,7 +17,7 @@ A transparent desktop overlay tool designed for the Roblox **Realistic Boiling W
 
 ## Installation & Running
 
-The overlay requires Python 3.10+ and uses external libraries for GUI image rendering and OCR scanning.
+The overlay requires Python 3.10+ and uses lightweight external libraries for GUI rendering.
 
 1. Clone or download the repository files.
 2. Install the required dependencies:
@@ -35,7 +35,7 @@ compile.bat
 ```
 
 ### Linux Support
-While the compiled Windows executable should run on Linux via Wine,this is not posible as the app uses windows only apis patch incoming ~~running the application **natively from source** is highly recommended. Running under Wine can result in issues with window transparency, topmost layering (Z-ordering) transitions, or screen-capturing (OCR) features (especially under Wayland compositors)~~.
+Running the application **natively from source** is highly recommended. Running the executable under Wine can result in issues with window transparency or topmost layering (Z-ordering) transitions under Wayland compositors.
 
 To run natively on Linux, simply clone the repository, install the dependencies using `pip install -r requirements.txt`, and run `python rbwr_overlay.py`.
 

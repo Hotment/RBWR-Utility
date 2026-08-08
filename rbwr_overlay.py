@@ -5,12 +5,19 @@ import sys
 import os
 import threading
 import logging
+import time
 import traceback
 import re
+from datetime import datetime, timezone
 import queue
+import urllib.request
+import urllib.error
 from PIL import Image, ImageDraw, ImageTk
 
-__version__ = "1.6.7"
+IS_LINUX = os.name == 'posix'
+IS_WINDOWS = os.name == 'nt'
+
+__version__ = "2.0.0"
 
 # --- Update Server Configuration ---
 SUGGESTIONS_SERVER_URL = "https://rbwr.hotment.dev"
@@ -217,12 +224,13 @@ def show_crash_dialog(tb_text):
                 
             def perform_send():
                 import urllib.request
-                import json
-                
+                import platform
+                os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
                 payload = {
                     "version": __version__,
                     "traceback": tb_text,
-                    "log_data": log_data
+                    "log_data": log_data,
+                    "os_info": os_info
                 }
                 
                 try:
@@ -232,7 +240,7 @@ def show_crash_dialog(tb_text):
                         data=data_bytes,
                         headers={
                             "Content-Type": "application/json",
-                            "User-Agent": "RBWR-Overlay-Client"
+                            "User-Agent": "RBWR-Overlay-Client/1.0"
                         },
                         method="POST"
                     )
@@ -313,41 +321,16 @@ def generate_default_icon():
         pass
 
 import re
-from ctypes import wintypes
 import ctypes
 import json
 
 CONFIG_FILE = "settings.json"
-
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
-
-HAS_OCR = False
-try:
-    from rapidocr_onnxruntime import RapidOCR
-    HAS_OCR = True
-    log.info("rapidocr_onnxruntime imported successfully.")
-    log.info(f"  Package location: {os.path.dirname(os.path.abspath(RapidOCR.__module__)) if hasattr(RapidOCR, '__module__') else 'unknown'}")
-except ImportError as e:
-    RapidOCR = None
-    log.warning(f"rapidocr_onnxruntime NOT available: {e}")
-except Exception as e:
-    RapidOCR = None
-    log.error(f"Unexpected error importing rapidocr_onnxruntime: {e}")
-    log.error(traceback.format_exc())
-
-def get_active_window_rect():
+if IS_WINDOWS:
+    from ctypes import wintypes
     try:
-        hwnd = ctypes.windll.user32.GetForegroundWindow()
-        if hwnd:
-            rect = wintypes.RECT()
-            if ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
-                return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         pass
-    return None
 
 BG_MAIN = "#07080a"       # Deep tactical carbon matte
 BG_CARD = "#11141a"       # Cyber deck plate dark gray
@@ -358,6 +341,7 @@ TEXT_LIGHT = "#ffffff"    # High contrast display white
 TEXT_MUTED = "#6c7d93"    # Muted control-room slate blue
 ACCENT_RED = "#ff003c"    # Emergency SCRAM laser red
 ACCENT_GOLD = "#ffaa00"   # Warning amber isotope yellow
+ACCENT_YELLOW = "#ffaa00" # Warning amber yellow alias
 
 APRMtoRecircTable = { # The numbers in the comments are values i got from the games reactor auto control
     0: 0, #0
@@ -468,9 +452,9 @@ class OverlayApp:
             except Exception:
                 pass
 
-        popup = tk.Toplevel(self.root)
+        popup = tk.Toplevel(self.win)
         self.custom_message_window = popup
-        popup.transient(self.root)
+        popup.transient(self.win)
         popup.title(title)
         
         accent_color = ACCENT_RED if is_error else ACCENT_CYAN
@@ -484,11 +468,11 @@ class OverlayApp:
             w = 400
             h = 240
 
-        x = self.root.winfo_x() + (self.root.winfo_width() - w) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - h) // 2
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
         
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
+        screen_w = self.win.winfo_screenwidth()
+        screen_h = self.win.winfo_screenheight()
         x = max(0, min(x, screen_w - w))
         y = max(0, min(y, screen_h - h))
         
@@ -511,7 +495,7 @@ class OverlayApp:
         title_bar.bind("<Button-1>", start_drag)
         title_bar.bind("<B1-Motion>", do_drag)
         
-        prefix = " ⚠ ERROR" if is_error else " ⚙ INFO"
+        prefix = " ERROR" if is_error else " INFO"
         title_lbl = tk.Label(title_bar, text=f"{prefix}: {title.upper()}", bg=BG_HEADER, fg=accent_color,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
@@ -545,7 +529,163 @@ class OverlayApp:
 
         popup.bind("<Destroy>", on_custom_message_destroy)
         popup.deiconify()
-        popup.lift(self.root)
+        popup.lift(self.win)
+        popup.focus_force()
+
+    def open_server_sync_dialog(self):
+        if hasattr(self, 'server_sync_window') and self.server_sync_window and self.server_sync_window.winfo_exists():
+            try:
+                self.server_sync_window.lift(self.win)
+                self.server_sync_window.focus_force()
+            except Exception:
+                pass
+            return
+
+        popup = tk.Toplevel(self.win)
+        self.server_sync_window = popup
+        popup.transient(self.win)
+        popup.title("Server Sync & DTL Calibration")
+
+        popup.configure(bg=BG_CARD, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
+        popup.overrideredirect(True)
+        popup.attributes("-topmost", True)
+
+        w = 360
+        h = 240
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
+
+        screen_w = self.win.winfo_screenwidth()
+        screen_h = self.win.winfo_screenheight()
+        x = max(0, min(x, screen_w - w))
+        y = max(0, min(y, screen_h - h))
+
+        popup.geometry(f"{w}x{h}+{x}+{y}")
+
+        drag_data = {"x": 0, "y": 0}
+        def start_drag(event):
+            drag_data["x"] = event.x
+            drag_data["y"] = event.y
+
+        def do_drag(event):
+            dx = event.x - drag_data["x"]
+            dy = event.y - drag_data["y"]
+            px = popup.winfo_x() + dx
+            py = popup.winfo_y() + dy
+            popup.geometry(f"+{px}+{py}")
+
+        title_bar = tk.Frame(popup, bg=BG_HEADER, height=30)
+        title_bar.pack(fill="x", side="top")
+        title_bar.bind("<Button-1>", start_drag)
+        title_bar.bind("<B1-Motion>", do_drag)
+
+        title_lbl = tk.Label(title_bar, text="LIVE SERVER SYNC", bg=BG_HEADER, fg=ACCENT_CYAN, font=("Consolas", 8, "bold"))
+        title_lbl.pack(side="left", padx=10, pady=5)
+        title_lbl.bind("<Button-1>", start_drag)
+        title_lbl.bind("<B1-Motion>", do_drag)
+
+        btn_close_top = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
+        btn_close_top.pack(side="right", fill="y")
+        btn_close_top.bind("<Button-1>", lambda e: popup.destroy())
+        btn_close_top.bind("<Enter>", lambda e: btn_close_top.config(bg=ACCENT_RED, fg=TEXT_LIGHT))
+        btn_close_top.bind("<Leave>", lambda e: btn_close_top.config(bg=BG_HEADER, fg=TEXT_MUTED))
+
+        content_frame = tk.Frame(popup, bg=BG_CARD, padx=15, pady=10)
+        content_frame.pack(fill="both", expand=True)
+
+        lbl_desc = tk.Label(content_frame, text="Select or enter Job ID or Server ID (e.g. 77f6-4b2f):", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 8))
+        lbl_desc.pack(anchor="w", pady=(0, 2))
+
+        if not hasattr(self, 'var_overlay_job_id'):
+            self.var_overlay_job_id = tk.StringVar(value="")
+
+        job_frame = tk.Frame(content_frame, bg=BG_CARD)
+        job_frame.pack(fill="x", pady=(0, 8))
+
+        self.cmb_overlay_job = ttk.Combobox(job_frame, textvariable=self.var_overlay_job_id, width=22, font=("Consolas", 9))
+        self.cmb_overlay_job.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        def _on_job_typing(event=None):
+            typed = self.var_overlay_job_id.get().strip().lower()
+            if hasattr(self, 'overlay_servers_data') and self.overlay_servers_data:
+                all_ids = [s.get("jobId", "") for s in self.overlay_servers_data if s and s.get("jobId")]
+                if typed:
+                    starts = [jid for jid in all_ids if jid.lower().startswith(typed)]
+                    contains = [jid for jid in all_ids if typed in jid.lower() and jid not in starts]
+                    matching = starts + contains
+                else:
+                    matching = all_ids
+                self.cmb_overlay_job['values'] = matching if matching else all_ids
+
+            self.fetch_overlay_servers_list_async()
+
+        self.cmb_overlay_job.bind("<KeyRelease>", _on_job_typing)
+        self.cmb_overlay_job.bind("<Return>", lambda e: self.connect_overlay_server_async(is_user_initiated=True))
+
+        if hasattr(self, 'overlay_servers_data') and self.overlay_servers_data:
+            job_ids = [s.get("jobId", "") for s in self.overlay_servers_data if s and s.get("jobId")]
+            self.cmb_overlay_job['values'] = job_ids
+
+        self.fetch_overlay_servers_list_async()
+
+        btn_sync = tk.Label(job_frame, text="Sync", bg=BG_MAIN, fg=ACCENT_GREEN, font=("Segoe UI", 9, "bold"), bd=1, relief="solid", padx=10, pady=2, cursor="hand2")
+        btn_sync.pack(side="right")
+        btn_sync.bind("<Button-1>", lambda e: self.connect_overlay_server_async(is_user_initiated=True))
+        btn_sync.bind("<Enter>", lambda e: btn_sync.config(bg=BG_HEADER, fg=TEXT_LIGHT))
+        btn_sync.bind("<Leave>", lambda e: btn_sync.config(bg=BG_MAIN, fg=ACCENT_GREEN))
+
+        calib_card = tk.Frame(content_frame, bg=BG_MAIN, bd=1, relief="solid", padx=10, pady=8)
+        calib_card.pack(fill="x", pady=(4, 6))
+
+        self.lbl_popup_dtl_countdown = tk.Label(calib_card, text="Demand Time Left: --s", bg=BG_MAIN, fg=ACCENT_GOLD, font=("Consolas", 9, "bold"))
+        self.lbl_popup_dtl_countdown.pack(anchor="w", pady=(0, 4))
+
+        calib_controls = tk.Frame(calib_card, bg=BG_MAIN)
+        calib_controls.pack(fill="x")
+
+        lbl_cal_title = tk.Label(calib_controls, text="Calibrate:", bg=BG_MAIN, fg=TEXT_MUTED, font=("Segoe UI", 8))
+        lbl_cal_title.pack(side="left", padx=(0, 4))
+
+        btn_m1 = tk.Label(calib_controls, text="-1s", bg=BG_CARD, fg=ACCENT_CYAN, font=("Segoe UI", 8, "bold"), bd=1, relief="solid", padx=5, pady=1, cursor="hand2")
+        btn_m1.pack(side="left", padx=2)
+        btn_m1.bind("<Button-1>", lambda e: self.calibrate_dtl_seconds(-1, is_delta=True))
+
+        btn_p1 = tk.Label(calib_controls, text="+1s", bg=BG_CARD, fg=ACCENT_CYAN, font=("Segoe UI", 8, "bold"), bd=1, relief="solid", padx=5, pady=1, cursor="hand2")
+        btn_p1.pack(side="left", padx=2)
+        btn_p1.bind("<Button-1>", lambda e: self.calibrate_dtl_seconds(1, is_delta=True))
+
+        self.var_calib_input = tk.StringVar(value="")
+        ent_cal = tk.Entry(calib_controls, textvariable=self.var_calib_input, bg=BG_CARD, fg=TEXT_LIGHT, font=("Consolas", 9), width=5, justify="center")
+        ent_cal.pack(side="left", padx=(6, 2))
+
+        def apply_exact_calib():
+            try:
+                v = float(self.var_calib_input.get().strip())
+                self.calibrate_dtl_seconds(v, is_delta=False)
+                self.var_calib_input.set("")
+            except ValueError:
+                pass
+
+        btn_set_cal = tk.Label(calib_controls, text="Set", bg=BG_CARD, fg=ACCENT_GREEN, font=("Segoe UI", 8, "bold"), bd=1, relief="solid", padx=6, pady=1, cursor="hand2")
+        btn_set_cal.pack(side="left", padx=2)
+        btn_set_cal.bind("<Button-1>", lambda e: apply_exact_calib())
+
+        self.lbl_sync_status = tk.Label(content_frame, text="", bg=BG_CARD, fg=ACCENT_RED, font=("Segoe UI", 8), wraplength=320, justify="left")
+        self.lbl_sync_status.pack(fill="x", pady=(2, 2))
+
+        btn_footer = tk.Frame(content_frame, bg=BG_CARD)
+        btn_footer.pack(fill="x", side="bottom")
+
+        btn_done = tk.Label(btn_footer, text="Close", bg=BG_MAIN, fg=TEXT_MUTED, font=("Segoe UI", 9), bd=1, relief="solid", padx=15, pady=3, cursor="hand2")
+        btn_done.pack(side="right")
+        btn_done.bind("<Button-1>", lambda e: popup.destroy())
+
+        def on_popup_destroy(event):
+            if event.widget == popup:
+                self.server_sync_window = None
+
+        popup.bind("<Destroy>", on_popup_destroy)
+        popup.deiconify()
+        popup.lift(self.win)
         popup.focus_force()
 
     def poll_gui_queue(self):
@@ -566,21 +706,567 @@ class OverlayApp:
             fn(*args, **kwargs)
         else:
             self.gui_queue.put((fn, args, kwargs))
+            
+    def find_server_by_id_or_job_id(self, servers, query):
+        if not query or not servers:
+            return None
+        query = str(query).strip()
+        for s in servers:
+            if not s:
+                continue
+            if s.get("jobId") == query or s.get("id") == query:
+                return s
 
-    def _sync_hud_scan(self):
-        self.enable_hud_scan = self.var_hud_scan.get()
+        q_parts = [p.strip() for p in query.split("-") if p.strip()]
+        if len(q_parts) >= 2:
+            for s in servers:
+                if not s:
+                    continue
+                for candidate in [s.get("jobId"), s.get("id")]:
+                    if not candidate:
+                        continue
+                    j_parts = [p.strip() for p in str(candidate).split("-") if p.strip()]
+                    if len(j_parts) >= 3:
+                        if j_parts[1].lower() == q_parts[0].lower() and j_parts[2].lower() == q_parts[1].lower():
+                            return s
+                        if len(q_parts) >= 3 and j_parts[1].lower() == q_parts[1].lower() and j_parts[2].lower() == q_parts[2].lower():
+                            return s
+        return None
+
+    def parse_servers_from_payload(self, raw_data):
+        if not raw_data:
+            return []
+        if isinstance(raw_data, str):
+            try:
+                raw_data = json.loads(raw_data)
+            except Exception:
+                return []
+        if isinstance(raw_data, dict):
+            if "servers" in raw_data and isinstance(raw_data["servers"], list):
+                return raw_data["servers"]
+            if "data" in raw_data:
+                d = raw_data["data"]
+                if isinstance(d, dict):
+                    if "servers" in d and isinstance(d["servers"], list):
+                        return d["servers"]
+                    if "data" in d and isinstance(d["data"], dict) and "servers" in d["data"]:
+                        return d["data"]["servers"]
+                elif isinstance(d, list):
+                    return d
+        elif isinstance(raw_data, list):
+            return raw_data
+        return []
+
+    def fetch_overlay_servers_list_async(self):
+        now = time.time()
+        api_key = getattr(self, 'server_checker_api_key', '')
+        if not api_key:
+            last_req = getattr(self, '_last_api_request_timestamp', 0.0)
+            cooldown = getattr(self, '_api_cooldown_seconds', 120.0)
+            if (now - last_req) < cooldown:
+                return
+            self._last_api_request_timestamp = now
+
+        self._last_overlay_servers_fetch = now
+
+        def _bg():
+            import json
+            servers = []
+            got_429 = False
+
+            if api_key:
+                try:
+                    req = urllib.request.Request(
+                        "https://rbwr.scatterbox.dev/api/servers/latest",
+                        headers={
+                            "User-Agent": "RBWR-Overlay-Client/1.0",
+                            "X-API-KEY": api_key
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        if resp.status == 200:
+                            raw = resp.read().decode("utf-8")
+                            payload = json.loads(raw)
+                            servers = self.parse_servers_from_payload(payload)
+                except Exception as e:
+                    log.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
+
+            if not servers:
+                now_fallback = time.time()
+                last_real_req = getattr(self, '_last_realisticbwr_request_timestamp', 0.0)
+                cooldown_real = getattr(self, '_api_cooldown_seconds', 120.0)
+                if (now_fallback - last_real_req) >= cooldown_real:
+                    self._last_realisticbwr_request_timestamp = now_fallback
+                    try:
+                        req = urllib.request.Request(
+                            "https://realisticbwr.org/api/public/servers",
+                            headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
+                        )
+                        with urllib.request.urlopen(req, timeout=5) as resp:
+                            if resp.status == 200:
+                                raw = resp.read().decode("utf-8")
+                                payload = json.loads(raw)
+                                servers = self.parse_servers_from_payload(payload)
+                                self._api_cooldown_seconds = 120.0
+                            elif resp.status == 429:
+                                got_429 = True
+                    except urllib.error.HTTPError as e:
+                        if e.code == 429:
+                            got_429 = True
+                    except Exception as e:
+                        log.debug(f"Error fetching servers in overlay: {e}")
+
+            if got_429:
+                self._api_cooldown_seconds = max(getattr(self, '_api_cooldown_seconds', 120.0) * 2, 300.0)
+
+            if servers:
+                job_ids = [s.get("jobId", "") for s in servers if s and s.get("jobId")]
+                self.run_on_main_thread(self._update_overlay_job_combobox, job_ids, servers)
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _update_overlay_job_combobox(self, job_ids, servers):
+        self.overlay_servers_data = servers
+        if hasattr(self, 'cmb_overlay_job') and self.cmb_overlay_job.winfo_exists():
+            typed = self.var_overlay_job_id.get().strip().lower() if hasattr(self, 'var_overlay_job_id') else ""
+            if typed:
+                starts = [j for j in job_ids if j.lower().startswith(typed)]
+                contains = [j for j in job_ids if typed in j.lower() and j not in starts]
+                matching = starts + contains
+                self.cmb_overlay_job['values'] = matching if matching else job_ids
+            else:
+                self.cmb_overlay_job['values'] = job_ids
+
+    def _validate_overlay_job_input(self, event=None):
+        if not hasattr(self, 'cmb_overlay_job') or not self.cmb_overlay_job.winfo_exists():
+            return
+        typed = self.var_overlay_job_id.get().strip()
+        all_servers = getattr(self, 'overlay_servers_data', [])
+        job_ids = [s.get("jobId", "") for s in all_servers if s and s.get("jobId")]
+
+        if not typed:
+            self.cmb_overlay_job['values'] = job_ids
+            return
+
+        starts = [j for j in job_ids if j.lower().startswith(typed.lower())]
+        contains = [j for j in job_ids if typed.lower() in j.lower() and j not in starts]
+        matching = starts + contains
+        self.cmb_overlay_job['values'] = matching if matching else job_ids
+
+    def validate_server_sync(self, srv):
+        if not srv:
+            return ["Server not found in public list"]
+        state = srv.get("state", {})
+        if not state or not isinstance(state, dict):
+            return ["Telemetry state payload empty"]
+
+        u1_st = state.get("Unit1", {})
+        u2_st = state.get("Unit2", {})
+        if not u1_st and not u2_st:
+            return ["Telemetry state payload empty"]
+
+        missing = []
+
+        u1 = state.get("Unit1")
+        if not u1 or not isinstance(u1, dict):
+            missing.append("Unit1 state")
+        else:
+            if u1.get("Demand Time Left") is None and u1.get("dtl") is None:
+                missing.append("Unit1.Demand Time Left")
+            dem1 = None
+            for k in ["DemandU1", "DemandU2", "Demand", "demand"]:
+                if k in u1 and u1[k] is not None:
+                    dem1 = u1[k]
+                    break
+            if dem1 is None:
+                missing.append("Unit1.Demand")
+
+            next1 = None
+            for k in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
+                if k in u1 and u1[k] is not None:
+                    next1 = u1[k]
+                    break
+            if next1 is None:
+                missing.append("Unit1.NextDemand")
+
+        u2 = state.get("Unit2")
+        if not u2 or not isinstance(u2, dict):
+            missing.append("Unit2 state")
+        else:
+            if u2.get("Demand Time Left") is None and u2.get("dtl") is None:
+                missing.append("Unit2.Demand Time Left")
+            dem2 = None
+            for k in ["DemandU1", "DemandU2", "Demand", "demand"]:
+                if k in u2 and u2[k] is not None:
+                    dem2 = u2[k]
+                    break
+            if dem2 is None:
+                missing.append("Unit2.Demand")
+
+            next2 = None
+            for k in ["NextDemandU2", "NextDemandU1", "Next Demand", "next_demand"]:
+                if k in u2 and u2[k] is not None:
+                    next2 = u2[k]
+                    break
+            if next2 is None:
+                missing.append("Unit2.NextDemand")
+
+        return missing
+
+    def connect_overlay_server_async(self, is_user_initiated=False):
+        if is_user_initiated:
+            self.overlay_sync_failed = False
+
+        if getattr(self, 'overlay_sync_failed', False):
+            return
+
+        job_id = self.var_overlay_job_id.get().strip() if hasattr(self, 'var_overlay_job_id') else ""
+        if not job_id:
+            return
+
+        now = time.time()
+        api_key = getattr(self, 'server_checker_api_key', '')
+        if not api_key:
+            last_req = getattr(self, '_last_api_request_timestamp', 0.0)
+            cooldown = getattr(self, '_api_cooldown_seconds', 120.0)
+
+            if (now - last_req) < cooldown:
+                log.info(f"API request throttled — last request was made {now - last_req:.1f}s ago (< {cooldown:.0f}s cooldown).")
+                return
+
+            self._last_api_request_timestamp = now
+
+        self.last_job_id = job_id
+        self.save_settings()
+
+        def _bg():
+            import json
+
+            servers = []
+            last_err = None
+            got_429 = False
+
+            if api_key:
+                try:
+                    req = urllib.request.Request(
+                        "https://rbwr.scatterbox.dev/api/servers/latest",
+                        headers={
+                            "User-Agent": "RBWR-Overlay-Client/1.0",
+                            "X-API-KEY": api_key
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        if resp.status == 200:
+                            raw = resp.read().decode("utf-8")
+                            payload = json.loads(raw)
+                            servers = self.parse_servers_from_payload(payload)
+                            self._api_cooldown_seconds = 120.0
+                        else:
+                            last_err = f"HTTP {resp.status}"
+                except Exception as e:
+                    last_err = str(e)
+                    log.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
+
+            if not servers:
+                now_fallback = time.time()
+                last_real_req = getattr(self, '_last_realisticbwr_request_timestamp', 0.0)
+                cooldown_real = getattr(self, '_api_cooldown_seconds', 120.0)
+                if (now_fallback - last_real_req) >= cooldown_real:
+                    self._last_realisticbwr_request_timestamp = now_fallback
+                    try:
+                        req = urllib.request.Request(
+                            "https://realisticbwr.org/api/public/servers",
+                            headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
+                        )
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            if resp.status == 200:
+                                raw = resp.read().decode("utf-8")
+                                payload = json.loads(raw)
+                                servers = self.parse_servers_from_payload(payload)
+                                self._api_cooldown_seconds = 120.0
+                            elif resp.status == 429:
+                                got_429 = True
+                                last_err = "HTTP 429: Too Many Requests"
+                    except urllib.error.HTTPError as e:
+                        if e.code == 429:
+                            got_429 = True
+                        last_err = f"HTTP Error {e.code}: {e.reason}"
+                    except Exception as e:
+                        last_err = str(e)
+                else:
+                    if not last_err:
+                        last_err = f"realisticbwr.org fallback throttled ({now_fallback - last_real_req:.1f}s < {cooldown_real:.0f}s)"
+
+            if got_429:
+                self._api_cooldown_seconds = max(getattr(self, '_api_cooldown_seconds', 120.0) * 2, 300.0)
+                log.warning(f"HTTP 429 Too Many Requests hit on server API. Engaged exponential backoff: next request allowed in {self._api_cooldown_seconds:.0f}s.")
+
+            if servers:
+                self.overlay_servers_data = servers
+                srv = self.find_server_by_id_or_job_id(servers, job_id)
+                
+                missing = self.validate_server_sync(srv)
+                if missing:
+                    self.run_on_main_thread(self._on_overlay_server_sync_failed, job_id, missing)
+                else:
+                    self.run_on_main_thread(self._on_overlay_server_connected, srv, False)
+            else:
+                err_msg = last_err or "Failed to connect to server API"
+                log.error(f"Error connecting overlay server sync: {err_msg}")
+                self._handle_async_sync_error(job_id, [err_msg])
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _handle_async_sync_error(self, job_id, err_list):
+        cached_servers = getattr(self, 'overlay_servers_data', [])
+        srv = self.find_server_by_id_or_job_id(cached_servers, job_id) if cached_servers else getattr(self, 'active_overlay_server', None)
+        if srv:
+            missing = self.validate_server_sync(srv)
+            if not missing:
+                self.run_on_main_thread(self._on_overlay_server_connected, srv, True)
+                return
+        self.run_on_main_thread(self._on_overlay_server_sync_failed, job_id, err_list)
+
+    def _on_overlay_server_sync_failed(self, job_id, missing):
+        err_detail = ", ".join(missing)
+        log.warning(f"Sync failed for Job ID '{job_id}'. Missing data: {err_detail}")
+        self.overlay_sync_failed = True
+        self.overlay_next_demand_switched = False
+        self.active_overlay_server = None
+        if hasattr(self, 'lbl_sync_status') and self.lbl_sync_status and self.lbl_sync_status.winfo_exists():
+            self.lbl_sync_status.config(text=f"Sync Failed! Missing data:\n{err_detail}", fg=ACCENT_RED)
+        if hasattr(self, 'lbl_sync_dtl') and self.lbl_sync_dtl and self.lbl_sync_dtl.winfo_exists():
+            self.lbl_sync_dtl.config(text="Sync Failed", fg=ACCENT_RED)
+        if hasattr(self, 'lbl_compact_sync_dtl') and self.lbl_compact_sync_dtl and self.lbl_compact_sync_dtl.winfo_exists():
+            self.lbl_compact_sync_dtl.config(text="Err", fg=ACCENT_RED)
+
+    def calibrate_dtl_seconds(self, value, is_delta=True):
+        if not hasattr(self, 'active_overlay_server') or not self.active_overlay_server:
+            return
+        now = time.time()
+        elapsed = now - getattr(self, 'overlay_heartbeat_timestamp', now)
+        current_offset = getattr(self, 'dtl_calibration_offset', 0.0)
+
+        if is_delta:
+            self.dtl_calibration_offset = current_offset + value
+        else:
+            self.dtl_calibration_offset = value - getattr(self, 'overlay_initial_dtl', 0.0) + elapsed
+
+        self.save_settings()
+        self._tick_overlay_dtl_countdown()
+
+    def _on_overlay_server_connected(self, srv, is_cached=False):
+        self.active_overlay_server = srv
+        self.overlay_sync_failed = False
+        self.overlay_next_demand_switched = False
+        
+        hb_str = srv.get("lastHeartbeat")
+        now = time.time()
+        hb_age = 0
+        if hb_str:
+            try:
+                clean_hb = hb_str.replace("Z", "+00:00")
+                dt = datetime.fromisoformat(clean_hb)
+                self.overlay_heartbeat_timestamp = dt.timestamp()
+                hb_age = now - self.overlay_heartbeat_timestamp
+            except Exception as e:
+                log.error(f"Error parsing lastHeartbeat: {e}")
+
+        if hasattr(self, 'lbl_sync_status') and self.lbl_sync_status and self.lbl_sync_status.winfo_exists():
+            if is_cached:
+                self.lbl_sync_status.config(text="Warning: Server Unreachable (Using Cached Data)", fg=ACCENT_YELLOW)
+            elif hb_age > 120:
+                self.lbl_sync_status.config(text="Warning: Outdated Data (Heartbeat > 2m ago)", fg=ACCENT_YELLOW)
+            else:
+                self.lbl_sync_status.config(text="Server Synced Successfully", fg=ACCENT_GREEN)
+
+        st = srv.get("state", {})
+        u1_st = st.get("Unit1", {})
+        u2_st = st.get("Unit2", {})
+
+        t_health = None
+        for key in ["TurbineHealth", "Turbine Health", "turbine_health", "Turbine_Health"]:
+            if key in u2_st and u2_st[key] is not None:
+                try:
+                    t_health = float(u2_st[key])
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        if getattr(self, 'enable_turbine_health_alert', False) and t_health is not None:
+            t_thresh = getattr(self, 'turbine_health_threshold', 65.0)
+            if t_health <= t_thresh:
+                if not getattr(self, '_turbine_health_alert_triggered', False):
+                    self._turbine_health_alert_triggered = True
+                    self.trigger_turbine_health_reminder(t_health, t_thresh)
+            else:
+                self._turbine_health_alert_triggered = False
+
+        dtl_val = u1_st.get("Demand Time Left") or u2_st.get("Demand Time Left") or 0
+        try:
+            self.overlay_initial_dtl = float(dtl_val)
+        except (ValueError, TypeError):
+            self.overlay_initial_dtl = 0.0
+
+        if hasattr(self, '_overlay_dtl_timer') and self._overlay_dtl_timer:
+            try:
+                self.root.after_cancel(self._overlay_dtl_timer)
+            except Exception:
+                pass
+
+        now = time.time()
+        elapsed = now - self.overlay_heartbeat_timestamp
+        live_dtl = max(0.0, self.overlay_initial_dtl - elapsed)
+        if live_dtl > 0.0:
+            self.overlay_0s_refetch_done = False
+            
+        thresh = getattr(self, 'next_demand_threshold_seconds', 60)
+
+        if getattr(self, 'overlay_next_demand_switched', False):
+            u_st = u1_st if self.calc.selected_unit == 1 else u2_st
+            new_next_dem = None
+            for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
+                if key in u_st and u_st[key] is not None:
+                    try:
+                        new_next_dem = float(u_st[key])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            if new_next_dem is not None and new_next_dem != getattr(self, '_last_switched_next_demand', None):
+                self.overlay_next_demand_switched = False
+                log.info(f"New upcoming demand detected ({new_next_dem} MWe) — updating Next Demand display.")
+            elif live_dtl > thresh:
+                self.overlay_next_demand_switched = False
+
+        if live_dtl >= thresh:
+            u_st = u1_st if self.calc.selected_unit == 1 else u2_st
+            cur_dem = None
+            for key in ["DemandU1", "DemandU2", "Demand", "demand"]:
+                if key in u_st and u_st[key] is not None:
+                    try:
+                        cur_dem = float(u_st[key])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            if cur_dem is not None:
+                calc_val = 0.0 if cur_dem < 0 else max(0.0, cur_dem)
+                self.var_demand.set(str(int(calc_val)))
+                self.update_calculations(source="demand")
+        else:
+            if not getattr(self, 'overlay_next_demand_switched', False):
+                self.overlay_next_demand_switched = True
+                u_st = u1_st if self.calc.selected_unit == 1 else u2_st
+                next_dem = None
+                for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
+                    if key in u_st and u_st[key] is not None:
+                        try:
+                            next_dem = float(u_st[key])
+                            break
+                        except (ValueError, TypeError):
+                            pass
+                if next_dem is not None:
+                    calc_val = 0.0 if next_dem < 0 else max(0.0, next_dem)
+                    self._last_switched_next_demand = next_dem
+                    self.var_demand.set(str(int(calc_val)))
+                    self.update_calculations(source="demand")
+
+        self._tick_overlay_dtl_countdown()
+
+    def _tick_overlay_dtl_countdown(self):
+        if not hasattr(self, 'active_overlay_server') or not self.active_overlay_server:
+            return
+
+        now = time.time()
+        elapsed = now - getattr(self, 'overlay_heartbeat_timestamp', now)
+        offset = getattr(self, 'dtl_calibration_offset', 0.0)
+        live_dtl = max(0.0, getattr(self, 'overlay_initial_dtl', 0.0) - elapsed + offset)
+
+        st = self.active_overlay_server.get("state", {})
+        u_st = st.get("Unit1", {}) if self.calc.selected_unit == 1 else st.get("Unit2", {})
+
+        next_dem = None
+        if not getattr(self, 'overlay_next_demand_switched', False):
+            for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
+                if key in u_st and u_st[key] is not None:
+                    try:
+                        next_dem = float(u_st[key])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+        if hasattr(self, 'lbl_popup_dtl_countdown'):
+            try:
+                if self.lbl_popup_dtl_countdown.winfo_exists():
+                    self.lbl_popup_dtl_countdown.config(text=f"Demand Time Left: {int(live_dtl)}s")
+            except Exception:
+                pass
+
+        def format_overlay_demand_label(dem_val, compact=False):
+            if dem_val is None:
+                return "---" if compact else "--- MWe"
+            try:
+                val = float(dem_val)
+                if val == -4:
+                    return "Evac"
+                if val == -3:
+                    return "RST"
+                if val == -2:
+                    return "LOOP"
+                if val == -1:
+                    return "Maint"
+                return f"{int(val)}" if compact else f"{int(val)} MWe"
+            except (ValueError, TypeError):
+                return str(dem_val)
+
+        next_txt_detailed = f"Next: {format_overlay_demand_label(next_dem)}"
+        next_txt_compact = format_overlay_demand_label(next_dem, compact=True)
+
+        if hasattr(self, 'lbl_sync_dtl'):
+            try:
+                if self.lbl_sync_dtl.winfo_exists():
+                    self.lbl_sync_dtl.config(text=next_txt_detailed)
+            except Exception:
+                pass
+
+        if hasattr(self, 'lbl_compact_sync_dtl'):
+            try:
+                if self.lbl_compact_sync_dtl.winfo_exists():
+                    self.lbl_compact_sync_dtl.config(text=next_txt_compact)
+            except Exception:
+                pass
+
+        if getattr(self, 'overlay_sync_failed', False):
+            self._overlay_dtl_timer = self.root.after(1000, self._tick_overlay_dtl_countdown)
+            return
+
+        thresh = getattr(self, 'next_demand_threshold_seconds', 60)
+        if live_dtl <= thresh and not getattr(self, 'overlay_next_demand_switched', False):
+            self.overlay_next_demand_switched = True
+            self.connect_overlay_server_async()
+
+        if live_dtl <= 0.0 and not getattr(self, 'overlay_0s_refetch_done', False):
+            self.overlay_0s_refetch_done = True
+            self.connect_overlay_server_async()
+
+        if getattr(self, 'overlay_next_demand_switched', False):
+            last_poll = getattr(self, '_last_60s_poll_timestamp', 0.0)
+            api_key = getattr(self, 'server_checker_api_key', '')
+            cooldown = 10.0 if api_key else getattr(self, '_api_cooldown_seconds', 120.0)
+            if now - last_poll >= cooldown:
+                self._last_60s_poll_timestamp = now
+                self.connect_overlay_server_async()
+
+        self._overlay_dtl_timer = self.root.after(1000, self._tick_overlay_dtl_countdown)
 
     def _sync_topmost_on_roblox(self):
         self.topmost_on_roblox = self.var_topmost_on_roblox.get()
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.withdraw()
         self.gui_queue = queue.Queue()
         self.poll_gui_queue()
         self.root.title(f"RBWR APRM Calculator v{__version__}")
         
-        # Load saved settings
         settings = self.load_settings()
         
         self.calc = Calculator(usage=settings["usage"])
@@ -589,15 +1275,60 @@ class OverlayApp:
         self.is_compact = settings["is_compact"]
         self.show_config = False
         self.updating_fields = False
+        self._api_cooldown_seconds: float = 120.0
+        self._last_api_request_timestamp: float = 0.0
+        self._last_60s_poll_timestamp: float = 0.0
+        self._last_realisticbwr_request_timestamp: float = 0.0
+        self._turbine_health_alert_triggered: bool = False
+        self.server_checker_api_key: str = str(settings.get("server_checker_api_key", ""))
         
-        # Window attributes
-        self.root.overrideredirect(True)  # Frameless/Borderless
-        self.root.attributes("-topmost", self.is_topmost)
-        self.root.attributes("-alpha", settings["opacity"])
-        self.root.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
+        if IS_LINUX:
+            self.win = tk.Toplevel(self.root)
+            self.win.title(f"RBWR APRM Calculator v{__version__}")
+            self.win.overrideredirect(True)
+        else:
+            self.root.withdraw()
+            self.win = self.root
+            self.win.overrideredirect(True)
+            
+        self.win.attributes("-topmost", self.is_topmost)
+        self.win.attributes("-alpha", settings["opacity"])
+        self.win.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         
+        self.root.option_add('*TCombobox*Listbox.background', BG_CARD)
+        self.root.option_add('*TCombobox*Listbox.foreground', TEXT_LIGHT)
+        self.root.option_add('*TCombobox*Listbox.selectBackground', '#2563eb')
+        self.root.option_add('*TCombobox*Listbox.selectForeground', '#ffffff')
+        self.root.option_add('*TCombobox*Listbox.font', ("Consolas", 9))
+        self.root.option_add('*TCombobox*Listbox.borderWidth', 1)
+        self.root.option_add('*TCombobox*Listbox.relief', 'solid')
+
+        self.root.option_add('*Entry.selectBackground', '#2563eb')
+        self.root.option_add('*Entry.selectForeground', '#ffffff')
+        self.root.option_add('*Entry.insertBackground', '#ffffff')
+        self.root.option_add('*Text.selectBackground', '#2563eb')
+        self.root.option_add('*Text.selectForeground', '#ffffff')
+        self.root.option_add('*Text.insertBackground', '#ffffff')
+
         self.style = ttk.Style()
         self.style.theme_use('clam')
+        self.style.configure("TCombobox",
+                             fieldbackground=BG_MAIN,
+                             background=BG_CARD,
+                             foreground=TEXT_LIGHT,
+                             darkcolor=BG_CARD,
+                             lightcolor=BG_CARD,
+                             selectbackground='#2563eb',
+                             selectforeground='#ffffff',
+                             insertcolor='#ffffff',
+                             arrowcolor=ACCENT_CYAN)
+        self.style.map("TCombobox",
+                       fieldbackground=[('readonly', BG_MAIN), ('focus', BG_MAIN), ('active', BG_MAIN)],
+                       foreground=[('readonly', TEXT_LIGHT), ('focus', TEXT_LIGHT), ('active', TEXT_LIGHT)],
+                       selectbackground=[('readonly', '#2563eb'), ('focus', '#2563eb'), ('active', '#2563eb')],
+                       selectforeground=[('readonly', '#ffffff'), ('focus', '#ffffff'), ('active', '#ffffff')],
+                       insertcolor=[('focus', '#ffffff'), ('active', '#ffffff')])
+
         self.style.configure("Horizontal.TScale",
                              troughcolor=BG_MAIN,
                              background=ACCENT_CYAN,
@@ -607,21 +1338,9 @@ class OverlayApp:
                              sliderthickness=14,
                              sliderlength=24)
         
-        # Screen Scan & OCR state variables
-        self.auto_scan_active = False
-        self.ocr_engine: RapidOCR | None = None  # pyright: ignore[reportInvalidTypeForm]
-        self.ocr_initializing = False
-        
-        if HAS_OCR:
-            self.ocr_initializing = True
-            threading.Thread(target=self.initialize_ocr, daemon=True).start()
-            
-        # Start background scanner loop thread
-        threading.Thread(target=self.scan_loop, daemon=True).start()
-        
         self.width_detailed = 420
         self.height_detailed = 350
-        self.width_compact = 430
+        self.width_compact = 435
         self.height_compact = 60
         self.settings_window = None
         self.suggestions_window = None
@@ -636,23 +1355,30 @@ class OverlayApp:
         self.var_usage = tk.StringVar(value=f"{self.calc.usage:.2f}")
         self.var_demand.trace_add("write", lambda name, index, mode: self.on_input_update("demand"))
         self.var_rtp.trace_add("write", lambda name, index, mode: self.on_input_update("rtp"))
-        self.enable_hud_scan = settings.get("enable_hud_scan", True)
         self.topmost_on_roblox = settings.get("topmost_on_roblox", True)
-        self.var_hud_scan = tk.BooleanVar(value=self.enable_hud_scan)
         self.var_topmost_on_roblox = tk.BooleanVar(value=self.topmost_on_roblox)
-        self.var_hud_scan.trace_add("write", lambda *args: self._sync_hud_scan())
         self.var_topmost_on_roblox.trace_add("write", lambda *args: self._sync_topmost_on_roblox())
         self.var_compact_menu = tk.BooleanVar(value=self.is_compact)
         self.var_topmost_menu = tk.BooleanVar(value=self.is_topmost)
         self.skipped_version = settings.get("skipped_version", "")
+        self.next_demand_threshold_seconds = settings.get("next_demand_threshold_seconds", 60)
+        self.var_demand_threshold = tk.StringVar(value=str(self.next_demand_threshold_seconds))
+        self.var_demand_threshold.trace_add("write", lambda *args: self.on_demand_threshold_change())
+        self.last_job_id = settings.get("last_job_id", "")
+        self.var_overlay_job_id = tk.StringVar(value=self.last_job_id)
+        self.var_overlay_job_id.trace_add("write", lambda *args: self.save_settings())
+        self.dtl_calibration_offset = float(settings.get("dtl_calibration_offset", 0.0))
         self.var_recirc_override = tk.StringVar(value="")
         self.var_recirc_override.trace_add("write", lambda *args: self.on_recirc_override_change())
-        
-        self.var_hotkey = tk.StringVar(value=settings["hotkey"])
-        self.var_hotkey.trace_add("write", lambda *args: self.start_hotkey_listener())
-        self.hotkey_thread_active = False
-        self.start_hotkey_listener()
-        
+        self.enable_turbine_health_alert = settings.get("enable_turbine_health_alert", False)
+        self.turbine_health_threshold = float(settings.get("turbine_health_threshold", 65.0))
+        self.var_turbine_health_alert = tk.BooleanVar(value=self.enable_turbine_health_alert)
+        self.is_roblox_active: bool = False
+        self._last_logged_foreground_hwnd = None
+        self._last_logged_roblox_state = None
+        self.var_turbine_health_threshold = tk.StringVar(value=str(int(self.turbine_health_threshold)))
+        self.var_turbine_health_threshold.trace_add("write", lambda *args: self.on_turbine_health_threshold_change())
+
         # Icon and Tray Setup (Loads existing icon if present, otherwise uses in-memory generated icon)
         self.icon_image_pil = get_default_icon_image()
         
@@ -674,17 +1400,16 @@ class OverlayApp:
                 
         self.setup_tray_icon()
         
-        self.context_menu = tk.Menu(self.root, tearoff=0, bg=BG_CARD, fg=TEXT_LIGHT, 
+        self.context_menu = tk.Menu(self.win, tearoff=0, bg=BG_CARD, fg=TEXT_LIGHT, 
                                     activebackground=BG_HEADER, activeforeground=ACCENT_CYAN, 
                                     bd=1, relief="solid", font=("Segoe UI", 9))
         self.context_menu.add_checkbutton(label="Compact Mode", variable=self.var_compact_menu, command=self.toggle_compact)
         self.context_menu.add_checkbutton(label="Always on Top", variable=self.var_topmost_menu, command=self.toggle_topmost)
         self.context_menu.add_checkbutton(label="Topmost on Roblox", variable=self.var_topmost_on_roblox, command=self.save_settings)
-        self.context_menu.add_checkbutton(label="Scan HUD First", variable=self.var_hud_scan, command=self.on_hud_scan_menu_toggle)
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Exit Application", command=self.quit_app)
         
-        self.root.bind("<Button-3>", self.show_context_menu)
+        self.win.bind("<Button-3>", self.show_context_menu)
         
         if self.is_compact:
             self.center_window(self.width_compact, self.height_compact)
@@ -692,59 +1417,68 @@ class OverlayApp:
             self.center_window(self.width_detailed, self.height_detailed)
         self.create_widgets()
         self.update_calculations(source="demand")
+
+        if self.last_job_id:
+            self.root.after(500, self.connect_overlay_server_async)
         
         self.check_for_updates()
         
-        self.check_focus_loop()
         self.root.after(10, self.setup_app_window_style)
+        self.root.after(100, self.check_focus_loop)
 
     def center_window(self, w, h):
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        screen_width = self.win.winfo_screenwidth()
+        screen_height = self.win.winfo_screenheight()
 
         x = (screen_width - w) // 2
         y = (screen_height - h) // 2
-        self.root.geometry(f"{w}x{h}+{x}+{y}")
+        self.win.geometry(f"{w}x{h}+{x}+{y}")
         self.start_x = x
         self.start_y = y
 
     def show_context_menu(self, event):
         try:
-            self.root.attributes("-topmost", False)
+            self.win.attributes("-topmost", False)
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.context_menu.grab_release()
-            self.root.attributes("-topmost", self.is_topmost)
+            self.win.attributes("-topmost", self.is_topmost)
 
     def setup_app_window_style(self):
+        self.win.deiconify()
         try:
-            GWL_EXSTYLE = -20
-            WS_EX_APPWINDOW = 0x00040000
-            WS_EX_TOOLWINDOW = 0x00000080
-            
-            hwnd_to_use = self.root.winfo_id()
-            parent = ctypes.windll.user32.GetParent(hwnd_to_use)
-            hwnd = parent if parent else hwnd_to_use
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            style = style & ~WS_EX_TOOLWINDOW
-            style = style | WS_EX_APPWINDOW
-            
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-            
-            w = self.width_compact if self.is_compact else self.width_detailed
-            h = self.height_compact if self.is_compact else self.height_detailed
-            x = getattr(self, 'start_x', 0)
-            y = getattr(self, 'start_y', 0)
-            
-            self.root.deiconify()
-            self.root.geometry(f"{w}x{h}+{x}+{y}")
+            if IS_WINDOWS:
+                GWL_EXSTYLE = -20
+                WS_EX_APPWINDOW = 0x00040000
+                WS_EX_TOOLWINDOW = 0x00000080
+                hwnd_to_use = self.win.winfo_id()
+                parent = ctypes.windll.user32.GetParent(hwnd_to_use)
+                hwnd = parent if parent else hwnd_to_use
+                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                style = style & ~WS_EX_TOOLWINDOW
+                style = style | WS_EX_APPWINDOW
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+            elif IS_LINUX:
+                try:
+                    self.win.attributes('-type', 'utility')
+                except Exception as le:
+                    log.warning(f"Linux window attribute note: {le}")
         except Exception as e:
             log.warning(f"Failed to set WS_EX_APPWINDOW: {e}")
+            
+        w = self.width_compact if self.is_compact else self.width_detailed
+        h = self.height_compact if self.is_compact else self.height_detailed
+        x = getattr(self, 'start_x', 0)
+        y = getattr(self, 'start_y', 0)
+        
+        self.win.geometry(f"{w}x{h}+{x}+{y}")
+        self.win.lift()
+        self.win.focus_force()
 
     def create_widgets(self):
         self.telemetry_frame = None
-        for child in self.root.winfo_children():
-            if child != self.context_menu:
+        for child in self.win.winfo_children():
+            if child != getattr(self, 'context_menu', None):
                 child.destroy()
             
         if self.is_compact:
@@ -764,13 +1498,13 @@ class OverlayApp:
     def do_drag(self, event):
         delta_x = event.x - self._drag_data["x"]
         delta_y = event.y - self._drag_data["y"]
-        x = self.root.winfo_x() + delta_x
-        y = self.root.winfo_y() + delta_y
-        self.root.geometry(f"+{x}+{y}")
+        x = self.win.winfo_x() + delta_x
+        y = self.win.winfo_y() + delta_y
+        self.win.geometry(f"+{x}+{y}")
 
     def toggle_topmost(self):
         self.is_topmost = not self.is_topmost
-        self.root.attributes("-topmost", self.is_topmost)
+        self.win.attributes("-topmost", self.is_topmost)
         symbol = "📌" if self.is_topmost else "📍"
         if hasattr(self, 'btn_topmost') and self.btn_topmost and self.btn_topmost.winfo_exists():
             self.btn_topmost.config(text=symbol)
@@ -792,16 +1526,16 @@ class OverlayApp:
             except Exception:
                 pass
         if self.is_compact:
-            self.root.geometry(f"{self.width_compact}x{self.height_compact}")
+            self.win.geometry(f"{self.width_compact}x{self.height_compact}")
             self.create_widgets()
             self.update_calculations(source="demand")
         else:
-            self.root.geometry(f"{self.width_detailed}x{self.height_detailed}")
+            self.win.geometry(f"{self.width_detailed}x{self.height_detailed}")
             self.create_widgets()
             self.update_calculations(source="demand")
 
     def build_detailed_layout(self):
-        title_bar = tk.Frame(self.root, bg=BG_HEADER, height=36)
+        title_bar = tk.Frame(self.win, bg=BG_HEADER, height=36)
         title_bar.pack(fill="x", side="top")
         title_bar.pack_propagate(False)
         self.make_draggable(title_bar)
@@ -823,6 +1557,12 @@ class OverlayApp:
         btn_settings.bind("<Enter>", lambda e: btn_settings.config(bg=BG_CARD, fg=ACCENT_CYAN))
         btn_settings.bind("<Leave>", lambda e: btn_settings.config(bg=BG_HEADER, fg=TEXT_MUTED))
 
+        btn_server_sync = tk.Label(title_bar, text="🌐", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 10), cursor="hand2")
+        btn_server_sync.pack(side="right", fill="y")
+        btn_server_sync.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
+        btn_server_sync.bind("<Enter>", lambda e: btn_server_sync.config(bg=BG_CARD, fg=ACCENT_CYAN))
+        btn_server_sync.bind("<Leave>", lambda e: btn_server_sync.config(bg=BG_HEADER, fg=TEXT_MUTED))
+
         btn_comp = tk.Label(title_bar, text="⛶", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11))
         btn_comp.pack(side="right", fill="y")
         btn_comp.bind("<Button-1>", lambda e: self.toggle_compact())
@@ -840,7 +1580,7 @@ class OverlayApp:
                                              font=("Segoe UI", 8, "bold"), cursor="hand2")
         self.lbl_recirc_indicator.bind("<Button-1>", lambda e: self.reset_recirc_override())
 
-        container = tk.Frame(self.root, bg=BG_MAIN, padx=15, pady=15)
+        container = tk.Frame(self.win, bg=BG_MAIN, padx=15, pady=15)
         container.pack(fill="both", expand=True)
         self.make_draggable(container)
 
@@ -849,14 +1589,18 @@ class OverlayApp:
         self.make_draggable(unit_frame)
 
         self.btn_u1 = tk.Label(unit_frame, text="UNIT 1", bg=BG_CARD, fg=ACCENT_CYAN, font=("Segoe UI", 9, "bold"),
-                               pady=6, width=18, bd=1, relief="flat", cursor="hand2")
-        self.btn_u1.pack(side="left", expand=True, fill="x", padx=(0, 4))
+                               pady=6, width=14, bd=1, relief="flat", cursor="hand2")
+        self.btn_u1.pack(side="left", fill="x", padx=(0, 4))
         self.btn_u1.bind("<Button-1>", lambda e: self.select_unit(1))
 
         self.btn_u2 = tk.Label(unit_frame, text="UNIT 2", bg=BG_MAIN, fg=TEXT_MUTED, font=("Segoe UI", 9, "bold"),
-                               pady=6, width=18, bd=1, relief="flat", cursor="hand2")
-        self.btn_u2.pack(side="right", expand=True, fill="x", padx=(4, 0))
+                               pady=6, width=14, bd=1, relief="flat", cursor="hand2")
+        self.btn_u2.pack(side="left", fill="x", padx=(4, 4))
         self.btn_u2.bind("<Button-1>", lambda e: self.select_unit(2))
+
+        self.lbl_sync_dtl = tk.Label(unit_frame, text="Next: -- MWe", bg=BG_MAIN, fg=ACCENT_GOLD, font=("Segoe UI", 8, "bold"), cursor="hand2")
+        self.lbl_sync_dtl.pack(side="right", padx=(4, 0))
+        self.lbl_sync_dtl.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
 
         self.update_unit_ui_state()
 
@@ -899,12 +1643,6 @@ class OverlayApp:
         btn_add10.bind("<Enter>", lambda e: btn_add10.config(bg=BG_HEADER, fg=TEXT_LIGHT))
         btn_add10.bind("<Leave>", lambda e: btn_add10.config(bg=BG_CARD, fg=ACCENT_CYAN))
 
-        self.btn_scan = tk.Label(demand_adj_frame, font=("Consolas", 8, "bold"), padx=5, pady=2, cursor="hand2")
-        self.btn_scan.pack(side="left", padx=(6, 0))
-        self.btn_scan.bind("<Button-1>", lambda e: self.toggle_auto_scan())
-        self.btn_scan.bind("<Enter>", self.on_scan_enter)
-        self.btn_scan.bind("<Leave>", self.on_scan_leave)
-
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
         self.lbl_rtp_in = tk.Label(input_card, text=f"CORE POWER ({unit_suffix}%)", bg=BG_MAIN, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
         self.lbl_rtp_in.grid(row=3, column=0, sticky="w", pady=2, padx=10)
@@ -924,7 +1662,7 @@ class OverlayApp:
         lbl_gen.grid(row=1, column=1, sticky="w", pady=2, padx=10)
         self.make_draggable(lbl_gen)
         
-        self.lbl_gen_val = tk.Label(input_card, text="⚡ 0.00 MWe", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
+        self.lbl_gen_val = tk.Label(input_card, text="0.00 MWe", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
         self.lbl_gen_val.grid(row=2, column=1, sticky="w", pady=(0, 10), padx=10)
         self.make_draggable(self.lbl_gen_val)
 
@@ -932,15 +1670,11 @@ class OverlayApp:
         lbl_feed.grid(row=3, column=1, sticky="w", pady=2, padx=10)
         self.make_draggable(lbl_feed)
         
-        self.lbl_feed_val = tk.Label(input_card, text="💧 0.00 kg/s", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
+        self.lbl_feed_val = tk.Label(input_card, text="0.00 kg/s", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
         self.lbl_feed_val.grid(row=4, column=1, sticky="w", pady=(0, 10), padx=10)
         self.make_draggable(self.lbl_feed_val)
 
-        self.lbl_debug = tk.Label(container, text="OCR: Standby", bg=BG_MAIN, fg=TEXT_MUTED,
-                                  font=("Consolas", 7))
-        self.lbl_debug.pack(side="bottom", fill="x", pady=(4, 0))
-
-        self.btn_feedback = tk.Label(container, text="💬 Feedback & Suggestions", bg=BG_MAIN, fg=TEXT_MUTED,
+        self.btn_feedback = tk.Label(container, text="Feedback & Suggestions", bg=BG_MAIN, fg=TEXT_MUTED,
                                      font=("Segoe UI", 8, "bold"), cursor="hand2")
         self.btn_feedback.pack(side="bottom", pady=(3, 3))
         self.btn_feedback.bind("<Button-1>", lambda e: self.open_suggestions_dialog())
@@ -957,15 +1691,13 @@ class OverlayApp:
         self.lbl_neon_rtp.pack(anchor="center")
         self.make_draggable(self.lbl_neon_rtp)
 
-        self.lbl_neon_sub = tk.Label(self.neon_frame, text="⚡ APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED, 
+        self.lbl_neon_sub = tk.Label(self.neon_frame, text="APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED, 
                                      font=("Consolas", 8, "bold"))
         self.lbl_neon_sub.pack(anchor="center", pady=(2, 0))
         self.make_draggable(self.lbl_neon_sub)
 
-        self.update_scan_button_styles()
-
     def build_compact_layout(self):
-        compact_frame = tk.Frame(self.root, bg=BG_HEADER, padx=8, pady=5)
+        compact_frame = tk.Frame(self.win, bg=BG_HEADER, padx=8, pady=5)
         compact_frame.pack(fill="both", expand=True)
         self.make_draggable(compact_frame)
         compact_frame.bind("<Double-Button-1>", lambda e: self.toggle_compact())
@@ -978,10 +1710,16 @@ class OverlayApp:
         btn_close.bind("<Leave>", lambda e: btn_close.config(fg=TEXT_MUTED))
 
         btn_exp = tk.Label(compact_frame, text="⛶", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 9), cursor="hand2")
-        btn_exp.pack(side="right", padx=6)
+        btn_exp.pack(side="right", padx=4)
         btn_exp.bind("<Button-1>", lambda e: self.toggle_compact())
         btn_exp.bind("<Enter>", lambda e: btn_exp.config(fg=ACCENT_CYAN))
         btn_exp.bind("<Leave>", lambda e: btn_exp.config(fg=TEXT_MUTED))
+
+        self.lbl_compact_sync_dtl = tk.Label(compact_frame, text="--", bg=BG_HEADER, fg=ACCENT_GOLD, font=("Consolas", 8, "bold"), cursor="hand2")
+        self.lbl_compact_sync_dtl.pack(side="right", padx=4)
+        self.lbl_compact_sync_dtl.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
+        self.lbl_compact_sync_dtl.bind("<Enter>", lambda e: self.lbl_compact_sync_dtl.config(fg=ACCENT_CYAN))
+        self.lbl_compact_sync_dtl.bind("<Leave>", lambda e: self.lbl_compact_sync_dtl.config(fg=ACCENT_GOLD))
 
         handle = tk.Label(compact_frame, text="⋮⋮", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 12, "bold"), cursor="fleur")
         handle.pack(side="left", padx=(0, 5))
@@ -1009,12 +1747,6 @@ class OverlayApp:
         btn_min10.bind("<Enter>", lambda e: btn_min10.config(fg=TEXT_LIGHT))
         btn_min10.bind("<Leave>", lambda e: btn_min10.config(fg=ACCENT_CYAN))
 
-        self.btn_compact_scan = tk.Label(compact_frame, font=("Segoe UI", 9, "bold"), padx=4, pady=1, cursor="hand2", bg=BG_HEADER)
-        self.btn_compact_scan.pack(side="left", padx=2)
-        self.btn_compact_scan.bind("<Button-1>", lambda e: self.toggle_auto_scan())
-        self.btn_compact_scan.bind("<Enter>", self.on_compact_scan_enter)
-        self.btn_compact_scan.bind("<Leave>", self.on_compact_scan_leave)
-
         self.ent_demand = tk.Entry(compact_frame, textvariable=self.var_demand, bg=BG_MAIN, fg=TEXT_LIGHT,
                                    insertbackground=TEXT_LIGHT, font=("Consolas", 10, "bold"), bd=0,
                                    highlightthickness=1, highlightcolor=ACCENT_CYAN, highlightbackground=BG_CARD,
@@ -1035,7 +1767,7 @@ class OverlayApp:
 
         # Stack RTP and Flow vertically to save horizontal space
         self.telemetry_frame = tk.Frame(compact_frame, bg=BG_HEADER)
-        self.telemetry_frame.place(x=288, rely=0.5, anchor="w")
+        self.telemetry_frame.pack(side="left", padx=(2, 0))
         self.make_draggable(self.telemetry_frame)
         self.telemetry_frame.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
@@ -1052,7 +1784,6 @@ class OverlayApp:
         self.make_draggable(self.lbl_compact_flow)
         self.lbl_compact_flow.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
-        self.update_scan_button_styles()
         self.update_unit_ui_state()
 
     def adjust_demand(self, amount):
@@ -1065,6 +1796,21 @@ class OverlayApp:
 
     def select_unit(self, unit):
         self.calc.selected_unit = unit
+        if hasattr(self, 'active_overlay_server') and self.active_overlay_server:
+            st = self.active_overlay_server.get("state", {})
+            u_st = st.get("Unit1", {}) if unit == 1 else st.get("Unit2", {})
+            target_keys = ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"] if getattr(self, 'overlay_next_demand_switched', False) else ["DemandU1", "DemandU2", "Demand", "demand"]
+            dem_val = None
+            for key in target_keys:
+                if key in u_st and u_st[key] is not None:
+                    try:
+                        dem_val = float(u_st[key])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            if dem_val is not None:
+                self.var_demand.set(str(dem_val))
+
         self.update_unit_ui_state()
         self.update_calculations(source="demand")
         self.save_settings()
@@ -1088,7 +1834,6 @@ class OverlayApp:
                 pystray.MenuItem("Compact Mode", lambda icon, item: self.toggle_compact(), checked=lambda item: self.is_compact),
                 pystray.MenuItem("Always on Top", lambda icon, item: self.toggle_topmost(), checked=lambda item: self.is_topmost),
                 pystray.MenuItem("Topmost on Roblox", lambda icon, item: self.toggle_topmost_on_roblox(), checked=lambda item: self.topmost_on_roblox),
-                pystray.MenuItem("Scan HUD First", lambda icon, item: self.toggle_hud_scan_setting(), checked=lambda item: self.enable_hud_scan),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Exit", lambda icon, item: self.quit_app())
             )
@@ -1103,12 +1848,16 @@ class OverlayApp:
             "usage": 61.32,
             "opacity": 0.90,
             "selected_unit": 1,
-            "hotkey": "F7",
             "is_compact": False,
             "is_topmost": True,
-            "enable_hud_scan": True,
             "topmost_on_roblox": True,
-            "skipped_version": ""
+            "skipped_version": "",
+            "next_demand_threshold_seconds": 60,
+            "last_job_id": "",
+            "dtl_calibration_offset": 0.0,
+            "enable_turbine_health_alert": False,
+            "turbine_health_threshold": 65.0,
+            "server_checker_api_key": ""
         }
         try:
             if os.path.exists(CONFIG_FILE):
@@ -1123,14 +1872,18 @@ class OverlayApp:
         try:
             data = {
                 "usage": self.calc.usage,
-                "opacity": self.root.attributes("-alpha"),
+                "opacity": self.win.attributes("-alpha"),
                 "selected_unit": self.calc.selected_unit,
-                "hotkey": self.var_hotkey.get(),
                 "is_compact": self.is_compact,
                 "is_topmost": self.is_topmost,
-                "enable_hud_scan": self.var_hud_scan.get(),
                 "topmost_on_roblox": self.var_topmost_on_roblox.get(),
-                "skipped_version": getattr(self, 'skipped_version', "")
+                "skipped_version": getattr(self, 'skipped_version', ""),
+                "next_demand_threshold_seconds": getattr(self, 'next_demand_threshold_seconds', 60),
+                "last_job_id": self.var_overlay_job_id.get().strip() if hasattr(self, 'var_overlay_job_id') else getattr(self, 'last_job_id', ""),
+                "dtl_calibration_offset": getattr(self, 'dtl_calibration_offset', 0.0),
+                "enable_turbine_health_alert": getattr(self, 'enable_turbine_health_alert', False),
+                "turbine_health_threshold": getattr(self, 'turbine_health_threshold', 65.0),
+                "server_checker_api_key": getattr(self, 'server_checker_api_key', "")
             }
             with open(CONFIG_FILE, "w") as f:
                 json.dump(data, f, indent=4)
@@ -1138,17 +1891,17 @@ class OverlayApp:
             pass
 
     def restore_window(self):
-        self.root.deiconify()
-        self.root.lift()
-        self.root.attributes("-topmost", self.is_topmost)
+        self.win.deiconify()
+        self.win.lift()
+        self.win.attributes("-topmost", self.is_topmost)
         if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
-            self.settings_window.lift(self.root)
+            self.settings_window.lift(self.win)
         if hasattr(self, 'suggestions_window') and self.suggestions_window and self.suggestions_window.winfo_exists():
-            self.suggestions_window.lift(self.root)
+            self.suggestions_window.lift(self.win)
         if hasattr(self, 'update_window') and self.update_window and self.update_window.winfo_exists():
-            self.update_window.lift(self.root)
+            self.update_window.lift(self.win)
         if hasattr(self, 'loading_window') and self.loading_window and self.loading_window.winfo_exists():
-            self.loading_window.lift(self.root)
+            self.loading_window.lift(self.win)
 
     def open_log_file(self):
         try:
@@ -1160,11 +1913,6 @@ class OverlayApp:
             log.error(f"Failed to open log file: {e}")
 
     def quit_app(self):
-        self.hotkey_thread_active = False
-        try:
-            ctypes.windll.user32.UnregisterHotKey(None, 101)
-        except Exception:
-            pass
         if hasattr(self, 'tray') and self.tray:
             try:
                 self.tray.stop()
@@ -1172,488 +1920,6 @@ class OverlayApp:
                 pass
         self.root.destroy()
         os._exit(0)
-
-    def get_ocr_model_paths(self):
-        import os
-        import sys
-        
-        det_name = "ch_PP-OCRv3_det_infer.onnx"
-        rec_name = "ch_PP-OCRv3_rec_infer.onnx"
-        cls_name = "ch_PP-OCRv3_cls_infer.onnx"
-        
-        possible_dirs = []
-        
-        try:
-            import rapidocr_onnxruntime
-            pkg_dir = os.path.dirname(os.path.abspath(rapidocr_onnxruntime.__file__))
-            possible_dirs.append(os.path.join(pkg_dir, "models"))
-        except Exception:
-            pass
-            
-        main_dir = os.path.dirname(os.path.abspath(__file__))
-        exe_dir = os.path.dirname(sys.executable)
-        
-        possible_dirs.extend([
-            os.path.join(exe_dir, "rapidocr_onnxruntime", "models"),
-            os.path.join(exe_dir, "models"),
-            os.path.join(main_dir, "rapidocr_onnxruntime", "models"),
-            os.path.join(main_dir, "models"),
-            os.path.join(main_dir, "venv", "Lib", "site-packages", "rapidocr_onnxruntime", "models"),
-        ])
-        
-        debug_info = []
-        
-        for d in possible_dirs:
-            det_p = os.path.join(d, det_name)
-            rec_p = os.path.join(d, rec_name)
-            cls_p = os.path.join(d, cls_name)
-            exists = os.path.exists(det_p)
-            debug_info.append(f"{d} (det={exists}, rec={os.path.exists(rec_p)}, cls={os.path.exists(cls_p)})")
-            if exists and os.path.exists(rec_p):
-                self.log_diag(f"Found OCR models in {d}", "success")
-                paths = {
-                    "det_model_path": det_p,
-                    "rec_model_path": rec_p,
-                    "use_cls": False,
-                    "limit_side_len": 720
-                }
-                # cls model is optional — only include if it actually exists
-                if os.path.exists(cls_p):
-                    paths["cls_model_path"] = cls_p
-                else:
-                    log.warning(f"cls model not found at {cls_p}, skipping (classification is optional)")
-                return paths
-                
-        print("OCR Model check failed. Searched in:")
-        for dbg in debug_info:
-            print(" -", dbg)
-        self.log_diag("OCR Model Paths not found.", "error")
-        return {}
-
-    def initialize_ocr(self):
-        try:
-            paths = self.get_ocr_model_paths()
-            log.info(f"Initializing RapidOCR with paths: {paths}")
-            
-            # Monkey-patch init_module if it exists (older rapidocr versions) to use fully-qualified imports
-            if hasattr(RapidOCR, 'init_module'):
-                _original_init_module = RapidOCR.init_module  # pyright: ignore[reportOptionalMemberAccess]
-                
-                @staticmethod
-                def _patched_init_module(module_name, class_name):
-                    import importlib
-                    qualified = f"rapidocr_onnxruntime.{module_name}"
-                    try:
-                        log.info(f"Importing OCR module: {qualified}.{class_name}")
-                        mod = importlib.import_module(qualified)
-                        return getattr(mod, class_name)
-                    except (ImportError, AttributeError):
-                        log.info(f"Qualified import failed, falling back to: {module_name}")
-                        return _original_init_module(module_name, class_name)
-                
-                RapidOCR.init_module = _patched_init_module
-            
-            self.ocr_engine = RapidOCR(**paths)  # pyright: ignore[reportOptionalCall]
-            log.info("RapidOCR engine initialized successfully!")
-        except Exception as e:
-            log.error(f"Failed to initialize RapidOCR engine: {e}")
-            log.error(traceback.format_exc())
-            self.log_diag(f"Init fail: {e}", "error")
-        finally:
-            self.ocr_initializing = False
-            self.run_on_main_thread(self.update_scan_button_styles)
-
-    def toggle_auto_scan(self):
-        if not HAS_OCR:
-            self.show_custom_message("Screen Reader", 
-                                     "To enable automatic screen scanning, please install the OCR package:\n\n"
-                                     "pip install rapidocr-onnxruntime pillow")
-            return
-
-        if self.ocr_initializing:
-            self.show_custom_message("Screen Reader", "Initializing OCR engine models. Please wait a few seconds...")
-            return
-
-        if not self.ocr_engine:
-            try:
-                paths = self.get_ocr_model_paths()
-                log.info(f"Retrying RapidOCR init with paths: {paths}")
-                self.ocr_engine = RapidOCR(**paths)  # pyright: ignore[reportOptionalCall]
-                log.info("RapidOCR engine initialized successfully on retry!")
-            except Exception as e:
-                log.error(f"Failed to initialize RapidOCR on retry: {e}")
-                log.error(traceback.format_exc())
-                self.show_custom_message("Screen Reader", f"Failed to initialize OCR engine models.\n\nError: {e}\n\nCheck RBWR_APRM_Calculator.log for details.", is_error=True)
-                return
-
-        self.auto_scan_active = not self.auto_scan_active
-        self.update_scan_button_styles()
-
-    def update_scan_button_styles(self):
-        if hasattr(self, 'btn_scan') and self.btn_scan and self.btn_scan.winfo_exists():
-            if not HAS_OCR:
-                self.btn_scan.config(text="🔍 N/A", bg=BG_CARD, fg="#3a3d46")
-            elif self.ocr_initializing:
-                self.btn_scan.config(text="🔍 INIT", bg=BG_CARD, fg=ACCENT_GOLD)
-            elif self.auto_scan_active:
-                self.btn_scan.config(text="🔍 ON", bg=ACCENT_GREEN, fg=BG_MAIN)
-            else:
-                self.btn_scan.config(text="🔍 OFF", bg=BG_CARD, fg=ACCENT_CYAN)
-
-        if hasattr(self, 'btn_compact_scan') and self.btn_compact_scan and self.btn_compact_scan.winfo_exists():
-            if not HAS_OCR:
-                self.btn_compact_scan.config(text="🔍", fg="#3a3d46")
-            elif self.ocr_initializing:
-                self.btn_compact_scan.config(text="⏳", fg=ACCENT_GOLD)
-            elif self.auto_scan_active:
-                self.btn_compact_scan.config(text="🔴", fg=ACCENT_RED)
-            else:
-                self.btn_compact_scan.config(text="🔍", fg=ACCENT_CYAN)
-
-    def on_scan_enter(self, e):
-        if not HAS_OCR or self.ocr_initializing:
-            return
-        if hasattr(self, 'btn_scan') and self.btn_scan and self.btn_scan.winfo_exists():
-            if self.auto_scan_active:
-                self.btn_scan.config(bg=BG_HEADER, fg=ACCENT_GREEN)
-            else:
-                self.btn_scan.config(bg=BG_HEADER, fg=TEXT_LIGHT)
-
-    def on_scan_leave(self, e):
-        self.update_scan_button_styles()
-
-    def on_compact_scan_enter(self, e):
-        if not HAS_OCR or self.ocr_initializing:
-            return
-        if hasattr(self, 'btn_compact_scan') and self.btn_compact_scan and self.btn_compact_scan.winfo_exists():
-            if self.auto_scan_active:
-                self.btn_compact_scan.config(fg=TEXT_LIGHT)
-            else:
-                self.btn_compact_scan.config(fg=TEXT_LIGHT)
-
-    def on_compact_scan_leave(self, e):
-        self.update_scan_button_styles()
-
-    def scan_loop(self):
-        import time
-        while True:
-            if self.auto_scan_active and self.ocr_engine:
-                success = self.perform_screen_scan()
-                if success:
-                    self.auto_scan_active = False
-                    self.run_on_main_thread(self.update_scan_button_styles)
-            time.sleep(1.0)
-
-    def start_hotkey_listener(self):
-        if hasattr(self, 'hotkey_thread_active') and self.hotkey_thread_active:
-            self.hotkey_thread_active = False
-            try:
-                ctypes.windll.user32.UnregisterHotKey(None, 101)
-            except Exception:
-                pass
-            
-        self.hotkey_thread_active = True
-        hotkey_val = self.var_hotkey.get().upper()
-        threading.Thread(target=self.hotkey_loop, args=(hotkey_val,), daemon=True).start()
-
-    def hotkey_loop(self, current_key):
-        import time
-        from ctypes import wintypes
-        user32 = ctypes.windll.user32
-
-        VK_MAP = {}
-        # F1-F12
-        for i in range(1, 13):
-            VK_MAP[f"F{i}"] = 0x6F + i
-        # Letters A-Z
-        for char_code in range(65, 91):
-            VK_MAP[chr(char_code)] = char_code
-        # Numbers 0-9
-        for num in range(10):
-            VK_MAP[str(num)] = 0x30 + num
-            
-        # Add basic symbols
-        VK_MAP["SPACE"] = 0x20
-        VK_MAP["TAB"] = 0x09
-        VK_MAP["RETURN"] = 0x0D
-        
-        vk = VK_MAP.get(current_key)
-        if vk is None:
-            self.log_diag(f"Key {current_key} not globally bindable", "warning")
-            return
-
-        user32.UnregisterHotKey(None, 101)
-        if not user32.RegisterHotKey(None, 101, 0, vk):
-            self.log_diag(f"Hotkey register failed for {current_key}", "error")
-            return
-            
-        self.log_diag(f"Bound global hotkey: {current_key}", "success")
-
-        msg = wintypes.MSG()
-        while self.hotkey_thread_active:
-            if user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1): # PM_REMOVE = 1
-                if msg.message == 0x0312:  # WM_HOTKEY
-                    self.run_on_main_thread(self.toggle_auto_scan)
-                user32.TranslateMessage(ctypes.byref(msg))
-                user32.DispatchMessageW(ctypes.byref(msg))
-            time.sleep(0.05)
-            
-        user32.UnregisterHotKey(None, 101)
-
-    def listen_for_hotkey(self):
-        if hasattr(self, 'btn_hotkey_bind') and self.btn_hotkey_bind and self.btn_hotkey_bind.winfo_exists():
-            self.btn_hotkey_bind.config(text="[ PRESS KEY... ]", fg=ACCENT_GOLD, bg=BG_HEADER)
-        if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
-            self.settings_window.bind("<Key>", self.on_hotkey_captured)
-            self.settings_window.focus_set()
-        else:
-            self.root.bind("<Key>", self.on_hotkey_captured)
-            self.root.focus_set()
-
-    def on_hotkey_captured(self, event):
-        if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
-            self.settings_window.unbind("<Key>")
-        else:
-            self.root.unbind("<Key>")
-        key = event.keysym.upper()
-        
-        if key == "ESCAPE":
-            if hasattr(self, 'btn_hotkey_bind') and self.btn_hotkey_bind and self.btn_hotkey_bind.winfo_exists():
-                self.btn_hotkey_bind.config(text=self.var_hotkey.get(), fg=ACCENT_CYAN, bg=BG_MAIN)
-            return
-
-        # Map common keysym representations to standard names
-        if key == "SPACE":
-            pass
-        elif key == "RETURN":
-            pass
-        elif len(key) == 1 and (key.isalpha() or key.isdigit()):
-            pass
-        elif key.startswith("F") and len(key) > 1 and key[1:].isdigit():
-            pass
-        else:
-            if len(key) > 6:
-                key = key[:6]
-
-        self.var_hotkey.set(key)
-        if hasattr(self, 'btn_hotkey_bind') and self.btn_hotkey_bind and self.btn_hotkey_bind.winfo_exists():
-            self.btn_hotkey_bind.config(text=key, fg=ACCENT_GREEN, bg=BG_MAIN)
-        self.save_settings()
-
-    def perform_screen_scan(self):
-        try:
-            rect = get_active_window_rect()
-            if not rect:
-                self.log_diag("No active window", "error")
-                return False
-
-            left, top, width, height = rect
-
-            hwnd = ctypes.windll.user32.GetForegroundWindow()
-            buffer_len = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
-            buffer = ctypes.create_unicode_buffer(buffer_len)
-            ctypes.windll.user32.GetWindowTextW(hwnd, buffer, buffer_len)
-            window_title = buffer.value
-
-            if "Roblox" not in window_title and "Realistic" not in window_title:
-                self.log_diag("Roblox not focused", "warning")
-                return False
-
-            from PIL import ImageGrab
-
-            found = False
-            if self.enable_hud_scan:
-                crop_w = 800
-                crop_h = 320
-                x_offset = 20
-                y_offset = -20
-                x1_hud = left + 10 + x_offset
-                y1_hud = top + height - crop_h - 10 + y_offset
-                x2_hud = x1_hud + crop_w
-                y2_hud = y1_hud + crop_h
-
-                self.log_diag("HUD scan stage...", "info")
-                screenshot = ImageGrab.grab(bbox=(x1_hud, y1_hud, x2_hud, y2_hud), all_screens=True)
-                found = self.process_ocr_image(screenshot, stage="HUD")
-                if found:
-                    return True
-
-            if not found:
-                self.log_diag("HUD miss. Full screen stage...", "info")
-                x1_full = left
-                y1_full = top
-                x2_full = x1_full + width
-                y2_full = y1_full + height
-                screenshot_full = ImageGrab.grab(bbox=(x1_full, y1_full, x2_full, y2_full), all_screens=True)
-                return self.process_ocr_image(screenshot_full, stage="FULL")
-            return False
-
-        except Exception as e:
-            self.log_diag(f"Scan crash: {str(e)}", "error")
-            return False
-
-    def process_ocr_image(self, img, stage=""):
-        engine = self.ocr_engine
-        if not engine:
-            self.log_diag("OCR not ready yet", "warning")
-            return False
-        
-        try:
-            def clean_demand_string(val_str: str) -> str:
-                if not val_str:
-                    return val_str
-                if not val_str.endswith('0'):
-                    r_index = val_str.rfind('0')
-                    if r_index != -1:
-                        val_str = val_str[:r_index + 1]
-                while True:
-                    if not val_str:
-                        break
-                    try:
-                        val_num = float(val_str)
-                    except ValueError:
-                        break
-                    if val_num > 1200 and val_str.endswith('00'):
-                        val_str = val_str[:-1]
-                    else:
-                        break
-                return val_str
-
-            import numpy as np
-            img_np = np.array(img.convert('RGB'))
-            result, _ = engine(img_np)
-            if not result:
-                self.log_diag(f"No text read in {stage}", "warning")
-                return False
-
-            text_lines = [line[1] for line in result]
-            full_text = " ".join(text_lines).strip()
-
-            cleaned = re.sub(r'[\s\-_:=|\\/\[\]\(\)]+', '', full_text)
-
-            next_match = re.search(r'(?i)NextDe[mr]a?nd?U([12lIz|ZzsS])(\*+|\d+)', cleaned)
-            demand_match = re.search(r'(?i)DemandU([12lIz|ZzsS])(\d+)', cleaned)
-
-            detected_unit = None
-            detected_demand = None
-
-            if next_match:
-                unit_char = next_match.group(1).lower()
-                if unit_char in ('1', 'l', 'i', '|'):
-                    detected_unit = 1
-                elif unit_char in ('2', 'z', 's'):
-                    detected_unit = 2
-                
-                val_str = next_match.group(2)
-                if '*' in val_str or not val_str.isdigit():
-                    if demand_match:
-                        dem_unit_char = demand_match.group(1).lower()
-                        if dem_unit_char in ('1', 'l', 'i', '|'):
-                            detected_unit = 1
-                        elif dem_unit_char in ('2', 'z', 's'):
-                            detected_unit = 2
-                        detected_demand = float(clean_demand_string(demand_match.group(2)))
-                else:
-                    detected_demand = float(clean_demand_string(val_str))
-            elif demand_match:
-                unit_char = demand_match.group(1).lower()
-                if unit_char in ('1', 'l', 'i', '|'):
-                    detected_unit = 1
-                elif unit_char in ('2', 'z', 's'):
-                    detected_unit = 2
-                detected_demand = float(clean_demand_string(demand_match.group(2)))
-
-            # Scan the rest of the text for a general unit indicator if not found via HUD demand labels
-            if detected_unit is None:
-                unit_word_match = re.search(r'(?i)\bUnit\s*0?([12])\b', full_text)
-                if unit_word_match:
-                    detected_unit = int(unit_word_match.group(1))
-                else:
-                    unit_cleaned_match = re.search(r'(?i)Unit0?([12])', cleaned)
-                    if unit_cleaned_match:
-                        detected_unit = int(unit_cleaned_match.group(1))
-                    else:
-                        u_word_match = re.search(r'(?i)\bU([12])\b', full_text)
-                        if u_word_match:
-                            detected_unit = int(u_word_match.group(1))
-
-            if detected_demand is not None:
-                self.log_diag(f"Matched HUD: U{detected_unit or '?'}({detected_demand})", "success")
-                self.root.after(0, lambda: self.apply_auto_telemetry(detected_unit, detected_demand))
-                return True
-
-            match_net = re.search(r'(?i)Network\s*dem[a-z0-9]*\s*[:\s]+(\d+)(?:\s*\(\s*(\d+)\s*\))?', full_text)
-            if match_net:
-                val1 = float(clean_demand_string(match_net.group(1)))
-                val2 = float(clean_demand_string(match_net.group(2))) if match_net.group(2) else None
-                
-                active_unit = detected_unit if detected_unit is not None else self.calc.selected_unit
-                if active_unit == 1:
-                     detected_demand = val1
-                else:
-                    if val2 is not None:
-                        if val2 > val1:
-                            detected_demand = val2 - val1
-                        else:
-                            detected_demand = val2
-                    else:
-                        detected_demand = val1
-                
-                self.log_diag(f"Matched Net: D({detected_demand}) (Unit: {active_unit})", "success")
-                self.run_on_main_thread(lambda: self.apply_auto_telemetry(active_unit, detected_demand))
-                return True
-
-            match_fallback = re.search(r'(?i)Demand(\d+)', cleaned)
-            if match_fallback:
-                detected_demand = float(clean_demand_string(match_fallback.group(1)))
-                self.log_diag(f"Matched Fallback: D({detected_demand}) (Unit: {detected_unit})", "success")
-                self.run_on_main_thread(lambda: self.apply_auto_telemetry(detected_unit, detected_demand))
-                return True
-
-            match_generic = re.search(r'(?i)(?:demand|load|dem)[A-Za-z]*(\d+)', cleaned)
-            if match_generic:
-                detected_demand = float(clean_demand_string(match_generic.group(1)))
-                self.log_diag(f"Matched Generic: D({detected_demand}) (Unit: {detected_unit})", "success")
-                self.run_on_main_thread(lambda: self.apply_auto_telemetry(detected_unit, detected_demand))
-                return True
-
-            snippet = (full_text[:20] + "...") if len(full_text) > 20 else full_text
-            self.log_diag(f"Unmatched: '{snippet}'", "warning")
-            return False
-        except Exception as e:
-            self.log_diag(f"OCR process fail: {str(e)}", "error")
-            return False
-
-    def apply_auto_telemetry(self, unit, demand):
-        if self.updating_fields:
-            return
-
-        if unit is not None and self.calc.selected_unit != unit:
-            self.select_unit(unit)
-
-        current_val = self.var_demand.get()
-        try:
-            current_float = float(current_val)
-        except ValueError:
-            current_float = -1.0
-
-        if abs(current_float - demand) > 0.1:
-            self.var_demand.set(f"{demand:.2f}" if not self.is_compact else f"{int(demand)}")
-
-    def log_diag(self, message, level="info"):
-        log_fn = getattr(log, level if level != "success" else "info", log.info)
-        log_fn(f"[DIAG] {message}")
-        if hasattr(self, 'lbl_debug') and self.lbl_debug and self.lbl_debug.winfo_exists():
-            color = TEXT_MUTED
-            if level == "error":
-                color = ACCENT_RED
-            elif level == "success":
-                color = ACCENT_GREEN
-            elif level == "warning":
-                color = ACCENT_GOLD
-            elif level == "info":
-                color = ACCENT_CYAN
-            self.run_on_main_thread(lambda: self.lbl_debug.config(text=f"OCR: {message}", fg=color))
 
     def update_unit_ui_state(self):
         if hasattr(self, 'btn_u1') and hasattr(self, 'btn_u2') and self.btn_u1.winfo_exists() and self.btn_u2.winfo_exists():
@@ -1684,20 +1950,20 @@ class OverlayApp:
             self.settings_window.focus_force()
             return
 
-        settings_win = tk.Toplevel(self.root)
+        settings_win = tk.Toplevel(self.win)
         self.settings_window = settings_win
-        settings_win.transient(self.root)
+        settings_win.transient(self.win)
 
         settings_win.title("APRM Monitor Settings")
         settings_win.configure(bg=BG_CARD, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         settings_win.overrideredirect(True)
         settings_win.attributes("-topmost", True)
 
-        # Center relative to root window
+        # Center relative to active overlay window
         w = 380
-        h = 435
-        x = self.root.winfo_x() + (self.root.winfo_width() - w) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - h) // 2
+        h = 480
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
 
         settings_win.geometry(f"{w}x{h}+{x}+{y}")
 
@@ -1719,7 +1985,7 @@ class OverlayApp:
         title_bar.bind("<Button-1>", start_drag)
         title_bar.bind("<B1-Motion>", do_drag)
 
-        title_lbl = tk.Label(title_bar, text=" ⚙ CONFIGURATION SETTINGS", bg=BG_HEADER, fg=ACCENT_CYAN,
+        title_lbl = tk.Label(title_bar, text="CONFIGURATION SETTINGS", bg=BG_HEADER, fg=ACCENT_CYAN,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
         title_lbl.bind("<Button-1>", start_drag)
@@ -1755,64 +2021,39 @@ class OverlayApp:
         lbl_opacity = tk.Label(content_frame, text="Overlay Opacity:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
         lbl_opacity.grid(row=2, column=0, sticky="w", pady=4)
 
-        self.slider_opacity = ttk.Scale(content_frame, from_=0.3, to=1.0, value=self.root.attributes("-alpha"),
+        self.slider_opacity = ttk.Scale(content_frame, from_=0.3, to=1.0, value=self.win.attributes("-alpha"),
                                          orient="horizontal", command=self.on_opacity_change)
         self.slider_opacity.grid(row=2, column=1, sticky="we", padx=10, pady=4)
 
 
-        lbl_hotkey = tk.Label(content_frame, text="Scan Hotkey:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_hotkey.grid(row=3, column=0, sticky="w", pady=4)
-
-        self.btn_hotkey_bind = tk.Label(content_frame, text=self.var_hotkey.get(), bg=BG_MAIN, fg=ACCENT_CYAN,
-                                        font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
-        self.btn_hotkey_bind.grid(row=3, column=1, sticky="e", padx=10, pady=4)
-        self.btn_hotkey_bind.bind("<Button-1>", lambda e: self.listen_for_hotkey())
-        self.btn_hotkey_bind.bind("<Enter>", lambda e: self.btn_hotkey_bind.config(bg=BG_HEADER, fg=TEXT_LIGHT))
-        self.btn_hotkey_bind.bind("<Leave>", lambda e: self.btn_hotkey_bind.config(bg=BG_MAIN, fg=ACCENT_CYAN if self.btn_hotkey_bind.cget("text") != "[ PRESS KEY... ]" else ACCENT_GOLD))
-
-
-        lbl_log = tk.Label(content_frame, text="Diagnostics:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_log.grid(row=4, column=0, sticky="w", pady=4)
-
-        self.btn_open_log = tk.Label(content_frame, text="📄 Open Log", bg=BG_MAIN, fg=ACCENT_CYAN,
-                                      font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
-        self.btn_open_log.grid(row=4, column=1, sticky="e", padx=10, pady=4)
-        self.btn_open_log.bind("<Button-1>", lambda e: self.open_log_file())
-        self.btn_open_log.bind("<Enter>", lambda e: self.btn_open_log.config(bg=BG_HEADER, fg=TEXT_LIGHT))
-        self.btn_open_log.bind("<Leave>", lambda e: self.btn_open_log.config(bg=BG_MAIN, fg=ACCENT_CYAN))
-
-
-        lbl_hud_scan = tk.Label(content_frame, text="Scan HUD first:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_hud_scan.grid(row=5, column=0, sticky="w", pady=4)
-
-        hud_status = "🟢 ENABLED" if self.var_hud_scan.get() else "🔴 DISABLED"
-        hud_color = ACCENT_GREEN if self.var_hud_scan.get() else ACCENT_RED
-        self.btn_hud_scan_toggle = tk.Label(content_frame, text=hud_status, bg=BG_MAIN, fg=hud_color,
-                                            font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
-        self.btn_hud_scan_toggle.grid(row=5, column=1, sticky="e", padx=10, pady=4)
-        self.btn_hud_scan_toggle.bind("<Button-1>", lambda e: self.toggle_hud_scan_setting())
-        self.btn_hud_scan_toggle.bind("<Enter>", lambda e: self.btn_hud_scan_toggle.config(bg=BG_HEADER))
-        self.btn_hud_scan_toggle.bind("<Leave>", lambda e: self.btn_hud_scan_toggle.config(bg=BG_MAIN))
-
-
         lbl_roblox_topmost = tk.Label(content_frame, text="Topmost on Roblox:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_roblox_topmost.grid(row=6, column=0, sticky="w", pady=4)
+        lbl_roblox_topmost.grid(row=3, column=0, sticky="w", pady=4)
 
-        roblox_topmost_status = "🟢 ENABLED" if self.var_topmost_on_roblox.get() else "🔴 DISABLED"
+        roblox_topmost_status = "ENABLED" if self.var_topmost_on_roblox.get() else "DISABLED"
         roblox_topmost_color = ACCENT_GREEN if self.var_topmost_on_roblox.get() else ACCENT_RED
         self.btn_roblox_topmost_toggle = tk.Label(content_frame, text=roblox_topmost_status, bg=BG_MAIN, fg=roblox_topmost_color,
                                                   font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
-        self.btn_roblox_topmost_toggle.grid(row=6, column=1, sticky="e", padx=10, pady=4)
+        self.btn_roblox_topmost_toggle.grid(row=3, column=1, sticky="e", padx=10, pady=4)
         self.btn_roblox_topmost_toggle.bind("<Button-1>", lambda e: self.toggle_roblox_topmost_setting())
         self.btn_roblox_topmost_toggle.bind("<Enter>", lambda e: self.btn_roblox_topmost_toggle.config(bg=BG_HEADER))
         self.btn_roblox_topmost_toggle.bind("<Leave>", lambda e: self.btn_roblox_topmost_toggle.config(bg=BG_MAIN))
 
 
+        lbl_thresh = tk.Label(content_frame, text="Next Demand Switch (s):", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
+        lbl_thresh.grid(row=4, column=0, sticky="w", pady=4)
+
+        self.ent_thresh = tk.Entry(content_frame, textvariable=self.var_demand_threshold, bg=BG_MAIN, fg=ACCENT_CYAN,
+                                   insertbackground=TEXT_LIGHT, font=("Consolas", 9, "bold"), bd=1, relief="solid",
+                                   width=6, justify="center")
+        self.ent_thresh.grid(row=4, column=1, sticky="e", padx=10, pady=4)
+        self.ent_thresh.bind("<Button-1>", lambda e: self.ent_thresh.focus_force())
+
+
         lbl_recirc = tk.Label(content_frame, text="Recirc Override (%):", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_recirc.grid(row=7, column=0, sticky="w", pady=4)
+        lbl_recirc.grid(row=5, column=0, sticky="w", pady=4)
 
         recirc_frame = tk.Frame(content_frame, bg=BG_CARD)
-        recirc_frame.grid(row=7, column=1, sticky="e", padx=10, pady=4)
+        recirc_frame.grid(row=5, column=1, sticky="e", padx=10, pady=4)
 
         self.ent_recirc = tk.Entry(recirc_frame, textvariable=self.var_recirc_override, bg=BG_MAIN, fg=ACCENT_CYAN,
                                    insertbackground=TEXT_LIGHT, font=("Consolas", 9, "bold"), bd=1, relief="solid",
@@ -1830,24 +2071,56 @@ class OverlayApp:
         btn_recirc_reset.bind("<Enter>", lambda e: btn_recirc_reset.config(bg=BG_HEADER, fg=TEXT_LIGHT))
         btn_recirc_reset.bind("<Leave>", lambda e: btn_recirc_reset.config(bg=BG_MAIN, fg=TEXT_MUTED))
 
-        lbl_recirc_note = tk.Label(content_frame, text="Use this when running RBMK or SELF-CIRC mode as those don't require recirc changes.", 
+        lbl_recirc_note = tk.Label(content_frame, text="Use this when running SELF-CIRC mode as it doesn't require recirc changes.", 
                                    bg=BG_CARD, fg=ACCENT_GOLD, font=("Segoe UI", 7, "italic"), justify="left")
-        lbl_recirc_note.grid(row=8, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 4))
+        lbl_recirc_note.grid(row=6, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 4))
+
+        lbl_turbine_alert = tk.Label(content_frame, text="Turbine Health Alert:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
+        lbl_turbine_alert.grid(row=7, column=0, sticky="w", pady=4)
+
+        t_alert_status = "ENABLED" if self.var_turbine_health_alert.get() else "DISABLED"
+        t_alert_color = ACCENT_GREEN if self.var_turbine_health_alert.get() else ACCENT_RED
+        self.btn_turbine_health_toggle = tk.Label(content_frame, text=t_alert_status, bg=BG_MAIN, fg=t_alert_color,
+                                                  font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
+        self.btn_turbine_health_toggle.grid(row=7, column=1, sticky="e", padx=10, pady=4)
+        self.btn_turbine_health_toggle.bind("<Button-1>", lambda e: self.toggle_turbine_health_alert_setting())
+        self.btn_turbine_health_toggle.bind("<Enter>", lambda e: self.btn_turbine_health_toggle.config(bg=BG_HEADER))
+        self.btn_turbine_health_toggle.bind("<Leave>", lambda e: self.btn_turbine_health_toggle.config(bg=BG_MAIN))
+
+        lbl_turbine_thresh = tk.Label(content_frame, text="Health Threshold (%):", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
+        lbl_turbine_thresh.grid(row=8, column=0, sticky="w", pady=4)
+
+        self.ent_turbine_thresh = tk.Entry(content_frame, textvariable=self.var_turbine_health_threshold, bg=BG_MAIN, fg=ACCENT_CYAN,
+                                           insertbackground=TEXT_LIGHT, font=("Consolas", 9, "bold"), bd=1, relief="solid",
+                                           width=6, justify="center")
+        self.ent_turbine_thresh.grid(row=8, column=1, sticky="e", padx=10, pady=4)
+        self.ent_turbine_thresh.bind("<Button-1>", lambda e: self.ent_turbine_thresh.focus_force())
+
+
+        lbl_log = tk.Label(content_frame, text="Diagnostics:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
+        lbl_log.grid(row=9, column=0, sticky="w", pady=4)
+
+        self.btn_open_log = tk.Label(content_frame, text="Open Log", bg=BG_MAIN, fg=ACCENT_CYAN,
+                                      font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
+        self.btn_open_log.grid(row=9, column=1, sticky="e", padx=10, pady=4)
+        self.btn_open_log.bind("<Button-1>", lambda e: self.open_log_file())
+        self.btn_open_log.bind("<Enter>", lambda e: self.btn_open_log.config(bg=BG_HEADER, fg=TEXT_LIGHT))
+        self.btn_open_log.bind("<Leave>", lambda e: self.btn_open_log.config(bg=BG_MAIN, fg=ACCENT_CYAN))
 
 
         lbl_feedback = tk.Label(content_frame, text="Feedback & Help:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
-        lbl_feedback.grid(row=9, column=0, sticky="w", pady=4)
+        lbl_feedback.grid(row=10, column=0, sticky="w", pady=4)
 
-        btn_feedback_settings = tk.Label(content_frame, text="💬 Feedback", bg=BG_MAIN, fg=ACCENT_CYAN,
+        btn_feedback_settings = tk.Label(content_frame, text="Feedback", bg=BG_MAIN, fg=ACCENT_CYAN,
                                       font=("Consolas", 9, "bold"), bd=1, relief="solid", padx=10, pady=3, cursor="hand2")
-        btn_feedback_settings.grid(row=9, column=1, sticky="e", padx=10, pady=4)
+        btn_feedback_settings.grid(row=10, column=1, sticky="e", padx=10, pady=4)
         btn_feedback_settings.bind("<Button-1>", lambda e: self.open_suggestions_dialog())
         btn_feedback_settings.bind("<Enter>", lambda e: btn_feedback_settings.config(bg=BG_HEADER, fg=TEXT_LIGHT))
         btn_feedback_settings.bind("<Leave>", lambda e: btn_feedback_settings.config(bg=BG_MAIN, fg=ACCENT_CYAN))
 
 
         lbl_ver = tk.Label(content_frame, text=f"Version: {__version__}", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 8))
-        lbl_ver.grid(row=10, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        lbl_ver.grid(row=11, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
         def on_settings_destroy(event):
             if event.widget == settings_win:
@@ -1857,6 +2130,14 @@ class OverlayApp:
         settings_win.bind("<Destroy>", on_settings_destroy)
         settings_win.focus_force()
 
+    def on_demand_threshold_change(self):
+        try:
+            val = int(self.var_demand_threshold.get().strip())
+            self.next_demand_threshold_seconds = max(0, val)
+            self.save_settings()
+        except (ValueError, TypeError):
+            pass
+
     def on_usage_change(self, *args):
         self.calc.set_usage(self.var_usage.get())
         self.update_calculations(source="demand")
@@ -1865,35 +2146,10 @@ class OverlayApp:
     def on_opacity_change(self, value):
         try:
             alpha = float(value)
-            self.root.attributes("-alpha", alpha)
+            self.win.attributes("-alpha", alpha)
             self.save_settings()
         except ValueError:
             pass
-
-    def toggle_hud_scan_setting(self):
-        new_val = not self.var_hud_scan.get()
-        self.var_hud_scan.set(new_val)
-        if hasattr(self, 'btn_hud_scan_toggle') and self.btn_hud_scan_toggle.winfo_exists():
-            self.btn_hud_scan_toggle.config(text="🟢 ENABLED" if new_val else "🔴 DISABLED",
-                                            fg=ACCENT_GREEN if new_val else ACCENT_RED)
-        self.save_settings()
-        if hasattr(self, 'tray') and self.tray:
-            try:
-                self.tray.update_menu()
-            except Exception:
-                pass
-
-    def on_hud_scan_menu_toggle(self):
-        new_val = self.var_hud_scan.get()
-        if hasattr(self, 'btn_hud_scan_toggle') and self.btn_hud_scan_toggle.winfo_exists():
-            self.btn_hud_scan_toggle.config(text="🟢 ENABLED" if new_val else "🔴 DISABLED",
-                                            fg=ACCENT_GREEN if new_val else ACCENT_RED)
-        self.save_settings()
-        if hasattr(self, 'tray') and self.tray:
-            try:
-                self.tray.update_menu()
-            except Exception:
-                pass
 
     def on_recirc_override_change(self):
         val_str = self.var_recirc_override.get().strip()
@@ -1909,6 +2165,42 @@ class OverlayApp:
             except ValueError:
                 pass
         self.update_calculations(source="demand")
+
+    def trigger_turbine_health_reminder(self, current_health, threshold):
+        log.warning(f"[ALERT] Unit 2 Turbine Health ({current_health:.1f}%) is below threshold ({threshold:.1f}%)!")
+        
+        def play_alert_sound():
+            try:
+                if IS_WINDOWS:
+                    import winsound
+                    winsound.MessageBeep(winsound.MB_ICONWARNING)
+                else:
+                    self.root.bell()
+            except Exception:
+                pass
+
+        threading.Thread(target=play_alert_sound, daemon=True).start()
+
+        title = "TURBINE HEALTH WARNING"
+        msg = f"Unit 2 Turbine Health is LOW!\n\nCurrent Health: {current_health:.1f}%\nAlert Threshold: {threshold:.1f}%."
+        self.run_on_main_thread(lambda: self.show_custom_message(title, msg, is_error=True))
+
+    def toggle_turbine_health_alert_setting(self):
+        new_val = not self.var_turbine_health_alert.get()
+        self.var_turbine_health_alert.set(new_val)
+        self.enable_turbine_health_alert = new_val
+        if hasattr(self, 'btn_turbine_health_toggle') and self.btn_turbine_health_toggle.winfo_exists():
+            self.btn_turbine_health_toggle.config(text="ENABLED" if new_val else "DISABLED",
+                                                  fg=ACCENT_GREEN if new_val else ACCENT_RED)
+        self.save_settings()
+
+    def on_turbine_health_threshold_change(self):
+        try:
+            val = float(self.var_turbine_health_threshold.get().strip())
+            self.turbine_health_threshold = max(0.0, min(100.0, val))
+            self.save_settings()
+        except (ValueError, TypeError):
+            pass
 
     def reset_recirc_override(self):
         self.var_recirc_override.set("")
@@ -1929,7 +2221,7 @@ class OverlayApp:
         new_val = not self.var_topmost_on_roblox.get()
         self.var_topmost_on_roblox.set(new_val)
         if hasattr(self, 'btn_roblox_topmost_toggle') and self.btn_roblox_topmost_toggle.winfo_exists():
-            self.btn_roblox_topmost_toggle.config(text="🟢 ENABLED" if new_val else "🔴 DISABLED",
+            self.btn_roblox_topmost_toggle.config(text="ENABLED" if new_val else "DISABLED",
                                                   fg=ACCENT_GREEN if new_val else ACCENT_RED)
         self.save_settings()
         if hasattr(self, 'tray') and self.tray:
@@ -1938,133 +2230,142 @@ class OverlayApp:
             except Exception:
                 pass
 
+    def is_any_window_open(self) -> bool:
+        window_attrs = [
+            'settings_window',
+            'suggestions_window',
+            'update_window',
+            'loading_window',
+            'custom_message_window',
+            'server_sync_window',
+        ]
+        for attr in window_attrs:
+            if hasattr(self, attr):
+                win_obj = getattr(self, attr, None)
+                if win_obj and win_obj.winfo_exists():
+                    return True
+
+        try:
+            for child in self.root.winfo_children():
+                if isinstance(child, tk.Toplevel) and child != self.win and child.winfo_exists():
+                    return True
+        except Exception:
+            pass
+
+        return False
+
     def update_topmost_state(self):
         try:
-            settings_open = False
-            if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
-                settings_open = True
-
-            suggestions_open = False
-            if hasattr(self, 'suggestions_window') and self.suggestions_window and self.suggestions_window.winfo_exists():
-                suggestions_open = True
-
-            update_open = False
-            if hasattr(self, 'update_window') and self.update_window and self.update_window.winfo_exists():
-                update_open = True
-
-            loading_open = False
-            if hasattr(self, 'loading_window') and self.loading_window and self.loading_window.winfo_exists():
-                loading_open = True
-
-            custom_message_open = False
-            if hasattr(self, 'custom_message_window') and self.custom_message_window and self.custom_message_window.winfo_exists():
-                custom_message_open = True
-
-            if (settings_open and self.settings_window) or \
-               (suggestions_open and self.suggestions_window) or \
-               (update_open and self.update_window) or \
-               (loading_open and self.loading_window) or \
-               (custom_message_open and self.custom_message_window):
-                if self.root.attributes("-topmost"):
-                    self.root.attributes("-topmost", False)
-
-                if settings_open and self.settings_window:
-                    if not self.settings_window.attributes("-topmost"):
-                        self.settings_window.attributes("-topmost", True)
-                    self.settings_window.lift()
-
-                if suggestions_open and self.suggestions_window:
-                    if not self.suggestions_window.attributes("-topmost"):
-                        self.suggestions_window.attributes("-topmost", True)
-                    self.suggestions_window.lift()
-
-                if update_open and self.update_window:
-                    if not self.update_window.attributes("-topmost"):
-                        self.update_window.attributes("-topmost", True)
-                    self.update_window.lift()
-
-                if loading_open and self.loading_window:
-                    if not self.loading_window.attributes("-topmost"):
-                        self.loading_window.attributes("-topmost", True)
-                    self.loading_window.lift()
-
-                if custom_message_open and self.custom_message_window:
-                    if not self.custom_message_window.attributes("-topmost"):
-                        self.custom_message_window.attributes("-topmost", True)
-                    self.custom_message_window.lift()
+            if self.is_any_window_open():
                 return
 
             if self.is_topmost:
-                if not self.root.attributes("-topmost"):
-                    self.root.attributes("-topmost", True)
+                if not self.win.attributes("-topmost"):
+                    self.win.attributes("-topmost", True)
             elif self.topmost_on_roblox:
                 hwnd = ctypes.windll.user32.GetForegroundWindow()
-                hwnd_to_use = self.root.winfo_id()
-                parent = ctypes.windll.user32.GetParent(hwnd_to_use)
-                our_hwnd = parent if parent else hwnd_to_use
+                try:
+                    hwnd_to_use = self.win.winfo_id()
+                    parent = ctypes.windll.user32.GetParent(hwnd_to_use)
+                    our_hwnd = parent if parent else hwnd_to_use
+                except Exception:
+                    hwnd_to_use = None
+                    our_hwnd = None
+
+                is_roblox = False
+                is_ours = False
+                window_title = ""
+                class_name = ""
+                proc_name = ""
+                pid_val = 0
 
                 if hwnd:
                     buffer_len = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
                     buffer = ctypes.create_unicode_buffer(buffer_len)
                     ctypes.windll.user32.GetWindowTextW(hwnd, buffer, buffer_len)
-                    window_title = buffer.value
-                    
-                    import os
-                    active_pid = wintypes.DWORD()
-                    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(active_pid))
-                    
-                    is_roblox = "Roblox" in window_title or "Realistic" in window_title
-                    is_ours = (active_pid.value == os.getpid())
-                    
-                    if not is_roblox:
-                        try:
-                            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-                            h_proc = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, active_pid.value)
-                            if h_proc:
-                                buf = ctypes.create_unicode_buffer(260)
-                                size = wintypes.DWORD(260)
-                                if ctypes.windll.kernel32.QueryFullProcessImageNameW(h_proc, 0, buf, ctypes.byref(size)):
-                                    proc_name = os.path.basename(buf.value).lower()
-                                    if "roblox" in proc_name:
-                                        is_roblox = True
-                                ctypes.windll.kernel32.CloseHandle(h_proc)
-                        except Exception:
-                            pass
+                    window_title = buffer.value.strip()
 
-                    if is_roblox or is_ours:
-                        if not self.root.attributes("-topmost"):
-                            self.root.attributes("-topmost", True)
-                    else:
-                        if self.root.attributes("-topmost"):
-                            self.root.attributes("-topmost", False)
-                            self.root.lower()
+                    class_buf = ctypes.create_unicode_buffer(256)
+                    ctypes.windll.user32.GetClassNameW(hwnd, class_buf, 256)
+                    class_name = class_buf.value.strip()
+
+                    active_pid = wintypes.DWORD(0)  # pyright: ignore[reportPossiblyUnboundVariable]
+                    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(active_pid))
+                    pid_val = active_pid.value
+
+                    if pid_val:
+                        for mask in (0x1000, 0x0410):
+                            try:
+                                h_proc = ctypes.windll.kernel32.OpenProcess(mask, False, pid_val)
+                                if h_proc:
+                                    pbuf = ctypes.create_unicode_buffer(512)
+                                    psize = wintypes.DWORD(512)  # pyright: ignore[reportPossiblyUnboundVariable]
+                                    if ctypes.windll.kernel32.QueryFullProcessImageNameW(h_proc, 0, pbuf, ctypes.byref(psize)):
+                                        proc_name = os.path.basename(pbuf.value).lower()
+                                    ctypes.windll.kernel32.CloseHandle(h_proc)
+                                    if proc_name:
+                                        break
+                            except Exception:
+                                pass
+
+                    title_lower = window_title.lower()
+                    is_roblox = bool(
+                        "roblox" in proc_name or
+                        "robloxplayerbeta" in proc_name or
+                        class_name in ("WINDOWSCLIENT", "RobloxApp", "RobloxPlayerBeta") or
+                        "roblox" in class_name.lower() or
+                        "roblox" in title_lower or
+                        "realistic" in title_lower or
+                        "rbwr" in title_lower
+                    )
+                    is_ours = bool(pid_val == os.getpid() or (our_hwnd and hwnd == our_hwnd) or (hwnd_to_use and hwnd == hwnd_to_use))
+
+                prev_roblox_active = getattr(self, 'is_roblox_active', False)
+                # Keep active if currently on Roblox, or if user is interacting with our overlay while Roblox was active
+                self.is_roblox_active = bool(is_roblox or (is_ours and prev_roblox_active))
+
+                if hwnd != getattr(self, '_last_logged_foreground_hwnd', None) or self.is_roblox_active != getattr(self, '_last_logged_roblox_state', None):
+                    self._last_logged_foreground_hwnd = hwnd
+                    self._last_logged_roblox_state = self.is_roblox_active
+                    log.info(
+                        f"[TopmostOnRoblox] hwnd=0x{hwnd:08X} | title='{window_title}' | class='{class_name}' | "
+                        f"pid={pid_val} | proc='{proc_name}' | is_roblox={is_roblox} | is_ours={is_ours} -> "
+                        f"is_roblox_active={self.is_roblox_active} (setting_enabled={self.topmost_on_roblox})"
+                    )
+
+                if self.is_roblox_active:
+                    if not self.win.attributes("-topmost"):
+                        self.win.attributes("-topmost", True)
+                        self.win.lift()
+                        log.info("[TopmostOnRoblox] Window raised to TOPMOST (Roblox is active)")
+                else:
+                    if self.win.attributes("-topmost"):
+                        self.win.attributes("-topmost", False)
+                        self.win.lower()
+                        if our_hwnd:
                             ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
                             ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                else:
-                    if self.root.attributes("-topmost"):
-                        self.root.attributes("-topmost", False)
-                        self.root.lower()
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                        log.info("[TopmostOnRoblox] Window lowered from TOPMOST (Roblox not active)")
             else:
-                if self.root.attributes("-topmost"):
-                    self.root.attributes("-topmost", False)
-                    self.root.lower()
-                    hwnd = ctypes.windll.user32.GetForegroundWindow()
-                    hwnd_to_use = self.root.winfo_id()
-                    parent = ctypes.windll.user32.GetParent(hwnd_to_use)
-                    our_hwnd = parent if parent else hwnd_to_use
-                    if hwnd and hwnd != our_hwnd:
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                    else:
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                        ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                self.is_roblox_active = False
+                if self.win.attributes("-topmost"):
+                    self.win.attributes("-topmost", False)
+                    self.win.lower()
+                    try:
+                        hwnd_to_use = self.win.winfo_id()
+                        parent = ctypes.windll.user32.GetParent(hwnd_to_use)
+                        our_hwnd = parent if parent else hwnd_to_use
+                        if our_hwnd:
+                            ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                            ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
     def check_focus_loop(self):
-        self.update_topmost_state()
+        if not self.is_any_window_open():
+            self.update_topmost_state()
         self.root.after(200, self.check_focus_loop)
 
     def check_for_updates(self):
@@ -2120,20 +2421,20 @@ class OverlayApp:
             self.update_window.focus_force()
             return
 
-        popup = tk.Toplevel(self.root)
+        popup = tk.Toplevel(self.win)
         self.update_window = popup
-        popup.transient(self.root)
+        popup.transient(self.win)
 
         popup.title("Update Available")
         popup.configure(bg=BG_CARD, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         popup.overrideredirect(True)
         popup.attributes("-topmost", True)
         
-        # Center relative to root window
+        # Center relative to active overlay window
         w = 380
         h = 260
-        x = self.root.winfo_x() + (self.root.winfo_width() - w) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - h) // 2
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
@@ -2155,7 +2456,7 @@ class OverlayApp:
         title_bar.bind("<Button-1>", start_drag)
         title_bar.bind("<B1-Motion>", do_drag)
         
-        title_lbl = tk.Label(title_bar, text=" ⚡ SYSTEM UPDATE AVAILABLE", bg=BG_HEADER, fg=ACCENT_GOLD,
+        title_lbl = tk.Label(title_bar, text="SYSTEM UPDATE AVAILABLE", bg=BG_HEADER, fg=ACCENT_GOLD,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
         title_lbl.bind("<Button-1>", start_drag)
@@ -2249,20 +2550,20 @@ class OverlayApp:
             self.suggestions_window.focus_force()
             return
 
-        popup = tk.Toplevel(self.root)
+        popup = tk.Toplevel(self.win)
         self.suggestions_window = popup
-        popup.transient(self.root)
+        popup.transient(self.win)
 
         popup.title("Submit Feedback & Suggestions")
         popup.configure(bg=BG_CARD, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         popup.overrideredirect(True)
         popup.attributes("-topmost", True)
         
-        # Center relative to root window
+        # Center relative to active overlay window
         w = 380
         h = 370
-        x = self.root.winfo_x() + (self.root.winfo_width() - w) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - h) // 2
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
@@ -2284,7 +2585,7 @@ class OverlayApp:
         title_bar.bind("<Button-1>", start_drag)
         title_bar.bind("<B1-Motion>", do_drag)
         
-        title_lbl = tk.Label(title_bar, text=" 💡 SUBMIT FEEDBACK & SUGGESTIONS", bg=BG_HEADER, fg=ACCENT_CYAN,
+        title_lbl = tk.Label(title_bar, text="SUBMIT FEEDBACK & SUGGESTIONS", bg=BG_HEADER, fg=ACCENT_CYAN,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
         title_lbl.bind("<Button-1>", start_drag)
@@ -2300,7 +2601,7 @@ class OverlayApp:
         content_frame.pack(fill="both", expand=True)
         
 
-        lbl_warning = tk.Label(content_frame, text="⚠️ Warning: Inappropriate feedback/suggestions or spam can result in a permanent or temporary IP ban.",
+        lbl_warning = tk.Label(content_frame, text="Warning: Inappropriate feedback/suggestions or spam can result in a permanent or temporary IP ban.",
                                bg=BG_CARD, fg=ACCENT_GOLD, font=("Segoe UI", 8, "bold"), justify="left", wraplength=340)
         lbl_warning.pack(anchor="w", pady=(0, 10))
         
@@ -2377,14 +2678,14 @@ class OverlayApp:
             # Start background thread to submit
             def run_submit():
                 nonlocal submit_in_progress
-                import urllib.request
-                import urllib.error
                 import json
                 
                 payload = {
                     "name": name_val,
                     "suggestion": sug_text,
-                    "anonymous": is_anon
+                    "anonymous": is_anon,
+                    "target": "overlay",
+                    "is_server_checker": False
                 }
                 
                 try:
@@ -2394,7 +2695,7 @@ class OverlayApp:
                         data=data_bytes,
                         headers={
                             "Content-Type": "application/json",
-                            "User-Agent": "RBWR-Overlay-Client"
+                            "User-Agent": "RBWR-Overlay-Client/1.0"
                         },
                         method="POST"
                     )
@@ -2465,20 +2766,20 @@ class OverlayApp:
             self.loading_window.focus_force()
             return
 
-        loading = tk.Toplevel(self.root)
+        loading = tk.Toplevel(self.win)
         self.loading_window = loading
-        loading.transient(self.root)
+        loading.transient(self.win)
 
         loading.title("Downloading Update")
         loading.configure(bg=BG_CARD, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         loading.overrideredirect(True)
         loading.attributes("-topmost", True)
         
-        # Center relative to root window
+        # Center relative to active overlay window
         w = 300
         h = 120
-        x = self.root.winfo_x() + (self.root.winfo_width() - w) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - h) // 2
+        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
+        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
         
         loading.geometry(f"{w}x{h}+{x}+{y}")
         
@@ -2498,7 +2799,7 @@ class OverlayApp:
         loading.bind("<Button-1>", start_drag)
         loading.bind("<B1-Motion>", do_drag)
         
-        lbl_status = tk.Label(loading, text="⚡ DOWNLOADING SYSTEM UPDATE...", bg=BG_CARD, fg=ACCENT_CYAN, font=("Consolas", 10, "bold"))
+        lbl_status = tk.Label(loading, text="DOWNLOADING SYSTEM UPDATE...", bg=BG_CARD, fg=ACCENT_CYAN, font=("Consolas", 10, "bold"))
         lbl_status.pack(pady=(25, 5))
         lbl_status.bind("<Button-1>", start_drag)
         lbl_status.bind("<B1-Motion>", do_drag)
@@ -2530,7 +2831,7 @@ class OverlayApp:
                 threading.Event().wait(1.0)
                 
                 def update_success_ui_and_reboot():
-                    lbl_status.config(text="⚡ REBOOTING OVERLAY...", fg=ACCENT_GREEN)
+                    lbl_status.config(text="REBOOTING OVERLAY...", fg=ACCENT_GREEN)
                     lbl_sub.config(text="Deleting old version & starting new one...")
                     loading.update()
                     cmd_script = f'timeout /t 2 /nobreak && del "{current_exe}" && start "" "{new_exe_path}"'
@@ -2623,43 +2924,37 @@ class OverlayApp:
         limit = 108
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
         if not self.is_compact:
-            self.lbl_gen_val.config(text=f"⚡ {gen_load:.2f} MWe", fg=ACCENT_CYAN)
-            self.lbl_feed_val.config(text=f"💧 {flow:.2f} kg/s", fg=ACCENT_GOLD)
+            self.lbl_gen_val.config(text=f"{gen_load:.2f} MWe", fg=ACCENT_CYAN)
+            self.lbl_feed_val.config(text=f"{flow:.2f} kg/s", fg=ACCENT_GOLD)
             self.lbl_neon_rtp.config(text=f"{thermal:.2f}% {unit_suffix}")
             
             if thermal > limit:
                 self.neon_frame.config(bg="#2a0c0e", highlightbackground=ACCENT_RED, bd=1)
                 self.lbl_neon_rtp.config(bg="#2a0c0e", fg=ACCENT_RED)
-                self.lbl_neon_sub.config(text=f"⚠️ OVERPOWER SCRAM RISK (>{limit}%)", bg="#2a0c0e", fg=ACCENT_RED)
+                self.lbl_neon_sub.config(text=f"OVERPOWER SCRAM RISK (>{limit}%)", bg="#2a0c0e", fg=ACCENT_RED)
             else:
                 self.neon_frame.config(bg=BG_CARD, highlightbackground=BG_CARD, bd=0)
                 self.lbl_neon_rtp.config(bg=BG_CARD, fg=ACCENT_CYAN)
-                self.lbl_neon_sub.config(text="⚡ APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED)
+                self.lbl_neon_sub.config(text="APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED)
         else:
             if thermal > limit:
                 self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_RED)
             else:
                 self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_CYAN)
             self.lbl_compact_flow.config(text=f"[{int(flow)} kg/s]", fg=TEXT_MUTED)
-            
-            if hasattr(self, 'telemetry_frame') and self.telemetry_frame and self.telemetry_frame.winfo_exists():
-                x_pos = 280 if thermal >= 100 else 288
-                self.telemetry_frame.place(x=x_pos)
 
     def show_error_state(self):
         self.update_recirc_indicator_ui()
         if not self.is_compact:
-            self.lbl_gen_val.config(text="⚠️ ERROR", fg=ACCENT_RED)
-            self.lbl_feed_val.config(text="⚠️ ERROR", fg=ACCENT_RED)
+            self.lbl_gen_val.config(text="ERROR", fg=ACCENT_RED)
+            self.lbl_feed_val.config(text="ERROR", fg=ACCENT_RED)
             self.lbl_neon_rtp.config(text="ERR", fg=ACCENT_RED)
             self.neon_frame.config(bg=BG_CARD, bd=0)
             self.lbl_neon_rtp.config(bg=BG_CARD)
-            self.lbl_neon_sub.config(text="⚠️ VALUE OUT OF RANGE", bg=BG_CARD, fg=ACCENT_RED)
+            self.lbl_neon_sub.config(text="VALUE OUT OF RANGE", bg=BG_CARD, fg=ACCENT_RED)
         else:
             self.lbl_compact_rtp.config(text="ERR", fg=ACCENT_RED)
-            self.lbl_compact_flow.config(text="[---]", fg=ACCENT_RED)
-            if hasattr(self, 'telemetry_frame') and self.telemetry_frame and self.telemetry_frame.winfo_exists():
-                self.telemetry_frame.place(x=288)
+            self.lbl_compact_flow.config(text="[---]", fg=TEXT_MUTED)
 
     def update_recirc_indicator_ui(self):
         override_active = self.calc.recirc_override is not None
@@ -2667,7 +2962,7 @@ class OverlayApp:
         if hasattr(self, 'lbl_recirc_indicator') and self.lbl_recirc_indicator and self.lbl_recirc_indicator.winfo_exists():
             if override_active:
                 val = self.calc.recirc_override
-                self.lbl_recirc_indicator.config(text=f"🔄 OVR: {val:.0f}%")
+                self.lbl_recirc_indicator.config(text=f"OVR: {val:.0f}%")
                 self.lbl_recirc_indicator.pack(side="right", padx=5)
             else:
                 self.lbl_recirc_indicator.pack_forget()
@@ -2683,6 +2978,13 @@ class OverlayApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw()
+    if IS_LINUX:
+        root.geometry("1x1+0+0")
+        try:
+            root.attributes('-alpha', 0)
+        except Exception:
+            pass
+    else:
+        root.withdraw()
     app = OverlayApp(root)
     root.mainloop()
