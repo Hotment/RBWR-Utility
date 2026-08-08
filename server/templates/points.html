@@ -5,7 +5,7 @@
 
 
 {% block content %}
-<main class="flex-grow max-w-6xl mx-auto px-6 py-8 w-full flex flex-col gap-8">
+<main class="flex-grow max-w-[1400px] mx-auto px-6 py-8 w-full flex flex-col gap-8">
     <div class="text-center md:text-left flex flex-col gap-2">
         <h1 class="text-4xl md:text-5xl font-display font-semibold tracking-tight text-white">
             Points & Rank Calculator
@@ -15,48 +15,80 @@
         </p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div class="lg:col-span-7 flex flex-col gap-8">
-            <div class="premium-glass rounded-2xl p-6 flex flex-col gap-6 shadow-xl">
-                <h3 class="text-lg font-semibold text-gray-200 border-b border-white/5 pb-3">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            <div
+                class="premium-glass rounded-2xl p-5 flex flex-col gap-3 shadow-xl border border-blue-500/20 bg-blue-950/10">
+                <div
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <h3 class="text-sm font-semibold text-gray-200 font-display">
+                            Import Live Server Sync
+                        </h3>
+                    </div>
+                    <span class="text-[11px] text-gray-400 font-mono">Run <code
+                            class="text-amber-300 font-mono">!serverinfo</code> for Job ID or use Server ID</span>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2.5">
+                    <div class="relative flex-grow">
+                        <input type="text" id="importJobIdInput" list="importJobIdDatalist" autocomplete="off"
+                            placeholder="Enter or select Job ID or Server ID..."
+                            class="premium-input w-full px-3.5 py-2 text-xs font-mono rounded-xl bg-background/80">
+                        <datalist id="importJobIdDatalist"></datalist>
+                    </div>
+                    <button type="button" onclick="importServerSync()"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold font-display shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5 shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Import Data
+                    </button>
+                </div>
+                <div id="import-status-msg" class="hidden text-[11px] font-mono p-2.5 rounded-lg border"></div>
+            </div>
+
+            <div class="premium-glass rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                <h3 class="text-sm font-semibold text-gray-200 border-b border-white/5 pb-2">
                     Points Ledger
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="flex flex-col gap-2 group">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="flex flex-col gap-1.5 group">
                         <label for="unit1"
                             class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors flex justify-between">
                             <span>Unit 1 Points</span>
                             <span class="font-mono text-gray-500">U1</span>
                         </label>
-                        <div class="flex items-stretch w-full h-11 shadow-sm">
+                        <div class="flex items-stretch w-full h-10 shadow-sm">
                             <button type="button" onclick="adjustPoints('unit1', -1000)"
-                                class="px-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-r-0 rounded-l-xl transition-colors font-mono text-xs focus:outline-none">
+                                class="px-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-r-0 rounded-l-xl transition-colors font-mono text-xs focus:outline-none">
                                 -1k
                             </button>
                             <input type="number" id="unit1" min="0" value="0"
-                                class="premium-input flex-grow w-full px-4 text-center text-sm border-y border-x-0 h-full font-mono">
+                                class="premium-input flex-grow w-full px-3 text-center text-sm border-y border-x-0 h-full font-mono">
                             <button type="button" onclick="adjustPoints('unit1', 1000)"
-                                class="px-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-l-0 rounded-r-xl transition-colors font-mono text-xs focus:outline-none">
+                                class="px-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-l-0 rounded-r-xl transition-colors font-mono text-xs focus:outline-none">
                                 +1k
                             </button>
                         </div>
                     </div>
 
-                    <div class="flex flex-col gap-2 group">
+                    <div class="flex flex-col gap-1.5 group">
                         <label for="unit2"
                             class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors flex justify-between">
                             <span>Unit 2 Points</span>
                             <span class="font-mono text-gray-500">U2</span>
                         </label>
-                        <div class="flex items-stretch w-full h-11 shadow-sm">
+                        <div class="flex items-stretch w-full h-10 shadow-sm">
                             <button type="button" onclick="adjustPoints('unit2', -1000)"
-                                class="px-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-r-0 rounded-l-xl transition-colors font-mono text-xs focus:outline-none">
+                                class="px-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-r-0 rounded-l-xl transition-colors font-mono text-xs focus:outline-none">
                                 -1k
                             </button>
                             <input type="number" id="unit2" min="0" value="0"
-                                class="premium-input flex-grow w-full px-4 text-center text-sm border-y border-x-0 h-full font-mono">
+                                class="premium-input flex-grow w-full px-3 text-center text-sm border-y border-x-0 h-full font-mono">
                             <button type="button" onclick="adjustPoints('unit2', 1000)"
-                                class="px-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-l-0 rounded-r-xl transition-colors font-mono text-xs focus:outline-none">
+                                class="px-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 border-l-0 rounded-r-xl transition-colors font-mono text-xs focus:outline-none">
                                 +1k
                             </button>
                         </div>
@@ -64,7 +96,7 @@
                 </div>
             </div>
 
-            <div class="flex flex-col gap-6">
+            <div class="flex flex-col gap-6 mt-2">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xl font-display font-semibold text-gray-200">
                         System Configuration
@@ -76,7 +108,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- U1 Status -->
                     <div class="premium-glass p-5 rounded-2xl flex flex-col gap-4">
                         <div class="flex justify-between items-center border-b border-white/5 pb-2">
                             <h4 class="text-sm font-semibold text-blue-400 font-display">Unit 1 Control (Max: 1.0 pts/s)
@@ -123,12 +154,34 @@
                                 <span>Deaerator Auto</span>
                             </label>
                         </div>
+                        <div class="border-t border-white/5 pt-3 flex flex-col gap-2.5">
+                            <span
+                                class="text-[10px] font-mono text-rose-400 font-medium uppercase tracking-wider">Abnormal
+                                Configuration</span>
+                            <label
+                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200 text-xs">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u1_abnormal_config" data-subsystem="1">
+                                <span>Turbine Bypass Open above 5%</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200 text-xs">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u1_abnormal_config" data-subsystem="2">
+                                <span>Deaerator Temp outside 105°C - 111°C</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200 text-xs">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u1_abnormal_config" data-subsystem="3">
+                                <span>Steam Pressure outside 6500 - 8000 kPa</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <!-- U2 Status -->
                     <div class="premium-glass p-5 rounded-2xl flex flex-col gap-4">
                         <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                            <h4 class="text-sm font-semibold text-purple-400 font-display">Unit 2 Control (Max: 1.2
+                            <h4 class="text-sm font-semibold text-purple-400 font-display">Unit 2 Control (Max: 1.167
                                 pts/s)</h4>
                             <span id="u2-warning-badge"
                                 class="hidden px-2 py-0.5 rounded bg-red-950/40 border border-red-500/30 text-[10px] font-medium text-red-400 uppercase tracking-wider">No
@@ -186,7 +239,6 @@
                         </div>
                     </div>
 
-                    <!-- TCR Status -->
                     <div class="premium-glass p-5 rounded-2xl flex flex-col gap-4">
                         <div class="flex justify-between items-center border-b border-white/5 pb-2">
                             <h4 class="text-sm font-semibold text-teal-400 font-display">TCR Control (Max: 0.33 pts/s)
@@ -208,7 +260,6 @@
                         </div>
                     </div>
 
-                    <!-- Demands -->
                     <div class="premium-glass p-5 rounded-2xl flex flex-col gap-4">
                         <div class="flex justify-between items-center border-b border-white/5 pb-2">
                             <h4 class="text-sm font-semibold text-emerald-400 font-display">Plant Demands (Max: 0.4
@@ -239,66 +290,140 @@
 
                 <div class="premium-glass p-5 rounded-2xl flex flex-col gap-4 mt-2">
                     <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                        <h4 class="text-sm font-semibold text-rose-400 font-display">Abnormal Configuration (Decreases
-                            Points Rate)</h4>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                        <!-- Unit 1 Abnormalities -->
-                        <div class="flex flex-col gap-3">
-                            <span class="text-[10px] font-mono text-gray-500 uppercase tracking-wider">Unit 1</span>
-                            <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
-                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
-                                    data-system="u1_abnormal_config" data-subsystem="2">
-                                <span>Deaerator Not Configured</span>
-                            </label>
-                            <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
-                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
-                                    data-system="u1_abnormal_config" data-subsystem="1">
-                                <span>Turbine Bypass Open above 5%</span>
-                            </label>
+                        <h4 class="text-sm font-semibold text-rose-400 font-display">Unit 2 Abnormal Configuration
+                            (Decreases Points Rate)</h4>
+                        <div id="debug-mode-badge"
+                            class="hidden text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                            DEBUG MODE ON
                         </div>
-                        <!-- Unit 2 Abnormalities -->
-                        <div class="flex flex-col gap-3">
-                            <span class="text-[10px] font-mono text-gray-500 uppercase tracking-wider">Unit 2</span>
+                    </div>
+                    <div class="flex flex-col gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="1">
-                                <span>Deaerator Not Configured</span>
+                                <span class="flex-grow">Deaerator Pressure outside 1.2 - 1.5 MPa</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="14">
+                                <span class="flex-grow">Deaerator Temp outside 105°C - 111°C</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="15">
+                                <span class="flex-grow">Steam Pressure outside 6500 - 8000 kPa</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="2">
-                                <span>Turbine Bypass Open above 5%</span>
+                                <span class="flex-grow">Turbine Bypass Valve Open &gt; 5%</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="3">
-                                <span>Polisher Bypass Used</span>
+                                <span class="flex-grow">Polisher Bypass Used</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="4">
-                                <span>MCC Water Levels &lt; -3m</span>
+                                <span class="flex-grow">MCC Water Levels &lt; -3m</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="5">
-                                <span>Turbine Aux Pump Used</span>
+                                <span class="flex-grow">Turbine Auxiliary Pump Used</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
                             <label
-                                class="flex items-center gap-3 cursor-pointer group text-gray-400 hover:text-gray-200">
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="9">
+                                <span class="flex-grow">Cooling Tower Level &lt; 1.1m</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="10">
+                                <span class="flex-grow">Recirc 1/2 Cavitation</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="11">
+                                <span class="flex-grow">CST 1/2 Water Level &lt; 2m</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
                                 <input type="checkbox" class="subsystem-toggle premium-checkbox"
                                     data-system="u2_abnormal_config" data-subsystem="6">
-                                <span>FWP Temperature Low</span>
+                                <span class="flex-grow">FWP Temp outside 60°C - 95°C</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">w:1.0</span>
                             </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="7">
+                                <span class="flex-grow">Disabled Random Events</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">w:0.75</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all sm:col-span-2">
+                                <input type="checkbox" class="subsystem-toggle premium-checkbox"
+                                    data-system="u2_abnormal_config" data-subsystem="8">
+                                <span class="flex-grow">Disabled Random Malfunctions</span>
+                                <span
+                                    class="debug-weight-badge hidden font-mono text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">w:0.5</span>
+                            </label>
+                            <div id="custom-penalties-container"
+                                class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
                         </div>
+                    </div>
+                </div>
+                <div id="debug-panel"
+                    class="hidden col-span-full mt-3 pt-3 border-t border-yellow-500/20 flex flex-col gap-2 bg-yellow-500/[0.03] p-3 rounded-xl border border-yellow-500/10">
+                    <div
+                        class="flex justify-between items-center text-xs text-yellow-400 font-semibold font-mono uppercase tracking-wider">
+                        <span>🛠️ Debug Mode: Add Custom Penalty</span>
+                        <span class="text-[10px] text-yellow-500/70 font-normal">In-Code Toggle: DEBUG_MODE</span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="text" id="custom-penalty-name" placeholder="Penalty Name (e.g. Test Leak)"
+                            class="premium-input text-xs px-3 py-1.5 flex-grow font-mono">
+                        <input type="number" id="custom-penalty-weight" step="0.1" value="1.0"
+                            placeholder="Weight (e.g. 0.5)" class="premium-input text-xs px-3 py-1.5 sm:w-32 font-mono">
+                        <button type="button" onclick="addCustomPenaltyFromUI()"
+                            class="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 rounded-lg text-xs font-semibold font-mono transition-colors">
+                            + Add Penalty
+                        </button>
                     </div>
                 </div>
             </div>
@@ -314,7 +439,8 @@
                 <div class="absolute top-6 left-6 right-6 flex justify-between items-start z-10">
                     <div class="flex items-center gap-2">
                         <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                            id="rate-dot"></div>
+                            id="rate-dot">
+                        </div>
                         <span id="rate-label" class="text-xs font-medium text-gray-400 tracking-wide uppercase">Rate
                             Active</span>
                     </div>
@@ -331,7 +457,7 @@
                     <div class="flex justify-center gap-6 text-xs text-gray-400 mt-2 font-mono">
                         <div>U1: <span id="display-u1-net-rate" class="text-gray-200 font-medium">1.200</span> / 1.200
                             pts/s</div>
-                        <div>U2: <span id="display-u2-net-rate" class="text-gray-200 font-medium">1.733</span> / 1.733
+                        <div>U2: <span id="display-u2-net-rate" class="text-gray-200 font-medium">1.700</span> / 1.700
                             pts/s</div>
                     </div>
                     <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mt-4">
@@ -346,15 +472,15 @@
                     </div>
                     <div class="flex justify-between items-center text-gray-400">
                         <span>Unit 2 Subsystems:</span>
-                        <span><span id="u2-rate" class="text-gray-200 font-medium">1.000</span> pts/s</span>
+                        <span><span id="u2-rate" class="text-gray-200 font-medium">1.167</span> pts/s</span>
                     </div>
-                    <div class="flex justify-between items-center text-gray-400">
+                    <!--<div class="flex justify-between items-center text-gray-400">
                         <span>TCR Subsystems:</span>
                         <span><span id="tcr-rate" class="text-gray-200 font-medium">0.333</span> pts/s</span>
-                    </div>
+                    </div>-->
 
                     <div class="flex justify-between items-center text-gray-400">
-                        <span>Demand Matchers:</span>
+                        <span>Plant Demand Bonus:</span>
                         <span><span id="demand-rate" class="text-gray-200 font-medium">0.400</span> pts/s</span>
                     </div>
                     <div class="flex justify-between items-center text-gray-400 border-t border-white/5 pt-2 mt-1">
@@ -471,10 +597,26 @@
         return subsystemStates.demandU[1] ? basePoints : 0.0;
     }
 
+    function getU2AutosCount() {
+        let count = 0;
+        for (const [key, val] of Object.entries(subsystemStates.u2)) {
+            if (val) {
+                if (key === "3") {
+                    count += 1.5;
+                } else if (key === "8") {
+                    count += 0.5;
+                } else {
+                    count += 1.0;
+                }
+            }
+        }
+        return count;
+    }
+
     function calculateU2Rate() {
         if (!subsystemStates.demandU[2]) return 0.0;
-        const u2AutosCount = Object.values(subsystemStates.u2).filter(v => v).length;
-        return 0.2 + (1.0 / (u2AutosCount + 1.0));
+        const u2AutosCount = getU2AutosCount();
+        return (1.0 / 6.0) + (1.0 / (u2AutosCount + 1.0));
     }
 
     function calculateTCRRate() {
@@ -488,15 +630,111 @@
         return subsystemStates.demandP ? maxPPS : 0.0;
     }
 
-    function calculateAbnormalRate(rate, config, maxPPS = 1.0) {
-        const abnormalActiveCount = Object.values(config).filter((v) => v).length;
-        if (abnormalActiveCount === 0 || rate === 0.0) return 0.0;
+    // --- DEBUG MODE CONFIGURATION ---
+    const DEBUG_MODE = false;
 
-        if (maxPPS === 1.2) {
-            const autosCount = Object.values(subsystemStates.u2).filter(v => v).length;
-            const abnormalRate = (1.0 / (autosCount + 1.0)) - (1.0 / (autosCount + abnormalActiveCount + 1.0));
+    const U2_ABNORMAL_WEIGHTS = {
+        "1": 1.0,   // Deaerator Pressure outside 1.2 - 1.5 MPa
+        "2": 1.0,   // Turbine Bypass Open > 5%
+        "3": 1.0,   // Polisher Bypass Used / Misaligned
+        "4": 1.0,   // MCC Water Levels < -3m
+        "5": 1.0,   // Turbine Aux Pump Used / Selector Not ON
+        "6": 1.0,   // FWP Temp outside 60°C - 95°C
+        "7": 0.75,  // Disabled Random Events
+        "8": 0.5,   // Disabled Random Malfunctions
+        "9": 1.0,   // Cooling Tower Level < 1.1m
+        "10": 1.0,  // Recirc 1 or 2 Cavitation
+        "11": 1.0,  // CST 1 or 2 < 2m
+        "14": 1.0,  // Deaerator Temp outside 105°C - 111°C
+        "15": 1.0   // Steam Pressure outside 6500 - 8000 kPa
+    };
+
+    let customPenaltyCounter = 100;
+
+    function registerCustomPenalty(label, weight, key = null) {
+        if (!key) {
+            key = `c_${customPenaltyCounter++}`;
+        }
+        U2_ABNORMAL_WEIGHTS[key] = parseFloat(weight) || 1.0;
+
+        const container = document.getElementById('custom-penalties-container');
+        if (container && !document.querySelector(`[data-subsystem="${key}"]`)) {
+            const labelEl = document.createElement('label');
+            labelEl.className = "flex items-center gap-2 cursor-pointer group text-gray-400 hover:text-gray-200 bg-white/[0.02] hover:bg-white/[0.04] p-2 rounded-lg border border-white/5 transition-all";
+            labelEl.innerHTML = `
+                <input type="checkbox" class="subsystem-toggle premium-checkbox" data-system="u2_abnormal_config" data-subsystem="${key}">
+                <span class="flex-grow text-xs">${label}</span>
+                <span class="debug-weight-badge ${DEBUG_MODE ? '' : 'hidden'} font-mono text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">w:${weight}</span>
+            `;
+            container.appendChild(labelEl);
+
+            const toggle = labelEl.querySelector('input');
+            toggle.addEventListener('change', () => {
+                updateRates();
+                updateRanks();
+            });
+        }
+
+        if (!subsystemStates.u2_abnormal_config) {
+            subsystemStates.u2_abnormal_config = {};
+        }
+        subsystemStates.u2_abnormal_config[key] = false;
+        updateRates();
+        updateRanks();
+    }
+
+    function addCustomPenaltyFromUI() {
+        const nameInput = document.getElementById('custom-penalty-name');
+        const weightInput = document.getElementById('custom-penalty-weight');
+        const name = nameInput.value.trim();
+        const weight = parseFloat(weightInput.value);
+        if (!name || isNaN(weight)) return;
+
+        registerCustomPenalty(name, weight);
+        nameInput.value = '';
+    }
+
+    function initDebugMode() {
+        if (DEBUG_MODE) {
+            const badge = document.getElementById('debug-mode-badge');
+            if (badge) badge.classList.remove('hidden');
+
+            const panel = document.getElementById('debug-panel');
+            if (panel) panel.classList.remove('hidden');
+
+            document.querySelectorAll('.debug-weight-badge').forEach(el => el.classList.remove('hidden'));
+        }
+    }
+
+    function calculateAbnormalRate(rate, config, maxPPS = 1.0) {
+        if (rate === 0.0) return 0.0;
+
+        if (maxPPS === 1.167 || Math.abs(maxPPS - (7.0 / 6.0)) < 0.01) {
+            let abnormalRate = 0.0;
+
+            // FWP Temp outside 60°C - 95°C (6) subtracts a fixed constant 1/6 (0.166666...) pts/s no matter what.
+            if (config["6"]) {
+                abnormalRate += (1.0 / 6.0);
+            }
+
+            let abnormalActiveCount = 0;
+            for (const [key, val] of Object.entries(config)) {
+                if (key === "6") continue;
+                if (val) {
+                    const weight = (U2_ABNORMAL_WEIGHTS[key] !== undefined) ? U2_ABNORMAL_WEIGHTS[key] : 1.0;
+                    abnormalActiveCount += weight;
+                }
+            }
+
+            if (abnormalActiveCount > 0) {
+                const autosCount = getU2AutosCount();
+                abnormalRate += (1.0 / (autosCount + 1.0)) - (1.0 / (autosCount + abnormalActiveCount + 1.0));
+            }
+
             return Math.max(0.0, abnormalRate);
         } else {
+            const abnormalActiveCount = Object.values(config).filter((v) => v).length;
+            if (abnormalActiveCount === 0) return 0.0;
             const baseRate = rate * (1.0 / maxPPS);
             const autoCount = (1.0 / baseRate) - 1.0;
             const abnormalRate = baseRate - (1.0 / (autoCount + abnormalActiveCount + 1.0));
@@ -606,15 +844,15 @@
         const tcrRate = calculateTCRRate();
         const demandRate = calculateDemandRate();
         const u1AbnormalRate = calculateAbnormalRate(u1Rate, subsystemStates.u1_abnormal_config, 1.0);
-        const u2AbnormalRate = calculateAbnormalRate(u2Rate, subsystemStates.u2_abnormal_config, 1.2);
+        const u2AbnormalRate = calculateAbnormalRate(u2Rate, subsystemStates.u2_abnormal_config, 1.167);
         const totalRate = u1Rate + u2Rate + tcrRate + demandRate - u1AbnormalRate - u2AbnormalRate;
 
         const u1NetRate = u1Rate - u1AbnormalRate + (demandRate / 2.0);
         const u2NetRate = u2Rate - u2AbnormalRate + tcrRate + (demandRate / 2.0);
 
         document.getElementById('u1-rate').textContent = u1Rate.toFixed(3);
-        document.getElementById('u2-rate').textContent = u2Rate.toFixed(3);
-        document.getElementById('tcr-rate').textContent = tcrRate.toFixed(3);
+        document.getElementById('u2-rate').textContent = (u2Rate + tcrRate).toFixed(3);
+        //document.getElementById('tcr-rate').textContent = tcrRate.toFixed(3);
         document.getElementById('demand-rate').textContent = demandRate.toFixed(3);
         document.getElementById('u1-abnormal-rate').textContent = u1AbnormalRate.toFixed(3);
         document.getElementById('abnormal-rate').textContent = u2AbnormalRate.toFixed(3);
@@ -716,8 +954,303 @@
             });
         });
 
+        function updateUrlQueryParam(val) {
+            const url = new URL(window.location.href);
+            if (val && val.trim()) {
+                url.searchParams.set('jobId', val.trim());
+            } else {
+                url.searchParams.delete('jobId');
+            }
+            window.history.replaceState({}, '', url.toString());
+        }
+
+        const jobIdInput = document.getElementById('importJobIdInput');
+        if (jobIdInput) {
+            jobIdInput.addEventListener('focus', fetchPointsServersApi);
+            jobIdInput.addEventListener('input', (e) => {
+                updateUrlQueryParam(e.target.value);
+                fetchPointsServersApi();
+            });
+            const urlParams = new URLSearchParams(window.location.search);
+            const qId = urlParams.get('jobId');
+            if (qId && qId.trim()) {
+                jobIdInput.value = qId.trim();
+                importServerSync();
+            }
+        }
+
+        initDebugMode();
         updateRates();
         updateRanks();
     });
+
+    let pointsServersData = [];
+    let lastPointsApiFetchTime = 0;
+
+    async function fetchPointsServersApi() {
+        const now = Date.now();
+        if (pointsServersData.length > 0 && (now - lastPointsApiFetchTime) < 3000) {
+            return;
+        }
+        try {
+            const res = await fetch('/api/public-servers');
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.success && json.data && json.data.servers) {
+                pointsServersData = json.data.servers.filter(s => s && s.state);
+                lastPointsApiFetchTime = Date.now();
+                updateImportDatalist();
+            }
+        } catch (e) {
+            console.error('Error fetching servers for points import:', e);
+        }
+    }
+
+    function updateImportDatalist() {
+        const datalist = document.getElementById('importJobIdDatalist');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        pointsServersData.forEach(srv => {
+            const opt = document.createElement('option');
+            opt.value = srv.jobId;
+            const u1P = srv.state?.Unit1?.PointsPerSecond !== undefined ? srv.state.Unit1.PointsPerSecond.toFixed(2) : '0';
+            const u2P = srv.state?.Unit2?.PointsPerSecond !== undefined ? srv.state.Unit2.PointsPerSecond.toFixed(2) : '0';
+            opt.label = `Job: ${srv.jobId.slice(0, 8)}... | U1 PPS: ${u1P} | U2 PPS: ${u2P}`;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function syncDomTogglesFromState() {
+        document.querySelectorAll('.subsystem-toggle').forEach(input => {
+            const sys = input.getAttribute('data-system');
+            const sub = input.getAttribute('data-subsystem');
+            if (sys && sub && subsystemStates[sys]) {
+                input.checked = !!subsystemStates[sys][sub];
+            }
+        });
+    }
+
+    function solveU1ForPPS(targetPPS) {
+        const u1AutoKeys = ["1", "2", "3", "4", "5", "6", "7"];
+        const u1PenKeys = ["1", "2"];
+
+        if (targetPPS >= 0.99) {
+            u1AutoKeys.forEach(k => subsystemStates.u1[k] = false);
+            u1PenKeys.forEach(k => subsystemStates.u1_abnormal_config[k] = false);
+            return;
+        }
+
+        let validCandidates = [];
+        let bestCandidate = null;
+        let minErr = Infinity;
+
+        for (let autoCount = 0; autoCount <= 7; autoCount++) {
+            for (let penCount = 0; penCount <= 2; penCount++) {
+                const baseRate = 1.0 / (autoCount + 1);
+                const abnormalRate = (penCount > 0) ? (baseRate - (1.0 / (autoCount + penCount + 1))) : 0.0;
+                const netRate = Math.max(0.0, baseRate - abnormalRate);
+                const err = Math.abs(netRate - targetPPS);
+
+                const cand = { autoCount, penCount, netRate, err };
+                if (err < 0.02) {
+                    validCandidates.push(cand);
+                }
+                if (err < minErr) {
+                    minErr = err;
+                    bestCandidate = cand;
+                }
+            }
+        }
+
+        let chosen = bestCandidate;
+        if (validCandidates.length > 0) {
+            validCandidates.sort((a, b) => b.autoCount - a.autoCount);
+            const maxAutos = validCandidates[0].autoCount;
+            const topCandidates = validCandidates.filter(c => c.autoCount === maxAutos);
+            chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+        }
+
+        const shuffledAutos = [...u1AutoKeys].sort(() => 0.5 - Math.random());
+        u1AutoKeys.forEach(k => subsystemStates.u1[k] = false);
+        for (let i = 0; i < (chosen?.autoCount || 0); i++) {
+            subsystemStates.u1[shuffledAutos[i]] = true;
+        }
+
+        const shuffledPens = [...u1PenKeys].sort(() => 0.5 - Math.random());
+        u1PenKeys.forEach(k => subsystemStates.u1_abnormal_config[k] = false);
+        for (let i = 0; i < (chosen?.penCount || 0); i++) {
+            subsystemStates.u1_abnormal_config[shuffledPens[i]] = true;
+        }
+    }
+
+    function solveU2ForPPS(targetPPS, certainPenalties) {
+        const certainKeys = ["6", "4", "10"];
+        certainKeys.forEach(k => {
+            subsystemStates.u2_abnormal_config[k] = !!certainPenalties[k];
+        });
+
+        const u2AutoKeys = ["1", "2", "3", "4", "5", "6", "7", "8"];
+        const nonCertainPenKeys = ["1", "2", "3", "5", "7", "8", "9", "11", "14", "15"];
+
+        if (targetPPS >= 1.15) {
+            u2AutoKeys.forEach(k => subsystemStates.u2[k] = true);
+            nonCertainPenKeys.forEach(k => subsystemStates.u2_abnormal_config[k] = false);
+            return;
+        }
+
+        let validCandidates = [];
+        let bestCandidate = null;
+        let minErr = Infinity;
+
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const candidateAutos = {};
+            u2AutoKeys.forEach(k => candidateAutos[k] = (Math.random() > 0.35));
+
+            const candidatePens = { ...subsystemStates.u2_abnormal_config };
+            nonCertainPenKeys.forEach(k => candidatePens[k] = (Math.random() > 0.75));
+
+            const tempStateU2 = { ...subsystemStates.u2 };
+            const tempStateAb = { ...subsystemStates.u2_abnormal_config };
+
+            subsystemStates.u2 = candidateAutos;
+            subsystemStates.u2_abnormal_config = candidatePens;
+
+            const u2Rate = calculateU2Rate();
+            const u2AbnormalRate = calculateAbnormalRate(u2Rate, candidatePens, 1.167);
+            const netRate = Math.max(0.0, u2Rate - u2AbnormalRate);
+            const err = Math.abs(netRate - targetPPS);
+            const autosCount = getU2AutosCount();
+
+            const cand = { candidateAutos, candidatePens, netRate, err, autosCount };
+            if (err < 0.025) {
+                validCandidates.push(cand);
+            }
+            if (err < minErr) {
+                minErr = err;
+                bestCandidate = cand;
+            }
+
+            subsystemStates.u2 = tempStateU2;
+            subsystemStates.u2_abnormal_config = tempStateAb;
+        }
+
+        let chosen = bestCandidate;
+        if (validCandidates.length > 0) {
+            validCandidates.sort((a, b) => b.autosCount - a.autosCount);
+            const maxAutos = validCandidates[0].autosCount;
+            const topCandidates = validCandidates.filter(c => c.autosCount === maxAutos);
+            chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+        }
+
+        if (chosen) {
+            subsystemStates.u2 = chosen.candidateAutos;
+            subsystemStates.u2_abnormal_config = chosen.candidatePens;
+        }
+    }
+
+    function findServerByIdOrJobId(servers, query) {
+        if (!query || !servers || !servers.length) return null;
+        query = String(query).trim();
+        const direct = servers.find(s => s && (s.jobId === query || s.id === query));
+        if (direct) return direct;
+
+        const qParts = query.split('-').map(p => p.trim()).filter(Boolean);
+        if (qParts.length >= 2) {
+            for (const s of servers) {
+                if (!s) continue;
+                const candidates = [s.jobId, s.id].filter(Boolean);
+                for (const idVal of candidates) {
+                    const jParts = String(idVal).split('-').map(p => p.trim()).filter(Boolean);
+                    if (jParts.length >= 3) {
+                        if (jParts[1].toLowerCase() === qParts[0].toLowerCase() && jParts[2].toLowerCase() === qParts[1].toLowerCase()) {
+                            return s;
+                        }
+                        if (qParts.length >= 3 && jParts[1].toLowerCase() === qParts[1].toLowerCase() && jParts[2].toLowerCase() === qParts[2].toLowerCase()) {
+                            return s;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    async function importServerSync() {
+        const statusEl = document.getElementById('import-status-msg');
+        const inputEl = document.getElementById('importJobIdInput');
+        const jobId = (inputEl.value || '').trim();
+
+        if (!jobId) {
+            statusEl.className = "text-[11px] font-mono p-2.5 rounded-lg border bg-rose-950/40 border-rose-500/30 text-rose-300";
+            statusEl.innerText = "Please select or enter a valid Job ID or Server ID.";
+            statusEl.classList.remove('hidden');
+            return;
+        }
+
+        await fetchPointsServersApi();
+
+        const srv = findServerByIdOrJobId(pointsServersData, jobId);
+        if (!srv || !srv.state) {
+            statusEl.className = "text-[11px] font-mono p-2.5 rounded-lg border bg-amber-950/40 border-amber-500/30 text-amber-300";
+            statusEl.innerText = `Server Job ID / Server ID "${jobId}" not found in active servers API list.`;
+            statusEl.classList.remove('hidden');
+            return;
+        }
+
+        const u1PPS = srv.state?.Unit1?.PointsPerSecond ?? 0;
+        const u2PPS = srv.state?.Unit2?.PointsPerSecond ?? 0;
+
+        const fwp1Temp = srv.state?.Unit2?.['FWP1 Temp'] ?? 75;
+        const fwp2Temp = srv.state?.Unit2?.['FWP2 Temp'] ?? 75;
+        const fwpOutOfRange = (fwp1Temp < 60 || fwp2Temp < 60 || fwp1Temp > 95 || fwp2Temp > 95);
+
+        const u1Lvl = srv.state?.Unit1?.ReactorLevel ?? 0;
+        const u1Dea = srv.state?.Unit1?.['Deareator Level'] ?? 0;
+        const u1Hw = srv.state?.Unit1?.['Hotwell Level'] ?? 0;
+        const u2Lvl = srv.state?.Unit2?.ReactorLevel ?? 0;
+        const u2Dea = srv.state?.Unit2?.['Deareator Level'] ?? 0;
+        const u2Hw = srv.state?.Unit2?.['Hotwell Level'] ?? 0;
+        const mccLow = (u1Lvl < -3 || u1Dea < -3 || u1Hw < -3 || u2Lvl < -3 || u2Dea < -3 || u2Hw < -3);
+
+        const u1Aprm = srv.state?.Unit1?.APRM ?? 0;
+        const u1R1 = srv.state?.Unit1?.Recirc1 ?? 0;
+        const u1R2 = srv.state?.Unit1?.Recirc2 ?? 0;
+        const u2Aprm = srv.state?.Unit2?.APRM ?? 0;
+        const u2R1 = srv.state?.Unit2?.Recirc1 ?? 0;
+        const u2R2 = srv.state?.Unit2?.Recirc2 ?? 0;
+        const recircCavitation = ((u1R1 > 30 || u1R2 > 30) && u1Aprm < 20) || ((u2R1 > 30 || u2R2 > 30) && u2Aprm < 20);
+
+        const certainPenalties = {
+            "6": fwpOutOfRange,
+            "4": mccLow,
+            "10": recircCavitation
+        };
+
+        subsystemStates.demandU[1] = (srv.state?.Unit1?.DemandU1 || 0) > 0;
+        subsystemStates.demandU[2] = (srv.state?.Unit2?.DemandU2 || 0) > 0;
+        subsystemStates.demandP = true;
+
+        solveU1ForPPS(u1PPS);
+        solveU2ForPPS(u2PPS, certainPenalties);
+
+        syncDomTogglesFromState();
+        updateRates();
+        updateRanks();
+
+        statusEl.className = "text-[11px] font-mono p-2.5 rounded-lg border bg-emerald-950/40 border-emerald-500/30 text-emerald-300";
+        statusEl.innerHTML = `
+            <div>✓ <strong>Imported Job ID:</strong> ${srv.jobId.slice(0, 13)}...</div>
+            <div class="mt-1 text-gray-300">
+                U1 Target: <strong>${u1PPS.toFixed(3)}</strong> pts/s | U2 Target: <strong>${u2PPS.toFixed(3)}</strong> pts/s
+            </div>
+            <div class="mt-1 text-zinc-400">
+                Certain Penalties: 
+                FWP Temp (60-95°C): <span class="${fwpOutOfRange ? 'text-rose-400 font-bold' : 'text-emerald-400'}">${fwpOutOfRange ? 'OUT OF RANGE' : 'NORMAL'}</span> | 
+                MCC &lt; -3m: <span class="${mccLow ? 'text-rose-400 font-bold' : 'text-emerald-400'}">${mccLow ? 'YES' : 'NO'}</span> | 
+                Recirc Cavitation: <span class="${recircCavitation ? 'text-rose-400 font-bold' : 'text-emerald-400'}">${recircCavitation ? 'YES' : 'NO'}</span>
+            </div>
+        `;
+        statusEl.classList.remove('hidden');
+    }
 </script>
 {% endblock %}

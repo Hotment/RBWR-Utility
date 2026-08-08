@@ -28,6 +28,36 @@
             </div>
 
             <div class="flex flex-col gap-6">
+                <div class="rounded-xl p-3.5 flex flex-col gap-2.5 border border-blue-500/20 bg-blue-950/20 shadow-lg">
+                    <div class="flex items-center justify-between border-b border-white/5 pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="text-xs font-semibold text-gray-200 font-display">Live Server
+                                Sync</span>
+                        </div>
+                        <span id="calc-sync-status" class="text-[10px] font-mono text-gray-400">Disconnected</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="relative flex-grow">
+                            <input type="text" id="calcJobIdInput" list="calcJobIdDatalist" autocomplete="off"
+                                placeholder="Enter or select Job ID or Server ID..."
+                                class="premium-input w-full px-3 py-1.5 text-xs font-mono rounded-lg bg-black/40">
+                            <datalist id="calcJobIdDatalist"></datalist>
+                        </div>
+                        <button type="button" onclick="connectCalcServerSync()"
+                            class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold font-display shadow transition-all shrink-0">
+                            Sync
+                        </button>
+                    <div id="calc-job-error-alert"
+                        class="hidden text-xs text-rose-400 font-mono p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30">
+                    </div>
+                    <div id="calc-countdown-bar"
+                        class="hidden flex items-center justify-between text-[11px] font-mono p-2 rounded-lg bg-black/40 border border-white/5">
+                        <span class="text-gray-400">Live Demand Time Left:</span>
+                        <span id="calc-countdown-val" class="font-bold text-amber-400">--s</span>
+                    </div>
+                </div>
+
                 <div class="flex flex-col gap-2 group">
                     <label for="web-demand"
                         class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors flex justify-between">
@@ -146,7 +176,7 @@
                 </div>
             </div>
 
-            <div id="ocr-tooltip"
+            <div id="desktop-app-tooltip"
                 class="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 flex gap-4 text-sm text-gray-400 relative interactive-card group">
                 <div class="mt-0.5 shrink-0">
                     <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2"
@@ -157,10 +187,9 @@
                 </div>
                 <div class="pr-6">
                     <strong class="block text-gray-200 font-medium mb-1">Desktop App Available</strong>
-                    Download the desktop app to automatically capture target demand values from your game window using a
-                    hotkey (F7).
+                    Download the lightweight desktop overlay app for real-time calculations, compact HUD mode, and always-on-top monitoring.
                 </div>
-                <button type="button" onclick="document.getElementById('ocr-tooltip').remove()"
+                <button type="button" onclick="document.getElementById('desktop-app-tooltip').remove()"
                     class="absolute top-4 right-4 text-gray-500 hover:text-gray-300 transition-colors focus:outline-none">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
@@ -293,6 +322,23 @@
             labelRtpSpan.innerText = "Reactor Thermal Power";
             labelRtpUnit.innerText = "RTP %";
             unitHeader.innerText = "UNIT 2 ACTIVE";
+        }
+
+        if (typeof activeCalcServer !== 'undefined' && activeCalcServer) {
+            const syncedDem = nextDemandSwitched ? getNextDemandValue(activeCalcServer, unit) : getCurrentDemandValue(activeCalcServer, unit);
+            if (syncedDem !== null) {
+                document.getElementById('web-demand').value = syncedDem;
+                const statusEl = document.getElementById('calc-sync-status');
+                if (statusEl) {
+                    if (nextDemandSwitched) {
+                        statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
+                        statusEl.innerText = `Pre-loaded Next Demand (${syncedDem} MWe)`;
+                    } else {
+                        statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+                        statusEl.innerText = `Synced Demand (${syncedDem} MWe)`;
+                    }
+                }
+            }
         }
 
         onInputDemand();
@@ -435,5 +481,246 @@
 
     document.getElementById('web-demand').value = "1000";
     onInputDemand();
+
+    let calcServersList = [];
+    let activeCalcServer = null;
+    let calcCountdownTimer = null;
+    let calcRecheckTimer = null;
+    let nextDemandSwitched = false;
+    let lastCalcFetchTime = 0;
+
+    async function fetchCalcServersApi() {
+        const now = Date.now();
+        if (calcServersList.length > 0 && (now - lastCalcFetchTime) < 3000) return;
+        try {
+            const res = await fetch('/api/public-servers');
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.success && json.data && json.data.servers) {
+                calcServersList = json.data.servers.filter(s => s && s.state);
+                lastCalcFetchTime = Date.now();
+                updateCalcDatalist();
+            }
+        } catch (e) {
+            console.error('Error fetching servers for calculator sync:', e);
+        }
+    }
+
+    function updateCalcDatalist() {
+        const datalist = document.getElementById('calcJobIdDatalist');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        calcServersList.forEach(srv => {
+            const opt = document.createElement('option');
+            opt.value = srv.jobId;
+            opt.label = `Job: ${srv.jobId.slice(0, 8)}... | ${srv.placeName || 'Server'}`;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function getCurrentDemandValue(srv, unit) {
+        if (!srv || !srv.state) return null;
+        const uState = unit === 1 ? srv.state.Unit1 : srv.state.Unit2;
+        if (!uState) return null;
+        for (let key of ['DemandU1', 'DemandU2', 'Demand', 'demand']) {
+            if (uState[key] !== undefined && uState[key] !== null) {
+                const val = parseFloat(uState[key]);
+                if (!isNaN(val)) return val;
+            }
+        }
+        return null;
+    }
+
+    function getNextDemandValue(srv, unit) {
+        if (!srv || !srv.state) return null;
+        const uState = unit === 1 ? srv.state.Unit1 : srv.state.Unit2;
+        if (!uState) return null;
+        for (let key of ['NextDemandU1', 'NextDemandU2', 'Next Demand', 'next_demand']) {
+            if (uState[key] !== undefined && uState[key] !== null) {
+                const val = parseFloat(uState[key]);
+                if (!isNaN(val)) return val;
+            }
+        }
+        return null;
+    }
+
+    function findServerByIdOrJobId(servers, query) {
+        if (!query || !servers || !servers.length) return null;
+        query = String(query).trim();
+        const direct = servers.find(s => s && (s.jobId === query || s.id === query));
+        if (direct) return direct;
+
+        const qParts = query.split('-').map(p => p.trim()).filter(Boolean);
+        if (qParts.length >= 2) {
+            for (const s of servers) {
+                if (!s) continue;
+                const candidates = [s.jobId, s.id].filter(Boolean);
+                for (const idVal of candidates) {
+                    const jParts = String(idVal).split('-').map(p => p.trim()).filter(Boolean);
+                    if (jParts.length >= 3) {
+                        if (jParts[1].toLowerCase() === qParts[0].toLowerCase() && jParts[2].toLowerCase() === qParts[1].toLowerCase()) {
+                            return s;
+                        }
+                        if (qParts.length >= 3 && jParts[1].toLowerCase() === qParts[1].toLowerCase() && jParts[2].toLowerCase() === qParts[2].toLowerCase()) {
+                            return s;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    function updateUrlQueryParam(val) {
+        const url = new URL(window.location.href);
+        if (val && val.trim()) {
+            url.searchParams.set('jobId', val.trim());
+        } else {
+            url.searchParams.delete('jobId');
+        }
+        window.history.replaceState({}, '', url.toString());
+    }
+
+    async function connectCalcServerSync() {
+        const input = document.getElementById('calcJobIdInput');
+        const jobId = (input.value || '').trim();
+        const statusEl = document.getElementById('calc-sync-status');
+        const countdownBar = document.getElementById('calc-countdown-bar');
+        const errorAlert = document.getElementById('calc-job-error-alert');
+
+        updateUrlQueryParam(jobId);
+
+        if (!jobId) {
+            statusEl.className = "text-[10px] font-mono text-rose-400 font-bold";
+            statusEl.innerText = "Select Job ID / Server ID";
+            if (errorAlert) errorAlert.classList.add('hidden');
+            return;
+        }
+
+        await fetchCalcServersApi();
+        activeCalcServer = findServerByIdOrJobId(calcServersList, jobId);
+
+        if (!activeCalcServer || !activeCalcServer.state) {
+            statusEl.className = "text-[10px] font-mono text-rose-400 font-bold";
+            statusEl.innerText = "Job ID Not Found";
+            if (errorAlert) {
+                errorAlert.innerHTML = `<strong>Error:</strong> Job ID <code class="px-1 py-0.5 rounded bg-black/40 text-rose-300 font-mono">${jobId}</code> was not found in active server data.`;
+                errorAlert.classList.remove('hidden');
+            }
+            if (calcCountdownTimer) clearInterval(calcCountdownTimer);
+            if (countdownBar) countdownBar.classList.add('hidden');
+            return;
+        }
+
+        if (errorAlert) errorAlert.classList.add('hidden');
+        nextDemandSwitched = false;
+        statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+        statusEl.innerText = "Synced: " + activeCalcServer.jobId.slice(0, 8) + "...";
+        if (countdownBar) countdownBar.classList.remove('hidden');
+
+        startCalcDemandCountdown();
+    }
+
+    function formatDemandLabel(dem) {
+        if (dem === -4) return "Evac";
+        if (dem === -3) return "RST";
+        if (dem === -2) return "LOOP";
+        if (dem === -1) return "Maint";
+        return dem + " MWe";
+    }
+
+    function startCalcDemandCountdown() {
+        if (calcCountdownTimer) clearInterval(calcCountdownTimer);
+        if (calcRecheckTimer) clearTimeout(calcRecheckTimer);
+
+        if (!activeCalcServer || !activeCalcServer.lastHeartbeat) return;
+
+        const hbTime = new Date(activeCalcServer.lastHeartbeat).getTime();
+        const dtlRaw = parseFloat(activeCalcServer.state?.Unit1?.['Demand Time Left'] || activeCalcServer.state?.Unit2?.['Demand Time Left']) || 0;
+        const countdownVal = document.getElementById('calc-countdown-val');
+        const statusEl = document.getElementById('calc-sync-status');
+
+        const nowInitial = Date.now();
+        const elapsedInitial = (nowInitial - hbTime) / 1000.0;
+        const initialLiveDTL = Math.max(0, dtlRaw - elapsedInitial);
+
+        if (initialLiveDTL >= 60) {
+            const curDem = getCurrentDemandValue(activeCalcServer, calc.selected_unit);
+            if (curDem !== null) {
+                const calcVal = curDem < 0 ? 0 : Math.max(0, curDem);
+                document.getElementById('web-demand').value = calcVal;
+                onInputDemand();
+                statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+                statusEl.innerText = `Synced Demand (${formatDemandLabel(curDem)})`;
+            }
+        } else if (!nextDemandSwitched) {
+            nextDemandSwitched = true;
+            const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
+            if (nextDem !== null) {
+                const calcVal = nextDem < 0 ? 0 : Math.max(0, nextDem);
+                document.getElementById('web-demand').value = calcVal;
+                onInputDemand();
+                statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
+                statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDem)})`;
+            }
+            calcRecheckTimer = setTimeout(recheckCalcServerSync, 150000);
+        }
+
+        calcCountdownTimer = setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - hbTime) / 1000.0;
+            const liveDTL = Math.max(0, dtlRaw - elapsed);
+
+            countdownVal.innerText = Math.round(liveDTL) + "s";
+
+            if (liveDTL < 60 && !nextDemandSwitched) {
+                nextDemandSwitched = true;
+                const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
+                if (nextDem !== null) {
+                    const calcVal = nextDem < 0 ? 0 : Math.max(0, nextDem);
+                    document.getElementById('web-demand').value = calcVal;
+                    onInputDemand();
+                    statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
+                    statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDem)})`;
+                }
+
+                calcRecheckTimer = setTimeout(recheckCalcServerSync, 150000);
+            }
+        }, 1000);
+    }
+
+    async function recheckCalcServerSync() {
+        if (!activeCalcServer) return;
+        const statusEl = document.getElementById('calc-sync-status');
+        statusEl.className = "text-[10px] font-mono text-blue-400 font-bold animate-pulse";
+        statusEl.innerText = "Re-checking Server Sync...";
+
+        await fetchCalcServersApi();
+        const updated = findServerByIdOrJobId(calcServersList, activeCalcServer.jobId);
+        if (updated && updated.state) {
+            activeCalcServer = updated;
+            nextDemandSwitched = false;
+            statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+            statusEl.innerText = "Synced: " + activeCalcServer.jobId.slice(0, 8) + "...";
+            startCalcDemandCountdown();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const jobIdInput = document.getElementById('calcJobIdInput');
+        if (jobIdInput) {
+            jobIdInput.addEventListener('focus', fetchCalcServersApi);
+            jobIdInput.addEventListener('input', (e) => {
+                updateUrlQueryParam(e.target.value);
+                fetchCalcServersApi();
+            });
+            const urlParams = new URLSearchParams(window.location.search);
+            const qId = urlParams.get('jobId');
+            if (qId && qId.trim()) {
+                jobIdInput.value = qId.trim();
+                connectCalcServerSync();
+            }
+        }
+    });
 </script>
 {% endblock %}

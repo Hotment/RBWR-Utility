@@ -506,8 +506,8 @@
     }
 
     function getSelectedServer() {
-        if (!currentJobId && serversData.length > 0) return serversData[0];
-        return findServerByIdOrJobId(serversData, currentJobId) || serversData[0] || null;
+        if (!currentJobId) return serversData.length > 0 ? serversData[0] : null;
+        return findServerByIdOrJobId(serversData, currentJobId);
     }
 
     function formatFieldValue(def, rawVal, unitState) {
@@ -541,13 +541,33 @@
 
     function renderTabletData() {
         const container = document.getElementById('tabletRowsContainer');
+        const statusEl = document.getElementById('statusIndicator');
         const srv = getSelectedServer();
 
         if (!srv) {
-            container.innerHTML = `
-                <div class="py-12 text-center text-gray-800 font-bold text-lg">
-                    No active server matching Job ID found. Select a valid Job ID from autocomplete above.
-                </div>`;
+            if (currentJobId) {
+                if (statusEl) {
+                    statusEl.className = 'inline-flex items-center gap-1.5 text-rose-400 font-medium';
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span> Job ID Not Found in Data';
+                }
+                container.innerHTML = `
+                    <div class="py-12 px-6 text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 mb-4 border border-rose-500/20">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-1">Job ID Not Found in Server Data</h3>
+                        <p class="text-sm text-gray-400 max-w-md mx-auto">
+                            The Job ID or Server ID <code class="px-2 py-0.5 rounded bg-black/40 text-rose-300 font-mono text-xs border border-rose-500/20">${currentJobId}</code> was not found in active server data. Please select an active server from the dropdown above.
+                        </p>
+                    </div>`;
+            } else {
+                container.innerHTML = `
+                    <div class="py-12 text-center text-gray-500 font-medium text-sm">
+                        No active servers available. Select a valid Job ID from autocomplete above.
+                    </div>`;
+            }
             document.getElementById('lastHeartbeatText').innerText = 'Last Heartbeat: N/A';
             return;
         }
