@@ -872,7 +872,12 @@ def submit_suggestion():
         new_id = max(s.get("id", 0) for s in suggestions) + 1
         
     name = "Anonymous" if payload.anonymous or not payload.name.strip() else payload.name.strip()
-    target_val = "server_checker" if (payload.target == "server_checker" or payload.is_server_checker) else "overlay"
+    if payload.target in ["point_graph", "points_graph", "point_history"]:
+        target_val = "point_graph"
+    elif payload.target == "server_checker" or payload.is_server_checker:
+        target_val = "server_checker"
+    else:
+        target_val = "overlay"
     
     new_sug = {
         "id": new_id,

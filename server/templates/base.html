@@ -155,10 +155,16 @@
         }
 
         .subtle-gradient-text {
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-image: linear-gradient(to right, #ffffff, #a1a1aa);
+            color: #ffffff;
+        }
+
+        .fluid-nav-mobile {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .fluid-nav-mobile::-webkit-scrollbar {
+            display: none;
         }
     </style>
     {% block extra_head %}{% endblock %}
@@ -167,8 +173,9 @@
 <body class="bg-background text-gray-100 min-h-screen flex flex-col font-sans selection:bg-blue-500/30">
 
     <header class="border-b border-white/5 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
-            <a href="/" class="flex items-center gap-3">
+        <div id="header-container"
+            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center gap-4">
+            <a id="header-logo" href="/" class="flex items-center gap-3 shrink-0">
                 <svg class="w-6 h-6 text-blue-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5"
                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.7"></circle>
@@ -185,55 +192,64 @@
                         Calculator</span>
                 </div>
             </a>
-            <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-400">
+            <nav id="main-nav"
+                class="hidden lg:flex items-center gap-6 text-sm font-medium text-gray-400 shrink-0 transition-[gap] duration-150 ease-out">
                 {% block nav %}
                 <a href="/"
-                    class="{% if request.path == '/' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Home</a>
+                    class="{% if request.path == '/' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Home</a>
                 <a href="/calculator"
-                    class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Web
+                    class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Web
                     Calculator</a>
                 <a href="/points"
-                    class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Points
+                    class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Points
                     Calculator</a>
                 <a href="/tablet"
-                    class="{% if request.path in ['/tablet', '/operator-tablet'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Operator
+                    class="{% if request.path in ['/tablet', '/operator-tablet'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Operator
                     Tablet</a>
                 <a href="/suggestions"
-                    class="{% if request.path == '/suggestions' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Suggestions</a>
+                    class="{% if request.path == '/suggestions' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Suggestions</a>
                 <a href="/contact"
-                    class="{% if request.path == '/contact' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %}">Contact</a>
+                    class="{% if request.path == '/contact' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Contact</a>
+                <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
+                    class="px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 transition-all text-xs font-semibold border border-emerald-500/20 flex items-center whitespace-nowrap"
+                    title="RBWR Point History Graph">
+                    POINT HISTORY
+                </a>
                 <a href="https://rbwr.scatterbox.dev" target="_blank" rel="noopener"
-                    class="px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 transition-all text-xs font-semibold border border-amber-500/20 flex items-center gap-1.5"
+                    class="px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 transition-all text-xs font-semibold border border-amber-500/20 flex items-center whitespace-nowrap"
                     title="RBWR SERVER CHECKER">
-                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                    RBWR SERVER CHECKER
+                    SERVER CHECKER
                 </a>
                 <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest" target="_blank"
-                    class="hover:text-white transition-colors">Download App</a>
+                    class="hover:text-white transition-colors whitespace-nowrap">Download App</a>
                 <a href="/admin"
-                    class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-medium border border-white/5">Admin</a>
+                    class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-medium border border-white/5 whitespace-nowrap">Admin</a>
                 {% endblock %}
             </nav>
-            <div class="md:hidden flex items-center gap-1">
+            <div
+                class="lg:hidden flex items-center gap-1.5 overflow-x-auto py-1 max-w-[65vw] sm:max-w-none fluid-nav-mobile">
                 {% block mobile_nav %}
                 <a href="/"
-                    class="px-2 py-1.5 {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
+                    class="px-2 py-1.5 shrink-0 {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
                 <a href="/calculator"
-                    class="px-2 py-1.5 {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web
+                    class="px-2 py-1.5 shrink-0 {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web
                     Calc</a>
                 <a href="/points"
-                    class="px-2 py-1.5 {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
+                    class="px-2 py-1.5 shrink-0 {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
                 <a href="/tablet"
-                    class="px-2 py-1.5 {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
+                    class="px-2 py-1.5 shrink-0 {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
                 <a href="/suggestions"
-                    class="px-2 py-1.5 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
+                    class="px-2 py-1.5 shrink-0 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
                 <a href="/contact"
-                    class="px-2 py-1.5 {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
+                    class="px-2 py-1.5 shrink-0 {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
+                <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
+                    class="px-2 py-1.5 shrink-0 border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 rounded font-medium text-xs whitespace-nowrap">Points
+                    Graph</a>
                 <a href="https://rbwr.scatterbox.dev" target="_blank" rel="noopener"
-                    class="px-2 py-1.5 border border-amber-500/30 bg-amber-500/10 text-amber-300 rounded font-medium text-xs">Server
+                    class="px-2 py-1.5 shrink-0 border border-amber-500/30 bg-amber-500/10 text-amber-300 rounded font-medium text-xs whitespace-nowrap">Server
                     Checker</a>
                 <a href="/admin"
-                    class="px-2 py-1.5 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
+                    class="px-2 py-1.5 shrink-0 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
                 {% endblock %}
             </div>
         </div>
@@ -242,13 +258,16 @@
     {% block content %}{% endblock %}
 
     <footer class="border-t border-white/5 bg-background py-8 text-center text-xs text-gray-500">
-        <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div
+            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="font-mono">
                 © 2026 RBWR Utilities
             </div>
-            <div class="flex items-center gap-6 font-medium">
+            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-4 lg:gap-6 font-medium">
                 <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
                     class="hover:text-gray-300 transition-colors">Github</a>
+                <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
+                    class="hover:text-emerald-300 transition-colors font-medium">Point History Graph</a>
                 <a href="/suggestions" class="hover:text-gray-300 transition-colors">Suggestions</a>
                 <a href="/contact" class="hover:text-gray-300 transition-colors">Contact</a>
                 <a href="/privacy" class="hover:text-gray-300 transition-colors">Privacy Policy</a>
@@ -261,6 +280,62 @@
             </div>
         </div>
     </footer>
+
+    <script>
+            (function () {
+                function autoScaleNav() {
+                    const nav = document.getElementById('main-nav');
+                    const container = document.getElementById('header-container');
+                    const logo = document.getElementById('header-logo');
+                    if (!nav || !container || !logo) return;
+
+                    if (window.getComputedStyle(nav).display === 'none') return;
+
+                    nav.style.gap = '24px';
+
+                    const items = Array.from(nav.children);
+                    if (items.length <= 1) return;
+
+                    const containerWidth = container.clientWidth;
+                    const containerStyle = window.getComputedStyle(container);
+                    const paddingX = parseFloat(containerStyle.paddingLeft) + parseFloat(containerStyle.paddingRight);
+                    const logoWidth = logo.offsetWidth;
+                    const availableWidth = containerWidth - paddingX - logoWidth - 24;
+
+                    let totalItemsWidth = 0;
+                    items.forEach(el => {
+                        totalItemsWidth += el.offsetWidth;
+                    });
+
+                    const numGaps = items.length - 1;
+                    const naturalTotalWidth = totalItemsWidth + (numGaps * 24);
+
+                    if (naturalTotalWidth > availableWidth && availableWidth > 200) {
+                        const remainingSpace = availableWidth - totalItemsWidth;
+                        const calculatedGap = Math.floor(remainingSpace / numGaps);
+                        const appliedGap = Math.max(4, Math.min(24, calculatedGap));
+                        nav.style.gap = appliedGap + 'px';
+                    } else {
+                        nav.style.gap = '24px';
+                    }
+                }
+
+                window.addEventListener('resize', autoScaleNav);
+                window.addEventListener('DOMContentLoaded', autoScaleNav);
+                window.addEventListener('load', autoScaleNav);
+
+                if (window.ResizeObserver) {
+                    new ResizeObserver(autoScaleNav).observe(document.documentElement);
+                }
+
+                const mainNav = document.getElementById('main-nav');
+                if (mainNav && window.MutationObserver) {
+                    new MutationObserver(autoScaleNav).observe(mainNav, { childList: true, subtree: true });
+                }
+
+                autoScaleNav();
+            })();
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

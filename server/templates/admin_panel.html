@@ -403,8 +403,12 @@
                             class="px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase">All Types</button>
                         <button onclick="filterTarget('overlay')" id="target-tab-overlay"
                             class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Overlay</button>
+                        <button onclick="filterTarget('point_graph')" id="target-tab-point_graph"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Point
+                            Graph</button>
                         <button onclick="filterTarget('server_checker')" id="target-tab-server_checker"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Server Checker</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Server
+                            Checker</button>
                     </div>
 
                     <div
@@ -462,7 +466,8 @@
                 class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display">Private Messages</h2>
-                    <p class="text-xs text-slate-500 font-mono mt-1">Confidential messages sent directly to the administrator.</p>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Confidential messages sent directly to the
+                        administrator.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
@@ -472,7 +477,8 @@
                         <div>TOTAL MESSAGES: <span id="contact-stat-total" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        Site</a>
                 </div>
             </header>
 
@@ -487,7 +493,8 @@
                 class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display">Banned IP Addresses</h2>
-                    <p class="text-xs text-slate-500 font-mono mt-1">Manage prohibited client IPs, view expiration dates, and enforce new bans.</p>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Manage prohibited client IPs, view expiration
+                        dates, and enforce new bans.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
@@ -496,13 +503,16 @@
                     </div>
                     <button onclick="openBanModal('')"
                         class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/30 tracking-wide font-mono font-medium text-xs transition flex items-center gap-2 shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
                         </svg>
                         Ban New IP
                     </button>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home Site</a>
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        Site</a>
                 </div>
             </header>
 
@@ -728,7 +738,7 @@
 
         function filterTarget(target) {
             currentTargetFilter = target;
-            ['all', 'overlay', 'server_checker'].forEach(t => {
+            ['all', 'overlay', 'point_graph', 'server_checker'].forEach(t => {
                 const btn = document.getElementById('target-tab-' + t);
                 if (btn) {
                     btn.className = (t === target)
@@ -966,10 +976,16 @@
                 else if (s.status === 'accepted') badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
                 else if (s.status === 'declined') badgeClass = 'bg-rose-950/40 text-rose-400 border border-rose-500/20';
 
-                const isServerChecker = s.target === 'server_checker' || s.is_server_checker;
-                const targetTag = isServerChecker
-                    ? '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Checker</span>'
-                    : '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold uppercase border border-blue-500/20">Overlay</span>';
+                let targetTag = '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold uppercase border border-blue-500/20">Overlay</span>';
+                let targetAttr = 'overlay';
+
+                if (s.target === 'point_graph' || s.target === 'points_graph') {
+                    targetTag = '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 text-[10px] rounded font-bold uppercase border border-emerald-500/20">Point Graph</span>';
+                    targetAttr = 'point_graph';
+                } else if (s.target === 'server_checker' || s.is_server_checker) {
+                    targetTag = '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Checker</span>';
+                    targetAttr = 'server_checker';
+                }
 
                 const bannedTag = isBanned
                     ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
@@ -998,7 +1014,7 @@
                 ` : '';
 
                 html += `
-                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}" data-target="${isServerChecker ? 'server_checker' : 'overlay'}">
+                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}" data-target="${targetAttr}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 <span class="text-sm font-bold text-slate-200">${escapeHtml(s.name || 'Anonymous')}</span>

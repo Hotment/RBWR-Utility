@@ -186,7 +186,6 @@
     <div class="w-96 shrink-0 flex flex-col gap-4">
         <div class="bg-surfaceElevated border border-border p-5 rounded-2xl shadow-xl backdrop-blur-md">
             <h1 class="text-base font-bold text-white flex items-center gap-2 mb-3">
-                <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 RBWR Operator Tablet
             </h1>
             <p class="text-xs text-gray-400 mb-4">
@@ -222,8 +221,8 @@
             <span id="activeServersCount" class="font-mono text-zinc-300">Servers Active: --</span>
             <span id="lastHeartbeatText" class="font-mono text-zinc-400">Last Heartbeat: --</span>
             <div class="flex items-center gap-2 pt-1 border-t border-white/5">
-                <span id="statusIndicator" class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live Auto-syncing
+                <span id="statusIndicator" class="inline-flex items-center text-emerald-400 font-medium">
+                    Live Auto-syncing
                 </span>
             </div>
             <span class="text-zinc-500">Refreshes every 1 min</span>
@@ -320,7 +319,7 @@
         { label: 'Demand Time Left', key: 'Demand Time Left', type: 'number', dp: 0 },
         { label: 'Scram Reason', key: 'SCRAMreason', type: 'string' },
         { label: 'Trip Reason', key: 'TRIPreason', type: 'string' },
-        { label: 'LOOP', key: 'Offsite Power', type: 'bool'},
+        { label: 'LOOP', key: 'Offsite Power', type: 'bool' },
         { label: 'Fuel Burn', key: 'Fuel Burn (default 0.54)', type: 'number', dp: 2 },
         { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
     ];
@@ -351,7 +350,7 @@
         { label: 'Demand Time Left', key: 'Demand Time Left', type: 'number', dp: 0 },
         { label: 'Scram Reason', key: 'SCRAMreason', type: 'string' },
         { label: 'Trip Reason', key: 'TRIPreason', type: 'string' },
-        { label: 'LOOP', key: 'Offsite Power', type: 'bool'},
+        { label: 'LOOP', key: 'Offsite Power', type: 'bool' },
         { label: 'Fuel Burn', key: 'Fuel Burn (default 0.54)', type: 'number', dp: 2 },
         { label: 'Points Per Second', key: 'PointsPerSecond', type: 'number', dp: 2 }
     ];
@@ -401,8 +400,8 @@
             isTabFocused = false;
             if (overlay) overlay.classList.remove('hidden');
             if (statusEl) {
-                statusEl.className = 'inline-flex items-center gap-1.5 text-amber-400 font-medium';
-                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> Sync Paused (Tab Inactive)';
+                statusEl.className = 'inline-flex items-center text-amber-400 font-medium';
+                statusEl.innerText = 'Sync Paused (Tab Inactive)';
             }
         } else if (!isTabFocused) {
             resumeTabletSync();
@@ -460,8 +459,8 @@
                 }
 
                 document.getElementById('activeServersCount').innerText = `Servers Active: ${serversData.length}`;
-                statusEl.className = 'inline-flex items-center gap-1.5 text-emerald-400 font-medium';
-                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Auto-syncing';
+                statusEl.className = 'inline-flex items-center text-emerald-400 font-medium';
+                statusEl.innerText = 'Live Auto-syncing';
 
                 renderTabletData();
             }
@@ -469,12 +468,12 @@
             console.error('Failed to fetch servers API:', err);
             if (cachedServersData.length > 0) {
                 serversData = cachedServersData;
-                statusEl.className = 'inline-flex items-center gap-1.5 text-amber-400 font-medium';
-                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> API Error (Showing Cached Data)';
+                statusEl.className = 'inline-flex items-center text-amber-400 font-medium';
+                statusEl.innerText = 'API Error (Showing Cached Data)';
                 renderTabletData();
             } else {
-                statusEl.className = 'inline-flex items-center gap-1.5 text-rose-400 font-medium';
-                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> API Sync Error';
+                statusEl.className = 'inline-flex items-center text-rose-400 font-medium';
+                statusEl.innerText = 'API Sync Error';
             }
         }
     }
@@ -547,8 +546,8 @@
         if (!srv) {
             if (currentJobId) {
                 if (statusEl) {
-                    statusEl.className = 'inline-flex items-center gap-1.5 text-rose-400 font-medium';
-                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span> Job ID Not Found in Data';
+                    statusEl.className = 'inline-flex items-center text-rose-400 font-medium';
+                    statusEl.innerText = 'Job ID Not Found in Data';
                 }
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center">
@@ -558,7 +557,7 @@
                             </svg>
                         </div>
                         <h3 class="text-lg font-bold text-white mb-1">Job ID Not Found in Server Data</h3>
-                        <p class="text-sm text-gray-400 max-w-md mx-auto">
+                        <p class="text-sm text-white max-w-md mx-auto">
                             The Job ID or Server ID <code class="px-2 py-0.5 rounded bg-black/40 text-rose-300 font-mono text-xs border border-rose-500/20">${currentJobId}</code> was not found in active server data. Please select an active server from the dropdown above.
                         </p>
                     </div>`;
