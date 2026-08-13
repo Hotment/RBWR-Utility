@@ -131,8 +131,10 @@
 
     .tablet-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
+        gap: 6px;
         background-color: #bebebe;
         border: 2px solid #000000;
         padding: 6px 12px;
@@ -143,16 +145,17 @@
     .tablet-row-label {
         font-weight: 700;
         color: #000000;
-        font-size: 1.05rem;
+        font-size: 0.95rem;
         letter-spacing: 0.2px;
+        white-space: nowrap;
     }
 
     .tablet-row-value-box {
         background-color: #ffffff;
         border: 2px solid #666666;
-        min-width: 280px;
+        width: 100%;
         max-width: 280px;
-        padding: 4px 16px;
+        padding: 4px 12px;
         text-align: center;
         box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
@@ -178,35 +181,52 @@
         border-radius: 4px;
         border: 2px solid #757575;
     }
+
+    @media (max-width: 640px) {
+        .tablet-bezel {
+            border-width: 8px;
+            border-radius: 20px;
+        }
+
+        .tablet-camera-notch,
+        .tablet-lens {
+            display: none;
+        }
+
+        .tablet-row-value-box {
+            max-width: 100%;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-10 px-6 py-6 flex gap-8 items-start">
-    <div class="w-96 shrink-0 flex flex-col gap-4">
-        <div class="bg-surfaceElevated border border-border p-5 rounded-2xl shadow-xl backdrop-blur-md">
-            <h1 class="text-base font-bold text-white flex items-center gap-2 mb-3">
+<div
+    class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full overflow-x-hidden">
+    <div class="w-full lg:w-96 shrink-0 flex flex-col gap-4">
+        <div class="bg-surfaceElevated border border-border p-4 sm:p-5 rounded-2xl shadow-xl backdrop-blur-md">
+            <h1 class="text-base font-bold text-white flex items-center gap-2 mb-3 whitespace-nowrap">
                 RBWR Operator Tablet
             </h1>
             <p class="text-xs text-gray-400 mb-4">
                 Enter your server's <code
-                    class="text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40">Job ID</code>
+                    class="text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40 whitespace-nowrap">Job ID</code>
                 or <code
-                    class="text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40">Server ID</code>
-                (e.g. <span class="text-amber-300 font-mono">77f6-4b2f</span> or run <span
-                    class="text-amber-300 font-mono">!serverinfo</span> in game).
+                    class="text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40 whitespace-nowrap">Server ID</code>
+                (e.g. <span class="text-amber-300 font-mono whitespace-nowrap">77f6-4b2f</span> or run <span
+                    class="text-amber-300 font-mono whitespace-nowrap">!serverinfo</span> in game).
             </p>
 
             <label for="jobIdInput"
-                class="block text-[11px] font-medium text-gray-400 mb-1 tracking-wider uppercase">Select / Enter Job ID
-                or Server ID</label>
+                class="block text-[11px] font-medium text-gray-400 mb-1 tracking-wider uppercase whitespace-nowrap">Select
+                / Enter Job ID or Server ID</label>
             <div class="flex gap-2 items-center">
                 <input type="text" id="jobIdInput" list="jobIdDatalist" autocomplete="off"
                     placeholder="Paste or select Job ID or Server ID..."
                     class="flex-1 min-w-0 bg-background border border-white/15 focus:border-blue-500 text-white text-sm rounded-xl px-3.5 py-2.5 outline-none font-mono transition-all">
                 <button id="refreshApiBtn" title="Refresh Servers API"
                     class="p-2.5 bg-white/5 hover:bg-white/10 border border-white/15 text-gray-300 hover:text-white rounded-xl transition-all shrink-0 flex items-center justify-center">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
                         </path>
@@ -218,18 +238,19 @@
 
         <div
             class="bg-surfaceElevated border border-border p-4 rounded-2xl shadow-xl backdrop-blur-md flex flex-col gap-2 text-xs text-gray-400">
-            <span id="activeServersCount" class="font-mono text-zinc-300">Servers Active: --</span>
-            <span id="lastHeartbeatText" class="font-mono text-zinc-400">Last Heartbeat: --</span>
+            <span id="activeServersCount" class="font-mono text-zinc-300 whitespace-nowrap">Servers Active: --</span>
+            <span id="lastHeartbeatText" class="font-mono text-zinc-400 whitespace-nowrap">Last Heartbeat: --</span>
             <div class="flex items-center gap-2 pt-1 border-t border-white/5">
-                <span id="statusIndicator" class="inline-flex items-center text-emerald-400 font-medium">
+                <span id="statusIndicator"
+                    class="inline-flex items-center text-emerald-400 font-medium whitespace-nowrap">
                     Live Auto-syncing
                 </span>
             </div>
-            <span class="text-zinc-500">Refreshes every 1 min</span>
+            <span class="text-zinc-500 whitespace-nowrap">Refreshes every 1 min</span>
         </div>
     </div>
 
-    <div class="flex-1 min-w-0">
+    <div class="flex-1 min-w-0 w-full">
         <div class="tablet-bezel p-3 md:p-5">
             <div class="tablet-camera-notch"></div>
             <div class="tablet-lens"></div>
@@ -241,7 +262,7 @@
                     <div
                         class="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xl mb-3 animate-pulse">
                         ⏸</div>
-                    <h3 class="text-white font-bold text-lg mb-1">Sync Paused (Tab Inactive)</h3>
+                    <h3 class="text-white font-bold text-lg mb-1 whitespace-nowrap">Sync Paused (Tab Inactive)</h3>
                     <p class="text-gray-300 text-xs max-w-xs">Click anywhere or switch to this tab to resume live
                         telemetry requests.</p>
                 </div>
@@ -250,13 +271,14 @@
                     <svg class="w-6 h-6 text-white shrink-0" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
                     </svg>
-                    <span>RBWR</span>
+                    <span class="whitespace-nowrap">RBWR</span>
                 </div>
 
                 <div class="tablet-tab-bar">
-                    <div class="tablet-tab active" data-tab="u1" onclick="switchTab('u1')">Unit 1</div>
-                    <div class="tablet-tab" data-tab="u2" onclick="switchTab('u2')">Unit 2</div>
-                    <div class="tablet-tab" data-tab="misc" onclick="switchTab('misc')">Misc</div>
+                    <div class="tablet-tab active whitespace-nowrap" data-tab="u1" onclick="switchTab('u1')">Unit 1
+                    </div>
+                    <div class="tablet-tab whitespace-nowrap" data-tab="u2" onclick="switchTab('u2')">Unit 2</div>
+                    <div class="tablet-tab whitespace-nowrap" data-tab="misc" onclick="switchTab('misc')">Misc</div>
                 </div>
 
                 <div class="tablet-search-container">

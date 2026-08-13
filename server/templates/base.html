@@ -170,28 +170,57 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="bg-background text-gray-100 min-h-screen flex flex-col font-sans selection:bg-blue-500/30">
+<body
+    class="bg-background text-gray-100 min-h-screen flex flex-col font-sans selection:bg-blue-500/30 max-w-full overflow-x-hidden">
 
     <header class="border-b border-white/5 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div id="header-container"
-            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center gap-4">
-            <a id="header-logo" href="/" class="flex items-center gap-3 shrink-0">
-                <svg class="w-6 h-6 text-blue-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5"
-                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.7"></circle>
-                    <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
-                        transform="rotate(30 12 12)"></ellipse>
-                    <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
-                        transform="rotate(90 12 12)"></ellipse>
-                    <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
-                        transform="rotate(150 12 12)"></ellipse>
-                </svg>
-                <div class="flex flex-col">
-                    <span class="font-bold text-sm tracking-wide text-zinc-100">RBWR Utility</span>
-                    <span class="text-[10px] text-zinc-500 font-mono tracking-wider -mt-1 uppercase">Thermal
-                        Calculator</span>
-                </div>
-            </a>
+            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center gap-4 max-w-full relative">
+
+            <div class="flex items-center gap-3">
+                <!-- Desktop Logo Link -->
+                <a id="header-logo" href="/" class="hidden lg:flex items-center gap-3 shrink-0">
+                    <svg class="w-6 h-6 text-blue-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5"
+                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.7"></circle>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(30 12 12)"></ellipse>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(90 12 12)"></ellipse>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(150 12 12)"></ellipse>
+                    </svg>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-sm tracking-wide text-zinc-100 whitespace-nowrap">RBWR
+                            Utility</span>
+                        <span
+                            class="text-[10px] text-zinc-500 font-mono tracking-wider -mt-1 uppercase whitespace-nowrap">Thermal
+                            Calculator</span>
+                    </div>
+                </a>
+
+                <!-- Mobile Logo Icon Button (No Text - Toggles Dropdown Menu) -->
+                <button type="button" id="mobile-menu-btn" onclick="toggleMobileMenu(event)"
+                    class="lg:hidden flex items-center gap-2 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all cursor-pointer focus:outline-none"
+                    title="Toggle Navigation Menu">
+                    <svg class="w-6 h-6 text-blue-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5"
+                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.7"></circle>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(30 12 12)"></ellipse>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(90 12 12)"></ellipse>
+                        <ellipse cx="12" cy="12" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"
+                            transform="rotate(150 12 12)"></ellipse>
+                    </svg>
+                    <svg id="mobile-menu-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-200"
+                        fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Desktop Navigation -->
             <nav id="main-nav"
                 class="hidden lg:flex items-center gap-6 text-sm font-medium text-gray-400 shrink-0 transition-[gap] duration-150 ease-out">
                 {% block nav %}
@@ -226,22 +255,23 @@
                     class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-medium border border-white/5 whitespace-nowrap">Admin</a>
                 {% endblock %}
             </nav>
-            <div
-                class="lg:hidden flex items-center gap-1.5 overflow-x-auto py-1 max-w-[65vw] sm:max-w-none fluid-nav-mobile">
+
+            <!-- Scrollable Mobile Horizontal Navigation Bar (alongside the logo icon) -->
+            <div class="lg:hidden flex items-center gap-1.5 overflow-x-auto py-1 min-w-0 flex-1 fluid-nav-mobile">
                 {% block mobile_nav %}
                 <a href="/"
-                    class="px-2 py-1.5 shrink-0 {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
                 <a href="/calculator"
-                    class="px-2 py-1.5 shrink-0 {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web
                     Calc</a>
                 <a href="/points"
-                    class="px-2 py-1.5 shrink-0 {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
                 <a href="/tablet"
-                    class="px-2 py-1.5 shrink-0 {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
                 <a href="/suggestions"
-                    class="px-2 py-1.5 shrink-0 {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Suggestions</a>
                 <a href="/contact"
-                    class="px-2 py-1.5 shrink-0 {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
                 <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
                     class="px-2 py-1.5 shrink-0 border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 rounded font-medium text-xs whitespace-nowrap">Points
                     Graph</a>
@@ -249,30 +279,147 @@
                     class="px-2 py-1.5 shrink-0 border border-amber-500/30 bg-amber-500/10 text-amber-300 rounded font-medium text-xs whitespace-nowrap">Server
                     Checker</a>
                 <a href="/admin"
-                    class="px-2 py-1.5 shrink-0 border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
                 {% endblock %}
+            </div>
+        </div>
+
+        <!-- Mobile Dropdown Menu Panel (Toggled via Logo Icon Button) -->
+        <div id="mobile-dropdown-menu"
+            class="hidden lg:hidden absolute top-16 left-0 right-0 bg-[#0c0c10]/95 backdrop-blur-2xl border-b border-white/10 shadow-2xl z-50 p-4 transition-all duration-200">
+            <div class="grid grid-cols-1 gap-1.5 font-medium text-sm">
+                <a href="/"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                        </path>
+                    </svg>
+                    <span>Home</span>
+                </a>
+                <a href="/calculator"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span>Web Calculator</span>
+                </a>
+                <a href="/points"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                    <span>Points Calculator</span>
+                </a>
+                <a href="/tablet"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>Operator Tablet</span>
+                </a>
+                <a href="/suggestions"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path == '/suggestions' %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-4a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
+                        </path>
+                    </svg>
+                    <span>Suggestions</span>
+                </a>
+                <a href="/contact"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold{% else %}text-gray-300 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
+                    <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span>Contact</span>
+                </a>
+
+                <div class="h-px bg-white/10 my-1"></div>
+
+                <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
+                    class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all font-semibold">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                            </path>
+                        </svg>
+                        <span>Point History Graph</span>
+                    </div>
+                    <svg class="w-3.5 h-3.5 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+
+                <a href="https://rbwr.scatterbox.dev" target="_blank" rel="noopener"
+                    class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-all font-semibold">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01">
+                            </path>
+                        </svg>
+                        <span>Server Checker</span>
+                    </div>
+                    <svg class="w-3.5 h-3.5 text-amber-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+
+                <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest" target="_blank"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white border border-transparent transition-all">
+                    <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    <span>Download Desktop App</span>
+                </a>
+
+                <a href="/admin"
+                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white border border-white/10 transition-all">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                        </path>
+                    </svg>
+                    <span>Admin Portal</span>
+                </a>
             </div>
         </div>
     </header>
 
     {% block content %}{% endblock %}
 
-    <footer class="border-t border-white/5 bg-background py-8 text-center text-xs text-gray-500">
+    <footer
+        class="border-t border-white/5 bg-background py-8 text-center text-xs text-gray-500 max-w-full overflow-x-hidden">
         <div
             class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="font-mono">
+            <div class="font-mono whitespace-nowrap">
                 © 2026 RBWR Utilities
             </div>
-            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-4 lg:gap-6 font-medium">
+            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4 lg:gap-6 font-medium">
                 <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
-                    class="hover:text-gray-300 transition-colors">Github</a>
+                    class="hover:text-gray-300 transition-colors whitespace-nowrap">Github</a>
                 <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
-                    class="hover:text-emerald-300 transition-colors font-medium">Point History Graph</a>
-                <a href="/suggestions" class="hover:text-gray-300 transition-colors">Suggestions</a>
-                <a href="/contact" class="hover:text-gray-300 transition-colors">Contact</a>
-                <a href="/privacy" class="hover:text-gray-300 transition-colors">Privacy Policy</a>
+                    class="hover:text-emerald-300 transition-colors font-medium whitespace-nowrap">Point History
+                    Graph</a>
+                <a href="/suggestions" class="hover:text-gray-300 transition-colors whitespace-nowrap">Suggestions</a>
+                <a href="/contact" class="hover:text-gray-300 transition-colors whitespace-nowrap">Contact</a>
+                <a href="/privacy" class="hover:text-gray-300 transition-colors whitespace-nowrap">Privacy Policy</a>
                 <a href="https://ko-fi.com/hotment" target="_blank" rel="noopener"
-                    class="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-all text-xs font-semibold border border-rose-500/20 inline-flex items-center gap-1.5"
+                    class="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-all text-xs font-semibold border border-rose-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                     title="Support on Ko-fi">
                     Support on Ko-fi
                 </a>
@@ -282,59 +429,86 @@
     </footer>
 
     <script>
-            (function () {
-                function autoScaleNav() {
-                    const nav = document.getElementById('main-nav');
-                    const container = document.getElementById('header-container');
-                    const logo = document.getElementById('header-logo');
-                    if (!nav || !container || !logo) return;
+        function toggleMobileMenu(e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById('mobile-dropdown-menu');
+            const chevron = document.getElementById('mobile-menu-chevron');
+            if (!menu) return;
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                if (chevron) chevron.classList.add('rotate-180');
+            } else {
+                menu.classList.add('hidden');
+                if (chevron) chevron.classList.remove('rotate-180');
+            }
+        }
 
-                    if (window.getComputedStyle(nav).display === 'none') return;
+        document.addEventListener('click', function (e) {
+            const menu = document.getElementById('mobile-dropdown-menu');
+            const btn = document.getElementById('mobile-menu-btn');
+            if (menu && !menu.classList.contains('hidden')) {
+                if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+                    menu.classList.add('hidden');
+                    const chevron = document.getElementById('mobile-menu-chevron');
+                    if (chevron) chevron.classList.remove('rotate-180');
+                }
+            }
+        });
 
+        (function () {
+            function autoScaleNav() {
+                const nav = document.getElementById('main-nav');
+                const container = document.getElementById('header-container');
+                const logo = document.getElementById('header-logo');
+                if (!nav || !container || !logo) return;
+
+                if (window.getComputedStyle(nav).display === 'none') return;
+
+                nav.style.gap = '24px';
+
+                const items = Array.from(nav.children);
+                if (items.length <= 1) return;
+
+                const containerWidth = container.clientWidth;
+                const containerStyle = window.getComputedStyle(container);
+                const paddingX = parseFloat(containerStyle.paddingLeft) + parseFloat(containerStyle.paddingRight);
+                const logoWidth = logo.offsetWidth;
+                const availableWidth = containerWidth - paddingX - logoWidth - 24;
+
+                let totalItemsWidth = 0;
+                items.forEach(el => {
+                    totalItemsWidth += el.offsetWidth;
+                });
+
+                const numGaps = items.length - 1;
+                const naturalTotalWidth = totalItemsWidth + (numGaps * 24);
+
+                if (naturalTotalWidth > availableWidth && availableWidth > 200) {
+                    const remainingSpace = availableWidth - totalItemsWidth;
+                    const calculatedGap = Math.floor(remainingSpace / numGaps);
+                    const appliedGap = Math.max(4, Math.min(24, calculatedGap));
+                    nav.style.gap = appliedGap + 'px';
+                } else {
                     nav.style.gap = '24px';
-
-                    const items = Array.from(nav.children);
-                    if (items.length <= 1) return;
-
-                    const containerWidth = container.clientWidth;
-                    const containerStyle = window.getComputedStyle(container);
-                    const paddingX = parseFloat(containerStyle.paddingLeft) + parseFloat(containerStyle.paddingRight);
-                    const logoWidth = logo.offsetWidth;
-                    const availableWidth = containerWidth - paddingX - logoWidth - 24;
-
-                    let totalItemsWidth = 0;
-                    items.forEach(el => {
-                        totalItemsWidth += el.offsetWidth;
-                    });
-
-                    const numGaps = items.length - 1;
-                    const naturalTotalWidth = totalItemsWidth + (numGaps * 24);
-
-                    if (naturalTotalWidth > availableWidth && availableWidth > 200) {
-                        const remainingSpace = availableWidth - totalItemsWidth;
-                        const calculatedGap = Math.floor(remainingSpace / numGaps);
-                        const appliedGap = Math.max(4, Math.min(24, calculatedGap));
-                        nav.style.gap = appliedGap + 'px';
-                    } else {
-                        nav.style.gap = '24px';
-                    }
                 }
+            }
 
-                window.addEventListener('resize', autoScaleNav);
-                window.addEventListener('DOMContentLoaded', autoScaleNav);
-                window.addEventListener('load', autoScaleNav);
+            window.addEventListener('resize', autoScaleNav);
+            window.addEventListener('DOMContentLoaded', autoScaleNav);
+            window.addEventListener('load', autoScaleNav);
 
-                if (window.ResizeObserver) {
-                    new ResizeObserver(autoScaleNav).observe(document.documentElement);
-                }
+            if (window.ResizeObserver) {
+                new ResizeObserver(autoScaleNav).observe(document.documentElement);
+            }
 
-                const mainNav = document.getElementById('main-nav');
-                if (mainNav && window.MutationObserver) {
-                    new MutationObserver(autoScaleNav).observe(mainNav, { childList: true, subtree: true });
-                }
+            const mainNav = document.getElementById('main-nav');
+            if (mainNav && window.MutationObserver) {
+                new MutationObserver(autoScaleNav).observe(mainNav, { childList: true, subtree: true });
+            }
 
-                autoScaleNav();
-            })();
+            autoScaleNav();
+        })();
     </script>
 
     {% block scripts %}{% endblock %}

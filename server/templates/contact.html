@@ -18,11 +18,11 @@
 {% endblock %}
 
 {% block content %}
-<main class="max-w-3xl mx-auto px-4 py-10">
+<main class="max-w-3xl mx-auto px-4 py-8 sm:py-10 overflow-x-hidden">
     <div class="mb-8 text-center sm:text-left">
         <div
-            class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono mb-3">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono mb-3 whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
                 </path>
@@ -38,10 +38,10 @@
         </p>
     </div>
 
-    <div class="contact-card">
+    <div class="contact-card p-5 sm:p-8">
         <div id="contactSuccessAlert"
             class="hidden mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
-            <div class="flex items-center gap-2 font-semibold">
+            <div class="flex items-center gap-2 font-semibold whitespace-nowrap">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
@@ -53,7 +53,7 @@
 
         <div id="contactErrorAlert"
             class="hidden mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
-            <div class="flex items-center gap-2 font-semibold">
+            <div class="flex items-center gap-2 font-semibold whitespace-nowrap">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -67,7 +67,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="contactName"
-                        class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider">Your Name / Handle
+                        class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider whitespace-nowrap">Your
+                        Name / Handle
                         <span class="text-gray-500">(Optional)</span></label>
                     <input type="text" id="contactName" placeholder="e.g. Operator123" maxlength="60"
                         class="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white text-sm rounded-xl px-4 py-2.5 outline-none transition-all">
@@ -75,7 +76,8 @@
 
                 <div>
                     <label for="contactInfo"
-                        class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider">Reply Contact
+                        class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider whitespace-nowrap">Reply
+                        Contact
                         <span class="text-gray-500">(Optional)</span></label>
                     <input type="text" id="contactInfo" placeholder="e.g. Discord handle or Email" maxlength="100"
                         class="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white text-sm rounded-xl px-4 py-2.5 outline-none transition-all">
@@ -84,7 +86,8 @@
 
             <div>
                 <label for="contactSubject"
-                    class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider">Subject /
+                    class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider whitespace-nowrap">Subject
+                    /
                     Category</label>
                 <select id="contactSubject"
                     class="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white text-sm rounded-xl px-4 py-2.5 outline-none transition-all">
@@ -98,21 +101,21 @@
 
             <div>
                 <label for="contactMessage"
-                    class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider">Message <span
-                        class="text-rose-400">*</span></label>
+                    class="block text-xs font-mono text-gray-300 mb-1.5 uppercase tracking-wider whitespace-nowrap">Message
+                    <span class="text-rose-400">*</span></label>
                 <textarea id="contactMessage" rows="5" required placeholder="Type your private message here..."
                     maxlength="2000"
                     class="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white text-sm rounded-xl p-4 outline-none transition-all resize-y"></textarea>
                 <div class="flex justify-between text-[11px] text-gray-500 mt-1">
-                    <span>Private & encrypted transmission</span>
-                    <span id="charCounter">0 / 2000</span>
+                    <span class="whitespace-nowrap">Private & encrypted transmission</span>
+                    <span id="charCounter" class="whitespace-nowrap">0 / 2000</span>
                 </div>
             </div>
 
             <div class="pt-2">
                 <button type="submit" id="btnSubmitContact"
-                    class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                     </svg>

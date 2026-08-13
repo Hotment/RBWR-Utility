@@ -5,19 +5,21 @@
 
 
 {% block content %}
-<main class="flex-grow max-w-6xl mx-auto px-6 py-12 md:py-20 w-full flex flex-col gap-24">
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<main
+    class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-20 w-full flex flex-col gap-16 md:gap-24 overflow-x-hidden">
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center">
         <div class="lg:col-span-7 flex flex-col gap-6">
             <div
-                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/40 border border-zinc-700/50 text-xs font-medium text-zinc-300 w-fit">
-                <span class="relative flex h-2 w-2">
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/40 border border-zinc-700/50 text-xs font-medium text-zinc-300 w-fit whitespace-nowrap">
+                <span class="relative flex h-2 w-2 shrink-0">
                     <span
                         class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
                 Online · Version {{ latest_version }}
             </div>
-            <h1 class="text-4xl md:text-6xl font-display font-semibold tracking-tight text-white leading-tight">
+            <h1
+                class="text-3xl sm:text-4xl md:text-6xl font-display font-semibold tracking-tight text-white leading-tight">
                 APRM & Thermal Solver for <span class="text-blue-500">RBWR</span>
             </h1>
             <p class="text-gray-400 text-base md:text-lg leading-relaxed max-w-xl">
@@ -26,8 +28,8 @@
             </p>
             <div class="flex flex-col sm:flex-row gap-4 mt-2">
                 <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest"
-                    class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-3 shadow-lg shadow-blue-500/10 tracking-wide text-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                    class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-3 shadow-lg shadow-blue-500/10 tracking-wide text-sm whitespace-nowrap">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3">
@@ -36,7 +38,7 @@
                     Download Latest (GitHub)
                 </a>
                 <a href="https://github.com/Hotment/rbwr_themal_calculator" target="_blank"
-                    class="px-6 py-3.5 border border-white/10 hover:border-white/20 rounded-xl font-medium transition text-gray-300 hover:text-white flex items-center justify-center gap-2 text-sm bg-white/5 hover:bg-white/10">
+                    class="px-6 py-3.5 border border-white/10 hover:border-white/20 rounded-xl font-medium transition text-gray-300 hover:text-white flex items-center justify-center gap-2 text-sm bg-white/5 hover:bg-white/10 whitespace-nowrap">
                     Source Code
                 </a>
             </div>
@@ -110,7 +112,7 @@
         </div>
 
         <div
-            class="premium-glass p-6 md:p-8 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/25 bg-emerald-950/15 shadow-2xl interactive-card">
+            class="premium-glass p-5 sm:p-6 md:p-8 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/25 bg-emerald-950/15 shadow-2xl interactive-card">
             <div class="flex items-start gap-4">
                 <div
                     class="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0 border border-emerald-500/30">
@@ -120,11 +122,12 @@
                     </svg>
                 </div>
                 <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-bold uppercase text-emerald-400 tracking-wider">Companion
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span
+                            class="text-xs font-mono font-bold uppercase text-emerald-400 tracking-wider whitespace-nowrap">Companion
                             Utility</span>
                         <span
-                            class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase border border-emerald-500/30">Free
+                            class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase border border-emerald-500/30 whitespace-nowrap">Free
                             & Private</span>
                     </div>
                     <h3 class="text-xl font-semibold text-gray-100">RBWR Point History Graph & Private Viewer</h3>
@@ -135,9 +138,9 @@
                 </div>
             </div>
             <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
-                class="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl text-sm font-display shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 shrink-0">
+                class="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl text-sm font-display shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap">
                 <span>Launch History Graph</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                 </svg>
@@ -147,14 +150,15 @@
 
     <!-- Download Section -->
     <section id="download" class="scroll-mt-24">
-        <div class="premium-glass rounded-2xl p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-center shadow-xl">
+        <div class="premium-glass rounded-2xl p-5 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-center shadow-xl">
             <div class="md:col-span-8 flex flex-col gap-4">
                 <span
-                    class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-[10px] font-bold w-fit uppercase">CURRENT
+                    class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-[10px] font-bold w-fit uppercase whitespace-nowrap">CURRENT
                     BUILD DETAILS</span>
                 <h3 class="text-2xl font-semibold text-gray-200">Release Package: v{{ latest_version }}</h3>
-                <div class="grid grid-cols-2 gap-4 text-xs font-mono text-gray-500">
-                    <div>COMPILED ON: <span class="text-gray-300">{{ release_date }}</span></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono text-gray-500">
+                    <div class="whitespace-nowrap">COMPILED ON: <span class="text-gray-300">{{ release_date }}</span>
+                    </div>
                 </div>
                 <div
                     class="text-sm text-gray-400 bg-black/20 p-4 rounded-xl border border-white/5 leading-relaxed font-mono">
@@ -164,9 +168,9 @@
             </div>
             <div class="md:col-span-4 flex flex-col gap-4">
                 <a href="https://github.com/Hotment/rbwr_themal_calculator/releases/latest"
-                    class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl flex items-center justify-center gap-3 transition tracking-wide text-sm shadow-lg shadow-blue-500/10">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg">
+                    class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl flex items-center justify-center gap-3 transition tracking-wide text-sm shadow-lg shadow-blue-500/10 whitespace-nowrap">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5"
+                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3">
                         </path>
@@ -178,7 +182,7 @@
     </section>
 
     <!-- Feedback Section -->
-    <section id="feedback" class="scroll-mt-24 grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <section id="feedback" class="scroll-mt-24 grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12">
         <div class="lg:col-span-5 flex flex-col gap-4">
             <h2 class="text-3xl font-display font-semibold tracking-tight text-white">
                 Send Feedback
@@ -190,11 +194,11 @@
                 class="text-xs text-gray-500 font-mono flex flex-col gap-2 bg-black/20 p-4 rounded-xl border border-white/5">
                 <div class="text-gray-300 font-semibold">// SUGGESTION / FEEDBACK GUIDELINES</div>
                 <div>1. Please do not spam suggestions.</div>
-                <div>2. Submissions are limited to 1 suggestion every 12 hours.</div>
+                <div>2. Submissions are limited to 1 suggestion every 30 minutes.</div>
             </div>
         </div>
 
-        <div class="lg:col-span-7 premium-glass p-6 md:p-8 rounded-2xl">
+        <div class="lg:col-span-7 premium-glass p-5 md:p-8 rounded-2xl">
             <form id="feedback-form" class="flex flex-col gap-5">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="flex flex-col gap-2 group">
@@ -203,9 +207,9 @@
                         <input type="text" id="name" placeholder="Leave empty for anonymous"
                             class="premium-input px-4 py-3 rounded-xl text-sm font-mono h-11">
                     </div>
-                    <div class="flex items-center pt-6">
+                    <div class="flex items-center pt-2 md:pt-6">
                         <label
-                            class="flex items-center gap-3 cursor-pointer group text-sm font-medium text-gray-400 group-hover:text-gray-300 transition-colors">
+                            class="flex items-center gap-3 cursor-pointer group text-sm font-medium text-gray-400 group-hover:text-gray-300 transition-colors whitespace-nowrap">
                             <input type="checkbox" id="anonymous" class="premium-checkbox">
                             <span>Submit as Anonymous</span>
                         </label>
@@ -223,7 +227,7 @@
                 <div id="form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
 
                 <button type="submit" id="submit-btn"
-                    class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm tracking-wide shadow-lg shadow-blue-500/10">
+                    class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm tracking-wide shadow-lg shadow-blue-500/10 whitespace-nowrap">
                     Submit Suggestion
                 </button>
             </form>

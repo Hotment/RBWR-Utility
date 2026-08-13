@@ -850,7 +850,7 @@ def submit_suggestion():
     data = load_suggestions()
     suggestions = data.setdefault("suggestions", [])
     
-    # Enforce rate limiting: 1 feedback entry per 12 hours per IP
+    # Enforce rate limiting: 1 feedback entry per 30 minutes per IP
     if ip != "unknown":
         now = datetime.now(timezone.utc)
         limit_period = timedelta(minutes=30)

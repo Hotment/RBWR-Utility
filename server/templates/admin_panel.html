@@ -128,11 +128,12 @@
     </style>
 </head>
 
-<body class="min-h-screen flex flex-col md:flex-row font-sans" data-is-root="{{ is_root|lower }}">
+<body class="min-h-screen flex flex-col md:flex-row font-sans max-w-full overflow-x-hidden"
+    data-is-root="{{ is_root|lower }}">
 
     <aside class="w-full md:w-64 bg-surface border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0">
         <div class="p-6 border-b border-white/5 flex items-center gap-3">
-            <div class="relative w-8 h-8 flex items-center justify-center">
+            <div class="relative w-8 h-8 flex items-center justify-center shrink-0">
                 <div
                     class="absolute inset-0 rounded-full border border-dashed border-blue-500 animate-[spin_15s_linear_infinite] opacity-50">
                 </div>
@@ -142,87 +143,88 @@
                 </div>
             </div>
             <div>
-                <h1 class="font-display font-semibold text-sm tracking-wider text-slate-200">Admin Panel</h1>
-                <p class="text-[8px] text-slate-500 font-mono tracking-widest">APRM Calculator</p>
+                <h1 class="font-display font-semibold text-sm tracking-wider text-slate-200 whitespace-nowrap">Admin
+                    Panel</h1>
+                <p class="text-[8px] text-slate-500 font-mono tracking-widest whitespace-nowrap">APRM Calculator</p>
             </div>
         </div>
 
         <nav class="p-4 flex flex-col gap-1.5 grow">
             <a href="/admin" id="nav-overview"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'overview' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z">
                     </path>
                 </svg>
-                <span>Overview</span>
+                <span class="whitespace-nowrap">Overview</span>
             </a>
 
             {% if permissions.suggestions %}
             <a href="/admin/suggestions" id="nav-suggestions"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'suggestions' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.95 2.68 3.22 1.24.22 2.5.34 3.79.34 1.29 0 2.55-.12 3.79-.34 1.56-.27 2.68-1.63 2.68-3.22V8.25A3.75 3.75 0 0012.75 4.5h-1.5a3.75 3.75 0 00-3.75 3.75v5.27h-.001z">
                     </path>
                 </svg>
-                <span>Suggestions</span>
+                <span class="whitespace-nowrap">Suggestions</span>
             </a>
             {% endif %}
 
             {% if permissions.crashes %}
             <a href="/admin/crashes" id="nav-crashes"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'crashes' %}bg-rose-600/10 text-rose-500 border border-rose-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-rose-500 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-rose-500 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
                     </path>
                 </svg>
-                <span>Crash Logs</span>
+                <span class="whitespace-nowrap">Crash Logs</span>
             </a>
             {% endif %}
 
             {% if permissions.contact %}
             <a href="/admin/contact" id="nav-contact"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'contact' %}bg-purple-600/10 text-purple-400 border border-purple-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75">
                     </path>
                 </svg>
-                <span>Private Messages</span>
+                <span class="whitespace-nowrap">Private Messages</span>
                 <span id="unreadContactBadge"
-                    class="hidden ml-auto px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold">0</span>
+                    class="hidden ml-auto px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold whitespace-nowrap">0</span>
             </a>
             {% endif %}
 
             {% if permissions.bans %}
             <a href="/admin/bans" id="nav-bans"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'bans' %}bg-amber-600/10 text-amber-400 border border-amber-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636">
                     </path>
                 </svg>
-                <span>Banned IPs</span>
+                <span class="whitespace-nowrap">Banned IPs</span>
             </a>
             {% endif %}
 
             {% if is_root %}
             <a href="/admin/accounts" id="nav-accounts"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'accounts' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
-                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition" fill="none"
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z">
                     </path>
                 </svg>
-                <span>Manage Admins</span>
+                <span class="whitespace-nowrap">Accounts</span>
             </a>
             {% endif %}
 
@@ -267,26 +269,26 @@
     <div class="grow flex flex-col min-w-0">
 
         <main id="view-overview"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-8 overflow-y-auto max-h-screen {% if active_view != 'overview' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-8 overflow-y-auto max-h-screen {% if active_view != 'overview' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-wide text-white font-display">Overview</h1>
-                    <p class="text-xs text-slate-500 font-mono mt-1">Logged in as {{ username }}</p>
+                    <h1 class="text-2xl font-bold tracking-wide text-white font-display whitespace-nowrap">Overview</h1>
+                    <p class="text-xs text-slate-500 font-mono mt-1 whitespace-nowrap">Logged in as {{ username }}</p>
                 </div>
                 <div class="flex gap-4 font-mono text-xs">
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 grow-0">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 grow-0">
                 {% if permissions.suggestions %}
                 <a href="/admin/suggestions" id="card-link-suggestions"
-                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
-                        class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition duration-300">
+                        class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition duration-300 shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -296,7 +298,7 @@
                     </div>
                     <div>
                         <h2
-                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-blue-400 transition duration-300">
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-blue-400 transition duration-300 whitespace-nowrap">
                             Suggestions Feed</h2>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
@@ -307,9 +309,9 @@
 
                 {% if permissions.crashes %}
                 <a href="/admin/crashes" id="card-link-crashes"
-                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
-                        class="w-12 h-12 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:bg-rose-500/20 transition duration-300">
+                        class="w-12 h-12 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:bg-rose-500/20 transition duration-300 shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -319,7 +321,7 @@
                     </div>
                     <div>
                         <h2
-                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-rose-400 transition duration-300">
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-rose-400 transition duration-300 whitespace-nowrap">
                             Crash Records</h2>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
@@ -330,9 +332,9 @@
 
                 {% if permissions.contact %}
                 <a href="/admin/contact" id="card-link-contact"
-                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
-                        class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20 transition duration-300">
+                        class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20 transition duration-300 shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -342,7 +344,7 @@
                     </div>
                     <div>
                         <h2
-                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-purple-400 transition duration-300">
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-purple-400 transition duration-300 whitespace-nowrap">
                             Private Messages</h2>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
@@ -353,9 +355,9 @@
 
                 {% if permissions.bans %}
                 <a href="/admin/bans" id="card-link-bans"
-                    class="cyber-panel hover-glow p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
-                        class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition duration-300">
+                        class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition duration-300 shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -365,7 +367,7 @@
                     </div>
                     <div>
                         <h2
-                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-amber-400 transition duration-300">
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-amber-400 transition duration-300 whitespace-nowrap">
                             Banned IPs</h2>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
@@ -377,20 +379,21 @@
         </main>
 
         <main id="view-suggestions"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'suggestions' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'suggestions' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-white font-display">Suggestions</h2>
+                    <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Suggestions
+                    </h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Review feedback and manage user requests.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
-                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
                         <div>TOTAL ENTRIES: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
@@ -398,31 +401,33 @@
             <div class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div
-                        class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
                         <button onclick="filterTarget('all')" id="target-tab-all"
-                            class="px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase">All Types</button>
+                            class="px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                            Types</button>
                         <button onclick="filterTarget('overlay')" id="target-tab-overlay"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Overlay</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Overlay</button>
                         <button onclick="filterTarget('point_graph')" id="target-tab-point_graph"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Point
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Point
                             Graph</button>
                         <button onclick="filterTarget('server_checker')" id="target-tab-server_checker"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Server
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Server
                             Checker</button>
                     </div>
 
                     <div
-                        class="cyber-panel p-1.5 rounded-xl flex border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
                         <button onclick="filterStatus('all')" id="tab-all"
-                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase">All Status</button>
+                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                            Status</button>
                         <button onclick="filterStatus('pending')" id="tab-pending"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Pending</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
                         <button onclick="filterStatus('considering')" id="tab-considering"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Considering</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
                         <button onclick="filterStatus('accepted')" id="tab-accepted"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Accepted</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted</button>
                         <button onclick="filterStatus('declined')" id="tab-declined"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase">Declined</button>
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
                     </div>
                 </div>
 
@@ -433,16 +438,17 @@
         </main>
 
         <main id="view-crashes"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'crashes' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'crashes' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-rose-500 font-display">Crash Reports</h2>
+                    <h2 class="text-xl font-bold tracking-wide text-rose-500 font-display whitespace-nowrap">Crash
+                        Reports</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">View error tracebacks and diagnostic logs.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
-                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
                         <div>OPEN: <span id="crash-stat-open" class="text-rose-400">0</span></div>
                         <div class="w-px bg-white/5 self-stretch"></div>
                         <div>FIXED: <span id="crash-stat-fixed" class="text-emerald-400">0</span></div>
@@ -450,7 +456,7 @@
                         <div>TOTAL: <span id="crash-stat-total-entries" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
@@ -461,23 +467,24 @@
         </main>
 
         <main id="view-contact"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'contact' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'contact' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display">Private Messages</h2>
+                    <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display whitespace-nowrap">Private
+                        Messages</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Confidential messages sent directly to the
                         administrator.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
-                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
                         <div>UNREAD: <span id="contact-stat-unread" class="text-purple-400">0</span></div>
                         <div class="w-px bg-white/5 self-stretch"></div>
                         <div>TOTAL MESSAGES: <span id="contact-stat-total" class="text-blue-400">0</span></div>
                     </div>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
@@ -488,22 +495,23 @@
         </main>
 
         <main id="view-bans"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'bans' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'bans' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display">Banned IP Addresses</h2>
+                    <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display whitespace-nowrap">Banned IP
+                        Addresses</h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Manage prohibited client IPs, view expiration
                         dates, and enforce new bans.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
-                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono">
+                        class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
                         <div>ACTIVE BANS: <span id="ban-stat-total" class="text-amber-400">0</span></div>
                     </div>
                     <button onclick="openBanModal('')"
-                        class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/30 tracking-wide font-mono font-medium text-xs transition flex items-center gap-2 shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/30 tracking-wide font-mono font-medium text-xs transition flex items-center gap-2 shrink-0 whitespace-nowrap">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
                             </path>
@@ -511,7 +519,7 @@
                         Ban New IP
                     </button>
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
@@ -523,16 +531,17 @@
 
         {% if is_root %}
         <main id="view-accounts"
-            class="view-section grow p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'accounts' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'accounts' %}hidden{% endif %}">
             <header
-                class="cyber-panel glow-cyan p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-white font-display">Admin Accounts</h2>
+                    <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Admin Accounts
+                    </h2>
                     <p class="text-xs text-slate-500 font-mono mt-1">Manage administrator accounts and permissions.</p>
                 </div>
                 <div class="flex gap-4 font-mono text-xs">
                     <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition">Home
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
