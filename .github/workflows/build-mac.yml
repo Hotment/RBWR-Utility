@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-macos:
-    name: Build macOS Universal App (Apple Silicon & Intel)
+    name: Build macOS (Apple Silicon)
     runs-on: macos-14
     steps:
       - name: Checkout repository
@@ -19,11 +19,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies & PyInstaller
+      - name: Install Dependencies & Nuitka
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install nuitka
 
       - name: Generate macOS Application Icon (.icns)
         run: |
@@ -39,26 +39,30 @@ jobs:
           iconutil -c icns icon.iconset -o icon.icns
           rm -rf icon.iconset
 
-      - name: Build Universal2 macOS App Bundle
+      - name: Compile to macOS App Bundle (Nuitka)
         run: |
-          pyinstaller \
-            --noconsole \
-            --windowed \
-            --target-arch universal2 \
-            --icon=icon.icns \
-            --name="RBWR APRM Calculator" \
-            --add-data "icon.png:." \
+          python -m nuitka \
+            --standalone \
+            --macos-create-app-bundle \
+            --macos-app-icon=icon.icns \
+            --macos-app-name="RBWR APRM Calculator" \
+            --macos-signed-app-name="RBWR APRM Calculator" \
+            --enable-plugin=tk-inter \
+            --output-filename="RBWR_APRM_Calculator" \
             rbwr_overlay.py
 
       - name: Code Sign and Package
         run: |
-          codesign --force --deep -s - "dist/RBWR APRM Calculator.app"
-          cd dist
-          zip -r -y "../RBWR_APRM_Calculator_macOS_Universal.zip" "RBWR APRM Calculator.app"
-          cd ..
+          if [ -d "rbwr_overlay.app" ]; then
+            mv "rbwr_overlay.app" "RBWR APRM Calculator.app"
+          elif [ -d "rbwr_overlay.dist/RBWR APRM Calculator.app" ]; then
+            mv "rbwr_overlay.dist/RBWR APRM Calculator.app" "RBWR APRM Calculator.app"
+          fi
+          codesign --force --deep -s - "RBWR APRM Calculator.app"
+          zip -r -y "RBWR_APRM_Calculator_macOS_arm64.zip" "RBWR APRM Calculator.app"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RBWR_APRM_Calculator_macOS_Universal
-          path: "RBWR_APRM_Calculator_macOS_Universal.zip"
+          name: RBWR_APRM_Calculator_macOS_arm64
+          path: "RBWR_APRM_Calculator_macOS_arm64.zip"
