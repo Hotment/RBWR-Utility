@@ -51,7 +51,7 @@ jobs:
             --output-filename="RBWR_APRM_Calculator" \
             rbwr_overlay.py
 
-      - name: Code Sign and Package
+      - name: Code Sign Application Bundle
         run: |
           if [ -d "rbwr_overlay.app" ]; then
             mv "rbwr_overlay.app" "RBWR APRM Calculator.app"
@@ -59,10 +59,9 @@ jobs:
             mv "rbwr_overlay.dist/RBWR APRM Calculator.app" "RBWR APRM Calculator.app"
           fi
           codesign --force --deep -s - "RBWR APRM Calculator.app"
-          zip -r -y "RBWR_APRM_Calculator_macOS_arm64.zip" "RBWR APRM Calculator.app"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RBWR_APRM_Calculator_macOS_arm64
-          path: "RBWR_APRM_Calculator_macOS_arm64.zip"
+          path: "RBWR APRM Calculator.app"
