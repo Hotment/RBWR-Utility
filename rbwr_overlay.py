@@ -14,10 +14,11 @@ import urllib.request
 import urllib.error
 from PIL import Image, ImageDraw, ImageTk
 
-IS_LINUX = os.name == 'posix'
-IS_WINDOWS = os.name == 'nt'
+IS_LINUX = sys.platform.startswith('linux')
+IS_WINDOWS = sys.platform == 'win32' or os.name == 'nt'
+IS_MAC = sys.platform == 'darwin'
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 # --- Update Server Configuration ---
 SUGGESTIONS_SERVER_URL = "https://rbwr.hotment.dev"
@@ -105,19 +106,15 @@ def show_crash_dialog(tb_text):
         crash_win = tk.Tk()
         crash_win.title("Application Crash Detected")
         
-        if os.path.exists("icon.ico"):
+        if IS_WINDOWS and os.path.exists("icon.ico"):
             try:
                 crash_win.iconbitmap("icon.ico")
             except Exception:
                 pass
         else:
             try:
-                icon_path = os.path.join(_log_dir, "icon.ico")
-                if os.path.exists(icon_path):
-                    crash_win.iconbitmap(icon_path)
-                else:
-                    crash_win.tk_icon = ImageTk.PhotoImage(get_default_icon_image())  # pyright: ignore[reportAttributeAccessIssue]
-                    crash_win.iconphoto(False, crash_win.tk_icon)  # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
+                crash_win.tk_icon = ImageTk.PhotoImage(get_default_icon_image())  # pyright: ignore[reportAttributeAccessIssue]
+                crash_win.iconphoto(False, crash_win.tk_icon)  # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
             except Exception:
                 pass
 
@@ -273,8 +270,14 @@ def show_crash_dialog(tb_text):
         crash_win.protocol("WM_DELETE_WINDOW", close_app)
         crash_win.mainloop()
     except Exception:
-        import ctypes
-        ctypes.windll.user32.MessageBoxW(0, f"Critical Crash:\n{tb_text}", "RBWR Overlay Crash", 0x10)
+        if IS_WINDOWS:
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, f"Critical Crash:\n{tb_text}", "RBWR Overlay Crash", 0x10)
+            except Exception:
+                pass
+        else:
+            print(f"Critical Crash:\n{tb_text}", file=sys.stderr)
         os._exit(1)
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -320,7 +323,57 @@ def generate_default_icon():
     except Exception:
         pass
 
-import re
+def get_macos_active_app():
+    if not IS_MAC:
+        return "", ""
+    try:
+        from ctypes import c_void_p, c_char_p, cdll, util
+        appkit_path = util.find_library('AppKit')
+        objc_path = util.find_library('objc')
+        if not appkit_path or not objc_path:
+            return "", ""
+        _ = cdll.LoadLibrary(appkit_path)
+        objc = cdll.LoadLibrary(objc_path)
+        
+        objc.objc_getClass.restype = c_void_p
+        objc.objc_getClass.argtypes = [c_char_p]
+        objc.sel_registerName.restype = c_void_p
+        objc.sel_registerName.argtypes = [c_char_p]
+        objc.objc_msgSend.restype = c_void_p
+        objc.objc_msgSend.argtypes = [c_void_p, c_void_p]
+        
+        NSWorkspace = objc.objc_getClass(b"NSWorkspace")
+        if not NSWorkspace:
+            return "", ""
+        sharedWS = objc.objc_msgSend(NSWorkspace, objc.sel_registerName(b"sharedWorkspace"))
+        if not sharedWS:
+            return "", ""
+        frontApp = objc.objc_msgSend(sharedWS, objc.sel_registerName(b"frontmostApplication"))
+        if not frontApp:
+            return "", ""
+        
+        name = ""
+        name_obj = objc.objc_msgSend(frontApp, objc.sel_registerName(b"localizedName"))
+        if name_obj:
+            utf8_str = objc.objc_msgSend(name_obj, objc.sel_registerName(b"UTF8String"))
+            if utf8_str:
+                raw_val = c_char_p(utf8_str).value
+                if raw_val is not None:
+                    name = raw_val.decode('utf-8', errors='ignore')
+        
+        bundle_id = ""
+        bundle_obj = objc.objc_msgSend(frontApp, objc.sel_registerName(b"bundleIdentifier"))
+        if bundle_obj:
+            utf8_bundle = objc.objc_msgSend(bundle_obj, objc.sel_registerName(b"UTF8String"))
+            if utf8_bundle:
+                raw_val = c_char_p(utf8_bundle).value
+                if raw_val is not None:
+                    bundle_id = raw_val.decode('utf-8', errors='ignore')
+        
+        return name, bundle_id
+    except Exception:
+        return "", ""
+
 import ctypes
 import json
 
@@ -1092,15 +1145,21 @@ class OverlayApp:
                     break
                 except (ValueError, TypeError):
                     pass
+            elif key in u1_st and u1_st[key] is not None:
+                try:
+                    t_health = float(u1_st[key])
+                    break
+                except (ValueError, TypeError):
+                    pass
 
-        if getattr(self, 'enable_turbine_health_alert', False) and t_health is not None:
+        if t_health is not None:
             t_thresh = getattr(self, 'turbine_health_threshold', 65.0)
-            if t_health <= t_thresh:
+            if t_health > t_thresh:
+                self._turbine_health_alert_triggered = False
+            elif t_health <= t_thresh and getattr(self, 'enable_turbine_health_alert', False):
                 if not getattr(self, '_turbine_health_alert_triggered', False):
                     self._turbine_health_alert_triggered = True
                     self.trigger_turbine_health_reminder(t_health, t_thresh)
-            else:
-                self._turbine_health_alert_triggered = False
 
         dtl_val = u1_st.get("Demand Time Left") or u2_st.get("Demand Time Left") or 0
         try:
@@ -1286,6 +1345,10 @@ class OverlayApp:
             self.win = tk.Toplevel(self.root)
             self.win.title(f"RBWR APRM Calculator v{__version__}")
             self.win.overrideredirect(True)
+        elif IS_MAC:
+            self.win = self.root
+            self.win.title(f"RBWR APRM Calculator v{__version__}")
+            self.win.overrideredirect(True)
         else:
             self.root.withdraw()
             self.win = self.root
@@ -1382,19 +1445,15 @@ class OverlayApp:
         # Icon and Tray Setup (Loads existing icon if present, otherwise uses in-memory generated icon)
         self.icon_image_pil = get_default_icon_image()
         
-        if os.path.exists("icon.ico"):
+        if IS_WINDOWS and os.path.exists("icon.ico"):
             try:
                 self.root.iconbitmap("icon.ico")
             except Exception:
                 log.warning("Failed to load custom icon from icon.ico")
         else:
             try:
-                icon_path = os.path.join(_log_dir, "icon.ico")
-                if os.path.exists(icon_path):
-                    self.root.iconbitmap(icon_path)
-                else:
-                    self.tk_icon = ImageTk.PhotoImage(self.icon_image_pil)
-                    self.root.iconphoto(False, self.tk_icon)  # pyright: ignore[reportArgumentType]
+                self.tk_icon = ImageTk.PhotoImage(self.icon_image_pil)
+                self.root.iconphoto(False, self.tk_icon)  # pyright: ignore[reportArgumentType]
             except Exception as e:
                 log.warning(f"Failed to set fallback icon: {e}")
                 
@@ -1463,8 +1522,10 @@ class OverlayApp:
                     self.win.attributes('-type', 'utility')
                 except Exception as le:
                     log.warning(f"Linux window attribute note: {le}")
+            elif IS_MAC:
+                pass
         except Exception as e:
-            log.warning(f"Failed to set WS_EX_APPWINDOW: {e}")
+            log.warning(f"Failed to set window style: {e}")
             
         w = self.width_compact if self.is_compact else self.width_detailed
         h = self.height_compact if self.is_compact else self.height_detailed
@@ -2174,6 +2235,9 @@ class OverlayApp:
                 if IS_WINDOWS:
                     import winsound
                     winsound.MessageBeep(winsound.MB_ICONWARNING)
+                elif IS_MAC:
+                    import subprocess
+                    subprocess.Popen(["afplay", "/System/Library/Sounds/Ping.aiff"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
                     self.root.bell()
             except Exception:
@@ -2263,62 +2327,80 @@ class OverlayApp:
                 if not self.win.attributes("-topmost"):
                     self.win.attributes("-topmost", True)
             elif self.topmost_on_roblox:
-                hwnd = ctypes.windll.user32.GetForegroundWindow()
-                try:
-                    hwnd_to_use = self.win.winfo_id()
-                    parent = ctypes.windll.user32.GetParent(hwnd_to_use)
-                    our_hwnd = parent if parent else hwnd_to_use
-                except Exception:
-                    hwnd_to_use = None
-                    our_hwnd = None
-
                 is_roblox = False
                 is_ours = False
-                window_title = ""
-                class_name = ""
-                proc_name = ""
-                pid_val = 0
+                our_hwnd = None
+                hwnd = None
 
-                if hwnd:
-                    buffer_len = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
-                    buffer = ctypes.create_unicode_buffer(buffer_len)
-                    ctypes.windll.user32.GetWindowTextW(hwnd, buffer, buffer_len)
-                    window_title = buffer.value.strip()
+                if IS_WINDOWS:
+                    hwnd = ctypes.windll.user32.GetForegroundWindow()
+                    try:
+                        hwnd_to_use = self.win.winfo_id()
+                        parent = ctypes.windll.user32.GetParent(hwnd_to_use)
+                        our_hwnd = parent if parent else hwnd_to_use
+                    except Exception:
+                        hwnd_to_use = None
+                        our_hwnd = None
 
-                    class_buf = ctypes.create_unicode_buffer(256)
-                    ctypes.windll.user32.GetClassNameW(hwnd, class_buf, 256)
-                    class_name = class_buf.value.strip()
+                    window_title = ""
+                    class_name = ""
+                    proc_name = ""
+                    pid_val = 0
 
-                    active_pid = wintypes.DWORD(0)  # pyright: ignore[reportPossiblyUnboundVariable]
-                    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(active_pid))
-                    pid_val = active_pid.value
+                    if hwnd:
+                        buffer_len = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
+                        buffer = ctypes.create_unicode_buffer(buffer_len)
+                        ctypes.windll.user32.GetWindowTextW(hwnd, buffer, buffer_len)
+                        window_title = buffer.value.strip()
 
-                    if pid_val:
-                        for mask in (0x1000, 0x0410):
-                            try:
-                                h_proc = ctypes.windll.kernel32.OpenProcess(mask, False, pid_val)
-                                if h_proc:
-                                    pbuf = ctypes.create_unicode_buffer(512)
-                                    psize = wintypes.DWORD(512)  # pyright: ignore[reportPossiblyUnboundVariable]
-                                    if ctypes.windll.kernel32.QueryFullProcessImageNameW(h_proc, 0, pbuf, ctypes.byref(psize)):
-                                        proc_name = os.path.basename(pbuf.value).lower()
-                                    ctypes.windll.kernel32.CloseHandle(h_proc)
-                                    if proc_name:
-                                        break
-                            except Exception:
-                                pass
+                        class_buf = ctypes.create_unicode_buffer(256)
+                        ctypes.windll.user32.GetClassNameW(hwnd, class_buf, 256)
+                        class_name = class_buf.value.strip()
 
-                    title_lower = window_title.lower()
+                        active_pid = wintypes.DWORD(0)  # pyright: ignore[reportPossiblyUnboundVariable]
+                        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(active_pid))
+                        pid_val = active_pid.value
+
+                        if pid_val:
+                            for mask in (0x1000, 0x0410):
+                                try:
+                                    h_proc = ctypes.windll.kernel32.OpenProcess(mask, False, pid_val)
+                                    if h_proc:
+                                        pbuf = ctypes.create_unicode_buffer(512)
+                                        psize = wintypes.DWORD(512)  # pyright: ignore[reportPossiblyUnboundVariable]
+                                        if ctypes.windll.kernel32.QueryFullProcessImageNameW(h_proc, 0, pbuf, ctypes.byref(psize)):
+                                            proc_name = os.path.basename(pbuf.value).lower()
+                                        ctypes.windll.kernel32.CloseHandle(h_proc)
+                                        if proc_name:
+                                            break
+                                except Exception:
+                                    pass
+
+                        title_lower = window_title.lower()
+                        is_roblox = bool(
+                            "roblox" in proc_name or
+                            "robloxplayerbeta" in proc_name or
+                            class_name in ("WINDOWSCLIENT", "RobloxApp", "RobloxPlayerBeta") or
+                            "roblox" in class_name.lower() or
+                            "roblox" in title_lower or
+                            "realistic" in title_lower or
+                            "rbwr" in title_lower
+                        )
+                        is_ours = bool(pid_val == os.getpid() or (our_hwnd and hwnd == our_hwnd) or (hwnd_to_use and hwnd == hwnd_to_use))
+
+                elif IS_MAC:
+                    app_name, bundle_id = get_macos_active_app()
+                    app_name_lower = (app_name or "").lower()
+                    bundle_id_lower = (bundle_id or "").lower()
                     is_roblox = bool(
-                        "roblox" in proc_name or
-                        "robloxplayerbeta" in proc_name or
-                        class_name in ("WINDOWSCLIENT", "RobloxApp", "RobloxPlayerBeta") or
-                        "roblox" in class_name.lower() or
-                        "roblox" in title_lower or
-                        "realistic" in title_lower or
-                        "rbwr" in title_lower
+                        "roblox" in app_name_lower or
+                        "roblox" in bundle_id_lower or
+                        "realistic" in app_name_lower or
+                        "rbwr" in app_name_lower
                     )
-                    is_ours = bool(pid_val == os.getpid() or (our_hwnd and hwnd == our_hwnd) or (hwnd_to_use and hwnd == hwnd_to_use))
+                    is_ours = bool("rbwr" in app_name_lower or "python" in app_name_lower or "tk" in app_name_lower)
+                else:
+                    is_roblox = True
 
                 prev_roblox_active = getattr(self, 'is_roblox_active', False)
                 # Keep active if currently on Roblox, or if user is interacting with our overlay while Roblox was active
@@ -2328,8 +2410,7 @@ class OverlayApp:
                     self._last_logged_foreground_hwnd = hwnd
                     self._last_logged_roblox_state = self.is_roblox_active
                     log.info(
-                        f"[TopmostOnRoblox] hwnd=0x{hwnd:08X} | title='{window_title}' | class='{class_name}' | "
-                        f"pid={pid_val} | proc='{proc_name}' | is_roblox={is_roblox} | is_ours={is_ours} -> "
+                        f"[TopmostOnRoblox] is_roblox={is_roblox} | is_ours={is_ours} -> "
                         f"is_roblox_active={self.is_roblox_active} (setting_enabled={self.topmost_on_roblox})"
                     )
 
@@ -2342,7 +2423,7 @@ class OverlayApp:
                     if self.win.attributes("-topmost"):
                         self.win.attributes("-topmost", False)
                         self.win.lower()
-                        if our_hwnd:
+                        if IS_WINDOWS and our_hwnd:
                             ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
                             ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
                         log.info("[TopmostOnRoblox] Window lowered from TOPMOST (Roblox not active)")
@@ -2351,15 +2432,16 @@ class OverlayApp:
                 if self.win.attributes("-topmost"):
                     self.win.attributes("-topmost", False)
                     self.win.lower()
-                    try:
-                        hwnd_to_use = self.win.winfo_id()
-                        parent = ctypes.windll.user32.GetParent(hwnd_to_use)
-                        our_hwnd = parent if parent else hwnd_to_use
-                        if our_hwnd:
-                            ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                            ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                    except Exception:
-                        pass
+                    if IS_WINDOWS:
+                        try:
+                            hwnd_to_use = self.win.winfo_id()
+                            parent = ctypes.windll.user32.GetParent(hwnd_to_use)
+                            our_hwnd = parent if parent else hwnd_to_use
+                            if our_hwnd:
+                                ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                                ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
+                        except Exception:
+                            pass
         except Exception:
             pass
 
@@ -2984,6 +3066,8 @@ if __name__ == "__main__":
             root.attributes('-alpha', 0)
         except Exception:
             pass
+    elif IS_MAC:
+        root.geometry("1x1+0+0")
     else:
         root.withdraw()
     app = OverlayApp(root)

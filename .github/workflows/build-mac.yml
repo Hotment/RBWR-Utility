@@ -1,0 +1,78 @@
+name: Build macOS Release (.app)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon (arm64)
+            os: macos-14
+            arch: arm64
+          - name: Intel (x86_64)
+            os: macos-13
+            arch: x86_64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: ${{ matrix.arch }}
+
+      - name: Install Python Dependencies & Nuitka
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka
+
+      - name: Generate macOS Application Icon (.icns)
+        run: |
+          mkdir -p icon.iconset
+          sips -z 16 16     icon.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32     icon.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32     icon.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64     icon.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128   icon.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256   icon.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 512 512   icon.png --out icon.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o icon.icns
+          rm -rf icon.iconset
+
+      - name: Compile to macOS App Bundle (Nuitka)
+        run: |
+          python -m nuitka \
+            --standalone \
+            --macos-create-app-bundle \
+            --macos-app-icon=icon.icns \
+            --macos-app-name="RBWR APRM Calculator" \
+            --macos-signed-app-name="RBWR APRM Calculator" \
+            --enable-plugin=tk-inter \
+            --output-filename="RBWR_APRM_Calculator" \
+            rbwr_overlay.py
+
+      - name: Code Sign and Package
+        run: |
+          if [ -d "rbwr_overlay.dist/RBWR APRM Calculator.app" ]; then
+            mv "rbwr_overlay.dist/RBWR APRM Calculator.app" "RBWR APRM Calculator.app"
+          fi
+          codesign --force --deep -s - "RBWR APRM Calculator.app"
+          zip -r -y "RBWR_APRM_Calculator_macOS_${{ matrix.arch }}.zip" "RBWR APRM Calculator.app"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_macOS_${{ matrix.arch }}
+          path: "RBWR_APRM_Calculator_macOS_${{ matrix.arch }}.zip"

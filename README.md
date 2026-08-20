@@ -34,10 +34,20 @@ To compile the application into a standalone Windows executable (`rbwr_overlay.e
 compile.bat
 ```
 
-### Linux Support
-Running the application **natively from source** is highly recommended. Running the executable under Wine can result in issues with window transparency or topmost layering (Z-ordering) transitions under Wayland compositors.
+### Linux & macOS Support
+Running the application **natively from source** is fully supported across Windows, Linux, and macOS (both Apple Silicon and Intel):
 
-To run natively on Linux, simply clone the repository, install the dependencies using `pip install -r requirements.txt`, and run `python rbwr_overlay.py`.
+1. Clone or download the repository.
+2. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the application:
+   ```bash
+   python rbwr_overlay.py
+   ```
+
+*Note for Linux users: Running natively is strongly recommended over Wine to avoid Wayland compositing and window transparency issues.*
 
 ---
 
