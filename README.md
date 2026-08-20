@@ -29,15 +29,18 @@ The overlay requires Python 3.10+ and uses lightweight external libraries for GU
    python rbwr_overlay.py
    ```
 
-To compile the application into a standalone Windows executable (`rbwr_overlay.exe`), run:
-```cmd
-compile.bat
-```
+### Pre-built Releases
 
-### Linux & macOS Support
+* **Windows:** Download the latest `RBWR_APRM_Calculator_vX.X.X.exe` or portable `.zip` from the [Releases](https://github.com/Hotment/rbwr_themal_calculator/releases) page.
+* **macOS (Apple Silicon - M1/M2/M3/M4):** Download `RBWR_APRM_Calculator_macOS_arm64.zip` from Releases. Extract the archive, then right-click `RBWR APRM Calculator.app` and select **Open** (required once on first launch for security approval).
+
+---
+
+### Running from Source (Windows, Linux & macOS)
+
 Running the application **natively from source** is fully supported across Windows, Linux, and macOS (both Apple Silicon and Intel):
 
-1. Clone or download the repository.
+1. Clone or download the repository files.
 2. Install the dependencies:
    ```bash
    pip install -r requirements.txt
@@ -47,7 +50,13 @@ Running the application **natively from source** is fully supported across Windo
    python rbwr_overlay.py
    ```
 
+*Note for Intel Mac users: Intel Macs can run the application directly from source using the steps above.*
 *Note for Linux users: Running natively is strongly recommended over Wine to avoid Wayland compositing and window transparency issues.*
+
+To compile your own Windows executable (`rbwr_overlay.exe`), run:
+```cmd
+compile.bat
+```
 
 ---
 
