@@ -27,7 +27,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          architecture: ${{ matrix.arch }}
 
       - name: Install Python Dependencies & Nuitka
         run: |
@@ -54,6 +53,7 @@ jobs:
           python -m nuitka \
             --standalone \
             --macos-create-app-bundle \
+            --macos-target-arch=${{ matrix.arch }} \
             --macos-app-icon=icon.icns \
             --macos-app-name="RBWR APRM Calculator" \
             --macos-signed-app-name="RBWR APRM Calculator" \
