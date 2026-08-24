@@ -45,12 +45,10 @@ def setup_logging(log_filename="server.log", max_bytes=5 * 1024 * 1024, backup_c
 
     log_format = '[%(asctime)s | %(levelname)s | %(name)s]: %(message)s'
 
-    # Stream (console) handler
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(CustomConsoleFormatter(log_format))
     stream_handler.setLevel(logging.INFO)
 
-    # Rotating file handler (5 MB max size, 5 backups = max 30MB)
     file_handler = RotatingFileHandler(
         log_file,
         maxBytes=max_bytes,
@@ -60,12 +58,10 @@ def setup_logging(log_filename="server.log", max_bytes=5 * 1024 * 1024, backup_c
     file_handler.setFormatter(PlainTextFormatter(log_format))
     file_handler.setLevel(logging.INFO)
 
-    # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     root_logger.handlers = [stream_handler, file_handler]
 
-    # Silence noisy third-party loggers
     for lib in ["disnake", "disnake.http", "disnake.gateway", "disnake.client", "disnake.webhook", "disnake.state"]:
         logging.getLogger(lib).setLevel(logging.WARNING)
 

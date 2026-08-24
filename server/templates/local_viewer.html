@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Point History Graph & Local Viewer{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="100% Client-Side Private RBWR Point History Graph & SAR Telemetry Viewer">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/points_style.css') }}?v=6">
+{% endblock %}
+
+{% block content %}
+<main class="flex-grow max-w-[1440px] mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
+        <div class="flex flex-col gap-1.5">
+            <div class="flex flex-wrap items-center gap-2.5">
+                <h1 class="text-2xl sm:text-3xl font-display font-semibold tracking-tight text-white">
+                    Point History Graph
+                </h1>
+            </div>
+            <p class="text-xs sm:text-sm text-gray-400 max-w-2xl">
+                Parse and visualize your <code>sar_data.json</code> telemetry strictly in browser memory. No files,
+                logs, or credentials are transmitted.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div class="user-session-box" id="localFileBadgeBox" style="display: none;">
+                <span class="user-avatar-badge">📁</span>
+                <span class="user-name-text" id="localFileNameBadge">file.json</span>
+                <span class="detail-badge" id="localFileSizeBadge">0 MB</span>
+            </div>
+
+            <button class="btn btn-secondary" id="btnOpenLocalPasteModal" title="Paste raw JSON directly">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                </svg>
+                <span>Paste JSON</span>
+            </button>
+
+            <button class="btn btn-primary" id="btnLocalSelectFile">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Open Local File</span>
+            </button>
+            <input type="file" id="localFileInput" accept=".json" style="display: none;">
+
+            <a href="https://points-rbwr.hotment.dev/login" target="_blank" rel="noopener" class="btn btn-ghost"
+                title="Live sync via Points RBWR">
+                Sign In
+            </a>
+        </div>
+    </div>
+
+    <section id="localDropzoneSection" class="local-dropzone-card">
+        <div class="upload-dropzone" id="localDropzone">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <h2 style="font-family: var(--font-heading); color: #ffffff; margin-top: 8px;">Select or Drop your SAR JSON
+                File</h2>
+            <p class="dropzone-text">Click anywhere here or drag and drop <code>sar_data.json</code></p>
+            <span class="privacy-note">File processing happens strictly on your CPU using HTML5 FileReader.</span>
+        </div>
+
+        <div class="form-group" style="margin-top: 18px;">
+            <label class="form-label" for="localJsonTextInput"
+                style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Or Paste Raw JSON Data</span>
+                <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: normal;">Parsed 100%
+                    locally</span>
+            </label>
+            <textarea id="localJsonTextInput" class="form-textarea" rows="4"
+                placeholder='{"player": {...}, "activityLogs": [...]}'
+                style="font-family: var(--font-mono); font-size: 0.8rem;"></textarea>
+            <button class="btn btn-primary" id="btnLocalProcessPaste" style="margin-top: 10px; width: 100%;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                <span>Load & View Pasted JSON</span>
+            </button>
+        </div>
+
+        <div class="privacy-disclaimer-box">
+            <div class="disclaimer-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <strong>Where to get your SAR Data & Privacy Protection</strong>
+            </div>
+            <p style="margin-bottom: 6px;">
+                Download your official <code>sar_data.json</code> file directly at
+                <a href="https://hydrogen.realisticbwr.org/privacy" target="_blank" rel="noopener noreferrer"
+                    style="color: #6ee7b7; text-decoration: underline; font-weight: 600;">https://hydrogen.realisticbwr.org/privacy</a>.
+            </p>
+            <p style="font-size: 0.76rem; color: #a7f3d0; margin: 0 0 8px 0;">
+                <strong>Zero Server Storage & Chat Discard:</strong> All file processing is performed 100% locally in
+                your browser memory. In-game chat logs, private messages, and moderation records are completely
+                discarded.
+            </p>
+            <div class="tracking-history-note">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4" />
+                    <path d="M12 8h.01" />
+                </svg>
+                <span><strong>Note:</strong> Points were not tracked before <strong>2026-03-20</strong>.</span>
+            </div>
+        </div>
+    </section>
+
+    <div id="localDashboardContent" style="display: none; flex-direction: column; gap: 24px;">
+        <section class="kpi-grid">
+            <div class="kpi-card card-unit1">
+                <div class="kpi-header">
+                    <span class="kpi-label">Unit 1 Total Points</span>
+                    <span class="kpi-tag tag-u1" id="localU1Gain24h">+0 (24h)</span>
+                </div>
+                <div class="kpi-value" id="localValUnit1Points">---</div>
+                <div class="kpi-footer">
+                    <span class="kpi-subtext" id="localU1Gain7d">+0 (7d gain)</span>
+                    <span class="kpi-meta" id="localU1Percent">--% of total</span>
+                </div>
+            </div>
+
+            <div class="kpi-card card-unit2">
+                <div class="kpi-header">
+                    <span class="kpi-label">Unit 2 Total Points</span>
+                    <span class="kpi-tag tag-u2" id="localU2Gain24h">+0 (24h)</span>
+                </div>
+                <div class="kpi-value" id="localValUnit2Points">---</div>
+                <div class="kpi-footer">
+                    <span class="kpi-subtext" id="localU2Gain7d">+0 (7d gain)</span>
+                    <span class="kpi-meta" id="localU2Percent">--% of total</span>
+                </div>
+            </div>
+
+            <div class="kpi-card card-total">
+                <div class="kpi-header">
+                    <span class="kpi-label">Combined Points</span>
+                    <span class="kpi-tag tag-total" id="localTotalGain24h">+0 total</span>
+                </div>
+                <div class="kpi-value" id="localValTotalPoints">---</div>
+                <div class="kpi-footer">
+                    <span class="kpi-subtext" id="localValPointEvents">0 point updates</span>
+                    <span class="kpi-meta" id="localValTotalLogs">0 total logs</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <div class="chart-card">
+                <div class="chart-top-bar">
+                    <div class="chart-controls-left">
+                        <div class="time-filters" id="localTimeFilterGroup">
+                            <button class="filter-btn active" data-range="all">All Time</button>
+                            <button class="filter-btn" data-range="30d">30 Days</button>
+                            <button class="filter-btn" data-range="14d">14 Days</button>
+                            <button class="filter-btn" data-range="7d">7 Days</button>
+                        </div>
+                    </div>
+
+                    <h2 class="chart-main-title">Point Progression Over Time</h2>
+
+                    <div class="chart-controls-right">
+                        <div class="chart-legend-box">
+                            <div class="legend-item legend-unit1" id="localLegendUnit1">
+                                <span class="legend-line line-u1"></span>
+                                <span class="legend-text">Unit 1</span>
+                            </div>
+                            <div class="legend-item legend-unit2" id="localLegendUnit2">
+                                <span class="legend-line line-u2"></span>
+                                <span class="legend-text">Unit 2</span>
+                            </div>
+                        </div>
+
+                        <div class="chart-view-toggle">
+                            <button class="btn-toggle-area" id="localBtnResetZoom"
+                                title="Reset pan and zoom to default range" style="display: none;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>Reset Zoom</span>
+                            </button>
+                            <button class="btn-toggle-area active" id="localBtnToggleArea" title="Toggle Area Shading">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="12 2 2 22 22 22 12 2" />
+                                </svg>
+                                <span>Area Fill</span>
+                            </button>
+                            <button class="btn-toggle-area" id="localBtnExportImage" title="Export graph as PNG image">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                                <span>Export PNG</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="localChartContainer">
+                    <svg id="localPointProgressionChart" preserveAspectRatio="none">
+                        <g id="localGridGroup" class="grid-layer"></g>
+                        <g id="localAreasGroup" class="areas-layer">
+                            <path id="localAreaUnit1" class="chart-area area-u1" fill="rgba(82, 148, 226, 0.18)" />
+                            <path id="localAreaUnit2" class="chart-area area-u2" fill="rgba(240, 113, 93, 0.15)" />
+                        </g>
+                        <g id="localLinesGroup" class="lines-layer">
+                            <path id="localLineUnit1" class="chart-line line-u1" stroke="#5294e2" />
+                            <path id="localLineUnit2" class="chart-line line-u2" stroke="#f0715d" />
+                        </g>
+                        <g id="localAxesGroup" class="axes-layer"></g>
+                        <g id="localCrosshairGroup" class="crosshair-layer" style="display: none;">
+                            <line id="localCrosshairLine" class="crosshair-v" />
+                        </g>
+                    </svg>
+                </div>
+
+                <div id="chartTooltip" class="chart-tooltip" style="display: none;">
+                    <div class="tooltip-header">
+                        <span class="tooltip-date" id="tooltipDate">---</span>
+                        <span class="tooltip-time" id="tooltipTime">---</span>
+                    </div>
+                    <div class="tooltip-body">
+                        <div class="tooltip-row tooltip-u1">
+                            <div class="tooltip-item-left">
+                                <span class="tooltip-name">Unit 1</span>
+                            </div>
+                            <div class="tooltip-item-right">
+                                <span class="tooltip-val" id="tooltipValU1">0</span>
+                                <span class="tooltip-delta delta-u1" id="tooltipDeltaU1">+0</span>
+                            </div>
+                        </div>
+                        <div class="tooltip-row tooltip-u2">
+                            <div class="tooltip-item-left">
+                                <span class="tooltip-name">Unit 2</span>
+                            </div>
+                            <div class="tooltip-item-right">
+                                <span class="tooltip-val" id="tooltipValU2">0</span>
+                                <span class="tooltip-delta delta-u2" id="tooltipDeltaU2">+0</span>
+                            </div>
+                        </div>
+                        <div class="tooltip-divider"></div>
+                        <div class="tooltip-row tooltip-combined">
+                            <span class="tooltip-name">Total Points</span>
+                            <span class="tooltip-val" id="tooltipValTotal">0</span>
+                        </div>
+                        <div class="tooltip-hint-row">
+                            <span class="tooltip-hint-text">Click point to view Event Breakdown</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-footer">
+                    <div class="footer-stat">
+                        <span class="stat-muted">Date Range:</span>
+                        <span class="stat-bold" id="localStatDateRange">---</span>
+                    </div>
+                    <div class="footer-stat">
+                        <span class="stat-muted">Total Timeline Steps:</span>
+                        <span class="stat-bold" id="localStatTimelinePoints">0 Events</span>
+                    </div>
+                    <div class="footer-stat">
+                        <span class="stat-muted">Player Identifier:</span>
+                        <span class="stat-bold stat-mono" id="localStatPlayerId">---</span>
+                    </div>
+                </div>
+                <div class="chart-footer-note"
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 16v-4" />
+                            <path d="M12 8h.01" />
+                        </svg>
+                        <span>Note: Points were not tracked before <strong>2026-03-20</strong>.</span>
+                    </div>
+                    <span style="font-size: 0.72rem; color: #9ca3af; font-family: var(--font-mono);">
+                        Drag horizontally to pan · Scroll wheel / pinch to zoom · Double-click to reset
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <section class="detail-card">
+            <div class="detail-card-header">
+                <div class="detail-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                        <path d="M22 12A10 10 0 0 0 12 2v10z" />
+                    </svg>
+                    <span>Points Source Breakdown</span>
+                </div>
+                <span class="detail-badge" id="localBreakdownTotalSources">0 Categories</span>
+            </div>
+            <div class="breakdown-bars-container" id="localBreakdownList">
+            </div>
+        </section>
+    </div>
+
+</main>
+
+<div class="modal-overlay" id="localDatapointModal" style="display: none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="modal-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>Event Details & Points Breakdown</span>
+            </div>
+            <button class="btn-close" id="btnCloseLocalDatapointModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="dp-header-info">
+                <div class="dp-header-row">
+                    <span class="dp-date-label" id="localModalDpDate">Aug 08, 2026</span>
+                    <span class="dp-time-label" id="localModalDpTime">11:42:41 UTC</span>
+                </div>
+                <span class="dp-type-badge" id="localModalDpTypeBadge">UNIT_2</span>
+            </div>
+
+            <div class="dp-stats-grid">
+                <div class="dp-stat-card">
+                    <span class="dp-stat-title">Point Change</span>
+                    <span class="dp-stat-value" id="localModalDpChange">+0</span>
+                </div>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-title">Unit 1 Points</span>
+                    <span class="dp-stat-value" id="localModalDpU1">0</span>
+                </div>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-title">Unit 2 Points</span>
+                    <span class="dp-stat-value" id="localModalDpU2">0</span>
+                </div>
+                <div class="dp-stat-card">
+                    <span class="dp-stat-title">Total Points</span>
+                    <span class="dp-stat-value" id="localModalDpTotal">0</span>
+                </div>
+            </div>
+
+            <div class="dp-breakdown-section">
+                <div class="dp-section-title">Points Breakdown</div>
+                <div class="dp-breakdown-list" id="localModalDpBreakdownList"></div>
+            </div>
+
+            <div class="dp-meta-row" id="localModalDpMetaRow" style="display: none;">
+                <span class="dp-meta-label">Server ID / Note:</span>
+                <code class="dp-meta-code" id="localModalDpMetaCode"></code>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" id="btnCloseLocalDatapointModalBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="localPasteModal" style="display: none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="modal-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                </svg>
+                <span>Paste Raw SAR JSON</span>
+            </div>
+            <button class="btn-close" id="btnCloseLocalPasteModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label" for="modalLocalJsonTextInput">Raw JSON Data</label>
+                <textarea id="modalLocalJsonTextInput" class="form-textarea" rows="8"
+                    placeholder='{"player": {...}, "activityLogs": [...]}'
+                    style="font-family: var(--font-mono); font-size: 0.8rem;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="btnCancelLocalPaste">Cancel</button>
+            <button class="btn btn-primary" id="btnSubmitLocalPaste">Process & View</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/local-viewer.js') }}?v=6"></script>
+{% endblock %}

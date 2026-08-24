@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Calculator - Telemetry Solver{% endblock %}
+{% block title %}RBWR Utility - Thermal Calculator{% endblock %}
 
 
 
@@ -8,9 +8,9 @@
 <main
     class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-6 w-full flex flex-col justify-center items-center gap-6 overflow-x-hidden">
 
-    <div class="text-center flex flex-col items-center gap-4 max-w-2xl">
+    <div class="text-center flex flex-col items-center gap-4 max-w-3xl">
         <h1 class="text-3xl sm:text-4xl md:text-5xl font-display font-semibold tracking-tight text-white">
-            Reactor Power Calculator
+            Reactor Thermal Power Calculator
         </h1>
     </div>
 
@@ -129,8 +129,6 @@
                 <div
                     class="absolute top-5 left-5 right-5 sm:top-6 sm:left-6 sm:right-6 flex justify-between items-start z-10 gap-2">
                     <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] shrink-0"
-                            id="status-dot"></div>
                         <span id="web-status-label"
                             class="text-xs font-medium text-gray-400 tracking-wide uppercase whitespace-nowrap">System
                             Nominal</span>
@@ -466,7 +464,6 @@
         const displaySub = document.getElementById('display-status-sub');
         const statusLabel = document.getElementById('web-status-label');
         const screen = document.getElementById('web-status-screen');
-        const statusDot = document.getElementById('status-dot');
 
         document.getElementById('display-flow').innerText = flow.toFixed(2);
         document.getElementById('display-gen').innerText = genLoad.toFixed(2);
@@ -484,7 +481,6 @@
             displaySub.innerText = `OVERPOWER SCRAM RISK (>${limit}%)`;
             statusLabel.innerText = "SCRAM RISK";
             statusLabel.className = "text-xs font-bold text-red-400 tracking-wide uppercase animate-pulse";
-            statusDot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.8)]";
         } else {
             screen.className = "flex-grow rounded-xl bg-surfaceElevated border border-white/5 p-6 flex flex-col justify-center relative overflow-hidden transition-all duration-500 shadow-inner min-h-[220px]";
             displayRtp.className = "text-6xl md:text-7xl font-display font-light tracking-tight text-white mb-0 transition-colors duration-300 drop-shadow-sm";
@@ -492,7 +488,6 @@
             displaySub.innerText = "Reactor Power Status";
             statusLabel.innerText = "System Nominal";
             statusLabel.className = "text-xs font-medium text-gray-400 tracking-wide uppercase";
-            statusDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
         }
     }
 

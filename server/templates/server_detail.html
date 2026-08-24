@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Server Info - {{ job_id }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+    .chart-canvas-container canvas {
+        cursor: grab;
+    }
+
+    .chart-canvas-container canvas:active {
+        cursor: grabbing;
+    }
+
+    .time-range-btn.active {
+        background-color: rgba(245, 158, 11, 0.2) !important;
+        color: #fde68a !important;
+        border-color: rgba(245, 158, 11, 0.5) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main
+    class="flex-grow max-w-[1600px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex flex-col gap-1.5 min-w-0">
+            <div class="flex items-center gap-2">
+                <a href="/servers"
+                    class="text-xs font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
+                        </path>
+                    </svg>
+                    Back to Server Inventory
+                </a>
+                <span class="text-gray-600">/</span>
+                <span class="text-xs font-mono text-gray-400">Live Server Graphs</span>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-mono font-bold tracking-tight text-white truncate"
+                    title="{{ job_id }}">
+                    {{ job_id }}
+                </h1>
+                <button type="button" onclick="copyText('{{ job_id }}', this)"
+                    class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-amber-300 transition-colors shrink-0"
+                    title="Copy Job ID">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+            <button type="button" onclick="refreshPage()" id="refreshBtn"
+                class="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md">
+                <svg id="refreshIcon" class="w-4 h-4 text-amber-400 transition-transform duration-500" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
+                </svg>
+                <span>Refresh Data</span>
+            </button>
+            <div
+                class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs font-mono flex items-center gap-2">
+                <span>Auto-refresh: 30s</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-blue-400 font-semibold">SCRAM
+                    Diagnostics</span>
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                    </path>
+                </svg>
+            </div>
+            <div class="space-y-2.5 pt-1 text-xs">
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
+                    <span class="text-gray-300 font-medium flex items-center gap-1.5">
+                        Unit 1 Reason
+                    </span>
+                    <span
+                        class="font-mono font-semibold {% if scram_reason_u1 != 'N/A' and scram_reason_u1 != '' and scram_reason_u1 != 'None' %}text-rose-400{% else %}text-emerald-400{% endif %}">
+                        {{ scram_reason_u1 }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
+                    <span class="text-gray-300 font-medium flex items-center gap-1.5">
+                        Unit 2 Reason
+                    </span>
+                    <span
+                        class="font-mono font-semibold {% if scram_reason_u2 != 'N/A' and scram_reason_u2 != '' and scram_reason_u2 != 'None' %}text-rose-400{% else %}text-emerald-400{% endif %}">
+                        {{ scram_reason_u2 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="premium-glass rounded-2xl p-5 shadow-xl border border-amber-500/30 bg-amber-950/10 flex flex-col justify-between gap-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-amber-400 font-semibold">Demand
+                    Schedule</span>
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div class="flex flex-col items-center justify-center py-2">
+                <span class="text-xs text-gray-400 font-mono">Time to next demand shift</span>
+                <span id="demand-timer"
+                    class="text-3xl sm:text-4xl font-mono font-bold text-amber-300 tracking-tight mt-0.5">
+                    {{ time_to_next_demand | round | int }}s
+                </span>
+            </div>
+            <div class="text-[11px] font-mono text-center text-gray-400">
+                Live dynamic countdown based on heartbeat timestamp
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-purple-400 font-semibold">Next Demand
+                    Info</span>
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+            </div>
+            <div class="space-y-2 pt-1 text-xs">
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
+                    <span class="text-gray-300 font-medium">Total Next Demand</span>
+                    <span class="font-mono font-bold text-sm text-white">{{ next_demand }} MW</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                    <div class="p-2 rounded-lg bg-white/5 border border-white/5 text-center">
+                        <span class="text-blue-400">U1:</span> <span class="text-gray-200 font-semibold">{{ dmandU1 }}
+                            MW</span>
+                    </div>
+                    <div class="p-2 rounded-lg bg-white/5 border border-white/5 text-center">
+                        <span class="text-amber-400">U2:</span> <span class="text-gray-200 font-semibold">{{ dmandU2 }}
+                            MW</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col gap-5">
+        <div
+            class="premium-glass rounded-2xl p-4 sm:p-5 shadow-xl border border-white/10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-lg sm:text-xl font-display font-semibold text-white">Reactor Metrics History</h2>
+                </div>
+                <p class="text-xs text-gray-400 font-mono">
+                    Drag horizontally to pan through history · Scroll wheel / pinch to zoom
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                <div
+                    class="flex items-center gap-1 p-1 bg-[#121217] rounded-xl border border-white/10 text-xs font-mono">
+                    <span class="text-gray-500 text-[11px] px-2 font-medium">Time Window:</span>
+                    <button type="button" onclick="setTimeWindow(600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">10m</button>
+                    <button type="button" onclick="setTimeWindow(1800, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">30m</button>
+                    <button type="button" onclick="setTimeWindow(3600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">1h</button>
+                    <button type="button" onclick="setTimeWindow(21600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">6h</button>
+                    <button type="button" onclick="setTimeWindow(86400, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">24h</button>
+                    <button type="button" onclick="setTimeWindow(null, this)" id="btnRangeAll"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer active">All</button>
+                </div>
+
+                <button type="button" onclick="resetAllZooms()"
+                    class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-gray-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    title="Reset pan and zoom across all charts">
+                    <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4">
+                        </path>
+                    </svg>
+                    <span>Reset View</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {% for chart in charts %}
+            <div
+                class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col gap-3 interactive-card">
+                <div class="flex items-center justify-between border-b border-white/5 pb-2.5">
+                    <h3 class="text-base font-display font-semibold text-white flex items-center gap-2">
+                        <span>{{ chart.metric }}</span>
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <span id="chart-points-{{ loop.index0 }}"
+                            class="text-[11px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                            -- points
+                        </span>
+                        <button type="button" onclick="resetSingleChartZoom({{ loop.index0 }})"
+                            class="p-1 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-amber-300 border border-white/5 text-[10px] font-mono transition-colors"
+                            title="Reset zoom on this graph">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="h-[300px] sm:h-[340px] w-full relative chart-canvas-container">
+                    <canvas id="chart-{{ loop.index0 }}" class="w-full h-full"></canvas>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function copyText(text, btn) {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            setTimeout(() => { btn.innerHTML = orig; }, 1800);
+        });
+    }
+
+    function refreshPage() {
+        const icon = document.getElementById('refreshIcon');
+        if (icon) icon.classList.add('animate-spin');
+        setTimeout(() => {
+            window.location.reload();
+        }, 300);
+    }
+
+    setInterval(function () {
+        window.location.reload();
+    }, 30000);
+
+    const dtl = {{ time_to_next_demand | tojson }};
+    const timerElem = document.getElementById('demand-timer');
+    if (timerElem && typeof dtl === 'number') {
+        const startTime = Date.now();
+        const initialDtl = dtl;
+        const updateTimer = () => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const remaining = Math.max(0, initialDtl - elapsed);
+            timerElem.textContent = Math.round(remaining) + 's';
+        };
+        setInterval(updateTimer, 1000);
+    }
+
+    function formatTimeAgo(sec) {
+        const s = Math.max(0, Math.round(sec));
+        if (s < 60) return `${s}s ago`;
+        if (s < 3600) {
+            const m = Math.floor(s / 60);
+            const remS = s % 60;
+            return remS > 0 ? `${m}m ${remS}s ago` : `${m}m ago`;
+        }
+        if (s < 86400) {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
+        }
+        const d = Math.floor(s / 86400);
+        const h = Math.floor((s % 86400) / 3600);
+        return h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
+    }
+
+    function formatAxisTick(sec) {
+        const s = Math.max(0, Math.round(sec));
+        if (s === 0) return 'Now';
+        if (s < 60) return `${s}s`;
+        if (s < 3600) return `${Math.round(s / 60)}m ago`;
+        if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+        return `${Math.round(s / 86400)}d ago`;
+    }
+
+    const chartsData = {{ charts | tojson }};
+    const chartInstances = [];
+    let currentWindowSeconds = null;
+
+    chartsData.forEach((chart, index) => {
+        const ctx = document.getElementById(`chart-${index}`);
+        if (!ctx) return;
+
+        let totalPoints = 0;
+        let chartMaxX = 0;
+
+        const datasets = (chart.datasets || []).map(ds => {
+            const isUnit1 = ds.label && ds.label.includes('1');
+            const color = isUnit1 ? '#3b82f6' : '#f59e0b';
+            const bgColor = isUnit1 ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+
+            const points = (ds.data || []).map(item => {
+                if (typeof item === 'object' && item !== null && 'x' in item && 'y' in item) {
+                    return { x: parseFloat(item.x), y: parseFloat(item.y) };
+                }
+                return null;
+            }).filter(p => p !== null && !isNaN(p.x) && !isNaN(p.y));
+
+            totalPoints += points.length;
+            points.forEach(p => {
+                if (p.x > chartMaxX) chartMaxX = p.x;
+            });
+
+            return {
+                label: ds.label,
+                data: points,
+                borderColor: color,
+                backgroundColor: bgColor,
+                fill: false,
+                tension: 0.15,
+                spanGaps: true,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: color,
+                pointHoverBorderColor: '#ffffff',
+                pointHoverBorderWidth: 2,
+                borderWidth: 2,
+            };
+        });
+
+        const pointsLabel = document.getElementById(`chart-points-${index}`);
+        if (pointsLabel) {
+            pointsLabel.textContent = `${totalPoints} points`;
+        }
+
+        const chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'nearest',
+                    axis: 'x'
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#9ca3af',
+                            font: { family: 'JetBrains Mono', size: 11 },
+                            boxWidth: 12,
+                            padding: 12
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#121217',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#e5e7eb',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        bodyFont: { family: 'JetBrains Mono', size: 12 },
+                        callbacks: {
+                            title: function (context) {
+                                if (!context || !context.length) return '';
+                                const xVal = context[0].parsed.x;
+                                return formatTimeAgo(xVal);
+                            },
+                            label: function (context) {
+                                return ` ${context.dataset.label}: ${context.parsed.y}`;
+                            }
+                        }
+                    },
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'x',
+                            modifierKey: null
+                        },
+                        zoom: {
+                            wheel: { enabled: true, speed: 0.1 },
+                            pinch: { enabled: true },
+                            mode: 'x'
+                        },
+                        limits: {
+                            x: { min: 0, max: chartMaxX > 0 ? chartMaxX : undefined }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        reverse: true,
+                        min: 0,
+                        max: chartMaxX > 0 ? chartMaxX : undefined,
+                        ticks: {
+                            color: '#9ca3af',
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            callback: function (val) {
+                                return formatAxisTick(val);
+                            },
+                            autoSkip: true,
+                            maxTicksLimit: 8
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#9ca3af',
+                            font: { family: 'JetBrains Mono', size: 10 }
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' }
+                    }
+                }
+            }
+        });
+
+        chartInstance._maxAvailableX = chartMaxX;
+        chartInstances.push(chartInstance);
+    });
+
+    function setTimeWindow(seconds, btnElement) {
+        currentWindowSeconds = seconds;
+
+        document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
+
+        chartInstances.forEach(chart => {
+            if (chart.resetZoom) chart.resetZoom('none');
+            chart.options.scales.x.min = 0;
+            const limitMax = chart._maxAvailableX || 0;
+            if (seconds === null) {
+                chart.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+            } else {
+                chart.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
+            }
+            chart.update('none');
+        });
+
+        try {
+            localStorage.setItem('rbwr_time_window', seconds !== null ? String(seconds) : 'all');
+        } catch (e) { }
+    }
+
+    function resetSingleChartZoom(index) {
+        const chart = chartInstances[index];
+        if (!chart) return;
+        if (chart.resetZoom) chart.resetZoom('none');
+        chart.options.scales.x.min = 0;
+        const limitMax = chart._maxAvailableX || 0;
+        if (currentWindowSeconds === null) {
+            chart.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+        } else {
+            chart.options.scales.x.max = limitMax > 0 ? Math.min(currentWindowSeconds, limitMax) : currentWindowSeconds;
+        }
+        chart.update('none');
+    }
+
+    function resetAllZooms() {
+        chartInstances.forEach((_, idx) => resetSingleChartZoom(idx));
+    }
+
+    try {
+        const saved = localStorage.getItem('rbwr_time_window');
+        if (saved && saved !== 'all') {
+            const sec = parseInt(saved, 10);
+            if (!isNaN(sec)) {
+                const targetBtn = Array.from(document.querySelectorAll('.time-range-btn')).find(b => b.textContent.trim().toLowerCase() === (sec === 600 ? '10m' : sec === 1800 ? '30m' : sec === 3600 ? '1h' : sec === 21600 ? '6h' : sec === 86400 ? '24h' : ''));
+                if (targetBtn) {
+                    setTimeWindow(sec, targetBtn);
+                }
+            }
+        }
+    } catch (e) { }
+</script>
+{% endblock %}

@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Server Browser{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+    .chart-canvas-container canvas {
+        cursor: grab;
+    }
+
+    .chart-canvas-container canvas:active {
+        cursor: grabbing;
+    }
+
+    .time-range-btn.active {
+        background-color: rgba(245, 158, 11, 0.2) !important;
+        color: #fde68a !important;
+        border-color: rgba(245, 158, 11, 0.4) !important;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main
+    class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="flex flex-col gap-2">
+            <h1
+                class="text-3xl sm:text-4xl md:text-5xl font-display font-semibold tracking-tight text-white flex items-center gap-3">
+                Server Browser
+            </h1>
+            <p class="text-gray-400 text-sm max-w-2xl">
+                Real-time monitoring for all active public Realistic Boiling Water Reactor servers. Inspect reactor
+                metrics,
+                SCRAM states, and demand information.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
+            <button type="button" onclick="refreshData()" id="refreshBtn"
+                class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 hover:text-white border border-white/10 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md">
+                <svg id="refreshIcon" class="w-4 h-4 text-amber-400 transition-transform duration-500" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
+                </svg>
+                <span>Refresh Data</span>
+            </button>
+        </div>
+    </div>
+
+    {% if charts and charts|length > 0 %}
+    <div class="premium-glass rounded-2xl p-5 md:p-6 shadow-xl border border-white/10 flex flex-col gap-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-3">
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs uppercase tracking-wider font-mono text-amber-400 font-semibold">Grid
+                        Analytics</span>
+                    <span id="globalPointsLabel"
+                        class="text-[11px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">--
+                        points</span>
+                </div>
+                <h2 class="text-xl font-display font-semibold text-white">Global Total Power Output (MW)</h2>
+                <p class="text-xs text-gray-400 font-mono">
+                    Drag horizontally to pan · Scroll wheel to zoom
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <div
+                    class="flex items-center gap-1 p-1 bg-[#121217] rounded-xl border border-white/10 text-xs font-mono">
+                    <span class="text-gray-500 text-[11px] px-2 font-medium">Time Window:</span>
+                    <button type="button" onclick="setGlobalTimeWindow(600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">10m</button>
+                    <button type="button" onclick="setGlobalTimeWindow(1800, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">30m</button>
+                    <button type="button" onclick="setGlobalTimeWindow(3600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">1h</button>
+                    <button type="button" onclick="setGlobalTimeWindow(21600, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">6h</button>
+                    <button type="button" onclick="setGlobalTimeWindow(86400, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">24h</button>
+                    <button type="button" onclick="setGlobalTimeWindow(null, this)" id="btnGlobalRangeAll"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer active">All</button>
+                </div>
+
+                <button type="button" onclick="resetGlobalZoom()"
+                    class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-gray-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    title="Reset pan and zoom on global power chart">
+                    <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                        </path>
+                    </svg>
+                    <span>Reset View</span>
+                </button>
+
+                <div class="flex items-center gap-3 text-xs font-mono pl-2 border-l border-white/10">
+                    <div class="flex items-center gap-1.5 text-blue-400">
+                        <span>Unit 1</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-amber-400">
+                        <span>Unit 2</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="h-[280px] sm:h-[320px] w-full relative chart-canvas-container">
+            <canvas id="globalChart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+        <div>
+            <h2 class="text-xl sm:text-2xl font-display font-semibold text-white">Active Server Instances</h2>
+            <p id="serverCountLabel" class="text-xs text-gray-400 font-mono mt-0.5">Showing {{ servers | length }}
+                active servers</p>
+        </div>
+
+        <div class="w-full sm:w-auto sm:min-w-[340px] relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input type="search" id="serverSearch" placeholder="Search by Job ID or Server ID..."
+                class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-amber-500/50" />
+            <button type="button" id="clearSearchBtn" onclick="clearSearch()"
+                class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="serverGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% if servers and servers|length > 0 %}
+        {% for server in servers %}
+        <div class="server-card premium-glass rounded-2xl p-5 shadow-xl border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-5 interactive-card"
+            data-job-id="{{ server.job_id }}">
+            <div class="flex flex-col gap-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <span class="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold">Job
+                            ID</span>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="font-mono text-xs text-gray-200 truncate select-all font-semibold"
+                                title="{{ server.job_id }}">{{ server.job_id }}</span>
+                            <button type="button" onclick="copyText('{{ server.job_id }}', this)"
+                                class="p-1 text-gray-500 hover:text-amber-300 transition-colors rounded hover:bg-white/5 shrink-0"
+                                title="Copy Job ID">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <span
+                        class="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold whitespace-nowrap shrink-0">
+                        {{ server.snapshot_count }} snapshots
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs">
+                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
+                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                            Unit 1 APRM
+                        </span>
+                        <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit1.aprm)
+                            }}%</span>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
+                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                            Unit 2 APRM
+                        </span>
+                        <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm)
+                            }}%</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-gray-400 font-mono px-1">
+                    <span>Last heartbeat:</span>
+                    <span class="text-gray-200 font-medium">{{ server.latest_timestamp }}</span>
+                </div>
+            </div>
+
+            <a href="/servers/{{ server.job_id }}"
+                class="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-semibold font-display transition-all flex items-center justify-center gap-2 group shadow-sm">
+                <span>View Telemetry & Analytics</span>
+                <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div
+            class="col-span-full premium-glass rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/10">
+            <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                </path>
+            </svg>
+            <h3 class="text-lg font-display font-semibold text-white">No active server data available</h3>
+            <p class="text-xs text-gray-400 max-w-md">
+                No active server heartbeats are currently stored. Server snapshots are updated automatically every 60
+                seconds.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="noResultsNotice"
+        class="hidden premium-glass rounded-2xl p-8 text-center flex-col items-center justify-center gap-2 border border-white/10">
+        <p class="text-sm font-semibold text-gray-300">No servers found matching your search.</p>
+        <button type="button" onclick="clearSearch()" class="text-xs font-mono text-amber-400 hover:underline">Clear
+            search query</button>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function copyText(text, btn) {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            setTimeout(() => { btn.innerHTML = orig; }, 1800);
+        });
+    }
+
+    function refreshData() {
+        const icon = document.getElementById('refreshIcon');
+        if (icon) icon.classList.add('animate-spin');
+        setTimeout(() => {
+            window.location.reload();
+        }, 300);
+    }
+
+    const searchInput = document.getElementById('serverSearch');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const serverCards = Array.from(document.querySelectorAll('.server-card'));
+    const serverCountLabel = document.getElementById('serverCountLabel');
+    const noResultsNotice = document.getElementById('noResultsNotice');
+
+    function filterServers() {
+        const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('hidden', query.length === 0);
+        }
+
+        serverCards.forEach(card => {
+            const jobId = (card.dataset.jobId || '').toLowerCase();
+            const matches = jobId.includes(query);
+            card.style.display = matches ? '' : 'none';
+            if (matches) visibleCount++;
+        });
+
+        if (serverCountLabel) {
+            serverCountLabel.textContent = `Showing ${visibleCount} active server${visibleCount === 1 ? '' : 's'}`;
+        }
+
+        if (noResultsNotice) {
+            if (visibleCount === 0 && serverCards.length > 0) {
+                noResultsNotice.classList.remove('hidden');
+                noResultsNotice.classList.add('flex');
+            } else {
+                noResultsNotice.classList.add('hidden');
+                noResultsNotice.classList.remove('flex');
+            }
+        }
+    }
+
+    function clearSearch() {
+        if (searchInput) {
+            searchInput.value = '';
+            filterServers();
+            searchInput.focus();
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterServers);
+    }
+
+    {% if charts and charts | length > 0 %}
+    let globalChartInstance = null;
+    let currentGlobalWindowSeconds = null;
+
+    (function () {
+        const chartData = {{ charts[0] | tojson
+    }};
+    const ctx = document.getElementById('globalChart');
+    if (!ctx || !chartData) return;
+
+    function formatTimeAgo(sec) {
+        const s = Math.max(0, Math.round(sec));
+        if (s === 0) return 'Now';
+        if (s < 60) return `${s}s ago`;
+        if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+        if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+        return `${Math.floor(s / 86400)}d ago`;
+    }
+
+    function formatAxisTick(sec) {
+        const s = Math.max(0, Math.round(sec));
+        if (s === 0) return 'Now';
+        if (s < 60) return `${s}s`;
+        if (s < 3600) return `${Math.round(s / 60)}m ago`;
+        if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+        return `${Math.round(s / 86400)}d ago`;
+    }
+
+    let totalGlobalPoints = 0;
+    let maxGlobalX = 0;
+
+    const datasets = (chartData.datasets || []).map((ds, idx) => {
+        const isUnit1 = ds.label && ds.label.includes('1');
+        const color = isUnit1 ? '#3b82f6' : '#f59e0b';
+        const bgGrad = isUnit1 ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+
+        const points = (ds.data || []).map(item => {
+            if (typeof item === 'object' && item !== null && 'x' in item && 'y' in item) {
+                return { x: parseFloat(item.x), y: parseFloat(item.y) };
+            }
+            return null;
+        }).filter(p => p !== null && !isNaN(p.x) && !isNaN(p.y));
+
+        totalGlobalPoints += points.length;
+        points.forEach(p => {
+            if (p.x > maxGlobalX) maxGlobalX = p.x;
+        });
+
+        return {
+            label: ds.label,
+            data: points,
+            borderColor: color,
+            backgroundColor: bgGrad,
+            fill: true,
+            tension: 0.15,
+            spanGaps: true,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: color,
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
+            borderWidth: 2,
+        };
+    });
+
+    const pointsLabel = document.getElementById('globalPointsLabel');
+    if (pointsLabel) {
+        pointsLabel.textContent = `${totalGlobalPoints} points`;
+    }
+
+    globalChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: {
+                intersect: false,
+                mode: 'nearest',
+                axis: 'x'
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#121217',
+                    titleColor: '#f3f4f6',
+                    bodyColor: '#e5e7eb',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    bodyFont: { family: 'JetBrains Mono', size: 12 },
+                    callbacks: {
+                        title: function (context) {
+                            if (!context || !context.length) return '';
+                            return formatTimeAgo(context[0].parsed.x);
+                        },
+                        label: function (context) {
+                            return ` ${context.dataset.label}: ${context.parsed.y} MW`;
+                        }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: { enabled: true, speed: 0.1 },
+                        pinch: { enabled: true },
+                        mode: 'x'
+                    },
+                    limits: {
+                        x: { min: 0, max: maxGlobalX > 0 ? maxGlobalX : undefined }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    reverse: true,
+                    min: 0,
+                    max: maxGlobalX > 0 ? maxGlobalX : undefined,
+                    ticks: {
+                        color: '#9ca3af',
+                        font: { family: 'JetBrains Mono', size: 10 },
+                        callback: function (val) {
+                            return formatAxisTick(val);
+                        },
+                        autoSkip: true,
+                        maxTicksLimit: 8
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' }
+                },
+                y: {
+                    ticks: {
+                        color: '#9ca3af',
+                        font: { family: 'JetBrains Mono', size: 10 },
+                        callback: function (val) { return val + ' MW'; }
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.04)' }
+                }
+            }
+        }
+    });
+
+    globalChartInstance._maxAvailableX = maxGlobalX;
+
+    try {
+        const saved = localStorage.getItem('rbwr_global_time_window');
+        if (saved && saved !== 'all') {
+            const sec = parseInt(saved, 10);
+            if (!isNaN(sec)) {
+                const targetBtn = Array.from(document.querySelectorAll('.time-range-btn')).find(b => b.textContent.trim().toLowerCase() === (sec === 600 ? '10m' : sec === 1800 ? '30m' : sec === 3600 ? '1h' : sec === 21600 ? '6h' : sec === 86400 ? '24h' : ''));
+                if (targetBtn) {
+                    setGlobalTimeWindow(sec, targetBtn);
+                }
+            }
+        }
+    } catch (e) { }
+    }) ();
+
+    function setGlobalTimeWindow(seconds, btnElement) {
+        currentGlobalWindowSeconds = seconds;
+
+        document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
+
+        if (globalChartInstance) {
+            if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
+            globalChartInstance.options.scales.x.min = 0;
+            const limitMax = globalChartInstance._maxAvailableX || 0;
+            if (seconds === null) {
+                globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+            } else {
+                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
+            }
+            globalChartInstance.update('none');
+        }
+
+        try {
+            localStorage.setItem('rbwr_global_time_window', seconds !== null ? String(seconds) : 'all');
+        } catch (e) { }
+    }
+
+    function resetGlobalZoom() {
+        if (!globalChartInstance) return;
+        if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
+        globalChartInstance.options.scales.x.min = 0;
+        const limitMax = globalChartInstance._maxAvailableX || 0;
+        if (currentGlobalWindowSeconds === null) {
+            globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+        } else {
+            globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(currentGlobalWindowSeconds, limitMax) : currentGlobalWindowSeconds;
+        }
+        globalChartInstance.update('none');
+    }
+    {% endif %}
+</script>
+{% endblock %}

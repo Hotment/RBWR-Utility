@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - 404 Not Found{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="404 - Page not found on RBWR Utility.">
+{% endblock %}
+
+{% block content %}
+<main
+    class="flex-1 max-w-3xl mx-auto px-4 py-16 sm:py-24 w-full flex flex-col items-center justify-center text-center gap-8">
+    <div class="flex flex-col gap-3">
+        <h1 class="text-7xl sm:text-9xl font-display font-black tracking-tight text-white drop-shadow-2xl select-none">
+            404
+        </h1>
+        <h2 class="text-2xl sm:text-3xl font-display font-semibold text-white tracking-tight">
+            Not Found
+        </h2>
+        <p class="text-gray-400 text-sm sm:text-base leading-relaxed max-w-md mx-auto">
+            The requested page does not exist.
+        </p>
+    </div>
+
+    <a href="/"
+        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-sm font-display shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Return to Home</span>
+    </a>
+</main>
+{% endblock %}

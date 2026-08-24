@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Points & Rank Calculator{% endblock %}
+{% block title %}RBWR Utility - Points & Rank Calculator{% endblock %}
 
 
 
@@ -39,9 +39,6 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="text-sm font-semibold text-white font-display whitespace-nowrap">Track Your Point
                         Progression Over Time</span>
-                    <span
-                        class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase border border-emerald-500/30 whitespace-nowrap">Free
-                        & 100% Private</span>
                 </div>
                 <p class="text-xs text-gray-400 mt-0.5">
                     Visualize historical point curves, unit splits, gain breakdowns, and timelines with the <strong>RBWR
@@ -49,13 +46,9 @@
                 </p>
             </div>
         </div>
-        <a href="https://points-rbwr.hotment.dev/" target="_blank" rel="noopener"
+        <a href="/points-graph"
             class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold font-display shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap">
             <span>Open History Graph</span>
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-            </svg>
         </a>
     </div>
 
@@ -476,9 +469,6 @@
 
                 <div class="absolute top-6 left-6 right-6 flex justify-between items-start z-10">
                     <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                            id="rate-dot">
-                        </div>
                         <span id="rate-label" class="text-xs font-medium text-gray-400 tracking-wide uppercase">Rate
                             Active</span>
                     </div>
@@ -905,14 +895,11 @@
         if (u1Warning) u1Warning.style.display = !subsystemStates.demandU[1] ? 'inline' : 'none';
         if (u2Warning) u2Warning.style.display = !subsystemStates.demandU[2] ? 'inline' : 'none';
 
-        const rateDot = document.getElementById('rate-dot');
         const rateLabel = document.getElementById('rate-label');
         if (totalRate > 0) {
-            rateDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
             rateLabel.innerText = "Rate Active";
             rateLabel.className = "text-xs font-medium text-gray-400 tracking-wide uppercase";
         } else {
-            rateDot.className = "w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]";
             rateLabel.innerText = "Rate Stagnant";
             rateLabel.className = "text-xs font-medium text-rose-400 tracking-wide uppercase";
         }

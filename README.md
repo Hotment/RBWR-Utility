@@ -31,7 +31,7 @@ The overlay requires Python 3.10+ and uses lightweight external libraries for GU
 
 ### Pre-built Releases
 
-* **Windows:** Download the latest `RBWR_APRM_Calculator_vX.X.X.exe` or portable `.zip` from the [Releases](https://github.com/Hotment/rbwr_themal_calculator/releases) page.
+* **Windows:** Download the latest `RBWR_APRM_Calculator_vX.X.X.exe` or portable `.zip` from the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page.
 * **macOS (Apple Silicon - M1/M2/M3/M4):** Download `RBWR_APRM_Calculator_macOS_arm64.zip` from Releases. Extract the archive, then right-click `RBWR APRM Calculator.app` and select **Open** (required once on first launch for security approval).
 
 ---

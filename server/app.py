@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR = os.path.join(BASE_DIR, "files")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 VERSIONS_FILE = os.path.join(BASE_DIR, "versions.json")
 SUGGESTIONS_FILE = os.path.join(BASE_DIR, "suggestions.json")
 CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
@@ -26,8 +27,8 @@ ADMINS_FILE = os.path.join(BASE_DIR, "admins.json")
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
-# Ensure files directory exists
 os.makedirs(FILES_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 load_dotenv()
 
 import sys
@@ -226,7 +227,6 @@ def add_security_headers(response):
     
     return response
 
-# --- Authentication & Persistence Helpers ---
 _generated_admin_user = secrets.token_hex(12)
 _generated_admin_pass = secrets.token_hex(24)
 
@@ -301,11 +301,9 @@ def has_permission(username: str, section: str) -> bool:
 def get_authenticated_user():
     username = session.get("username")
     if session.get("admin_logged_in") and username:
-        # Check if root
         root_user, _ = get_admin_credentials()
         if secrets.compare_digest(username, root_user):
             return username
-        # Check other admins
         admins_data = load_admins()
         if username in admins_data.get("admins", {}):
             return username
@@ -485,21 +483,17 @@ def is_ip_banned(ip: str) -> bool:
     ban_info = banned[ip]
     expires_at_str = ban_info.get("expires_at")
     if expires_at_str is None:
-        # Permanent ban
         return True
     
     try:
         expires_at = datetime.fromisoformat(expires_at_str)
         if datetime.now(timezone.utc) > expires_at:
-            # Ban expired, remove record
             del banned[ip]
             save_banned_ips(data)
             return False
         return True
     except Exception:
         return True
-
-# --- Request Payloads ---
 
 class SuggestionPayload(BaseModel):
     name: str = Field(default="", max_length=50)
@@ -540,8 +534,6 @@ class BanPayload(BaseModel):
 class UnbanPayload(BaseModel):
     ip: str
 
-# --- API Endpoints ---
-
 @app.route("/", methods=["GET"])
 def root():
     data = load_versions()
@@ -553,7 +545,7 @@ def root():
     headers = {"User-Agent": "RBWR-Overlay-Server"}
     try:
         r = requests.get(
-            "https://api.github.com/repos/Hotment/rbwr_themal_calculator/releases/latest",
+            "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest",
             headers=headers,
             timeout=3
         )
@@ -588,41 +580,46 @@ def favicon():
 
 @app.route("/calculator", methods=["GET"])
 def calculator_page():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    return render_template("calculator.html", latest_version=latest_ver)
+    return render_template("calculator.html")
 
 @app.route("/points", methods=["GET"])
 def points_page():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    return render_template("points.html", latest_version=latest_ver)
+    return render_template("points.html")
+
+@app.route("/points-graph", methods=["GET"])
+def local_viewer_page():
+    return render_template("local_viewer.html")
 
 @app.route("/tablet", methods=["GET"])
 @app.route("/operator-tablet", methods=["GET"])
 def operator_tablet_page():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    return render_template("operator_tablet.html", latest_version=latest_ver)
+    return render_template("operator_tablet.html")
 
 @app.route("/privacy", methods=["GET"])
 @app.route("/privacy-policy", methods=["GET"])
 def privacy_page():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
     privacy_file = os.path.join(TEMPLATES_DIR, "privacy.html")
     if os.path.exists(privacy_file):
         mtime = os.path.getmtime(privacy_file)
         last_updated = datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%B %d, %Y")
     else:
         last_updated = datetime.now(timezone.utc).strftime("%B %d, %Y")
-    return render_template("privacy.html", latest_version=latest_ver, last_updated=last_updated)
+    return render_template("privacy.html", last_updated=last_updated)
 
 @app.route("/contact", methods=["GET"])
 def contact_page():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    return render_template("contact.html", latest_version=latest_ver)
+    return render_template("contact.html")
+
+@app.route("/credits", methods=["GET"])
+@app.route("/acknowledgements", methods=["GET"])
+def credits_page():
+    return render_template("credits.html")
+
+@app.errorhandler(404)
+def page_not_found(e):
+    if request.path.startswith("/api/") or request.headers.get("Accept") == "application/json":
+        return jsonify({"detail": "Not found", "status": 404}), 404
+    return render_template("404.html"), 404
 
 @app.route("/api/contact", methods=["POST"])
 def submit_contact_message():
@@ -681,89 +678,632 @@ def submit_contact_message():
 
     return jsonify({"success": True, "id": msg_id})
 
+# ==============================================================================
+# RBWR Server Checker Engine
+# Original implementation & architecture by felixq (https://github.com/felixqx1/RBWR-Server-checker)
+# Licensed under GNU General Public License v2.0 (GPL-2.0)
+# ==============================================================================
+
+SERVER_CHECKER_PURGE_KEYS = [
+    "Reactor Scram State",
+    "Startup XFMR",
+    "DoAutoScramU1",
+    "DieselRPM",
+    "Turbine RPM",
+    "FWP1",
+    "FWP2",
+    "Recirc1",
+    "Recirc2",
+    "APRM Setpoint",
+    "AutoPressure",
+    "NextDemandU1",
+    "BypassTurbineAutoTrip",
+    "Vibrations",
+    "Fuel Burn (default 0.54)",
+    "Avg. Rod",
+    "TurbineTrip",
+    "TotalPowerGenerated",
+    "Offsite Power",
+    "StartupUnit1",
+    "BusA",
+    "BusB",
+    "Disk Ruptured",
+    "RPS Trip State B",
+    "RPS Trip State A",
+    "TRIPreason",
+    "PointsPerSecond",
+    "DCBus",
+    "StartupUnit2",
+    "SCRAMreason",
+    "DiffPressure",
+    "NextDemandU2",
+    "DoAutoScramU2",
+    "Demand Time Left",
+    "CasingTemperature",
+]
+
+_sc_lock = threading.RLock()
+_sc_public_server_ids = []
+_sc_server_ids = []
+_sc_latest_data = {}
+
+def get_sc_data(filename: str, max_retries: int = 6):
+    filepath = os.path.join(DATA_DIR, filename)
+    if not os.path.exists(filepath):
+        return {}
+    for attempt in range(max_retries):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (PermissionError, json.JSONDecodeError):
+            if attempt < max_retries - 1:
+                time.sleep(0.05 * (attempt + 1))
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.05)
+    return {}
+
+def save_sc_data(data, filename: str, max_retries: int = 10):
+    filepath = os.path.join(DATA_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    unique_id = f"{os.getpid()}_{threading.get_ident()}_{time.time_ns()}"
+    temp_path = f"{filepath}.{unique_id}.tmp"
+    
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.flush()
+            
+        for attempt in range(max_retries):
+            try:
+                os.replace(temp_path, filepath)
+                return True
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    time.sleep(0.04 * (attempt + 1))
+                else:
+                    try:
+                        with open(filepath, "w", encoding="utf-8") as f:
+                            json.dump(data, f)
+                        return True
+                    except Exception as fallback_err:
+                        logger.error(f"Error in direct save fallback for {filename}: {fallback_err}")
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.04 * (attempt + 1))
+                else:
+                    logger.error(f"Error replacing {temp_path} to {filepath}: {e}")
+    except Exception as e:
+        logger.error(f"Error saving server checker data to {filename}: {e}")
+        return False
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+    return False
+
+def update_public_roblox_servers():
+    url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
+    try:
+        response = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            with _sc_lock:
+                _sc_public_server_ids.clear()
+                for server in data.get('data', []):
+                    if 'id' in server:
+                        _sc_public_server_ids.append(server['id'])
+            return True
+        else:
+            logger.warning(f"Failed to update Roblox public servers. Status: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"Error updating public Roblox servers: {e}")
+        return False
+
+def pull_server_checker_data():
+    urls = [
+        "https://hydrogen.realisticbwr.org/api/public/servers",
+        "https://realisticbwr.org/api/public/servers"
+    ]
+    response = None
+    for url in urls:
+        try:
+            resp = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=60)
+            if resp.status_code == 200:
+                response = resp
+                break
+        except Exception as e:
+            logger.warning(f"Failed to fetch {url}: {e}")
+            continue
+
+    if not response or response.status_code != 200:
+        logger.warning("All server telemetry endpoints failed or timed out.")
+        return False
+
+    try:
+        resp_json = response.json()
+    except Exception as e:
+        logger.error(f"Failed to decode server telemetry JSON: {e}")
+        return False
+
+    with _sc_lock:
+        current_data = get_sc_data("servers.json")
+        found_new_server = False
+        servers_list = resp_json.get('data', {}).get('servers', [])
+
+        for server in servers_list:
+            job_id = server.get('jobId')
+            if job_id and job_id not in _sc_server_ids:
+                _sc_server_ids.append(job_id)
+                found_new_server = True
+        
+        success_public = False
+        if found_new_server or not _sc_public_server_ids:
+            success_public = update_public_roblox_servers()
+
+        rbwr_api_ids = [s.get('jobId') for s in servers_list if s.get('jobId')]
+
+        if success_public and _sc_public_server_ids:
+            for job_id in list(current_data.keys()):
+                if job_id not in _sc_public_server_ids and job_id not in rbwr_api_ids:
+                    del current_data[job_id]
+        
+        _sc_latest_data.clear()
+        _sc_latest_data.update(resp_json)
+
+        for server in servers_list:
+            job_id = server.get('jobId')
+            if not job_id:
+                continue
+
+            if _sc_public_server_ids and job_id not in _sc_public_server_ids:
+                continue
+
+            if job_id not in current_data:
+                current_data[job_id] = {}
+
+            raw_state = server.get('state')
+            if not isinstance(raw_state, dict):
+                continue
+
+            state = raw_state.copy()
+            if "Misc" in state:
+                del state["Misc"]
+
+            for unit in ("Unit1", "Unit2"):
+                unit_state = state.get(unit)
+                if isinstance(unit_state, dict):
+                    state[unit] = {
+                        k: (round(v, 2) if not isinstance(v, (str, bool)) and isinstance(v, (int, float)) else v)
+                        for k, v in unit_state.items()
+                        if k not in SERVER_CHECKER_PURGE_KEYS
+                    }
+                else:
+                    state[unit] = {}
+
+            heartbeat = server.get('lastHeartbeat', datetime.now(timezone.utc).isoformat())
+            current_data[job_id][heartbeat] = state
+        save_sc_data(current_data, "servers.json")
+
+        global_data = get_sc_data("global.json")
+        stats_payload = resp_json.get('data', {}).get('stats', {})
+        if stats_payload:
+            global_data[str(datetime.now(timezone.utc).isoformat())] = stats_payload
+            save_sc_data(global_data, "global.json")
+
+        return True
+
+def server_checker_worker():
+    time.sleep(2)
+    while True:
+        try:
+            pull_server_checker_data()
+        except Exception as e:
+            logger.error(f"Error in server_checker_worker: {e}")
+        time.sleep(60)
+
+_sc_worker_thread = None
+_sc_worker_started = False
+_sc_worker_lock = threading.Lock()
+
+def start_server_checker_worker():
+    global _sc_worker_started, _sc_worker_thread
+    with _sc_worker_lock:
+        if _sc_worker_started:
+            return
+        
+        is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
+        if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+            return
+            
+        _sc_worker_started = True
+        _sc_worker_thread = threading.Thread(target=server_checker_worker, daemon=True, name="SCWorkerThread")
+        _sc_worker_thread.start()
+        logger.info("Started background server checker worker thread.")
+
+start_server_checker_worker()
+
+@app.before_request
+def ensure_server_checker_worker():
+    if not _sc_worker_started:
+        start_server_checker_worker()
+
+def convert_ISO_to_secs(timestamp_str):
+    try:
+        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        age_seconds = (now - dt).total_seconds()
+        return max(0, round(age_seconds))
+    except Exception:
+        return 0
+
+def build_server_cards(data):
+    cards = []
+    if not data:
+        return cards
+
+    for job_id, snapshots in sorted(data.items()):
+        if not snapshots:
+            continue
+        latest_timestamp = max(snapshots.keys())
+        latest_state = snapshots[latest_timestamp]
+        unit1 = latest_state.get("Unit1", {})
+        unit2 = latest_state.get("Unit2", {})
+        cards.append({
+            "job_id": job_id,
+            "latest_timestamp": f"{convert_ISO_to_secs(latest_timestamp)}s ago",
+            "snapshot_count": len(snapshots),
+            "unit1": {
+                "demand_time_left": unit1.get("Demand Time Left", 0),
+                "aprm": unit1.get("APRM", 0),
+                "reactor_temp": unit1.get("Reactor Temp", 0),
+            },
+            "unit2": {
+                "demand_time_left": unit2.get("Demand Time Left", 0),
+                "aprm": unit2.get("APRM", 0),
+                "reactor_temp": unit2.get("Reactor Temp", 0),
+            },
+        })
+    return cards
+
+def parse_label_seconds(label, fallback_idx=0):
+    try:
+        if isinstance(label, (int, float)):
+            return float(label)
+        return float(str(label).split()[0])
+    except Exception:
+        return float(fallback_idx)
+
+def compress_points(points):
+    """
+    Compress collinear points where points is a list of (x, y) tuples.
+    x is seconds_ago (float), y is metric value (float).
+    """
+    if len(points) <= 2:
+        return [{"x": round(x, 1), "y": round(y, 2)} for x, y in points]
+
+    compressed = [points[0]]
+    for i in range(1, len(points) - 1):
+        x1, y1 = points[i - 1]
+        x2, y2 = points[i]
+        x3, y3 = points[i + 1]
+
+        try:
+            cross_product = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2)
+        except Exception:
+            cross_product = 1.0
+
+        if abs(cross_product) > 1e-5:
+            compressed.append(points[i])
+
+    compressed.append(points[-1])
+    return [{"x": round(x, 1), "y": round(y, 2)} for x, y in compressed]
+
+def build_chart_payload(job_id, snapshots):
+    metrics = {
+        "APRM": ("3", "APRM (%)", ["APRM"]),
+        "RTP": ("2", "RTP (%)", ["RTP"]),
+        "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"]),
+        "Reactor Temp": ("3", "Reactor Temperature (°F)", ["Reactor Temp"]),
+        "ReactorLevel": ("3", "Reactor Water Level (in)", ["ReactorLevel"]),
+        "Deareator Level": ("3", "Deaerator Level (in)", ["Deareator Level", "Deaerator Level"]),
+        "Hotwell Level": ("3", "Hotwell Level (in)", ["Hotwell Level"]),
+        "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"]),
+        "GeneratorTemperature": ("2", "Generator Temperature (°F)", ["GeneratorTemperature", "Generator Temperature"]),
+        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"])
+    }
+    chart_payload = []
+    ordered_snapshots = []
+
+    if not snapshots:
+        return {
+            "job_id": job_id,
+            "snapshots": [],
+            "charts": [],
+        }
+
+    for timestamp, state in sorted(snapshots.items()):
+        sec_ago = convert_ISO_to_secs(timestamp)
+        ordered_snapshots.append({
+            "timestamp": timestamp,
+            "seconds_ago": sec_ago,
+            "display_time": f"{sec_ago} seconds ago",
+            "state": state,
+        })
+
+    for metric_key, (unit_type, metric_title, field_aliases) in metrics.items():
+        u1_points = []
+        u2_points = []
+
+        for entry in ordered_snapshots:
+            sec_ago = entry["seconds_ago"]
+            u1_state = entry["state"].get("Unit1", {})
+            u2_state = entry["state"].get("Unit2", {})
+
+            if unit_type in ("1", "3"):
+                v1 = None
+                if metric_key == "Demand":
+                    v1 = u1_state.get("DemandU1") if u1_state.get("DemandU1") is not None else u1_state.get("Demand")
+                else:
+                    for alias in field_aliases:
+                        if alias in u1_state and u1_state[alias] is not None:
+                            v1 = u1_state[alias]
+                            break
+                if v1 is not None and isinstance(v1, (int, float)):
+                    u1_points.append((sec_ago, float(v1)))
+
+            if unit_type in ("2", "3"):
+                v2 = None
+                if metric_key == "Demand":
+                    v2 = u2_state.get("DemandU2") if u2_state.get("DemandU2") is not None else u2_state.get("Demand")
+                else:
+                    for alias in field_aliases:
+                        if alias in u2_state and u2_state[alias] is not None:
+                            v2 = u2_state[alias]
+                            break
+                if v2 is not None and isinstance(v2, (int, float)):
+                    u2_points.append((sec_ago, float(v2)))
+
+        datasets = []
+        if u1_points and unit_type in ("1", "3"):
+            c_u1 = compress_points(u1_points)
+            datasets.append({
+                "label": "Unit 1",
+                "data": c_u1,
+                "borderColor": "#3b82f6",
+                "backgroundColor": "rgba(59, 130, 246, 0.08)",
+            })
+
+        if u2_points and unit_type in ("2", "3"):
+            c_u2 = compress_points(u2_points)
+            datasets.append({
+                "label": "Unit 2",
+                "data": c_u2,
+                "borderColor": "#f59e0b",
+                "backgroundColor": "rgba(245, 158, 11, 0.08)",
+            })
+
+        chart_payload.append({
+            "metric": metric_title,
+            "datasets": datasets,
+        })
+
+    return {
+        "job_id": job_id,
+        "snapshots": ordered_snapshots,
+        "charts": chart_payload,
+    }
+
+def build_global_chart_payload(snapshots):
+    chart_payload = []
+    ordered_snapshots = []
+
+    if not snapshots:
+        return {
+            "snapshots": [],
+            "charts": [],
+        }
+
+    for timestamp, data in sorted(snapshots.items()):
+        sec_ago = convert_ISO_to_secs(timestamp)
+        ordered_snapshots.append({
+            "timestamp": timestamp,
+            "seconds_ago": sec_ago,
+            "display_time": f"{sec_ago}s ago",
+            "data": data,
+        })
+
+    u1_points = []
+    u2_points = []
+
+    for entry in ordered_snapshots:
+        sec_ago = entry["seconds_ago"]
+        data_entry = entry.get("data", {})
+        unit1 = data_entry.get("unit1", {})
+        unit2 = data_entry.get("unit2", {})
+
+        v1 = unit1.get("megawatts")
+        v2 = unit2.get("megawatts")
+        if v1 is not None and isinstance(v1, (int, float)) and v1 > 0:
+            u1_points.append((sec_ago, float(v1)))
+        if v2 is not None and isinstance(v2, (int, float)) and v2 > 0:
+            u2_points.append((sec_ago, float(v2)))
+
+    datasets = []
+    if u1_points:
+        datasets.append({
+            "label": "Unit 1",
+            "data": compress_points(u1_points),
+            "borderColor": "#3b82f6",
+            "backgroundColor": "rgba(59, 130, 246, 0.08)",
+        })
+    if u2_points:
+        datasets.append({
+            "label": "Unit 2",
+            "data": compress_points(u2_points),
+            "borderColor": "#f59e0b",
+            "backgroundColor": "rgba(245, 158, 11, 0.08)",
+        })
+
+    chart_payload.append({
+        "metric": "Global Power Output (MW)",
+        "datasets": datasets,
+    })
+
+    return {
+        "snapshots": ordered_snapshots,
+        "charts": chart_payload,
+    }
+
+@app.route("/servers", methods=["GET"])
+def servers_page():
+    servers_data = get_sc_data("servers.json")
+    global_data = get_sc_data("global.json")
+    global_payload = build_global_chart_payload(global_data)
+    server_cards = build_server_cards(servers_data)
+    
+    return render_template(
+        "servers.html",
+        servers=server_cards,
+        charts=global_payload.get("charts", [])
+    )
+
+@app.route("/servers/<job_id>", methods=["GET"])
+def server_detail_page(job_id):
+    servers_data = get_sc_data("servers.json")
+    snapshots = servers_data.get(job_id)
+    if snapshots is None:
+        if _sc_latest_data:
+            for s in _sc_latest_data.get('data', {}).get('servers', []):
+                if s.get('jobId') == job_id:
+                    snapshots = {s.get('lastHeartbeat', datetime.now(timezone.utc).isoformat()): s.get('state', {})}
+                    break
+                    
+    if snapshots is None:
+        return redirect("/servers")
+
+    try:
+        payload = build_chart_payload(job_id, snapshots)
+    except Exception as e:
+        logger.error(f"Error building chart payload for {job_id}: {e}")
+        return redirect("/servers")
+
+    server = None
+    if _sc_latest_data:
+        for s in _sc_latest_data.get('data', {}).get('servers', []):
+            if s.get('jobId') == job_id:
+                server = s
+                break
+
+    if not server:
+        latest_ts = max(snapshots.keys()) if snapshots else None
+        latest_st = snapshots.get(latest_ts, {}) if latest_ts else {}
+        unit1_st = latest_st.get("Unit1", {})
+        unit2_st = latest_st.get("Unit2", {})
+        
+        summary = {
+            "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
+            "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
+            "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
+            "next_demand": round(float(unit1_st.get("NextDemandU1", 0)) + float(unit2_st.get("NextDemandU2", 0)), 2),
+            "dmandU1": unit1_st.get("NextDemandU1", 0),
+            "dmandU2": unit2_st.get("NextDemandU2", 0),
+        }
+        return render_template("server_detail.html", **payload, **summary)
+
+    unit1_state = server.get('state', {}).get('Unit1', {})
+    unit2_state = server.get('state', {}).get('Unit2', {})
+
+    scram_reasonU1 = unit1_state.get('SCRAMreason', 'N/A')
+    scram_reasonU2 = unit2_state.get('SCRAMreason', 'N/A')
+    dmand_left_data = float(unit1_state.get('Demand Time Left', 0))
+    dmand_next1 = float(unit1_state.get('NextDemandU1', 0))
+    dmand_next2 = float(unit2_state.get('NextDemandU2', 0))
+    next_demand = round(dmand_next1 + dmand_next2, 2)
+
+    try:
+        hb_ts = server.get('lastHeartbeat', '')
+        elapsed = time.time() - datetime.fromisoformat(hb_ts.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        elapsed = 0
+
+    dmand_left = max(0.0, dmand_left_data - elapsed)
+
+    summary = {
+        "scram_reason_u1": scram_reasonU1 or "N/A",
+        "scram_reason_u2": scram_reasonU2 or "N/A",
+        "time_to_next_demand": dmand_left,
+        "next_demand": next_demand,
+        "dmandU1": dmand_next1,
+        "dmandU2": dmand_next2,
+    }
+
+    return render_template("server_detail.html", **payload, **summary)
+
+@app.route("/api/servers/latest", methods=["GET"])
+def get_latest_servers_api():
+    if _sc_latest_data:
+        return jsonify(_sc_latest_data)
+    servers_data = get_sc_data("servers.json")
+    return jsonify({"success": True, "servers": servers_data})
+
+@app.route("/api/servers/refresh", methods=["POST"])
+def refresh_servers_api():
+    success = pull_server_checker_data()
+    return jsonify({"success": success})
+
 _servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
 _cache_lock = threading.Lock()
 
 @app.route("/api/public-servers", methods=["GET"])
 @app.route("/public-servers", methods=["GET"])
 def proxy_public_servers():
+    if _sc_latest_data:
+        res_json = dict(_sc_latest_data)
+        if "success" not in res_json:
+            res_json["success"] = True
+        return jsonify(res_json)
+
     now = time.time()
     with _cache_lock:
-        if _servers_cache["data"] is not None and (now - _servers_cache["timestamp"]) < 120:
+        if _servers_cache["data"] is not None and (now - _servers_cache["timestamp"]) < 60:
             return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
 
-    api_key = os.environ.get("SERVER_CHECKER_API_KEY", "")
-    primary_url = "https://rbwr.scatterbox.dev/api/servers/latest"
+    primary_url = "https://hydrogen.realisticbwr.org/api/public/servers"
     fallback_url = "https://realisticbwr.org/api/public/servers"
 
-    if api_key:
+    for url in [primary_url, fallback_url]:
         try:
             resp = requests.get(
-                primary_url,
-                headers={
-                    "User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)",
-                    "X-API-KEY": api_key
-                },
-                timeout=5
+                url,
+                headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"},
+                timeout=10
             )
             if resp.status_code == 200:
-                res_json = resp.json()
-                if isinstance(res_json, dict):
-                    if "success" not in res_json:
+                try:
+                    res_json = resp.json()
+                    if isinstance(res_json, dict) and "success" not in res_json:
                         res_json["success"] = True
                     content = json.dumps(res_json).encode("utf-8")
-                else:
-                    content = json.dumps({"success": True, "data": res_json}).encode("utf-8")
+                except Exception:
+                    content = resp.content
 
-                status_code = 200
-                content_type = "application/json"
                 with _cache_lock:
                     _servers_cache["data"] = content
                     _servers_cache["timestamp"] = time.time()
-                    _servers_cache["content_type"] = content_type
-                    _servers_cache["status_code"] = status_code
-                return Response(content, status=status_code, content_type=content_type)
+                    _servers_cache["content_type"] = "application/json"
+                    _servers_cache["status_code"] = 200
+                return Response(content, status=200, content_type="application/json")
         except Exception as e:
-            logger.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
+            logger.warning(f"Error fetching from {url}: {e}")
 
-    try:
-        resp = requests.get(
-            fallback_url,
-            headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"},
-            timeout=10
-        )
-        status_code = resp.status_code
-        content_type = resp.headers.get("Content-Type", "application/json")
-
-        if status_code == 200:
-            try:
-                res_json = resp.json()
-                if isinstance(res_json, dict):
-                    if "success" not in res_json:
-                        res_json["success"] = True
-                    content = json.dumps(res_json).encode("utf-8")
-                else:
-                    content = json.dumps({"success": True, "data": res_json}).encode("utf-8")
-            except Exception:
-                content = resp.content
-
-            with _cache_lock:
-                _servers_cache["data"] = content
-                _servers_cache["timestamp"] = time.time()
-                _servers_cache["content_type"] = content_type
-                _servers_cache["status_code"] = status_code
-            return Response(content, status=status_code, content_type=content_type)
-        else:
-            with _cache_lock:
-                if _servers_cache["data"] is not None:
-                    return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
-            return Response(resp.content, status=status_code, content_type=content_type)
-    except Exception as e:
-        logger.error(f"Error fetching public servers API: {e}")
-        with _cache_lock:
-            if _servers_cache["data"] is not None:
-                return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
-        return jsonify({"success": False, "error": str(e)}), 500
+    with _cache_lock:
+        if _servers_cache["data"] is not None:
+            return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
+    return jsonify({"success": False, "error": "Unable to reach server telemetry API"}), 500
 
 @app.route("/version/latest", methods=["GET"])
 def get_latest_version():
@@ -821,9 +1361,7 @@ def suggestions_route():
     if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
         return jsonify({"suggestions": get_public_suggestions()})
         
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    return render_template("suggestions.html", latest_version=latest_ver, suggestions=get_public_suggestions())
+    return render_template("suggestions.html", suggestions=get_public_suggestions())
 
 @app.route("/api/suggestions", methods=["GET"])
 def get_suggestions_api():
@@ -850,7 +1388,6 @@ def submit_suggestion():
     data = load_suggestions()
     suggestions = data.setdefault("suggestions", [])
     
-    # Enforce rate limiting: 1 feedback entry per 30 minutes per IP
     if ip != "unknown":
         now = datetime.now(timezone.utc)
         limit_period = timedelta(minutes=30)
@@ -983,8 +1520,6 @@ def delete_crash(username):
         return jsonify({"message": f"Crash report #{payload.id} deleted successfully.", "id": payload.id})
 
     return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
-
-# --- Admin API / Dashboard ---
 
 @app.route("/admin/suggestions/status", methods=["POST"])
 @admin_required
@@ -1299,7 +1834,6 @@ def is_login_rate_limited(ip: str) -> bool:
         return False
     now = datetime.now(timezone.utc)
     attempts = _login_attempts.setdefault(ip, [])
-    # Filter out attempts older than 1 minute
     attempts[:] = [t for t in attempts if now - t < timedelta(minutes=1)]
     return len(attempts) >= 5
 
@@ -1346,7 +1880,6 @@ def admin_login():
         username = request.form.get("username", "")
         password = request.form.get("password", "")
         
-        # Check root
         root_user, root_pass = get_admin_credentials()
         is_root_username = secrets.compare_digest(username, root_user)
         is_root_password = secrets.compare_digest(password, root_pass)
@@ -1355,7 +1888,6 @@ def admin_login():
         if is_root_username and is_root_password:
             authenticated = True
         else:
-            # Check other admins
             admins_data = load_admins()
             admin_info = admins_data.get("admins", {}).get(username)
             if admin_info:
