@@ -111,7 +111,7 @@ if "%FORMAT%"=="zip" (
     set "OUTPUT_PARAM="
 ) else (
     set "NUITKA_PARAMS=--standalone --onefile"
-    set "OUTPUT_PARAM=--output-filename=RBWR_APRM_Calculator_v%VERSION%.exe"
+    set "OUTPUT_PARAM=--output-filename=RBWR_APRM_Calculator_win_x64_v%VERSION%.exe"
 )
 
 echo.
@@ -119,11 +119,11 @@ echo.
 if "%FORMAT%"=="zip" (
     if exist "rbwr_overlay.build" rmdir /s /q "rbwr_overlay.build" >nul 2>&1
     if exist "rbwr_overlay.dist" rmdir /s /q "rbwr_overlay.dist" >nul 2>&1
-    if exist "RBWR_APRM_Calculator_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_v%VERSION%" >nul 2>&1
-    if exist "RBWR_APRM_Calculator_v%VERSION%.zip" del /f /q "RBWR_APRM_Calculator_v%VERSION%.zip" >nul 2>&1
+    if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_win_x64_v%VERSION%" >nul 2>&1
+    if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%.zip" del /f /q "RBWR_APRM_Calculator_win_x64_v%VERSION%.zip" >nul 2>&1
 ) else (
     if exist "rbwr_overlay.onefile-build" rmdir /s /q "rbwr_overlay.onefile-build" >nul 2>&1
-    if exist "RBWR_APRM_Calculator_v%VERSION%.exe" del /f /q "RBWR_APRM_Calculator_v%VERSION%.exe" >nul 2>&1
+    if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%.exe" del /f /q "RBWR_APRM_Calculator_win_x64_v%VERSION%.exe" >nul 2>&1
 )
 
 :: Step 3: Trigger Nuitka high-fidelity compilation or Mock Dry-Run
@@ -135,7 +135,7 @@ if "%DRY_RUN%"=="1" (
         if not exist "rbwr_overlay.dist" mkdir "rbwr_overlay.dist"
         echo Mock executable > "rbwr_overlay.dist\RBWR_APRM_Calculator.exe"
     ) else (
-        echo Mock executable > "RBWR_APRM_Calculator_v%VERSION%.exe"
+        echo Mock executable > "RBWR_APRM_Calculator_win_x64_v%VERSION%.exe"
     )
     cmd /c exit 0
 ) else (
@@ -158,16 +158,16 @@ goto package_exe
 :package_zip
 echo [INFO] Standalone folder compiled. Packaging into zip...
 if exist "rbwr_overlay.dist" (
-    if exist "RBWR_APRM_Calculator_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_v%VERSION%"
-    rename "rbwr_overlay.dist" "RBWR_APRM_Calculator_v%VERSION%"
+    if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_win_x64_v%VERSION%"
+    rename "rbwr_overlay.dist" "RBWR_APRM_Calculator_win_x64_v%VERSION%"
     goto do_zip
 )
-if exist "RBWR_APRM_Calculator_v%VERSION%.dist" (
-    if exist "RBWR_APRM_Calculator_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_v%VERSION%"
-    rename "RBWR_APRM_Calculator_v%VERSION%.dist" "RBWR_APRM_Calculator_v%VERSION%"
+if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%.dist" (
+    if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%" rmdir /s /q "RBWR_APRM_Calculator_win_x64_v%VERSION%"
+    rename "RBWR_APRM_Calculator_win_x64_v%VERSION%.dist" "RBWR_APRM_Calculator_win_x64_v%VERSION%"
     goto do_zip
 )
-if exist "RBWR_APRM_Calculator_v%VERSION%" (
+if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%" (
     goto do_zip
 )
 echo [ERROR] Expected build directory not found!
@@ -175,15 +175,15 @@ pause
 exit /b 1
 
 :do_zip
-python -c "import shutil; shutil.make_archive('RBWR_APRM_Calculator_v%VERSION%', 'zip', 'RBWR_APRM_Calculator_v%VERSION%')"
-rmdir /s /q "RBWR_APRM_Calculator_v%VERSION%"
-echo [OK] Packaged standalone folder into RBWR_APRM_Calculator_v%VERSION%.zip
+python -c "import shutil; shutil.make_archive('RBWR_APRM_Calculator_win_x64_v%VERSION%', 'zip', 'RBWR_APRM_Calculator_win_x64_v%VERSION%')"
+rmdir /s /q "RBWR_APRM_Calculator_win_x64_v%VERSION%"
+echo [OK] Packaged standalone folder into RBWR_APRM_Calculator_win_x64_v%VERSION%.zip
 exit /b 0
 
 :package_exe
 echo [OK] Release package compiled successfully.
-if exist "RBWR_APRM_Calculator_v%VERSION%.exe" (
-    copy /y "RBWR_APRM_Calculator_v%VERSION%.exe" "RBWR_APRM_Calculator.exe" >nul
+if exist "RBWR_APRM_Calculator_win_x64_v%VERSION%.exe" (
+    copy /y "RBWR_APRM_Calculator_win_x64_v%VERSION%.exe" "RBWR_APRM_Calculator.exe" >nul
 )
 exit /b 0
 
