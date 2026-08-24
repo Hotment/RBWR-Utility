@@ -18,7 +18,7 @@ IS_LINUX = sys.platform.startswith('linux')
 IS_WINDOWS = sys.platform == 'win32' or os.name == 'nt'
 IS_MAC = sys.platform == 'darwin'
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 # --- Update Server Configuration ---
 SUGGESTIONS_SERVER_URL = "https://rbwr.hotment.dev"
@@ -183,7 +183,7 @@ def show_crash_dialog(tb_text):
             import urllib.parse
             import webbrowser
             body_param = urllib.parse.quote(f"Please describe what you were doing when the crash occurred:\n\n```\n{tb_text}```")
-            webbrowser.open(f"https://github.com/Hotment/rbwr_themal_calculator/issues/new?body={body_param}")
+            webbrowser.open(f"https://github.com/Hotment/RBWR-Utility/issues/new?body={body_param}")
             
         def close_app():
             crash_win.destroy()
@@ -812,65 +812,28 @@ class OverlayApp:
 
     def fetch_overlay_servers_list_async(self):
         now = time.time()
-        api_key = getattr(self, 'server_checker_api_key', '')
-        if not api_key:
-            last_req = getattr(self, '_last_api_request_timestamp', 0.0)
-            cooldown = getattr(self, '_api_cooldown_seconds', 120.0)
-            if (now - last_req) < cooldown:
-                return
-            self._last_api_request_timestamp = now
+        last_req = getattr(self, '_last_overlay_servers_fetch', 0.0)
+        if (now - last_req) < 10.0:
+            return
 
         self._last_overlay_servers_fetch = now
 
         def _bg():
             import json
             servers = []
-            got_429 = False
 
-            if api_key:
-                try:
-                    req = urllib.request.Request(
-                        "https://rbwr.scatterbox.dev/api/servers/latest",
-                        headers={
-                            "User-Agent": "RBWR-Overlay-Client/1.0",
-                            "X-API-KEY": api_key
-                        }
-                    )
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        if resp.status == 200:
-                            raw = resp.read().decode("utf-8")
-                            payload = json.loads(raw)
-                            servers = self.parse_servers_from_payload(payload)
-                except Exception as e:
-                    log.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
-
-            if not servers:
-                now_fallback = time.time()
-                last_real_req = getattr(self, '_last_realisticbwr_request_timestamp', 0.0)
-                cooldown_real = getattr(self, '_api_cooldown_seconds', 120.0)
-                if (now_fallback - last_real_req) >= cooldown_real:
-                    self._last_realisticbwr_request_timestamp = now_fallback
-                    try:
-                        req = urllib.request.Request(
-                            "https://realisticbwr.org/api/public/servers",
-                            headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
-                        )
-                        with urllib.request.urlopen(req, timeout=5) as resp:
-                            if resp.status == 200:
-                                raw = resp.read().decode("utf-8")
-                                payload = json.loads(raw)
-                                servers = self.parse_servers_from_payload(payload)
-                                self._api_cooldown_seconds = 120.0
-                            elif resp.status == 429:
-                                got_429 = True
-                    except urllib.error.HTTPError as e:
-                        if e.code == 429:
-                            got_429 = True
-                    except Exception as e:
-                        log.debug(f"Error fetching servers in overlay: {e}")
-
-            if got_429:
-                self._api_cooldown_seconds = max(getattr(self, '_api_cooldown_seconds', 120.0) * 2, 300.0)
+            try:
+                req = urllib.request.Request(
+                    "https://rbwr.hotment.dev/api/servers/latest",
+                    headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        raw = resp.read().decode("utf-8")
+                        payload = json.loads(raw)
+                        servers = self.parse_servers_from_payload(payload)
+            except Exception as e:
+                log.debug(f"Error fetching servers in overlay: {e}")
 
             if servers:
                 job_ids = [s.get("jobId", "") for s in servers if s and s.get("jobId")]
@@ -978,17 +941,12 @@ class OverlayApp:
             return
 
         now = time.time()
-        api_key = getattr(self, 'server_checker_api_key', '')
-        if not api_key:
-            last_req = getattr(self, '_last_api_request_timestamp', 0.0)
-            cooldown = getattr(self, '_api_cooldown_seconds', 120.0)
+        last_req = getattr(self, '_last_api_request_timestamp', 0.0)
 
-            if (now - last_req) < cooldown:
-                log.info(f"API request throttled — last request was made {now - last_req:.1f}s ago (< {cooldown:.0f}s cooldown).")
-                return
+        if not is_user_initiated and (now - last_req) < 10.0:
+            return
 
-            self._last_api_request_timestamp = now
-
+        self._last_api_request_timestamp = now
         self.last_job_id = job_id
         self.save_settings()
 
@@ -997,62 +955,24 @@ class OverlayApp:
 
             servers = []
             last_err = None
-            got_429 = False
 
-            if api_key:
-                try:
-                    req = urllib.request.Request(
-                        "https://rbwr.scatterbox.dev/api/servers/latest",
-                        headers={
-                            "User-Agent": "RBWR-Overlay-Client/1.0",
-                            "X-API-KEY": api_key
-                        }
-                    )
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        if resp.status == 200:
-                            raw = resp.read().decode("utf-8")
-                            payload = json.loads(raw)
-                            servers = self.parse_servers_from_payload(payload)
-                            self._api_cooldown_seconds = 120.0
-                        else:
-                            last_err = f"HTTP {resp.status}"
-                except Exception as e:
-                    last_err = str(e)
-                    log.warning(f"Primary server API (scatterbox.dev) unavailable: {e}. Falling back to realisticbwr.org...")
-
-            if not servers:
-                now_fallback = time.time()
-                last_real_req = getattr(self, '_last_realisticbwr_request_timestamp', 0.0)
-                cooldown_real = getattr(self, '_api_cooldown_seconds', 120.0)
-                if (now_fallback - last_real_req) >= cooldown_real:
-                    self._last_realisticbwr_request_timestamp = now_fallback
-                    try:
-                        req = urllib.request.Request(
-                            "https://realisticbwr.org/api/public/servers",
-                            headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
-                        )
-                        with urllib.request.urlopen(req, timeout=10) as resp:
-                            if resp.status == 200:
-                                raw = resp.read().decode("utf-8")
-                                payload = json.loads(raw)
-                                servers = self.parse_servers_from_payload(payload)
-                                self._api_cooldown_seconds = 120.0
-                            elif resp.status == 429:
-                                got_429 = True
-                                last_err = "HTTP 429: Too Many Requests"
-                    except urllib.error.HTTPError as e:
-                        if e.code == 429:
-                            got_429 = True
-                        last_err = f"HTTP Error {e.code}: {e.reason}"
-                    except Exception as e:
-                        last_err = str(e)
-                else:
-                    if not last_err:
-                        last_err = f"realisticbwr.org fallback throttled ({now_fallback - last_real_req:.1f}s < {cooldown_real:.0f}s)"
-
-            if got_429:
-                self._api_cooldown_seconds = max(getattr(self, '_api_cooldown_seconds', 120.0) * 2, 300.0)
-                log.warning(f"HTTP 429 Too Many Requests hit on server API. Engaged exponential backoff: next request allowed in {self._api_cooldown_seconds:.0f}s.")
+            try:
+                req = urllib.request.Request(
+                    "https://rbwr.hotment.dev/api/servers/latest",
+                    headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        raw = resp.read().decode("utf-8")
+                        payload = json.loads(raw)
+                        servers = self.parse_servers_from_payload(payload)
+                    else:
+                        last_err = f"HTTP {resp.status}"
+            except urllib.error.HTTPError as e:
+                last_err = f"HTTP Error {e.code}: {e.reason}"
+            except Exception as e:
+                last_err = str(e)
+                log.warning(f"Server API (rbwr.hotment.dev) error: {e}")
 
             if servers:
                 self.overlay_servers_data = servers
@@ -1309,9 +1229,7 @@ class OverlayApp:
 
         if getattr(self, 'overlay_next_demand_switched', False):
             last_poll = getattr(self, '_last_60s_poll_timestamp', 0.0)
-            api_key = getattr(self, 'server_checker_api_key', '')
-            cooldown = 10.0 if api_key else getattr(self, '_api_cooldown_seconds', 120.0)
-            if now - last_poll >= cooldown:
+            if now - last_poll >= 10.0:
                 self._last_60s_poll_timestamp = now
                 self.connect_overlay_server_async()
 
@@ -1334,12 +1252,9 @@ class OverlayApp:
         self.is_compact = settings["is_compact"]
         self.show_config = False
         self.updating_fields = False
-        self._api_cooldown_seconds: float = 120.0
         self._last_api_request_timestamp: float = 0.0
         self._last_60s_poll_timestamp: float = 0.0
-        self._last_realisticbwr_request_timestamp: float = 0.0
         self._turbine_health_alert_triggered: bool = False
-        self.server_checker_api_key: str = str(settings.get("server_checker_api_key", ""))
         
         if IS_LINUX:
             self.win = tk.Toplevel(self.root)
@@ -1917,8 +1832,7 @@ class OverlayApp:
             "last_job_id": "",
             "dtl_calibration_offset": 0.0,
             "enable_turbine_health_alert": False,
-            "turbine_health_threshold": 65.0,
-            "server_checker_api_key": ""
+            "turbine_health_threshold": 65.0
         }
         try:
             if os.path.exists(CONFIG_FILE):
@@ -1943,8 +1857,7 @@ class OverlayApp:
                 "last_job_id": self.var_overlay_job_id.get().strip() if hasattr(self, 'var_overlay_job_id') else getattr(self, 'last_job_id', ""),
                 "dtl_calibration_offset": getattr(self, 'dtl_calibration_offset', 0.0),
                 "enable_turbine_health_alert": getattr(self, 'enable_turbine_health_alert', False),
-                "turbine_health_threshold": getattr(self, 'turbine_health_threshold', 65.0),
-                "server_checker_api_key": getattr(self, 'server_checker_api_key', "")
+                "turbine_health_threshold": getattr(self, 'turbine_health_threshold', 65.0)
             }
             with open(CONFIG_FILE, "w") as f:
                 json.dump(data, f, indent=4)
@@ -2461,7 +2374,7 @@ class OverlayApp:
             try:
                 threading.Event().wait(1.5)
                 
-                url = "https://api.github.com/repos/Hotment/rbwr_themal_calculator/releases/latest"
+                url = "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest"
                 req = urllib.request.Request(url, headers=UPDATE_HTTP_HEADERS)
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:
