@@ -1006,6 +1006,8 @@ def build_chart_payload(job_id, snapshots):
     metrics = {
         "APRM": ("3", "APRM (%)", ["APRM"]),
         "RTP": ("2", "RTP (%)", ["RTP"]),
+        "Xenon": ("3", "Xenon (%)", ["Xenon"]),
+        "Iodine": ("3", "Iodine (%)", ["Iodine"]),
         "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"]),
         "Reactor Temp": ("3", "Reactor Temperature (°F)", ["Reactor Temp"]),
         "ReactorLevel": ("3", "Reactor Water Level (in)", ["ReactorLevel"]),
