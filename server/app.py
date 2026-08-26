@@ -1019,8 +1019,8 @@ def compress_points(points, precision=2):
 
 def build_chart_payload(job_id, snapshots):
     metrics = {
-        "APRM": ("3", "APRM (%)", ["APRM"], 2),
-        "RTP": ("2", "RTP (%)", ["RTP"], 2),
+        "APRM": ("3", "APRM (%)", ["APRM"], 4),
+        "RTP": ("2", "RTP (%)", ["RTP"], 4),
         "Xenon": ("3", "Xenon (%)", ["Xenon"], 6),
         "Iodine": ("3", "Iodine (%)", ["Iodine"], 6),
         "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"], 2),
