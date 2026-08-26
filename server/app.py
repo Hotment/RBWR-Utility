@@ -717,6 +717,8 @@ SERVER_CHECKER_PURGE_KEYS = [
 ]
 
 SERVER_CHECKER_FIELD_PRECISION = {
+    "APRM": None,
+    "RTP": None,
     "Xenon": None,
     "Iodine": None,
     "FWP1 Temp": 4,
