@@ -1,0 +1,88 @@
+name: Build Linux Release (Executable & Package)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install System Dependencies (Tkinter, Patchelf & CCache)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk tk-dev tcl-dev patchelf ccache build-essential xvfb
+
+      - name: Install Python Dependencies & Nuitka
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka
+
+      - name: Generate Application Icon
+        run: |
+          python -c "import rbwr_overlay; rbwr_overlay.generate_default_icon()"
+
+      - name: Compile to Linux App (Nuitka Onefile Standalone)
+        run: |
+          python -m nuitka \
+            --standalone \
+            --onefile \
+            --enable-plugin=tk-inter \
+            --linux-icon=icon.png \
+            --output-filename="RBWR_APRM_Calculator" \
+            --jobs=$(nproc) \
+            rbwr_overlay.py
+
+      - name: Verify Binary Execution (Headless Xvfb Smoke Test)
+        run: |
+          chmod +x RBWR_APRM_Calculator
+          timeout 5s xvfb-run -a ./RBWR_APRM_Calculator || [ $? -eq 124 ]
+          echo "Linux binary verified and executes successfully!"
+
+      - name: Package Linux Application Bundle
+        run: |
+          APP_VERSION=$(python -c "import re; m = re.search(r'__version__\s*=\s*[\"\\\'](.*?)[\"\\\']', open('rbwr_overlay.py').read()); print(m.group(1) if m else 'latest')")
+          BUNDLE_DIR="RBWR_APRM_Calculator_Linux_x86_64_v${APP_VERSION}"
+
+          mkdir -p "${BUNDLE_DIR}"
+          cp RBWR_APRM_Calculator "${BUNDLE_DIR}/"
+          cp icon.png "${BUNDLE_DIR}/"
+
+          cat << 'EOF' > "${BUNDLE_DIR}/rbwr-calculator.desktop"
+          [Desktop Entry]
+          Name=RBWR APRM Calculator
+          Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+          Exec=./RBWR_APRM_Calculator
+          Icon=icon.png
+          Terminal=false
+          Type=Application
+          Categories=Utility;Game;
+          EOF
+
+          chmod +x "${BUNDLE_DIR}/RBWR_APRM_Calculator"
+          chmod +x "${BUNDLE_DIR}/rbwr-calculator.desktop"
+
+          tar -czvf "${BUNDLE_DIR}.tar.gz" "${BUNDLE_DIR}"
+
+          cp RBWR_APRM_Calculator "RBWR_APRM_Calculator_linux_x86_64_v${APP_VERSION}"
+
+      - name: Upload Linux Package Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_Linux_x86_64
+          path: |
+            RBWR_APRM_Calculator_Linux_x86_64_v*.tar.gz
+            RBWR_APRM_Calculator_linux_x86_64_v*

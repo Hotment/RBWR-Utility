@@ -32,6 +32,7 @@ The overlay requires Python 3.10+ and uses lightweight external libraries for GU
 ### Pre-built Releases
 
 * **Windows:** Download the latest `RBWR_APRM_Calculator_vX.X.X.exe` or portable `.zip` from the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page.
+* **Linux (x86_64):** Download `RBWR_APRM_Calculator_Linux_x86_64_vX.X.X.tar.gz` or standalone binary from the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page. Extract and run `./RBWR_APRM_Calculator`.
 * **macOS (Apple Silicon - M1/M2/M3/M4):** Download `RBWR_APRM_Calculator_macOS_arm64.zip` from Releases. Extract the archive, then right-click `RBWR APRM Calculator.app` and select **Open** (required once on first launch for security approval).
 
 ---
@@ -53,10 +54,16 @@ Running the application **natively from source** is fully supported across Windo
 *Note for Intel Mac users: Intel Macs can run the application directly from source using the steps above.*
 *Note for Linux users: Running natively is strongly recommended over Wine to avoid Wayland compositing and window transparency issues.*
 
-To compile your own Windows executable (`rbwr_overlay.exe`), run:
-```cmd
-compile.bat
-```
+To compile your own executable:
+* **Windows (`.exe`):**
+  ```cmd
+  compile.bat
+  ```
+* **Linux (`standalone binary`):**
+  ```bash
+  chmod +x compile.sh
+  ./compile.sh
+  ```
 
 ---
 
