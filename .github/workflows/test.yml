@@ -3,8 +3,18 @@ name: Cross-Platform Test (Linux & macOS)
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'rbwr_overlay.py'
+      - 'verify_calculations.py'
+      - 'requirements.txt'
+      - '.github/workflows/test.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'rbwr_overlay.py'
+      - 'verify_calculations.py'
+      - 'requirements.txt'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 jobs:
