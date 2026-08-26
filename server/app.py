@@ -685,42 +685,49 @@ def submit_contact_message():
 # ==============================================================================
 
 SERVER_CHECKER_PURGE_KEYS = [
-    "Reactor Scram State",
-    "Startup XFMR",
-    "DoAutoScramU1",
-    "DieselRPM",
-    "Turbine RPM",
-    "FWP1",
-    "FWP2",
-    "Recirc1",
-    "Recirc2",
     "APRM Setpoint",
     "AutoPressure",
-    "NextDemandU1",
-    "BypassTurbineAutoTrip",
-    "Vibrations",
-    "Fuel Burn (default 0.54)",
-    "Avg. Rod",
-    "TurbineTrip",
-    "TotalPowerGenerated",
-    "Offsite Power",
-    "StartupUnit1",
     "BusA",
     "BusB",
+    "BypassTurbineAutoTrip",
+    "DCBus",
+    "Demand Time Left",
+    "DieselRPM",
+    "DoAutoScramU1",
+    "DiffPressure",
     "Disk Ruptured",
+    "DoAutoScramU2",
+    "Fuel Burn (default 0.54)",
+    "NextDemandU1",
+    "NextDemandU2",
+    "Offsite Power",
+    "PointsPerSecond",
     "RPS Trip State B",
     "RPS Trip State A",
-    "TRIPreason",
-    "PointsPerSecond",
-    "DCBus",
-    "StartupUnit2",
+    "Reactor Scram State",
     "SCRAMreason",
-    "DiffPressure",
-    "NextDemandU2",
-    "DoAutoScramU2",
-    "Demand Time Left",
-    "CasingTemperature",
+    "Startup XFMR",
+    "StartupUnit1",
+    "StartupUnit2",
+    "TRIPreason",
+    "TotalPowerGenerated",
+    "Turbine RPM",
+    "TurbineTrip",
+    "Vibrations",
 ]
+
+SERVER_CHECKER_FIELD_PRECISION = {
+    "Xenon": None,
+    "Iodine": None,
+    "FWP1 Temp": 4,
+    "FWP2 Temp": 4,
+    "Recirc1": 3,
+    "Recirc2": 3,
+    "CasingTemperature": 4,
+    "PradDoSieci": 0,
+    "Output (MW)": 0,
+    "Reactor Temp": 4,
+}
 
 _sc_lock = threading.RLock()
 _sc_public_server_ids = []
@@ -876,11 +883,16 @@ def pull_server_checker_data():
             for unit in ("Unit1", "Unit2"):
                 unit_state = state.get(unit)
                 if isinstance(unit_state, dict):
-                    state[unit] = {
-                        k: (round(v, 2) if not isinstance(v, (str, bool)) and isinstance(v, (int, float)) else v)
-                        for k, v in unit_state.items()
-                        if k not in SERVER_CHECKER_PURGE_KEYS
-                    }
+                    unit_dict = {}
+                    for k, v in unit_state.items():
+                        if k in SERVER_CHECKER_PURGE_KEYS:
+                            continue
+                        if isinstance(v, (int, float)) and not isinstance(v, bool):
+                            prec = SERVER_CHECKER_FIELD_PRECISION.get(k, 2)
+                            unit_dict[k] = round(v, prec) if prec is not None else v
+                        else:
+                            unit_dict[k] = v
+                    state[unit] = unit_dict
                 else:
                     state[unit] = {}
 
@@ -977,13 +989,14 @@ def parse_label_seconds(label, fallback_idx=0):
     except Exception:
         return float(fallback_idx)
 
-def compress_points(points):
+def compress_points(points, precision=2):
     """
     Compress collinear points where points is a list of (x, y) tuples.
     x is seconds_ago (float), y is metric value (float).
+    precision controls the number of decimal places for y (default 2, None for unrounded).
     """
     if len(points) <= 2:
-        return [{"x": round(x, 1), "y": round(y, 2)} for x, y in points]
+        return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in points]
 
     compressed = [points[0]]
     for i in range(1, len(points) - 1):
@@ -1000,22 +1013,22 @@ def compress_points(points):
             compressed.append(points[i])
 
     compressed.append(points[-1])
-    return [{"x": round(x, 1), "y": round(y, 2)} for x, y in compressed]
+    return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in compressed]
 
 def build_chart_payload(job_id, snapshots):
     metrics = {
-        "APRM": ("3", "APRM (%)", ["APRM"]),
-        "RTP": ("2", "RTP (%)", ["RTP"]),
-        "Xenon": ("3", "Xenon (%)", ["Xenon"]),
-        "Iodine": ("3", "Iodine (%)", ["Iodine"]),
-        "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"]),
-        "Reactor Temp": ("3", "Reactor Temperature (°F)", ["Reactor Temp"]),
-        "ReactorLevel": ("3", "Reactor Water Level (in)", ["ReactorLevel"]),
-        "Deareator Level": ("3", "Deaerator Level (in)", ["Deareator Level", "Deaerator Level"]),
-        "Hotwell Level": ("3", "Hotwell Level (in)", ["Hotwell Level"]),
-        "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"]),
-        "GeneratorTemperature": ("2", "Generator Temperature (°F)", ["GeneratorTemperature", "Generator Temperature"]),
-        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"])
+        "APRM": ("3", "APRM (%)", ["APRM"], 2),
+        "RTP": ("2", "RTP (%)", ["RTP"], 2),
+        "Xenon": ("3", "Xenon (%)", ["Xenon"], 6),
+        "Iodine": ("3", "Iodine (%)", ["Iodine"], 6),
+        "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"], 2),
+        "Reactor Temp": ("3", "Reactor Temperature (°F)", ["Reactor Temp"], 2),
+        "ReactorLevel": ("3", "Reactor Water Level (in)", ["ReactorLevel"], 2),
+        "Deareator Level": ("3", "Deaerator Level (in)", ["Deareator Level", "Deaerator Level"], 2),
+        "Hotwell Level": ("3", "Hotwell Level (in)", ["Hotwell Level"], 2),
+        "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"], 2),
+        "GeneratorTemperature": ("2", "Generator Temperature (°F)", ["GeneratorTemperature", "Generator Temperature"], 2),
+        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2)
     }
     chart_payload = []
     ordered_snapshots = []
@@ -1036,7 +1049,11 @@ def build_chart_payload(job_id, snapshots):
             "state": state,
         })
 
-    for metric_key, (unit_type, metric_title, field_aliases) in metrics.items():
+    for metric_key, metric_cfg in metrics.items():
+        unit_type = metric_cfg[0]
+        metric_title = metric_cfg[1]
+        field_aliases = metric_cfg[2]
+        precision = metric_cfg[3] if len(metric_cfg) > 3 else 2
         u1_points = []
         u2_points = []
 
@@ -1071,7 +1088,7 @@ def build_chart_payload(job_id, snapshots):
 
         datasets = []
         if u1_points and unit_type in ("1", "3"):
-            c_u1 = compress_points(u1_points)
+            c_u1 = compress_points(u1_points, precision=precision)
             datasets.append({
                 "label": "Unit 1",
                 "data": c_u1,
@@ -1080,7 +1097,7 @@ def build_chart_payload(job_id, snapshots):
             })
 
         if u2_points and unit_type in ("2", "3"):
-            c_u2 = compress_points(u2_points)
+            c_u2 = compress_points(u2_points, precision=precision)
             datasets.append({
                 "label": "Unit 2",
                 "data": c_u2,
