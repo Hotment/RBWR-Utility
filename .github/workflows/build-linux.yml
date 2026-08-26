@@ -54,7 +54,15 @@ jobs:
 
       - name: Package Linux Application Bundle
         run: |
-          APP_VERSION=$(python -c "import re; m = re.search(r'__version__\s*=\s*[\"\\\'](.*?)[\"\\\']', open('rbwr_overlay.py').read()); print(m.group(1) if m else 'latest')")
+          APP_VERSION=$(python - << 'EOF'
+          with open('rbwr_overlay.py', 'r', encoding='utf-8') as f:
+              for line in f:
+                  if line.startswith('__version__'):
+                      print(line.split('=')[1].strip().strip('\'"'))
+                      break
+          EOF
+          )
+          echo "Packaging application version: ${APP_VERSION}"
           BUNDLE_DIR="RBWR_APRM_Calculator_Linux_x86_64_v${APP_VERSION}"
 
           mkdir -p "${BUNDLE_DIR}"

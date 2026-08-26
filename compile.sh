@@ -26,7 +26,14 @@ echo "[2/3] Generating default custom icons..."
 python3 -c "import rbwr_overlay; rbwr_overlay.generate_default_icon()"
 
 # Extract version
-CURRENT_VERSION=$(python3 -c "import re; m = re.search(r'__version__\s*=\s*[\"\\\'](.*?)[\"\\\']', open('rbwr_overlay.py').read()); print(m.group(1) if m else '1.0.0')")
+CURRENT_VERSION=$(python3 - << 'EOF'
+with open('rbwr_overlay.py', 'r', encoding='utf-8') as f:
+    for line in f:
+        if line.startswith('__version__'):
+            print(line.split('=')[1].strip().strip('\'"'))
+            break
+EOF
+)
 echo "Current version detected: ${CURRENT_VERSION}"
 
 # Step 3: Compile with Nuitka
