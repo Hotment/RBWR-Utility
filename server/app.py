@@ -1023,13 +1023,13 @@ def build_chart_payload(job_id, snapshots):
         "RTP": ("2", "RTP (%)", ["RTP"], 4),
         "Xenon": ("3", "Xenon (%)", ["Xenon"], 6),
         "Iodine": ("3", "Iodine (%)", ["Iodine"], 6),
-        "Pressure": ("3", "Reactor Pressure (PSI)", ["Pressure"], 2),
-        "Reactor Temp": ("3", "Reactor Temperature (°F)", ["Reactor Temp"], 2),
-        "ReactorLevel": ("3", "Reactor Water Level (in)", ["ReactorLevel"], 2),
-        "Deareator Level": ("3", "Deaerator Level (in)", ["Deareator Level", "Deaerator Level"], 2),
-        "Hotwell Level": ("3", "Hotwell Level (in)", ["Hotwell Level"], 2),
+        "Pressure": ("3", "Reactor Pressure (kPa)", ["Pressure"], 2),
+        "Reactor Temp": ("3", "Reactor Temperature (°C)", ["Reactor Temp"], 2),
+        "ReactorLevel": ("3", "Reactor Water Level (m)", ["ReactorLevel"], 2),
+        "Deareator Level": ("3", "Deaerator Level (m)", ["Deareator Level", "Deaerator Level"], 2),
+        "Hotwell Level": ("3", "Hotwell Level (m)", ["Hotwell Level"], 2),
         "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"], 2),
-        "GeneratorTemperature": ("2", "Generator Temperature (°F)", ["GeneratorTemperature", "Generator Temperature"], 2),
+        "GeneratorTemperature": ("2", "Generator Temperature (°C)", ["GeneratorTemperature", "Generator Temperature"], 2),
         "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2)
     }
     chart_payload = []
