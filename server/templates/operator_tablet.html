@@ -331,8 +331,8 @@
         { label: 'Reactor Level', key: 'ReactorLevel', type: 'number', dp: 2 },
         { label: 'Dea Level', key: 'Deareator Level', type: 'number', dp: 2 },
         { label: 'Hotwell Level', key: 'Hotwell Level', type: 'number', dp: 2 },
-        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2 },
-        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2 },
+        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2, multiplier: 100, suffix: '%' },
+        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2, multiplier: 100, suffix: '%' },
         { label: 'Vibrations', key: 'Vibrations', type: 'number', dp: 2 },
         { label: 'Pressure', key: 'Pressure', type: 'number', dp: 2 },
         { label: 'Turbine RPM', key: 'Turbine RPM', type: 'number', dp: 0 },
@@ -356,8 +356,8 @@
         { label: 'Reactor Level', key: 'ReactorLevel', type: 'number', dp: 2 },
         { label: 'Dea Level', key: 'Deareator Level', type: 'number', dp: 2 },
         { label: 'Hotwell Level', key: 'Hotwell Level', type: 'number', dp: 2 },
-        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2 },
-        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2 },
+        { label: 'Xenon', key: 'Xenon', type: 'number', dp: 2, multiplier: 100, suffix: '%' },
+        { label: 'Iodine', key: 'Iodine', type: 'number', dp: 2, multiplier: 100, suffix: '%' },
         { label: 'Disc Ruptured', key: 'Disk Ruptured', type: 'bool' },
         { label: 'Vibrations', key: 'Vibrations', type: 'number', dp: 2 },
         { label: 'Pressure', key: 'Pressure', type: 'number', dp: 2 },
@@ -535,13 +535,16 @@
         if (rawVal === undefined || rawVal === null) return 'N/A';
 
         if (def.type === 'number') {
-            const num = parseFloat(rawVal);
+            let num = parseFloat(rawVal);
             if (isNaN(num)) return 'N/A';
             if ((def.label && def.label.includes('Demand')) || (def.key && def.key.includes('Demand'))) {
                 if (num === -4) return 'Evacuation';
                 if (num === -3) return 'RST';
                 if (num === -2) return 'LOOP';
                 if (num === -1) return 'Maintenace';
+            }
+            if (def.multiplier !== undefined) {
+                num *= def.multiplier;
             }
             const formatted = num.toFixed(def.dp !== undefined ? def.dp : 2);
             return def.suffix ? `${formatted}${def.suffix}` : formatted;

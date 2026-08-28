@@ -1021,8 +1021,8 @@ def build_chart_payload(job_id, snapshots):
     metrics = {
         "APRM": ("3", "APRM (%)", ["APRM"], 4),
         "RTP": ("2", "RTP (%)", ["RTP"], 4),
-        "Xenon": ("3", "Xenon (%)", ["Xenon"], 6),
-        "Iodine": ("3", "Iodine (%)", ["Iodine"], 6),
+        "Xenon": ("3", "Xenon (%)", ["Xenon"], 6, 100.0),
+        "Iodine": ("3", "Iodine (%)", ["Iodine"], 6, 100.0),
         "Pressure": ("3", "Reactor Pressure (kPa)", ["Pressure"], 2),
         "Reactor Temp": ("3", "Reactor Temperature (°C)", ["Reactor Temp"], 2),
         "ReactorLevel": ("3", "Reactor Water Level (m)", ["ReactorLevel"], 2),
@@ -1056,6 +1056,7 @@ def build_chart_payload(job_id, snapshots):
         metric_title = metric_cfg[1]
         field_aliases = metric_cfg[2]
         precision = metric_cfg[3] if len(metric_cfg) > 3 else 2
+        scale_factor = metric_cfg[4] if len(metric_cfg) > 4 else 1.0
         u1_points = []
         u2_points = []
 
@@ -1074,7 +1075,7 @@ def build_chart_payload(job_id, snapshots):
                             v1 = u1_state[alias]
                             break
                 if v1 is not None and isinstance(v1, (int, float)):
-                    u1_points.append((sec_ago, float(v1)))
+                    u1_points.append((sec_ago, float(v1) * scale_factor))
 
             if unit_type in ("2", "3"):
                 v2 = None
@@ -1086,7 +1087,7 @@ def build_chart_payload(job_id, snapshots):
                             v2 = u2_state[alias]
                             break
                 if v2 is not None and isinstance(v2, (int, float)):
-                    u2_points.append((sec_ago, float(v2)))
+                    u2_points.append((sec_ago, float(v2) * scale_factor))
 
         datasets = []
         if u1_points and unit_type in ("1", "3"):
