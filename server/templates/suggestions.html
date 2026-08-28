@@ -141,7 +141,7 @@
 
                 <div class="flex flex-col gap-1.5 group">
                     <label class="text-xs font-medium text-gray-400">Target Project / Category</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs font-mono">
                         <label
                             class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-blue-500/40 cursor-pointer transition">
                             <input type="radio" name="submit-target" value="overlay" checked
@@ -164,6 +164,14 @@
                                 class="premium-checkbox accent-amber-500">
                             <span class="inline-flex items-center text-amber-300 font-medium whitespace-nowrap">
                                 Server Checker
+                            </span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-purple-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="general"
+                                class="premium-checkbox accent-purple-500">
+                            <span class="inline-flex items-center text-purple-300 font-medium whitespace-nowrap">
+                                General
                             </span>
                         </label>
                     </div>
@@ -304,9 +312,10 @@
             if (searchQuery) {
                 const nameMatch = (item.name || '').toLowerCase().includes(searchQuery);
                 const textMatch = (item.suggestion || '').toLowerCase().includes(searchQuery);
+                const isGeneral = item.target === 'general';
                 const isPointGraph = item.target === 'point_graph' || item.target === 'points_graph';
                 const isServerChecker = item.target === 'server_checker' || item.is_server_checker;
-                const targetStr = isPointGraph ? 'point history graph' : (isServerChecker ? 'server checker' : 'aprm overlay');
+                const targetStr = isGeneral ? 'general' : (isPointGraph ? 'point history graph' : (isServerChecker ? 'server checker' : 'aprm overlay'));
                 const targetMatch = targetStr.includes(searchQuery);
                 if (!nameMatch && !textMatch && !targetMatch) return false;
             }
@@ -329,12 +338,16 @@
         emptyState.classList.add('hidden');
 
         feed.innerHTML = filtered.map(item => {
+            const isGeneral = item.target === 'general';
             const isPointGraph = item.target === 'point_graph' || item.target === 'points_graph';
             const isServerChecker = item.target === 'server_checker' || item.is_server_checker;
             let targetBadge = '';
             let targetLabel = 'APRM Overlay';
 
-            if (isPointGraph) {
+            if (isGeneral) {
+                targetLabel = 'General';
+                targetBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">General</span>`;
+            } else if (isPointGraph) {
                 targetLabel = 'Point History Graph';
                 targetBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Point History Graph</span>`;
             } else if (isServerChecker) {

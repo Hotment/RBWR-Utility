@@ -1435,6 +1435,8 @@ def submit_suggestion():
         target_val = "point_graph"
     elif payload.target == "server_checker" or payload.is_server_checker:
         target_val = "server_checker"
+    elif payload.target == "general":
+        target_val = "general"
     else:
         target_val = "overlay"
     
