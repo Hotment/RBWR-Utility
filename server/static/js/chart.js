@@ -544,6 +544,10 @@ class SARProgressionChart {
         this.applyFilter(this.activeRange);
     }
 
+    setRange(range) {
+        return this.applyFilter(range);
+    }
+
     applyFilter(range) {
         this.activeRange = range;
         if (!this.rawTimeline.length) {
@@ -565,7 +569,7 @@ class SARProgressionChart {
         if (range === "all") {
             this.filteredTimeline = [...this.rawTimeline];
         } else {
-            const daysMap = { "30d": 30, "14d": 14, "7d": 7 };
+            const daysMap = { "30d": 30, "14d": 14, "7d": 7, "24h": 1, "1d": 1 };
             const days = daysMap[range] || 30;
             const latestEpoch = this.rawTimeline[this.rawTimeline.length - 1].timestamp_epoch;
             const cutoffEpoch = latestEpoch - (days * 24 * 3600 * 1000);
@@ -576,21 +580,58 @@ class SARProgressionChart {
             }
         }
 
-        let maxVal = 0;
+        let minVal = Infinity;
+        let maxVal = -Infinity;
         for (const d of this.filteredTimeline) {
-            if (d.u1 > maxVal) maxVal = d.u1;
-            if (d.u2 > maxVal) maxVal = d.u2;
+            if (this.showU1 && typeof d.u1 === "number") {
+                if (d.u1 < minVal) minVal = d.u1;
+                if (d.u1 > maxVal) maxVal = d.u1;
+            }
+            if (this.showU2 && typeof d.u2 === "number") {
+                if (d.u2 < minVal) minVal = d.u2;
+                if (d.u2 > maxVal) maxVal = d.u2;
+            }
+            if (!this.showU1 && !this.showU2) {
+                if (typeof d.u1 === "number") {
+                    if (d.u1 < minVal) minVal = d.u1;
+                    if (d.u1 > maxVal) maxVal = d.u1;
+                }
+                if (typeof d.u2 === "number") {
+                    if (d.u2 < minVal) minVal = d.u2;
+                    if (d.u2 > maxVal) maxVal = d.u2;
+                }
+            }
         }
-        if (maxVal === 0) maxVal = 1000;
-        const niceMax = this._calculateNiceMax(maxVal * 1.05);
+        if (!isFinite(minVal)) minVal = 0;
+        if (!isFinite(maxVal) || maxVal === 0) maxVal = 1000;
+
+        if (range === "all") {
+            if (minVal <= 0 || (maxVal > 0 && minVal / maxVal < 0.2)) {
+                this.baseMinY = 0;
+                this.baseMaxY = this._calculateNiceMax(maxVal * 1.05);
+            } else {
+                const span = maxVal - minVal;
+                const pad = span > 0 ? span * 0.10 : Math.max(10, maxVal * 0.05);
+                this.baseMinY = Math.max(0, Math.floor(minVal - pad));
+                this.baseMaxY = Math.ceil(maxVal + pad);
+            }
+        } else {
+            const span = maxVal - minVal;
+            const pad = span > 0 ? span * 0.10 : Math.max(10, maxVal * 0.05);
+            this.baseMinY = Math.max(0, Math.floor(minVal - pad));
+            this.baseMaxY = Math.ceil(maxVal + pad);
+        }
 
         this.baseMinEpoch = this.filteredTimeline[0].timestamp_epoch;
         this.baseMaxEpoch = this.filteredTimeline[this.filteredTimeline.length - 1].timestamp_epoch;
+        if (this.baseMinEpoch === this.baseMaxEpoch) {
+            this.baseMinEpoch -= 60000;
+            this.baseMaxEpoch += 60000;
+        }
+
         this.viewMinEpoch = this.baseMinEpoch;
         this.viewMaxEpoch = this.baseMaxEpoch;
 
-        this.baseMinY = 0;
-        this.baseMaxY = niceMax;
         this.viewMinY = this.baseMinY;
         this.viewMaxY = this.baseMaxY;
 
@@ -611,14 +652,14 @@ class SARProgressionChart {
     toggleSeries(seriesName) {
         if (seriesName === "u1") {
             this.showU1 = !this.showU1;
-            if (this.lineU1) this.lineU1.style.display = this.showU1 ? "block" : "none";
-            if (this.areaU1) this.areaU1.style.display = (this.showU1 && this.showArea) ? "block" : "none";
         } else if (seriesName === "u2") {
             this.showU2 = !this.showU2;
-            if (this.lineU2) this.lineU2.style.display = this.showU2 ? "block" : "none";
-            if (this.areaU2) this.areaU2.style.display = (this.showU2 && this.showArea) ? "block" : "none";
         }
-        this.render();
+        if (!this.isZoomed) {
+            this.applyFilter(this.activeRange);
+        } else {
+            this.render();
+        }
     }
 
     _formatPoints(val) {
