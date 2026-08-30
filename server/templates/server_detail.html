@@ -45,6 +45,11 @@
                     title="{{ job_id }}">
                     {{ job_id }}
                 </h1>
+                {% if is_private %}
+                <span class="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold">
+                    Private Server
+                </span>
+                {% endif %}
                 <button type="button" onclick="copyText('{{ job_id }}', this)"
                     class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-amber-300 transition-colors shrink-0"
                     title="Copy Job ID">

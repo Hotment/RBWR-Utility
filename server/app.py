@@ -853,22 +853,12 @@ def pull_server_checker_data():
         if found_new_server or not _sc_public_server_ids:
             success_public = update_public_roblox_servers()
 
-        rbwr_api_ids = [s.get('jobId') for s in servers_list if s.get('jobId')]
-
-        if success_public and _sc_public_server_ids:
-            for job_id in list(current_data.keys()):
-                if job_id not in _sc_public_server_ids and job_id not in rbwr_api_ids:
-                    del current_data[job_id]
-        
         _sc_latest_data.clear()
         _sc_latest_data.update(resp_json)
 
         for server in servers_list:
             job_id = server.get('jobId')
             if not job_id:
-                continue
-
-            if _sc_public_server_ids and job_id not in _sc_public_server_ids:
                 continue
 
             if job_id not in current_data:
@@ -966,8 +956,10 @@ def build_server_cards(data):
         latest_state = snapshots[latest_timestamp]
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
+        is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
         cards.append({
             "job_id": job_id,
+            "is_private": is_private,
             "latest_timestamp": f"{convert_ISO_to_secs(latest_timestamp)}s ago",
             "snapshot_count": len(snapshots),
             "unit1": {
@@ -1226,7 +1218,9 @@ def server_detail_page(job_id):
         unit1_st = latest_st.get("Unit1", {})
         unit2_st = latest_st.get("Unit2", {})
         
+        is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
         summary = {
+            "is_private": is_private,
             "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
             "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
@@ -1254,7 +1248,9 @@ def server_detail_page(job_id):
 
     dmand_left = max(0.0, dmand_left_data - elapsed)
 
+    is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
     summary = {
+        "is_private": is_private,
         "scram_reason_u1": scram_reasonU1 or "N/A",
         "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
