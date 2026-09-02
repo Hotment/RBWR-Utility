@@ -876,13 +876,13 @@ def pull_server_checker_data():
             continue
 
     if not response or response.status_code != 200:
-        logger.warning("All server telemetry endpoints failed or timed out.")
+        logger.warning("All server endpoints failed or timed out.")
         return False
 
     try:
         resp_json = response.json()
     except Exception as e:
-        logger.error(f"Failed to decode server telemetry JSON: {e}")
+        logger.error(f"Failed to decode server response JSON: {e}")
         return False
 
     with _sc_lock:
@@ -1537,7 +1537,7 @@ def proxy_public_servers():
     with _cache_lock:
         if _servers_cache["data"] is not None:
             return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
-    return jsonify({"success": False, "error": "Unable to reach server telemetry API"}), 500
+    return jsonify({"success": False, "error": "Unable to reach game API"}), 500
 
 @app.route("/version/latest", methods=["GET"])
 def get_latest_version():
