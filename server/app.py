@@ -2158,6 +2158,7 @@ def view_servers_dashboard(username):
     if not has_permission(username, "servers"):
         return redirect("/admin")
     servers_data = get_sc_data("servers.json")
+    server_cards = build_server_cards(servers_data)
     initial_tab = request.args.get("status") or request.args.get("tab") or "all"
     return render_template(
         "admin_panel.html",
