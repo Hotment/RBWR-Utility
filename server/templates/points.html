@@ -739,14 +739,8 @@
         if (maxPPS === 1.167 || Math.abs(maxPPS - (7.0 / 6.0)) < 0.01) {
             let abnormalRate = 0.0;
 
-            // FWP Temp outside 60°C - 95°C (6) subtracts a fixed constant 1/6 (0.166666...) pts/s no matter what.
-            if (config["6"]) {
-                abnormalRate += (1.0 / 6.0);
-            }
-
             let abnormalActiveCount = 0;
             for (const [key, val] of Object.entries(config)) {
-                if (key === "6") continue;
                 if (val) {
                     const weight = (U2_ABNORMAL_WEIGHTS[key] !== undefined) ? U2_ABNORMAL_WEIGHTS[key] : 1.0;
                     abnormalActiveCount += weight;
