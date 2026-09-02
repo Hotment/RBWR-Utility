@@ -2,7 +2,11 @@
     data-job-id="{{ server.job_id }}" data-short-id="{{ server.short_id }}"
     data-is-private="{{ 'true' if server.is_private else 'false' }}"
     data-is-historical="{{ 'true' if server.is_historical else 'false' }}"
-    data-is-persistent="{{ 'true' if server.is_persistent else 'false' }}">
+    data-is-persistent="{{ 'true' if server.is_persistent else 'false' }}"
+    data-player-count="{{ server.player_count }}"
+    data-snapshot-count="{{ server.snapshot_count }}"
+    data-age-seconds="{{ server.age_seconds }}"
+    data-raw-timestamp="{{ server.raw_timestamp }}">
     <div class="flex flex-col gap-3">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">

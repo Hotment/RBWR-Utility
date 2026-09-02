@@ -137,6 +137,29 @@
                     class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Persistent</button>
             </div>
 
+            <div class="relative min-w-[190px]">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                    </svg>
+                </div>
+                <select id="serverSort" onchange="setSortOption(this.value)"
+                    class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-amber-500/50 appearance-none cursor-pointer">
+                    <option value="newest">Sort: Newest First</option>
+                    <option value="oldest">Sort: Oldest First</option>
+                    <option value="players_desc">Sort: Most Players</option>
+                    <option value="players_asc">Sort: Fewest Players</option>
+                    <option value="snapshots_desc">Sort: Most Snapshots</option>
+                    <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </div>
+
             <div class="relative min-w-[280px] sm:min-w-[320px]">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,8 +250,58 @@
     let serverCountLabel = null;
     let noResultsNotice = null;
     let currentStatusFilter = 'all';
+    let currentSort = 'newest';
     let lookupDebounceTimer = null;
+    let searchDebounceTimer = null;
     let activeLookupQuery = '';
+    let initialActiveCardsHtml = '';
+    let isHistoricalLoaded = false;
+    let historicalTotalCount = 0;
+    let historicalTotalPages = 1;
+    let historicalFetchAbortController = null;
+
+    function setSortOption(sortVal) {
+        currentSort = sortVal || 'newest';
+        if (currentStatusFilter === 'historical') {
+            fetchHistoricalPage(1);
+        } else {
+            filterServers(true);
+        }
+    }
+
+    function getCardPlayerCount(card) {
+        if (card.dataset.playerCount !== undefined && card.dataset.playerCount !== '') {
+            const p = parseInt(card.dataset.playerCount, 10);
+            if (!isNaN(p)) return p;
+        }
+        const m = card.textContent.match(/(\d+)\s*\/\s*\d+\s*Players/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    function getCardSnapshotCount(card) {
+        if (card.dataset.snapshotCount !== undefined && card.dataset.snapshotCount !== '') {
+            const s = parseInt(card.dataset.snapshotCount, 10);
+            if (!isNaN(s)) return s;
+        }
+        const m = card.textContent.match(/(\d+)\s*snapshots/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    function getCardTimestamp(card) {
+        if (card.dataset.rawTimestamp) {
+            const t = Date.parse(card.dataset.rawTimestamp);
+            if (!isNaN(t)) return t;
+        }
+        if (card.dataset.ageSeconds !== undefined && card.dataset.ageSeconds !== '') {
+            const sec = parseFloat(card.dataset.ageSeconds);
+            if (!isNaN(sec)) return Date.now() - (sec * 1000);
+        }
+        const m = card.textContent.match(/(\d+)s\s*ago/i);
+        if (m) return Date.now() - (parseInt(m[1], 10) * 1000);
+        return 0;
+    }
 
     function isExactJobOrServerIdMatch(query, jobId, shortId) {
         if (!query) return false;
@@ -283,7 +356,116 @@
             btn.classList.add('active', 'bg-white/10', 'text-white', 'font-semibold');
             btn.classList.remove('text-gray-400');
         }
-        filterServers(true);
+
+        if (currentStatusFilter === 'historical') {
+            fetchHistoricalPage(1);
+        } else {
+            const grid = document.getElementById('serverGrid');
+            if (grid && isHistoricalLoaded) {
+                grid.innerHTML = initialActiveCardsHtml;
+                serverCards = Array.from(document.querySelectorAll('.server-card'));
+                isHistoricalLoaded = false;
+            }
+            filterServers(true);
+        }
+    }
+
+    async function fetchHistoricalPage(page = 1) {
+        isHistoricalLoaded = true;
+        currentPage = page;
+
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
+        if (!clearSearchBtn) clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (!serverCountLabel) serverCountLabel = document.getElementById('serverCountLabel');
+        if (!noResultsNotice) noResultsNotice = document.getElementById('noResultsNotice');
+        const container = document.getElementById('paginationContainer');
+        const grid = document.getElementById('serverGrid');
+
+        const rawQuery = searchInput ? searchInput.value : '';
+        const query = rawQuery.trim();
+
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('hidden', query.length === 0);
+        }
+
+        if (historicalFetchAbortController) {
+            historicalFetchAbortController.abort();
+        }
+        historicalFetchAbortController = new AbortController();
+
+        if (grid) {
+            grid.innerHTML = `
+                <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-3">
+                    <div class="w-8 h-8 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin"></div>
+                    <span class="text-xs font-mono text-gray-400">Loading historical servers...</span>
+                </div>
+            `;
+        }
+        if (noResultsNotice) {
+            noResultsNotice.classList.add('hidden');
+            noResultsNotice.classList.remove('flex');
+        }
+
+        try {
+            const url = `/api/servers/historical?page=${page}&per_page=${PAGE_SIZE}&q=${encodeURIComponent(query)}&sort=${encodeURIComponent(currentSort)}`;
+            const resp = await fetch(url, { signal: historicalFetchAbortController.signal });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            historicalTotalCount = data.total || 0;
+            historicalTotalPages = data.total_pages || 1;
+            currentPage = data.page || page;
+
+            if (historicalTotalCount === 0) {
+                if (grid) grid.innerHTML = '';
+                if (noResultsNotice) {
+                    noResultsNotice.classList.remove('hidden');
+                    noResultsNotice.classList.add('flex');
+                }
+                if (serverCountLabel) {
+                    serverCountLabel.textContent = 'Showing 0 historical servers';
+                }
+                if (container) {
+                    container.classList.add('hidden');
+                    container.classList.remove('flex');
+                }
+                return;
+            }
+
+            if (grid) {
+                grid.innerHTML = data.cards_html;
+                serverCards = Array.from(document.querySelectorAll('.server-card'));
+            }
+
+            const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+            const endIdx = Math.min(currentPage * PAGE_SIZE, historicalTotalCount);
+
+            if (serverCountLabel) {
+                if (query.length > 0) {
+                    serverCountLabel.textContent = `Showing ${startIdx}–${endIdx} of ${historicalTotalCount.toLocaleString()} matching historical servers`;
+                } else {
+                    serverCountLabel.textContent = `Showing ${startIdx}–${endIdx} of ${historicalTotalCount.toLocaleString()} historical servers`;
+                }
+            }
+
+            if (noResultsNotice) {
+                noResultsNotice.classList.add('hidden');
+                noResultsNotice.classList.remove('flex');
+            }
+
+            renderPagination(historicalTotalCount, currentPage, historicalTotalPages);
+
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('Error loading historical servers:', err);
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-xs font-mono text-rose-400">
+                        Failed to load historical servers. Please try again.
+                    </div>
+                `;
+            }
+        }
     }
 
     function lookupHistoricalServer(query) {
@@ -394,6 +576,30 @@
             lookupHistoricalServer(query);
         }
 
+        matchingCards.sort((a, b) => {
+            const pA = getCardPlayerCount(a);
+            const pB = getCardPlayerCount(b);
+            const sA = getCardSnapshotCount(a);
+            const sB = getCardSnapshotCount(b);
+            const tA = getCardTimestamp(a);
+            const tB = getCardTimestamp(b);
+
+            if (currentSort === 'players_desc') {
+                return (pB - pA) || (sB - sA) || (tB - tA);
+            } else if (currentSort === 'players_asc') {
+                return (pA - pB) || (sA - sB) || (tA - tB);
+            } else if (currentSort === 'snapshots_desc') {
+                return (sB - sA) || (pB - pA) || (tB - tA);
+            } else if (currentSort === 'snapshots_asc') {
+                return (sA - sB) || (pA - pB) || (tA - tB);
+            } else if (currentSort === 'oldest') {
+                return (tA - tB) || (pB - pA);
+            } else {
+                // newest
+                return (tB - tA) || (pB - pA);
+            }
+        });
+
         applyPaginationDisplay();
     }
 
@@ -407,13 +613,18 @@
         const endIdx = startIdx + PAGE_SIZE;
         const pageSlice = matchingCards.slice(startIdx, endIdx);
 
-        serverCards.forEach(card => {
-            if (pageSlice.includes(card)) {
+        const grid = document.getElementById('serverGrid');
+        if (grid) {
+            pageSlice.forEach(card => {
+                grid.appendChild(card);
                 card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        });
+            });
+            serverCards.forEach(card => {
+                if (!pageSlice.includes(card)) {
+                    card.style.display = 'none';
+                }
+            });
+        }
 
         const query = (searchInput ? searchInput.value : '').trim();
         if (serverCountLabel) {
@@ -445,10 +656,10 @@
             }
         }
 
-        renderPagination(totalItems);
+        renderPagination(totalItems, currentPage, totalPages);
     }
 
-    function renderPagination(totalItems) {
+    function renderPagination(totalItems, explicitPage = null, explicitTotalPages = null) {
         const container = document.getElementById('paginationContainer');
         const buttonsContainer = document.getElementById('paginationButtons');
         const pageStartEl = document.getElementById('pageStartIdx');
@@ -466,13 +677,15 @@
         container.classList.remove('hidden');
         container.classList.add('flex');
 
-        const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
-        const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
-        const endIdx = Math.min(currentPage * PAGE_SIZE, totalItems);
+        const activePage = explicitPage !== null ? explicitPage : currentPage;
+        const totalPages = explicitTotalPages !== null ? explicitTotalPages : (Math.ceil(totalItems / PAGE_SIZE) || 1);
 
-        if (pageStartEl) pageStartEl.textContent = startIdx;
-        if (pageEndEl) pageEndEl.textContent = endIdx;
-        if (pageTotalEl) pageTotalEl.textContent = totalItems;
+        const startIdx = (activePage - 1) * PAGE_SIZE + 1;
+        const endIdx = Math.min(activePage * PAGE_SIZE, totalItems);
+
+        if (pageStartEl) pageStartEl.textContent = startIdx.toLocaleString();
+        if (pageEndEl) pageEndEl.textContent = endIdx.toLocaleString();
+        if (pageTotalEl) pageTotalEl.textContent = totalItems.toLocaleString();
 
         if (totalPages <= 1) {
             buttonsContainer.innerHTML = '';
@@ -481,9 +694,9 @@
 
         let html = '';
 
-        const prevDisabled = currentPage === 1;
+        const prevDisabled = activePage <= 1;
         html += `
-            <button type="button" onclick="goToPage(${currentPage - 1})"
+            <button type="button" onclick="goToPage(${activePage - 1})"
                 ${prevDisabled ? 'disabled' : ''}
                 class="px-3 py-1.5 rounded-xl border border-white/10 ${prevDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer'} transition-all flex items-center gap-1.5 font-medium">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
@@ -491,7 +704,7 @@
             </button>
         `;
 
-        let startPage = Math.max(1, currentPage - 2);
+        let startPage = Math.max(1, activePage - 2);
         let endPage = Math.min(totalPages, startPage + 4);
         if (endPage - startPage < 4) {
             startPage = Math.max(1, endPage - 4);
@@ -505,7 +718,7 @@
         }
 
         for (let p = startPage; p <= endPage; p++) {
-            const isCurrent = p === currentPage;
+            const isCurrent = p === activePage;
             html += `
                 <button type="button" onclick="goToPage(${p})"
                     class="w-8 h-8 rounded-xl border ${isCurrent ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 font-bold shadow-sm' : 'border-white/10 hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer font-medium'} transition-all">
@@ -521,9 +734,9 @@
             html += `<button type="button" onclick="goToPage(${totalPages})" class="w-8 h-8 rounded-xl border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer font-medium">${totalPages}</button>`;
         }
 
-        const nextDisabled = currentPage === totalPages;
+        const nextDisabled = activePage >= totalPages;
         html += `
-            <button type="button" onclick="goToPage(${currentPage + 1})"
+            <button type="button" onclick="goToPage(${activePage + 1})"
                 ${nextDisabled ? 'disabled' : ''}
                 class="px-3 py-1.5 rounded-xl border border-white/10 ${nextDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer'} transition-all flex items-center gap-1.5 font-medium">
                 <span>Next</span>
@@ -535,8 +748,12 @@
     }
 
     function goToPage(page) {
-        currentPage = page;
-        applyPaginationDisplay();
+        if (currentStatusFilter === 'historical') {
+            fetchHistoricalPage(page);
+        } else {
+            currentPage = page;
+            applyPaginationDisplay();
+        }
         const grid = document.getElementById('serverGrid');
         if (grid) {
             const rect = grid.getBoundingClientRect();
@@ -550,7 +767,11 @@
         if (!searchInput) searchInput = document.getElementById('serverSearch');
         if (searchInput) {
             searchInput.value = '';
-            filterServers(true);
+            if (currentStatusFilter === 'historical') {
+                fetchHistoricalPage(1);
+            } else {
+                filterServers(true);
+            }
             searchInput.focus();
         }
     }
@@ -562,16 +783,43 @@
         serverCountLabel = document.getElementById('serverCountLabel');
         noResultsNotice = document.getElementById('noResultsNotice');
 
+        const grid = document.getElementById('serverGrid');
+        if (grid) {
+            initialActiveCardsHtml = grid.innerHTML;
+        }
+
         if (searchInput) {
-            searchInput.addEventListener('input', () => filterServers(true));
+            searchInput.addEventListener('input', () => {
+                if (currentStatusFilter === 'historical') {
+                    clearTimeout(searchDebounceTimer);
+                    searchDebounceTimer = setTimeout(() => {
+                        fetchHistoricalPage(1);
+                    }, 250);
+                } else {
+                    filterServers(true);
+                }
+            });
         }
 
         const urlParams = new URLSearchParams(window.location.search);
-        const q = urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId');
-        if (q && searchInput) {
-            searchInput.value = q.trim();
+        const sortParam = urlParams.get('sort');
+        if (sortParam) {
+            currentSort = sortParam;
+            const sortSelect = document.getElementById('serverSort');
+            if (sortSelect) sortSelect.value = sortParam;
         }
-        filterServers(true);
+
+        const initialStatus = urlParams.get('status') || urlParams.get('tab');
+        if (initialStatus === 'historical') {
+            const histBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'historical');
+            setStatusFilter('historical', histBtn);
+        } else {
+            const q = urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId');
+            if (q && searchInput) {
+                searchInput.value = q.trim();
+            }
+            filterServers(true);
+        }
     });
 
     {% if charts and charts | length > 0 %}

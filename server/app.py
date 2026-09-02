@@ -29,6 +29,7 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
+load_dotenv(ENV_FILE)
 load_dotenv()
 
 import sys
@@ -115,8 +116,13 @@ def get_dashboard_payload_data(username=None):
         contact_messages = sorted(contact_data.get("messages", []), key=lambda m: m.get("timestamp", ""), reverse=True)
 
     persistent_data = load_persistent_servers()
-    servers_data = get_sc_data("servers.json")
+    servers_data = get_sc_data("servers.json") or {}
     server_cards = build_server_cards(servers_data)
+
+    active_count = len(server_cards)
+    total_count = len(servers_data)
+    persistent_count = len(persistent_data.get("persistent", {}))
+    historical_count = max(0, total_count - active_count)
 
     return {
         "suggestions": suggestions,
@@ -124,7 +130,13 @@ def get_dashboard_payload_data(username=None):
         "crashes": crashes,
         "contact_messages": contact_messages,
         "servers": server_cards,
-        "persistent_servers": persistent_data.get("persistent", {})
+        "persistent_servers": persistent_data.get("persistent", {}),
+        "server_counts": {
+            "total": total_count,
+            "active": active_count,
+            "historical": historical_count,
+            "persistent": persistent_count
+        }
     }
 
 def get_accounts_payload_data():
@@ -764,6 +776,49 @@ _sc_public_server_ids = []
 _sc_public_servers_info = {}
 _sc_server_ids = []
 _sc_latest_data = {}
+_sc_server_meta = {}
+
+def load_server_meta():
+    global _sc_server_meta
+    data = get_sc_data("server_meta.json")
+    if isinstance(data, dict):
+        _sc_server_meta.clear()
+        _sc_server_meta.update(data)
+    return _sc_server_meta
+
+def save_server_meta():
+    save_sc_data(_sc_server_meta, "server_meta.json")
+
+def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
+    if job_id in _sc_public_server_ids:
+        return False
+    meta = _sc_server_meta.get(job_id)
+    if meta is not None and "is_private" in meta:
+        return bool(meta["is_private"])
+    if latest_state and "IsPrivate" in latest_state:
+        return bool(latest_state["IsPrivate"])
+    if snapshots:
+        for snap in snapshots.values():
+            if isinstance(snap, dict) and "IsPrivate" in snap:
+                return bool(snap["IsPrivate"])
+    if is_active and _sc_public_server_ids:
+        return job_id not in _sc_public_server_ids
+    return False
+
+def get_server_player_count(job_id, snapshots=None, latest_state=None):
+    if job_id in _sc_public_servers_info:
+        return int(_sc_public_servers_info[job_id].get("playing", 0))
+    if latest_state and latest_state.get("PlayerCount", 0) > 0:
+        return int(latest_state["PlayerCount"])
+    meta = _sc_server_meta.get(job_id)
+    if meta and meta.get("last_player_count", 0) > 0:
+        return int(meta["last_player_count"])
+    if snapshots:
+        for ts in sorted(snapshots.keys(), reverse=True):
+            p = snapshots[ts].get("PlayerCount", 0)
+            if p > 0:
+                return int(p)
+    return 0
 
 def get_sc_data(filename: str, max_retries: int = 6):
     filepath = os.path.join(DATA_DIR, filename)
@@ -853,6 +908,22 @@ def update_public_roblox_servers():
                 _sc_public_server_ids.extend(public_ids)
                 _sc_public_servers_info.clear()
                 _sc_public_servers_info.update(public_info)
+
+                meta_dirty = False
+                for s_id in public_ids:
+                    if s_id not in _sc_server_meta or _sc_server_meta[s_id].get("is_private") is not False:
+                        if s_id not in _sc_server_meta:
+                            _sc_server_meta[s_id] = {}
+                        _sc_server_meta[s_id]["is_private"] = False
+                        meta_dirty = True
+                    p_num = public_info.get(s_id, {}).get("playing", 0)
+                    if p_num > 0:
+                        if s_id not in _sc_server_meta:
+                            _sc_server_meta[s_id] = {}
+                        _sc_server_meta[s_id]["last_player_count"] = p_num
+                        meta_dirty = True
+                if meta_dirty:
+                    save_server_meta()
             return True
         return False
     except Exception as e:
@@ -905,6 +976,7 @@ def pull_server_checker_data():
 
         persistent_data = load_persistent_servers()
         persistent_ids = set(persistent_data.get("persistent", {}).keys())
+        meta_dirty = False
 
         for server in servers_list:
             job_id = server.get('jobId')
@@ -925,6 +997,23 @@ def pull_server_checker_data():
             info = _sc_public_servers_info.get(job_id, {})
             player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else 0
             state["PlayerCount"] = player_count
+
+            # Track visibility and last player count in metadata
+            if _sc_public_server_ids:
+                is_priv = job_id not in _sc_public_server_ids
+                state["IsPrivate"] = is_priv
+                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
+                    if job_id not in _sc_server_meta:
+                        _sc_server_meta[job_id] = {}
+                    _sc_server_meta[job_id]["is_private"] = is_priv
+                    meta_dirty = True
+                if player_count > 0:
+                    if job_id not in _sc_server_meta:
+                        _sc_server_meta[job_id] = {}
+                    _sc_server_meta[job_id]["last_player_count"] = player_count
+                    meta_dirty = True
+            elif job_id in _sc_server_meta and "is_private" in _sc_server_meta[job_id]:
+                state["IsPrivate"] = _sc_server_meta[job_id]["is_private"]
 
             for unit in ("Unit1", "Unit2"):
                 unit_state = state.get(unit)
@@ -963,6 +1052,8 @@ def pull_server_checker_data():
                     logger.info(f"Pruned historical server {s_id} (age: {age_seconds}s > 48h)")
 
         save_sc_data(current_data, "servers.json")
+        if meta_dirty:
+            save_server_meta()
 
         global_data = get_sc_data("global.json")
         stats_payload = resp_json.get('data', {}).get('stats', {})
@@ -1073,12 +1164,12 @@ def build_server_cards(data, search_query=None):
         unit2 = latest_state.get("Unit2", {})
 
         info = _sc_public_servers_info.get(job_id, {})
-        player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else latest_state.get("PlayerCount", 0)
+        player_count = get_server_player_count(job_id, snapshots, latest_state)
         max_players = info.get("maxPlayers", 12)
 
-        is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
         is_persistent = job_id in persistent_ids
-        is_historical = (player_count == 0)
+        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(not is_historical))
 
         if is_historical and not is_persistent:
             if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
@@ -1086,6 +1177,7 @@ def build_server_cards(data, search_query=None):
 
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+        age_sec = convert_ISO_to_secs(latest_timestamp)
 
         cards.append({
             "job_id": job_id,
@@ -1095,7 +1187,9 @@ def build_server_cards(data, search_query=None):
             "is_historical": is_historical,
             "player_count": player_count,
             "max_players": max_players,
-            "latest_timestamp": f"{convert_ISO_to_secs(latest_timestamp)}s ago",
+            "raw_timestamp": latest_timestamp,
+            "age_seconds": age_sec,
+            "latest_timestamp": f"{age_sec}s ago",
             "snapshot_count": len(snapshots),
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
@@ -1386,10 +1480,10 @@ def server_detail_page(job_id):
 
     info = _sc_public_servers_info.get(job_id, {})
     latest_state = snapshots.get(max(snapshots.keys()), {}) if snapshots else {}
-    player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else latest_state.get("PlayerCount", 0)
+    player_count = get_server_player_count(job_id, snapshots, latest_state)
     max_players = info.get("maxPlayers", 12)
-    is_historical = (player_count == 0)
-    is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
+    is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+    is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(not is_historical))
     is_admin = bool(get_authenticated_user())
 
     if not server:
@@ -1482,6 +1576,132 @@ def lookup_server_api():
         "found": True,
         "server": target_card,
         "card_html": card_html
+    })
+
+@app.route("/api/servers/historical", methods=["GET"])
+def get_historical_servers_api():
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    if per_page <= 0 or per_page > 100:
+        per_page = 20
+    if page <= 0:
+        page = 1
+
+    query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip().lower()
+
+    servers_data = get_sc_data("servers.json")
+    if not servers_data:
+        return jsonify({
+            "success": True,
+            "servers": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 0,
+            "cards_html": ""
+        })
+
+    persistent_data = load_persistent_servers()
+    persistent_ids = set(persistent_data.get("persistent", {}).keys())
+
+    historical_cards = []
+    for job_id, snapshots in servers_data.items():
+        if not snapshots:
+            continue
+        latest_timestamp = max(snapshots.keys())
+        latest_state = snapshots[latest_timestamp]
+
+        info = _sc_public_servers_info.get(job_id, {})
+        player_count = get_server_player_count(job_id, snapshots, latest_state)
+        is_persistent = job_id in persistent_ids
+        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+
+        if not is_historical or is_persistent:
+            continue
+
+        j_parts = [p for p in job_id.split("-") if p]
+        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+
+        if query:
+            clean_q = query.replace("-", "")
+            clean_jid = job_id.lower().replace("-", "")
+            clean_sid = short_id.lower().replace("-", "")
+            matches = (
+                query in job_id.lower() or
+                (short_id and query in short_id.lower()) or
+                (clean_q and clean_q in clean_jid) or
+                (clean_sid and clean_q in clean_sid) or
+                is_exact_job_or_server_id_match(query, job_id)
+            )
+            if not matches:
+                continue
+
+        unit1 = latest_state.get("Unit1", {})
+        unit2 = latest_state.get("Unit2", {})
+        max_players = info.get("maxPlayers", 12)
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=False)
+        age_sec = convert_ISO_to_secs(latest_timestamp)
+
+        historical_cards.append({
+            "job_id": job_id,
+            "short_id": short_id,
+            "is_private": is_private,
+            "is_persistent": False,
+            "is_historical": True,
+            "player_count": player_count,
+            "max_players": max_players,
+            "raw_timestamp": latest_timestamp,
+            "age_seconds": age_sec,
+            "latest_timestamp": f"{age_sec}s ago",
+            "snapshot_count": len(snapshots),
+            "unit1": {
+                "demand_time_left": unit1.get("Demand Time Left", 0),
+                "aprm": unit1.get("APRM", 0),
+                "reactor_temp": unit1.get("Reactor Temp", 0),
+            },
+            "unit2": {
+                "demand_time_left": unit2.get("Demand Time Left", 0),
+                "aprm": unit2.get("APRM", 0),
+                "reactor_temp": unit2.get("Reactor Temp", 0),
+            },
+        })
+
+    sort_option = request.args.get("sort", "newest").strip().lower()
+    if sort_option == "players_desc":
+        historical_cards.sort(key=lambda c: (c.get("player_count", 0), c.get("snapshot_count", 0)), reverse=True)
+    elif sort_option == "players_asc":
+        historical_cards.sort(key=lambda c: (c.get("player_count", 0), c.get("snapshot_count", 0)))
+    elif sort_option == "snapshots_desc":
+        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count", 0)), reverse=True)
+    elif sort_option == "snapshots_asc":
+        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count", 0)))
+    elif sort_option == "oldest":
+        historical_cards.sort(key=lambda c: c.get("raw_timestamp", ""))
+    else:  # newest
+        historical_cards.sort(key=lambda c: c.get("raw_timestamp", ""), reverse=True)
+
+    total = len(historical_cards)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    if page > total_pages:
+        page = total_pages
+
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    page_cards = historical_cards[start_idx:end_idx]
+
+    cards_html = "".join(
+        render_template("_server_card.html", server=c)
+        for c in page_cards
+    )
+
+    return jsonify({
+        "success": True,
+        "servers": page_cards,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "cards_html": cards_html
     })
 
 @app.route("/api/servers/refresh", methods=["POST"])
@@ -1938,11 +2158,12 @@ def view_servers_dashboard(username):
     if not has_permission(username, "servers"):
         return redirect("/admin")
     servers_data = get_sc_data("servers.json")
-    server_cards = build_server_cards(servers_data)
+    initial_tab = request.args.get("status") or request.args.get("tab") or "all"
     return render_template(
         "admin_panel.html",
         username=username,
         active_view="servers",
+        initial_server_tab=initial_tab,
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
         servers=server_cards

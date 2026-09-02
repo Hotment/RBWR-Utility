@@ -549,42 +549,93 @@
             <header
                 class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-emerald-400 font-display whitespace-nowrap">Server Instances & Persistence</h2>
-                    <p class="text-xs text-slate-500 font-mono mt-1">Manage active, historical (48h retention), and persistent Roblox game servers.</p>
+                    <h2 class="text-xl font-bold tracking-wide text-emerald-400 font-display whitespace-nowrap">Server
+                        Instances & Persistence</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Manage active, historical (48h retention), and
+                        persistent Roblox game servers.</p>
                 </div>
                 <div class="flex items-center gap-4 flex-wrap">
-                    <div class="flex gap-3 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 font-mono whitespace-nowrap">
+                    <div
+                        class="flex gap-3 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 font-mono whitespace-nowrap">
                         <div>TOTAL: <span id="server-stat-total" class="text-white font-bold">0</span></div>
                         <div class="text-slate-600">|</div>
                         <div>ACTIVE: <span id="server-stat-active" class="text-emerald-400 font-bold">0</span></div>
                         <div class="text-slate-600">|</div>
-                        <div>HISTORICAL: <span id="server-stat-historical" class="text-slate-400 font-bold">0</span></div>
+                        <div>HISTORICAL: <span id="server-stat-historical" class="text-slate-400 font-bold">0</span>
+                        </div>
                         <div class="text-slate-600">|</div>
-                        <div>PERSISTENT: <span id="server-stat-persistent" class="text-amber-400 font-bold">0</span></div>
+                        <div>PERSISTENT: <span id="server-stat-persistent" class="text-amber-400 font-bold">0</span>
+                        </div>
                     </div>
                     <a href="/servers"
-                        class="px-4 py-2 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 hover:text-emerald-200 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Public Server List</a>
+                        class="px-4 py-2 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 hover:text-emerald-200 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Public
+                        Server List</a>
                 </div>
             </header>
 
-            <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div
+                class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 <div class="relative flex-1 max-w-md">
-                    <input type="search" id="adminServerSearch" oninput="filterAdminServers()" placeholder="Filter by Job ID..."
-                        class="premium-input w-full pl-9 pr-3 py-2 text-xs font-mono rounded-lg outline-none" />
-                    <svg class="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    <input type="search" id="adminServerSearch" oninput="onAdminSearchInput()"
+                        placeholder="Search by Job ID or Server ID..."
+                        class="premium-input w-full pl-9 pr-8 py-2 text-xs font-mono rounded-lg outline-none" />
+                    <svg class="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
+                    <button type="button" id="clearAdminSearchBtn" onclick="clearAdminSearch()"
+                        class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-white cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <div class="flex items-center gap-1 p-1 bg-black/40 rounded-lg border border-white/5 text-xs font-mono">
-                    <button type="button" onclick="setAdminServerFilter('all', this)" class="admin-server-filter-btn px-3 py-1 rounded bg-white/10 text-white font-semibold cursor-pointer">All</button>
-                    <button type="button" onclick="setAdminServerFilter('active', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Active</button>
-                    <button type="button" onclick="setAdminServerFilter('historical', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Historical</button>
-                    <button type="button" onclick="setAdminServerFilter('persistent', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Persistent</button>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="relative min-w-[170px]">
+                        <select id="adminServerSort" onchange="setAdminServerSort(this.value)"
+                            class="premium-input w-full pl-3 pr-7 py-1.5 text-xs font-mono rounded-lg bg-black/40 text-slate-200 border border-white/5 focus:border-emerald-500/50 appearance-none cursor-pointer">
+                            <option value="newest">Sort: Newest First</option>
+                            <option value="oldest">Sort: Oldest First</option>
+                            <option value="players_desc">Sort: Most Players</option>
+                            <option value="players_asc">Sort: Fewest Players</option>
+                            <option value="snapshots_desc">Sort: Most Snapshots</option>
+                            <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+                        </select>
+                        <svg class="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-slate-500 pointer-events-none"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                            </path>
+                        </svg>
+                    </div>
+                    <div
+                        class="flex items-center gap-1 p-1 bg-black/40 rounded-lg border border-white/5 text-xs font-mono">
+                        <button type="button" onclick="setAdminServerFilter('all', this)"
+                            class="admin-server-filter-btn px-3 py-1 rounded bg-white/10 text-white font-semibold cursor-pointer">All</button>
+                        <button type="button" onclick="setAdminServerFilter('active', this)"
+                            class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Active</button>
+                        <button type="button" onclick="setAdminServerFilter('historical', this)"
+                            class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Historical</button>
+                        <button type="button" onclick="setAdminServerFilter('persistent', this)"
+                            class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Persistent</button>
+                    </div>
                 </div>
             </div>
 
             <div id="admin-servers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <p class="text-sm text-slate-500 italic font-mono col-span-full">Loading servers...</p>
+            </div>
+
+            <div id="adminPaginationContainer"
+                class="hidden flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl cyber-panel border border-white/5 text-xs font-mono">
+                <div class="text-slate-400 text-center sm:text-left">
+                    Showing <span id="adminPageStartIdx" class="text-white font-semibold">1</span>–<span
+                        id="adminPageEndIdx" class="text-white font-semibold">20</span> of <span
+                        id="adminPageTotalCount" class="text-white font-semibold">0</span> servers
+                </div>
+                <div id="adminPaginationButtons" class="flex items-center gap-1.5 flex-wrap justify-center">
+                </div>
             </div>
         </main>
 
@@ -689,8 +740,17 @@
             bindNavLink('nav-crashes', 'crashes', '/admin/crashes');
             bindNavLink('nav-contact', 'contact', '/admin/contact');
             bindNavLink('nav-bans', 'bans', '/admin/bans');
+            bindNavLink('nav-servers', 'servers', '/admin/servers');
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
+            }
+
+            const initialServerTab = '{{ initial_server_tab | default("all") }}';
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialTab = urlParams.get('status') || urlParams.get('tab') || initialServerTab;
+            if (initialTab === 'historical') {
+                const histBtn = Array.from(document.querySelectorAll('.admin-server-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'historical');
+                setAdminServerFilter('historical', histBtn);
             }
 
             const cardSug = document.getElementById('card-link-suggestions');
@@ -851,7 +911,94 @@
             });
         }
 
+        const ADMIN_PAGE_SIZE = 20;
         let adminServerFilter = 'all';
+        let adminCurrentSort = 'newest';
+        let adminCurrentPage = 1;
+        let adminMatchingCards = [];
+        let adminAllCards = [];
+        let latestAdminServers = [];
+        let latestAdminPersistentMap = {};
+        let adminIsHistoricalMode = false;
+        let adminHistoricalTotalCount = 0;
+        let adminHistoricalTotalPages = 1;
+        let adminHistoricalAbortController = null;
+        let adminSearchDebounceTimer = null;
+
+        function isExactJobOrServerIdMatch(query, jobId, shortId) {
+            if (!query) return false;
+            const q = String(query).trim().toLowerCase();
+            const jid = String(jobId || '').trim().toLowerCase();
+            const sid = String(shortId || '').trim().toLowerCase();
+            if (!q || !jid) return false;
+
+            if (q === jid) return true;
+
+            const cleanQ = q.replace(/-/g, '');
+            const cleanJid = jid.replace(/-/g, '');
+            if (cleanQ.length === 32 && cleanQ === cleanJid) return true;
+
+            if (sid) {
+                if (q === sid || cleanQ === sid.replace(/-/g, '')) return true;
+            }
+
+            const jParts = jid.split('-').filter(Boolean);
+            if (jParts.length >= 3) {
+                const expectedShort = `${jParts[1]}-${jParts[2]}`;
+                const expectedCompact = `${jParts[1]}${jParts[2]}`;
+                if (q === expectedShort || q === expectedCompact) return true;
+
+                const qParts = q.split('-').filter(Boolean);
+                if (qParts.length === 2 && qParts[0] === jParts[1] && qParts[1] === jParts[2]) return true;
+            }
+
+            if (jParts.length >= 1 && q.length === 8 && q === jParts[0]) return true;
+
+            return false;
+        }
+
+        function getAdminCardPlayerCount(card) {
+            if (card.dataset.playerCount !== undefined && card.dataset.playerCount !== '') {
+                const p = parseInt(card.dataset.playerCount, 10);
+                if (!isNaN(p)) return p;
+            }
+            const m = card.textContent.match(/(\d+)\s*\/\s*\d+\s*Players/i);
+            if (m) return parseInt(m[1], 10);
+            return 0;
+        }
+
+        function getAdminCardSnapshotCount(card) {
+            if (card.dataset.snapshotCount !== undefined && card.dataset.snapshotCount !== '') {
+                const s = parseInt(card.dataset.snapshotCount, 10);
+                if (!isNaN(s)) return s;
+            }
+            const m = card.textContent.match(/(\d+)\s*snaps/i);
+            if (m) return parseInt(m[1], 10);
+            return 0;
+        }
+
+        function getAdminCardTimestamp(card) {
+            if (card.dataset.rawTimestamp) {
+                const t = Date.parse(card.dataset.rawTimestamp);
+                if (!isNaN(t)) return t;
+            }
+            if (card.dataset.ageSeconds !== undefined && card.dataset.ageSeconds !== '') {
+                const sec = parseFloat(card.dataset.ageSeconds);
+                if (!isNaN(sec)) return Date.now() - (sec * 1000);
+            }
+            const m = card.textContent.match(/(\d+)s\s*ago/i);
+            if (m) return Date.now() - (parseInt(m[1], 10) * 1000);
+            return 0;
+        }
+
+        function setAdminServerSort(sortVal) {
+            adminCurrentSort = sortVal || 'newest';
+            if (adminServerFilter === 'historical') {
+                fetchAdminHistoricalPage(1);
+            } else {
+                filterAdminServers(true);
+            }
+        }
 
         function setAdminServerFilter(filter, btn) {
             adminServerFilter = filter;
@@ -863,14 +1010,122 @@
                 btn.classList.add('bg-white/10', 'text-white', 'font-semibold');
                 btn.classList.remove('text-slate-400');
             }
-            filterAdminServers();
+
+            if (adminServerFilter === 'historical') {
+                fetchAdminHistoricalPage(1);
+            } else {
+                if (adminIsHistoricalMode) {
+                    adminIsHistoricalMode = false;
+                    renderServers(latestAdminServers, latestAdminPersistentMap);
+                } else {
+                    filterAdminServers(true);
+                }
+            }
         }
 
-        function filterAdminServers() {
-            const searchVal = (document.getElementById('adminServerSearch')?.value || '').trim().toLowerCase();
-            const cards = document.querySelectorAll('.admin-server-card');
-            cards.forEach(card => {
+        function onAdminSearchInput() {
+            if (adminServerFilter === 'historical') {
+                clearTimeout(adminSearchDebounceTimer);
+                adminSearchDebounceTimer = setTimeout(() => {
+                    fetchAdminHistoricalPage(1);
+                }, 250);
+            } else {
+                filterAdminServers(true);
+            }
+        }
+
+        function clearAdminSearch() {
+            const input = document.getElementById('adminServerSearch');
+            if (input) {
+                input.value = '';
+                if (adminServerFilter === 'historical') {
+                    fetchAdminHistoricalPage(1);
+                } else {
+                    filterAdminServers(true);
+                }
+                input.focus();
+            }
+        }
+
+        async function fetchAdminHistoricalPage(page = 1) {
+            adminIsHistoricalMode = true;
+            adminCurrentPage = page;
+
+            const container = document.getElementById('admin-servers-container');
+            const searchVal = (document.getElementById('adminServerSearch')?.value || '').trim();
+            const clearBtn = document.getElementById('clearAdminSearchBtn');
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', searchVal.length === 0);
+            }
+
+            if (adminHistoricalAbortController) {
+                adminHistoricalAbortController.abort();
+            }
+            adminHistoricalAbortController = new AbortController();
+
+            if (container) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-center flex flex-col items-center justify-center gap-3">
+                        <div class="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-400 rounded-full animate-spin"></div>
+                        <span class="text-xs font-mono text-slate-400">Loading historical servers...</span>
+                    </div>
+                `;
+            }
+
+            try {
+                const url = `/api/servers/historical?page=${page}&per_page=${ADMIN_PAGE_SIZE}&q=${encodeURIComponent(searchVal)}&sort=${encodeURIComponent(adminCurrentSort)}`;
+                const resp = await fetch(url, { signal: adminHistoricalAbortController.signal });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+
+                adminHistoricalTotalCount = data.total || 0;
+                adminHistoricalTotalPages = data.total_pages || 1;
+                adminCurrentPage = data.page || page;
+
+                if (adminHistoricalTotalCount === 0) {
+                    if (container) {
+                        container.innerHTML = `<div class="cyber-panel p-8 rounded-xl text-center text-slate-500 font-mono text-sm col-span-full">No historical servers found matching your query.</div>`;
+                    }
+                    renderAdminPagination(0);
+                    return;
+                }
+
+                if (container) {
+                    container.innerHTML = (data.servers || []).map(s => buildAdminServerCardHtml(s, latestAdminPersistentMap)).join('');
+                    adminAllCards = Array.from(document.querySelectorAll('.admin-server-card'));
+                }
+
+                renderAdminPagination(adminHistoricalTotalCount, adminCurrentPage, adminHistoricalTotalPages);
+
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error('Error fetching admin historical servers:', err);
+                if (container) {
+                    container.innerHTML = `<div class="col-span-full py-12 text-center text-xs font-mono text-rose-400">Failed to load historical servers.</div>`;
+                }
+            }
+        }
+
+        function filterAdminServers(resetPage = true) {
+            if (resetPage) {
+                adminCurrentPage = 1;
+            }
+
+            const searchInput = document.getElementById('adminServerSearch');
+            const searchVal = (searchInput?.value || '').trim().toLowerCase();
+            const clearBtn = document.getElementById('clearAdminSearchBtn');
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', searchVal.length === 0);
+            }
+
+            if (!adminAllCards || adminAllCards.length === 0) {
+                adminAllCards = Array.from(document.querySelectorAll('.admin-server-card'));
+            }
+
+            adminMatchingCards = [];
+            adminAllCards.forEach(card => {
                 const jobId = (card.getAttribute('data-job-id') || '').toLowerCase();
+                const shortId = (card.getAttribute('data-short-id') || '').toLowerCase();
                 const isHistorical = card.getAttribute('data-is-historical') === 'true';
                 const isPersistent = card.getAttribute('data-is-persistent') === 'true';
 
@@ -883,9 +1138,169 @@
                     matchesFilter = isPersistent;
                 }
 
-                const matchesSearch = !searchVal || jobId.includes(searchVal);
-                card.style.display = (matchesFilter && matchesSearch) ? 'flex' : 'none';
+                let matchesSearch = true;
+                if (searchVal.length > 0) {
+                    matchesSearch = jobId.includes(searchVal) || (shortId && shortId.includes(searchVal)) || isExactJobOrServerIdMatch(searchVal, jobId, shortId);
+                }
+
+                if (matchesFilter && matchesSearch) {
+                    adminMatchingCards.push(card);
+                }
             });
+
+            adminMatchingCards.sort((a, b) => {
+                const pA = getAdminCardPlayerCount(a);
+                const pB = getAdminCardPlayerCount(b);
+                const sA = getAdminCardSnapshotCount(a);
+                const sB = getAdminCardSnapshotCount(b);
+                const tA = getAdminCardTimestamp(a);
+                const tB = getAdminCardTimestamp(b);
+
+                if (adminCurrentSort === 'players_desc') {
+                    return (pB - pA) || (sB - sA) || (tB - tA);
+                } else if (adminCurrentSort === 'players_asc') {
+                    return (pA - pB) || (sA - sB) || (tA - tB);
+                } else if (adminCurrentSort === 'snapshots_desc') {
+                    return (sB - sA) || (pB - pA) || (tB - tA);
+                } else if (adminCurrentSort === 'snapshots_asc') {
+                    return (sA - sB) || (pA - pB) || (tA - tB);
+                } else if (adminCurrentSort === 'oldest') {
+                    return (tA - tB) || (pB - pA);
+                } else {
+                    return (tB - tA) || (pB - pA);
+                }
+            });
+
+            applyAdminPaginationDisplay();
+        }
+
+        function applyAdminPaginationDisplay() {
+            const totalItems = adminMatchingCards.length;
+            const totalPages = Math.ceil(totalItems / ADMIN_PAGE_SIZE) || 1;
+            if (adminCurrentPage > totalPages) adminCurrentPage = totalPages;
+            if (adminCurrentPage < 1) adminCurrentPage = 1;
+
+            const startIdx = (adminCurrentPage - 1) * ADMIN_PAGE_SIZE;
+            const endIdx = startIdx + ADMIN_PAGE_SIZE;
+            const pageSlice = adminMatchingCards.slice(startIdx, endIdx);
+
+            const container = document.getElementById('admin-servers-container');
+            if (container) {
+                pageSlice.forEach(card => {
+                    container.appendChild(card);
+                    card.style.display = 'flex';
+                });
+                adminAllCards.forEach(card => {
+                    if (!pageSlice.includes(card)) {
+                        card.style.display = 'none';
+                    }
+                });
+            }
+
+            renderAdminPagination(totalItems, adminCurrentPage, totalPages);
+        }
+
+        function goToAdminPage(p) {
+            if (adminServerFilter === 'historical') {
+                fetchAdminHistoricalPage(p);
+            } else {
+                adminCurrentPage = p;
+                applyAdminPaginationDisplay();
+            }
+            const container = document.getElementById('admin-servers-container');
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                if (rect.top < 0) {
+                    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        function renderAdminPagination(totalItems, explicitPage = null, explicitTotalPages = null) {
+            const container = document.getElementById('adminPaginationContainer');
+            const buttonsContainer = document.getElementById('adminPaginationButtons');
+            const pageStartEl = document.getElementById('adminPageStartIdx');
+            const pageEndEl = document.getElementById('adminPageEndIdx');
+            const pageTotalEl = document.getElementById('adminPageTotalCount');
+
+            if (!container || !buttonsContainer) return;
+
+            if (totalItems <= 0) {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+
+            const activePage = explicitPage !== null ? explicitPage : adminCurrentPage;
+            const totalPages = explicitTotalPages !== null ? explicitTotalPages : (Math.ceil(totalItems / ADMIN_PAGE_SIZE) || 1);
+
+            const startIdx = (activePage - 1) * ADMIN_PAGE_SIZE + 1;
+            const endIdx = Math.min(activePage * ADMIN_PAGE_SIZE, totalItems);
+
+            if (pageStartEl) pageStartEl.textContent = startIdx.toLocaleString();
+            if (pageEndEl) pageEndEl.textContent = endIdx.toLocaleString();
+            if (pageTotalEl) pageTotalEl.textContent = totalItems.toLocaleString();
+
+            if (totalPages <= 1) {
+                buttonsContainer.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = activePage <= 1;
+            html += `
+                <button type="button" onclick="goToAdminPage(${activePage - 1})"
+                    ${prevDisabled ? 'disabled' : ''}
+                    class="px-3 py-1.5 rounded-lg border border-white/5 ${prevDisabled ? 'opacity-30 cursor-not-allowed text-slate-500' : 'hover:bg-white/5 text-slate-300 hover:text-white cursor-pointer'} transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    <span>Prev</span>
+                </button>
+            `;
+
+            let startPage = Math.max(1, activePage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+
+            if (startPage > 1) {
+                html += `<button type="button" onclick="goToAdminPage(1)" class="w-8 h-8 rounded-lg border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white transition cursor-pointer">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="px-1 text-slate-500 select-none">...</span>`;
+                }
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                const isCurrent = p === activePage;
+                html += `
+                    <button type="button" onclick="goToAdminPage(${p})"
+                        class="w-8 h-8 rounded-lg border ${isCurrent ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold' : 'border-white/5 hover:bg-white/5 text-slate-400 hover:text-white cursor-pointer'} transition">
+                        ${p}
+                    </button>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="px-1 text-slate-500 select-none">...</span>`;
+                }
+                html += `<button type="button" onclick="goToAdminPage(${totalPages})" class="w-8 h-8 rounded-lg border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white transition cursor-pointer">${totalPages}</button>`;
+            }
+
+            const nextDisabled = activePage >= totalPages;
+            html += `
+                <button type="button" onclick="goToAdminPage(${activePage + 1})"
+                    ${nextDisabled ? 'disabled' : ''}
+                    class="px-3 py-1.5 rounded-lg border border-white/5 ${nextDisabled ? 'opacity-30 cursor-not-allowed text-slate-500' : 'hover:bg-white/5 text-slate-300 hover:text-white cursor-pointer'} transition flex items-center gap-1">
+                    <span>Next</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            `;
+
+            buttonsContainer.innerHTML = html;
         }
 
         let ws;
@@ -1000,20 +1415,31 @@
                 }
             }
 
-            const servers = data.servers || [];
-            const totalServers = servers.length;
-            const persistentCount = servers.filter(s => s.is_persistent).length;
-            const historicalCount = servers.filter(s => s.is_historical && !s.is_persistent).length;
-            const activeCount = servers.filter(s => !s.is_historical).length;
+            if (data.server_counts) {
+                const sTot = document.getElementById('server-stat-total');
+                if (sTot) sTot.innerText = data.server_counts.total;
+                const sAct = document.getElementById('server-stat-active');
+                if (sAct) sAct.innerText = data.server_counts.active;
+                const sHist = document.getElementById('server-stat-historical');
+                if (sHist) sHist.innerText = data.server_counts.historical;
+                const sPers = document.getElementById('server-stat-persistent');
+                if (sPers) sPers.innerText = data.server_counts.persistent;
+            } else {
+                const servers = data.servers || [];
+                const totalServers = servers.length;
+                const persistentCount = servers.filter(s => s.is_persistent).length;
+                const historicalCount = servers.filter(s => s.is_historical && !s.is_persistent).length;
+                const activeCount = servers.filter(s => !s.is_historical).length;
 
-            const sTot = document.getElementById('server-stat-total');
-            if (sTot) sTot.innerText = totalServers;
-            const sAct = document.getElementById('server-stat-active');
-            if (sAct) sAct.innerText = activeCount;
-            const sHist = document.getElementById('server-stat-historical');
-            if (sHist) sHist.innerText = historicalCount;
-            const sPers = document.getElementById('server-stat-persistent');
-            if (sPers) sPers.innerText = persistentCount;
+                const sTot = document.getElementById('server-stat-total');
+                if (sTot) sTot.innerText = totalServers;
+                const sAct = document.getElementById('server-stat-active');
+                if (sAct) sAct.innerText = activeCount;
+                const sHist = document.getElementById('server-stat-historical');
+                if (sHist) sHist.innerText = historicalCount;
+                const sPers = document.getElementById('server-stat-persistent');
+                if (sPers) sPers.innerText = persistentCount;
+            }
         }
 
         function formatTimestamp(isoStr) {
@@ -1364,7 +1790,8 @@
         }
 
         function escapeHtml(text) {
-            if (!text) return '';
+            if (text === null || text === undefined) return '';
+            const str = String(text);
             const map = {
                 '&': '&amp;',
                 '<': '&lt;',
@@ -1372,7 +1799,7 @@
                 '"': '&quot;',
                 "'": '&#039;'
             };
-            return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+            return str.replace(/[&<>"']/g, function (m) { return map[m]; });
         }
 
         async function updateStatus(id, status) {
@@ -1522,96 +1949,116 @@
             }
         }
 
+        function buildAdminServerCardHtml(s, persistentMap = {}) {
+            const isPrivate = Boolean(s.is_private);
+            const isPersistent = Boolean(s.is_persistent);
+            const isHistorical = Boolean(s.is_historical);
+            const pCount = s.player_count !== undefined ? s.player_count : 0;
+            const maxP = s.max_players || 12;
+
+            const persistInfo = persistentMap[s.job_id] || {};
+            const markedBy = persistInfo.marked_by ? `by ${escapeHtml(persistInfo.marked_by)}` : '';
+            const markedAt = persistInfo.marked_at ? formatTimestamp(persistInfo.marked_at) : '';
+
+            const jParts = (s.job_id || '').split('-').filter(Boolean);
+            const shortId = s.short_id || (jParts.length >= 3 ? `${jParts[1]}-${jParts[2]}` : '');
+
+            return `
+                <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60')} flex flex-col justify-between gap-4 transition-all"
+                    data-job-id="${escapeHtml(s.job_id)}"
+                    data-short-id="${escapeHtml(shortId)}"
+                    data-is-private="${isPrivate}"
+                    data-is-historical="${isHistorical}"
+                    data-is-persistent="${isPersistent}"
+                    data-player-count="${pCount}"
+                    data-snapshot-count="${s.snapshot_count || 0}"
+                    data-age-seconds="${s.age_seconds || 0}"
+                    data-raw-timestamp="${escapeHtml(s.raw_timestamp || '')}">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-start justify-between gap-2 border-b border-white/5 pb-2.5">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
+                                    ${shortId ? `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold">ID: ${escapeHtml(shortId)}</span>` : ''}
+                                    ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
+                                    ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : (isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical (48h)</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>')}
+                                </div>
+                                <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold mt-1" title="${escapeHtml(s.job_id)}">
+                                    ${escapeHtml(s.job_id)}
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold shrink-0">
+                                ${s.snapshot_count || 0} snaps
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                <span class="text-slate-500 text-[10px]">U1 APRM</span>
+                                <span class="text-white font-bold">${(s.unit1 && s.unit1.aprm !== undefined) ? Number(s.unit1.aprm).toFixed(2) : '0.00'}%</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                <span class="text-slate-500 text-[10px]">U2 APRM</span>
+                                <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
+                                <span class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                                    👥 Player Count
+                                </span>
+                                <span class="font-bold ${pCount > 0 ? 'text-emerald-400' : 'text-slate-400'}">
+                                    ${pCount} / ${maxP} Players
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                            <span>Last Heartbeat:</span>
+                            <span class="text-slate-300 font-semibold">${escapeHtml(s.latest_timestamp || 'N/A')}</span>
+                        </div>
+                        ${isPersistent && (markedBy || markedAt) ? `
+                            <div class="text-[10px] text-amber-400/80 font-mono bg-amber-950/30 p-2 rounded border border-amber-500/20">
+                                Marked persistent ${markedBy} ${markedAt ? 'on ' + markedAt : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 border-t border-white/5 pt-3 font-mono text-xs">
+                        <a href="/servers/${escapeHtml(s.job_id)}" target="_blank"
+                            class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs transition flex items-center gap-1.5">
+                            <span>Analytics</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </a>
+
+                        <button onclick="toggleAdminServerPersist('${escapeHtml(s.job_id)}', ${!isPersistent})"
+                            class="px-3 py-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1.5 ${isPersistent ? 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border-amber-500/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/40'}">
+                            <span>${isPersistent ? 'Unmark Persistent' : 'Make Persistent'}</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderServers(servers, persistentMap = {}) {
+            latestAdminServers = servers || [];
+            latestAdminPersistentMap = persistentMap || {};
+
+            if (adminServerFilter === 'historical') {
+                return;
+            }
+
             const container = document.getElementById('admin-servers-container');
             if (!container) return;
 
             if (!servers || servers.length === 0) {
                 container.innerHTML = `<div class="cyber-panel p-8 rounded-xl text-center text-slate-500 font-mono text-sm col-span-full">No server instances recorded.</div>`;
+                renderAdminPagination(0);
                 return;
             }
 
-            container.innerHTML = servers.map(s => {
-                const isPrivate = Boolean(s.is_private);
-                const isPersistent = Boolean(s.is_persistent);
-                const isHistorical = Boolean(s.is_historical);
-                const pCount = s.player_count || 0;
-                const maxP = s.max_players || 12;
+            container.innerHTML = servers.map(s => buildAdminServerCardHtml(s, persistentMap)).join('');
+            adminAllCards = Array.from(document.querySelectorAll('.admin-server-card'));
 
-                const persistInfo = persistentMap[s.job_id] || {};
-                const markedBy = persistInfo.marked_by ? `by ${escapeHtml(persistInfo.marked_by)}` : '';
-                const markedAt = persistInfo.marked_at ? formatTimestamp(persistInfo.marked_at) : '';
-
-                return `
-                    <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60')} flex flex-col justify-between gap-4 transition-all"
-                        data-job-id="${escapeHtml(s.job_id)}"
-                        data-is-private="${isPrivate}"
-                        data-is-historical="${isHistorical}"
-                        data-is-persistent="${isPersistent}">
-                        <div class="flex flex-col gap-3">
-                            <div class="flex items-start justify-between gap-2 border-b border-white/5 pb-2.5">
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
-                                        ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
-                                        ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : (isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical (48h)</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>')}
-                                    </div>
-                                    <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold mt-1" title="${escapeHtml(s.job_id)}">
-                                        ${escapeHtml(s.job_id)}
-                                    </div>
-                                </div>
-                                <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold shrink-0">
-                                    ${s.snapshot_count || 0} snaps
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
-                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
-                                    <span class="text-slate-500 text-[10px]">U1 APRM</span>
-                                    <span class="text-white font-bold">${(s.unit1 && s.unit1.aprm !== undefined) ? Number(s.unit1.aprm).toFixed(2) : '0.00'}%</span>
-                                </div>
-                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
-                                    <span class="text-slate-500 text-[10px]">U2 APRM</span>
-                                    <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
-                                </div>
-                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
-                                    <span class="text-slate-400 text-[11px] flex items-center gap-1.5">
-                                        👥 Player Count
-                                    </span>
-                                    <span class="font-bold ${pCount > 0 ? 'text-emerald-400' : 'text-slate-400'}">
-                                        ${pCount} / ${maxP} Players
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                                <span>Last Heartbeat:</span>
-                                <span class="text-slate-300 font-semibold">${escapeHtml(s.latest_timestamp || 'N/A')}</span>
-                            </div>
-                            ${isPersistent && (markedBy || markedAt) ? `
-                                <div class="text-[10px] text-amber-400/80 font-mono bg-amber-950/30 p-2 rounded border border-amber-500/20">
-                                    Marked persistent ${markedBy} ${markedAt ? 'on ' + markedAt : ''}
-                                </div>
-                            ` : ''}
-                        </div>
-
-                        <div class="flex items-center justify-between gap-2 border-t border-white/5 pt-3 font-mono text-xs">
-                            <a href="/servers/${escapeHtml(s.job_id)}" target="_blank"
-                                class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs transition flex items-center gap-1.5">
-                                <span>Analytics</span>
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                            </a>
-
-                            <button onclick="toggleAdminServerPersist('${escapeHtml(s.job_id)}', ${!isPersistent})"
-                                class="px-3 py-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1.5 ${isPersistent ? 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border-amber-500/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/40'}">
-                                <span>${isPersistent ? 'Unmark Persistent' : 'Make Persistent'}</span>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            filterAdminServers();
+            filterAdminServers(false);
         }
 
         async function toggleAdminServerPersist(jobId, shouldPersist) {
