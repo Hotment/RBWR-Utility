@@ -1016,13 +1016,53 @@ def convert_ISO_to_secs(timestamp_str):
     except Exception:
         return 0
 
-def build_server_cards(data):
+def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
+    """
+    Returns True ONLY if query is an exact match for:
+    1. The full Job ID (with or without hyphens).
+    2. The shortened Server ID (e.g. '77f6-4b2f' or '77f64b2f'), which is parts[1]-parts[2] of the UUID.
+    3. The first 8-character block of the UUID (e.g. '00109df1').
+    Partial queries (e.g. '77f6', 'b', '001') return False.
+    """
+    if not query or not job_id:
+        return False
+    q = query.strip().lower()
+    jid = job_id.strip().lower()
+    if not q or not jid:
+        return False
+
+    if q == jid:
+        return True
+
+    clean_jid = jid.replace("-", "")
+    clean_q = q.replace("-", "")
+    if len(clean_q) == 32 and clean_q == clean_jid:
+        return True
+
+    j_parts = [p for p in jid.split("-") if p]
+    if len(j_parts) >= 3:
+        short_id = f"{j_parts[1]}-{j_parts[2]}"
+        short_id_compact = f"{j_parts[1]}{j_parts[2]}"
+        if q == short_id or q == short_id_compact:
+            return True
+
+        q_parts = [p for p in q.split("-") if p]
+        if len(q_parts) == 2 and q_parts[0] == j_parts[1] and q_parts[1] == j_parts[2]:
+            return True
+
+    if len(j_parts) >= 1 and len(q) == 8 and q == j_parts[0]:
+        return True
+
+    return False
+
+def build_server_cards(data, search_query=None):
     cards = []
     if not data:
         return cards
 
     persistent_data = load_persistent_servers()
     persistent_ids = set(persistent_data.get("persistent", {}).keys())
+    clean_query = (search_query or "").strip()
 
     for job_id, snapshots in sorted(data.items()):
         if not snapshots:
@@ -1040,8 +1080,16 @@ def build_server_cards(data):
         is_persistent = job_id in persistent_ids
         is_historical = (player_count == 0)
 
+        if is_historical and not is_persistent:
+            if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
+                continue
+
+        j_parts = [p for p in job_id.split("-") if p]
+        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+
         cards.append({
             "job_id": job_id,
+            "short_id": short_id,
             "is_private": is_private,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
@@ -1294,10 +1342,11 @@ def build_global_chart_payload(snapshots):
 
 @app.route("/servers", methods=["GET"])
 def servers_page():
+    query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip()
     servers_data = get_sc_data("servers.json")
     global_data = get_sc_data("global.json")
     global_payload = build_global_chart_payload(global_data)
-    server_cards = build_server_cards(servers_data)
+    server_cards = build_server_cards(servers_data, search_query=query)
     
     return render_template(
         "servers.html",
@@ -1406,6 +1455,34 @@ def get_latest_servers_api():
         return jsonify(_sc_latest_data)
     servers_data = get_sc_data("servers.json")
     return jsonify({"success": True, "servers": servers_data})
+
+@app.route("/api/servers/lookup", methods=["GET"])
+def lookup_server_api():
+    query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip()
+    if not query:
+        return jsonify({"success": True, "found": False, "message": "Query parameter 'q' is required."})
+
+    servers_data = get_sc_data("servers.json")
+    if not servers_data:
+        return jsonify({"success": True, "found": False})
+
+    matched_cards = build_server_cards(servers_data, search_query=query)
+    target_card = None
+    for card in matched_cards:
+        if is_exact_job_or_server_id_match(query, card.get("job_id", "")):
+            target_card = card
+            break
+
+    if not target_card:
+        return jsonify({"success": True, "found": False})
+
+    card_html = render_template("_server_card.html", server=target_card)
+    return jsonify({
+        "success": True,
+        "found": True,
+        "server": target_card,
+        "card_html": card_html
+    })
 
 @app.route("/api/servers/refresh", methods=["POST"])
 def refresh_servers_api():

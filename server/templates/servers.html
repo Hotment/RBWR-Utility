@@ -160,105 +160,7 @@
     <div id="serverGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {% if servers and servers|length > 0 %}
         {% for server in servers %}
-        <div class="server-card premium-glass rounded-2xl p-5 shadow-xl border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-5 interactive-card"
-            data-job-id="{{ server.job_id }}" data-is-private="{{ 'true' if server.is_private else 'false' }}"
-            data-is-historical="{{ 'true' if server.is_historical else 'false' }}"
-            data-is-persistent="{{ 'true' if server.is_persistent else 'false' }}" {% if server.is_private
-            %}style="display: none;" {% endif %}>
-            <div class="flex flex-col gap-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <span
-                                class="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold">Job
-                                ID</span>
-                            {% if server.is_private %}
-                            <span
-                                class="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[10px] font-mono font-bold">
-                                Private
-                            </span>
-                            {% endif %}
-                            {% if server.is_persistent %}
-                            <span
-                                class="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-mono font-bold">
-                                Persistent
-                            </span>
-                            {% elif server.is_historical %}
-                            <span
-                                class="px-2 py-0.5 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-[10px] font-mono font-bold">
-                                Historical
-                            </span>
-                            {% else %}
-                            <span
-                                class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
-                                Active
-                            </span>
-                            {% endif %}
-                        </div>
-                        <div class="flex items-center gap-2 mt-0.5">
-                            <span class="font-mono text-xs text-gray-200 truncate select-all font-semibold"
-                                title="{{ server.job_id }}">{{ server.job_id }}</span>
-                            <button type="button" onclick="copyText('{{ server.job_id }}', this)"
-                                class="p-1 text-gray-500 hover:text-amber-300 transition-colors rounded hover:bg-white/5 shrink-0"
-                                title="Copy Job ID">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
-                                    </path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <span
-                        class="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold whitespace-nowrap shrink-0">
-                        {{ server.snapshot_count }} snapshots
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs">
-                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
-                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
-                            Unit 1 APRM
-                        </span>
-                        <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit1.aprm)
-                            }}%</span>
-                    </div>
-
-                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
-                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
-                            Unit 2 APRM
-                        </span>
-                        <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm)
-                            }}%</span>
-                    </div>
-
-                    <div
-                        class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex items-center justify-between col-span-2">
-                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
-                            Player Count
-                        </span>
-                        <span
-                            class="font-mono font-bold text-xs {% if server.player_count > 0 %}text-emerald-400{% else %}text-slate-400{% endif %}">
-                            {{ server.player_count }} / {{ server.max_players }} Players
-                        </span>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between text-xs text-gray-400 font-mono px-1">
-                    <span>Last heartbeat:</span>
-                    <span class="text-gray-200 font-medium">{{ server.latest_timestamp }}</span>
-                </div>
-            </div>
-
-            <a href="/servers/{{ server.job_id }}"
-                class="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-semibold font-display transition-all flex items-center justify-center gap-2 group shadow-sm">
-                <span>View Telemetry & Analytics</span>
-                <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-            </a>
-        </div>
+        {% include "_server_card.html" %}
         {% endfor %}
         {% else %}
         <div
@@ -275,6 +177,17 @@
             </p>
         </div>
         {% endif %}
+    </div>
+
+    <div id="paginationContainer"
+        class="hidden flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5 text-xs font-mono">
+        <div id="paginationInfo" class="text-gray-400">
+            Showing <span id="pageStartIdx" class="text-white font-semibold">1</span>–<span id="pageEndIdx"
+                class="text-white font-semibold">20</span> of <span id="pageTotalCount"
+                class="text-white font-semibold">0</span> servers
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap justify-center" id="paginationButtons">
+        </div>
     </div>
 
     <div id="noResultsNotice"
@@ -305,12 +218,60 @@
         }, 300);
     }
 
+    const PAGE_SIZE = 20;
+    let currentPage = 1;
     let searchInput = null;
     let clearSearchBtn = null;
     let serverCards = [];
+    let matchingCards = [];
     let serverCountLabel = null;
     let noResultsNotice = null;
     let currentStatusFilter = 'all';
+    let lookupDebounceTimer = null;
+    let activeLookupQuery = '';
+
+    function isExactJobOrServerIdMatch(query, jobId, shortId) {
+        if (!query) return false;
+        const q = String(query).trim().toLowerCase();
+        const jid = String(jobId || '').trim().toLowerCase();
+        const sid = String(shortId || '').trim().toLowerCase();
+        if (!q || !jid) return false;
+
+        if (q === jid) return true;
+
+        const cleanQ = q.replace(/-/g, '');
+        const cleanJid = jid.replace(/-/g, '');
+        if (cleanQ.length === 32 && cleanQ === cleanJid) return true;
+
+        if (sid) {
+            if (q === sid || cleanQ === sid.replace(/-/g, '')) return true;
+        }
+
+        const jParts = jid.split('-').filter(Boolean);
+        if (jParts.length >= 3) {
+            const expectedShort = `${jParts[1]}-${jParts[2]}`;
+            const expectedCompact = `${jParts[1]}${jParts[2]}`;
+            if (q === expectedShort || q === expectedCompact) return true;
+
+            const qParts = q.split('-').filter(Boolean);
+            if (qParts.length === 2 && qParts[0] === jParts[1] && qParts[1] === jParts[2]) return true;
+        }
+
+        if (jParts.length >= 1 && q.length === 8 && q === jParts[0]) return true;
+
+        return false;
+    }
+
+    function isExactQueryFormat(query) {
+        if (!query) return false;
+        const q = String(query).trim().toLowerCase();
+        const clean = q.replace(/-/g, '');
+        if (clean.length === 32 || q.length === 36) return true;
+        if (clean.length === 8) return true;
+        const parts = q.split('-').filter(Boolean);
+        if (parts.length === 2 && parts[0].length === 4 && parts[1].length === 4) return true;
+        return false;
+    }
 
     function setStatusFilter(status, btn) {
         currentStatusFilter = status;
@@ -322,35 +283,78 @@
             btn.classList.add('active', 'bg-white/10', 'text-white', 'font-semibold');
             btn.classList.remove('text-gray-400');
         }
-        filterServers();
+        filterServers(true);
     }
 
-    function filterServers() {
-        if (!searchInput) {
-            searchInput = document.getElementById('serverSearch');
-        }
-        if (!clearSearchBtn) {
-            clearSearchBtn = document.getElementById('clearSearchBtn');
-        }
+    function lookupHistoricalServer(query) {
+        clearTimeout(lookupDebounceTimer);
+        lookupDebounceTimer = setTimeout(async () => {
+            if (!query || activeLookupQuery === query) return;
+            activeLookupQuery = query;
+
+            try {
+                const resp = await fetch(`/api/servers/lookup?q=${encodeURIComponent(query)}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data && data.found && data.card_html) {
+                    const grid = document.getElementById('serverGrid');
+                    if (!grid) return;
+
+                    const existing = grid.querySelector(`[data-job-id="${data.server.job_id}"]`);
+                    if (!existing) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = data.card_html.trim();
+                        const newCard = tempDiv.firstElementChild;
+                        if (newCard) {
+                            newCard.setAttribute('data-dynamically-loaded', 'true');
+                            grid.appendChild(newCard);
+                            serverCards = Array.from(document.querySelectorAll('.server-card'));
+                            filterServers(false);
+                        }
+                    } else {
+                        filterServers(false);
+                    }
+                }
+            } catch (err) {
+                console.warn('Error looking up historical server:', err);
+            }
+        }, 250);
+    }
+
+    function filterServers(resetPage = true) {
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
+        if (!clearSearchBtn) clearSearchBtn = document.getElementById('clearSearchBtn');
         if (!serverCards || serverCards.length === 0) {
             serverCards = Array.from(document.querySelectorAll('.server-card'));
         }
-        if (!serverCountLabel) {
-            serverCountLabel = document.getElementById('serverCountLabel');
-        }
-        if (!noResultsNotice) {
-            noResultsNotice = document.getElementById('noResultsNotice');
+        if (!serverCountLabel) serverCountLabel = document.getElementById('serverCountLabel');
+        if (!noResultsNotice) noResultsNotice = document.getElementById('noResultsNotice');
+
+        if (resetPage) {
+            currentPage = 1;
         }
 
-        const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
-        let visibleCount = 0;
+        const rawQuery = searchInput ? searchInput.value : '';
+        const query = rawQuery.trim().toLowerCase();
 
         if (clearSearchBtn) {
             clearSearchBtn.classList.toggle('hidden', query.length === 0);
         }
 
+        if (query.length === 0) {
+            const dynamicCards = document.querySelectorAll('.server-card[data-dynamically-loaded="true"]');
+            if (dynamicCards.length > 0) {
+                dynamicCards.forEach(c => c.remove());
+                serverCards = Array.from(document.querySelectorAll('.server-card'));
+            }
+            activeLookupQuery = '';
+        }
+
+        matchingCards = [];
+
         serverCards.forEach(card => {
             const jobId = (card.dataset.jobId || '').toLowerCase();
+            const shortId = (card.dataset.shortId || '').toLowerCase();
             const isPrivate = card.dataset.isPrivate === 'true';
             const isHistorical = card.dataset.isHistorical === 'true';
             const isPersistent = card.dataset.isPersistent === 'true';
@@ -365,26 +369,74 @@
             }
 
             let isVisible = false;
-            if (query.length === 0) {
-                isVisible = !isPrivate && matchesStatus;
+
+            if (isHistorical && !isPersistent) {
+                if (query.length > 0 && isExactJobOrServerIdMatch(query, jobId, shortId)) {
+                    isVisible = matchesStatus;
+                } else {
+                    isVisible = false;
+                }
             } else {
-                isVisible = jobId.includes(query) && matchesStatus;
+                if (query.length === 0) {
+                    isVisible = !isPrivate && matchesStatus;
+                } else {
+                    const matchesSearch = jobId.includes(query) || (shortId && shortId.includes(query));
+                    isVisible = matchesSearch && matchesStatus;
+                }
             }
 
-            card.style.display = isVisible ? '' : 'none';
-            if (isVisible) visibleCount++;
+            if (isVisible) {
+                matchingCards.push(card);
+            }
         });
 
-        if (serverCountLabel) {
-            if (query.length === 0 && currentStatusFilter === 'all') {
-                serverCountLabel.textContent = `Showing ${visibleCount} active server${visibleCount === 1 ? '' : 's'}`;
+        if (matchingCards.length === 0 && isExactQueryFormat(query)) {
+            lookupHistoricalServer(query);
+        }
+
+        applyPaginationDisplay();
+    }
+
+    function applyPaginationDisplay() {
+        const totalItems = matchingCards.length;
+        const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * PAGE_SIZE;
+        const endIdx = startIdx + PAGE_SIZE;
+        const pageSlice = matchingCards.slice(startIdx, endIdx);
+
+        serverCards.forEach(card => {
+            if (pageSlice.includes(card)) {
+                card.style.display = '';
             } else {
-                serverCountLabel.textContent = `Showing ${visibleCount} matching server${visibleCount === 1 ? '' : 's'}`;
+                card.style.display = 'none';
+            }
+        });
+
+        const query = (searchInput ? searchInput.value : '').trim();
+        if (serverCountLabel) {
+            if (totalItems === 0) {
+                serverCountLabel.textContent = 'Showing 0 servers';
+            } else if (totalItems <= PAGE_SIZE) {
+                if (query.length === 0 && currentStatusFilter === 'all') {
+                    serverCountLabel.textContent = `Showing ${totalItems} active server${totalItems === 1 ? '' : 's'}`;
+                } else {
+                    serverCountLabel.textContent = `Showing ${totalItems} matching server${totalItems === 1 ? '' : 's'}`;
+                }
+            } else {
+                const rangeText = `${startIdx + 1}–${Math.min(endIdx, totalItems)}`;
+                if (query.length === 0 && currentStatusFilter === 'all') {
+                    serverCountLabel.textContent = `Showing ${rangeText} of ${totalItems} active servers`;
+                } else {
+                    serverCountLabel.textContent = `Showing ${rangeText} of ${totalItems} matching servers`;
+                }
             }
         }
 
         if (noResultsNotice) {
-            if (visibleCount === 0 && serverCards.length > 0) {
+            if (totalItems === 0) {
                 noResultsNotice.classList.remove('hidden');
                 noResultsNotice.classList.add('flex');
             } else {
@@ -392,15 +444,113 @@
                 noResultsNotice.classList.remove('flex');
             }
         }
+
+        renderPagination(totalItems);
+    }
+
+    function renderPagination(totalItems) {
+        const container = document.getElementById('paginationContainer');
+        const buttonsContainer = document.getElementById('paginationButtons');
+        const pageStartEl = document.getElementById('pageStartIdx');
+        const pageEndEl = document.getElementById('pageEndIdx');
+        const pageTotalEl = document.getElementById('pageTotalCount');
+
+        if (!container || !buttonsContainer) return;
+
+        if (totalItems <= 0) {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        container.classList.add('flex');
+
+        const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+        const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+        const endIdx = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+        if (pageStartEl) pageStartEl.textContent = startIdx;
+        if (pageEndEl) pageEndEl.textContent = endIdx;
+        if (pageTotalEl) pageTotalEl.textContent = totalItems;
+
+        if (totalPages <= 1) {
+            buttonsContainer.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+
+        const prevDisabled = currentPage === 1;
+        html += `
+            <button type="button" onclick="goToPage(${currentPage - 1})"
+                ${prevDisabled ? 'disabled' : ''}
+                class="px-3 py-1.5 rounded-xl border border-white/10 ${prevDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer'} transition-all flex items-center gap-1.5 font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span>Prev</span>
+            </button>
+        `;
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) {
+            startPage = Math.max(1, endPage - 4);
+        }
+
+        if (startPage > 1) {
+            html += `<button type="button" onclick="goToPage(1)" class="w-8 h-8 rounded-xl border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer font-medium">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="px-1 text-gray-500 select-none">...</span>`;
+            }
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            const isCurrent = p === currentPage;
+            html += `
+                <button type="button" onclick="goToPage(${p})"
+                    class="w-8 h-8 rounded-xl border ${isCurrent ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 font-bold shadow-sm' : 'border-white/10 hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer font-medium'} transition-all">
+                    ${p}
+                </button>
+            `;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="px-1 text-gray-500 select-none">...</span>`;
+            }
+            html += `<button type="button" onclick="goToPage(${totalPages})" class="w-8 h-8 rounded-xl border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer font-medium">${totalPages}</button>`;
+        }
+
+        const nextDisabled = currentPage === totalPages;
+        html += `
+            <button type="button" onclick="goToPage(${currentPage + 1})"
+                ${nextDisabled ? 'disabled' : ''}
+                class="px-3 py-1.5 rounded-xl border border-white/10 ${nextDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer'} transition-all flex items-center gap-1.5 font-medium">
+                <span>Next</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+        `;
+
+        buttonsContainer.innerHTML = html;
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        applyPaginationDisplay();
+        const grid = document.getElementById('serverGrid');
+        if (grid) {
+            const rect = grid.getBoundingClientRect();
+            if (rect.top < 0) {
+                grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
     }
 
     function clearSearch() {
-        if (!searchInput) {
-            searchInput = document.getElementById('serverSearch');
-        }
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
         if (searchInput) {
             searchInput.value = '';
-            filterServers();
+            filterServers(true);
             searchInput.focus();
         }
     }
@@ -413,7 +563,7 @@
         noResultsNotice = document.getElementById('noResultsNotice');
 
         if (searchInput) {
-            searchInput.addEventListener('input', filterServers);
+            searchInput.addEventListener('input', () => filterServers(true));
         }
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -421,7 +571,7 @@
         if (q && searchInput) {
             searchInput.value = q.trim();
         }
-        filterServers();
+        filterServers(true);
     });
 
     {% if charts and charts | length > 0 %}
