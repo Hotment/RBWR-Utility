@@ -77,7 +77,7 @@ sock = Sock(app)
 active_connections = set()
 
 def get_dashboard_payload_data(username=None):
-    perms = get_user_permissions(username) if username else {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+    perms = get_user_permissions(username) if username else {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
     
     suggestions = []
     if perms.get("suggestions", True):
@@ -114,11 +114,17 @@ def get_dashboard_payload_data(username=None):
         contact_data = load_contact_messages()
         contact_messages = sorted(contact_data.get("messages", []), key=lambda m: m.get("timestamp", ""), reverse=True)
 
+    persistent_data = load_persistent_servers()
+    servers_data = get_sc_data("servers.json")
+    server_cards = build_server_cards(servers_data)
+
     return {
         "suggestions": suggestions,
         "banned_ips": banned_ips,
         "crashes": crashes,
-        "contact_messages": contact_messages
+        "contact_messages": contact_messages,
+        "servers": server_cards,
+        "persistent_servers": persistent_data.get("persistent", {})
     }
 
 def get_accounts_payload_data():
@@ -276,19 +282,20 @@ def is_root_user(username: str) -> bool:
 
 def get_user_permissions(username: str) -> dict:
     if not username:
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
     if is_root_user(username):
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
     admins_data = load_admins()
     admin_info = admins_data.get("admins", {}).get(username, {})
     perms = admin_info.get("permissions")
     if perms is None:
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True}
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
     return {
         "suggestions": bool(perms.get("suggestions", True)),
         "crashes": bool(perms.get("crashes", True)),
         "contact": bool(perms.get("contact", True)),
-        "bans": bool(perms.get("bans", True))
+        "bans": bool(perms.get("bans", True)),
+        "servers": bool(perms.get("servers", True))
     }
 
 def has_permission(username: str, section: str) -> bool:
@@ -534,6 +541,11 @@ class BanPayload(BaseModel):
 class UnbanPayload(BaseModel):
     ip: str
 
+class ServerPersistPayload(BaseModel):
+    job_id: str
+    persistent: bool
+    note: str = ""
+
 @app.route("/", methods=["GET"])
 def root():
     data = load_versions()
@@ -731,8 +743,25 @@ SERVER_CHECKER_FIELD_PRECISION = {
     "Reactor Temp": 4,
 }
 
+PERSISTENT_SERVERS_FILE = os.path.join(DATA_DIR, "persistent_servers.json")
+
+def load_persistent_servers():
+    if not os.path.exists(PERSISTENT_SERVERS_FILE):
+        return {"persistent": {}}
+    try:
+        with open(PERSISTENT_SERVERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"persistent": {}}
+
+def save_persistent_servers(data):
+    os.makedirs(os.path.dirname(PERSISTENT_SERVERS_FILE), exist_ok=True)
+    with open(PERSISTENT_SERVERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
 _sc_lock = threading.RLock()
 _sc_public_server_ids = []
+_sc_public_servers_info = {}
 _sc_server_ids = []
 _sc_latest_data = {}
 
@@ -794,20 +823,38 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
     return False
 
 def update_public_roblox_servers():
-    url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
+    base_url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
+    cursor = ""
+    public_ids = []
+    public_info = {}
+    
     try:
-        response = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=10)
-        if response.status_code == 200:
+        for _ in range(5):
+            url = f"{base_url}&cursor={cursor}" if cursor else base_url
+            response = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=10)
+            if response.status_code != 200:
+                break
             data = response.json()
+            for server in data.get('data', []):
+                s_id = server.get('id')
+                if s_id:
+                    public_ids.append(s_id)
+                    public_info[s_id] = {
+                        "playing": int(server.get("playing", 0)),
+                        "maxPlayers": int(server.get("maxPlayers", 12))
+                    }
+            cursor = data.get('nextPageCursor')
+            if not cursor:
+                break
+
+        if public_ids or public_info:
             with _sc_lock:
                 _sc_public_server_ids.clear()
-                for server in data.get('data', []):
-                    if 'id' in server:
-                        _sc_public_server_ids.append(server['id'])
+                _sc_public_server_ids.extend(public_ids)
+                _sc_public_servers_info.clear()
+                _sc_public_servers_info.update(public_info)
             return True
-        else:
-            logger.warning(f"Failed to update Roblox public servers. Status: {response.status_code}")
-            return False
+        return False
     except Exception as e:
         logger.error(f"Error updating public Roblox servers: {e}")
         return False
@@ -856,6 +903,9 @@ def pull_server_checker_data():
         _sc_latest_data.clear()
         _sc_latest_data.update(resp_json)
 
+        persistent_data = load_persistent_servers()
+        persistent_ids = set(persistent_data.get("persistent", {}).keys())
+
         for server in servers_list:
             job_id = server.get('jobId')
             if not job_id:
@@ -871,6 +921,10 @@ def pull_server_checker_data():
             state = raw_state.copy()
             if "Misc" in state:
                 del state["Misc"]
+
+            info = _sc_public_servers_info.get(job_id, {})
+            player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else 0
+            state["PlayerCount"] = player_count
 
             for unit in ("Unit1", "Unit2"):
                 unit_state = state.get(unit)
@@ -890,6 +944,24 @@ def pull_server_checker_data():
 
             heartbeat = server.get('lastHeartbeat', datetime.now(timezone.utc).isoformat())
             current_data[job_id][heartbeat] = state
+
+        max_retention_seconds = 48 * 3600
+        for s_id in list(current_data.keys()):
+            if s_id in persistent_ids:
+                continue
+            snaps = current_data.get(s_id, {})
+            if not snaps:
+                del current_data[s_id]
+                continue
+            latest_ts = max(snaps.keys())
+            latest_snap = snaps[latest_ts]
+            p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else latest_snap.get("PlayerCount", 0)
+            if p_count == 0:
+                age_seconds = convert_ISO_to_secs(latest_ts)
+                if age_seconds > max_retention_seconds:
+                    del current_data[s_id]
+                    logger.info(f"Pruned historical server {s_id} (age: {age_seconds}s > 48h)")
+
         save_sc_data(current_data, "servers.json")
 
         global_data = get_sc_data("global.json")
@@ -949,6 +1021,9 @@ def build_server_cards(data):
     if not data:
         return cards
 
+    persistent_data = load_persistent_servers()
+    persistent_ids = set(persistent_data.get("persistent", {}).keys())
+
     for job_id, snapshots in sorted(data.items()):
         if not snapshots:
             continue
@@ -956,10 +1031,22 @@ def build_server_cards(data):
         latest_state = snapshots[latest_timestamp]
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
+
+        info = _sc_public_servers_info.get(job_id, {})
+        player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else latest_state.get("PlayerCount", 0)
+        max_players = info.get("maxPlayers", 12)
+
         is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
+        is_persistent = job_id in persistent_ids
+        is_historical = (player_count == 0)
+
         cards.append({
             "job_id": job_id,
             "is_private": is_private,
+            "is_persistent": is_persistent,
+            "is_historical": is_historical,
+            "player_count": player_count,
+            "max_players": max_players,
             "latest_timestamp": f"{convert_ISO_to_secs(latest_timestamp)}s ago",
             "snapshot_count": len(snapshots),
             "unit1": {
@@ -1011,6 +1098,7 @@ def compress_points(points, precision=2):
 
 def build_chart_payload(job_id, snapshots):
     metrics = {
+        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2),
         "APRM": ("3", "APRM (%)", ["APRM"], 4),
         "RTP": ("2", "RTP (%)", ["RTP"], 4),
         "Xenon": ("3", "Xenon (%)", ["Xenon"], 6, 100.0),
@@ -1022,7 +1110,7 @@ def build_chart_payload(job_id, snapshots):
         "Hotwell Level": ("3", "Hotwell Level (m)", ["Hotwell Level"], 2),
         "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"], 2),
         "GeneratorTemperature": ("2", "Generator Temperature (°C)", ["GeneratorTemperature", "Generator Temperature"], 2),
-        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2)
+        "CasingTemperature": ("2", "Casing Temperature (°C)", ["CasingTemperature", "Casing Temperature"], 4)
     }
     chart_payload = []
     ordered_snapshots = []
@@ -1030,6 +1118,7 @@ def build_chart_payload(job_id, snapshots):
     if not snapshots:
         return {
             "job_id": job_id,
+            "last_heartbeat_age": 0,
             "snapshots": [],
             "charts": [],
         }
@@ -1041,6 +1130,34 @@ def build_chart_payload(job_id, snapshots):
             "seconds_ago": sec_ago,
             "display_time": f"{sec_ago} seconds ago",
             "state": state,
+        })
+
+    player_points = []
+    for entry in ordered_snapshots:
+        sec_ago = entry["seconds_ago"]
+        st = entry["state"]
+        p_val = st.get("PlayerCount")
+        if p_val is None:
+            p_val = st.get("Players")
+        if p_val is None:
+            p_val = st.get("playing")
+        if p_val is not None and isinstance(p_val, (int, float)):
+            player_points.append((sec_ago, float(p_val)))
+
+    if not player_points and ordered_snapshots:
+        cur_p = _sc_public_servers_info.get(job_id, {}).get("playing", 0)
+        player_points.append((ordered_snapshots[-1]["seconds_ago"], float(cur_p)))
+
+    if player_points:
+        c_players = compress_points(player_points, precision=0)
+        chart_payload.append({
+            "metric": "Player Count",
+            "datasets": [{
+                "label": "Players",
+                "data": c_players,
+                "borderColor": "#10b981",
+                "backgroundColor": "rgba(16, 185, 129, 0.08)",
+            }]
         })
 
     for metric_key, metric_cfg in metrics.items():
@@ -1105,8 +1222,11 @@ def build_chart_payload(job_id, snapshots):
             "datasets": datasets,
         })
 
+    last_heartbeat_age = ordered_snapshots[-1]["seconds_ago"] if ordered_snapshots else 0
+
     return {
         "job_id": job_id,
+        "last_heartbeat_age": last_heartbeat_age,
         "snapshots": ordered_snapshots,
         "charts": chart_payload,
     }
@@ -1212,15 +1332,30 @@ def server_detail_page(job_id):
                 server = s
                 break
 
+    persistent_data = load_persistent_servers()
+    is_persistent = job_id in persistent_data.get("persistent", {})
+
+    info = _sc_public_servers_info.get(job_id, {})
+    latest_state = snapshots.get(max(snapshots.keys()), {}) if snapshots else {}
+    player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else latest_state.get("PlayerCount", 0)
+    max_players = info.get("maxPlayers", 12)
+    is_historical = (player_count == 0)
+    is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
+    is_admin = bool(get_authenticated_user())
+
     if not server:
         latest_ts = max(snapshots.keys()) if snapshots else None
         latest_st = snapshots.get(latest_ts, {}) if latest_ts else {}
         unit1_st = latest_st.get("Unit1", {})
         unit2_st = latest_st.get("Unit2", {})
-        
-        is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
+
         summary = {
             "is_private": is_private,
+            "is_persistent": is_persistent,
+            "is_historical": is_historical,
+            "is_admin": is_admin,
+            "player_count": player_count,
+            "max_players": max_players,
             "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
             "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
@@ -1248,9 +1383,13 @@ def server_detail_page(job_id):
 
     dmand_left = max(0.0, dmand_left_data - elapsed)
 
-    is_private = bool(_sc_public_server_ids and job_id not in _sc_public_server_ids)
     summary = {
         "is_private": is_private,
+        "is_persistent": is_persistent,
+        "is_historical": is_historical,
+        "is_admin": is_admin,
+        "player_count": player_count,
+        "max_players": max_players,
         "scram_reason_u1": scram_reasonU1 or "N/A",
         "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
@@ -1716,6 +1855,57 @@ def view_bans_dashboard(username):
 def admin_root(username):
     return render_template("admin_panel.html", username=username, active_view="overview", is_root=is_root_user(username), permissions=get_user_permissions(username))
 
+@app.route("/admin/servers", methods=["GET"])
+@admin_required
+def view_servers_dashboard(username):
+    if not has_permission(username, "servers"):
+        return redirect("/admin")
+    servers_data = get_sc_data("servers.json")
+    server_cards = build_server_cards(servers_data)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        active_view="servers",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        servers=server_cards
+    )
+
+@app.route("/admin/servers/persist", methods=["POST"])
+@app.route("/api/admin/servers/persist", methods=["POST"])
+@admin_required
+def toggle_server_persistence(username):
+    if not has_permission(username, "servers"):
+        return jsonify({"detail": "Permission denied for servers section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        payload = ServerPersistPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    job_id = payload.job_id.strip()
+    if not job_id:
+        return jsonify({"detail": "job_id is required."}), 400
+
+    data = load_persistent_servers()
+    persistent = data.setdefault("persistent", {})
+
+    if payload.persistent:
+        persistent[job_id] = {
+            "marked_by": username,
+            "marked_at": datetime.now(timezone.utc).isoformat(),
+            "note": payload.note.strip()
+        }
+        msg = f"Server {job_id} marked as persistent."
+    else:
+        if job_id in persistent:
+            del persistent[job_id]
+        msg = f"Server {job_id} persistence removed."
+
+    save_persistent_servers(data)
+    broadcast_update("dashboard")
+    return jsonify({"success": True, "message": msg, "job_id": job_id, "is_persistent": payload.persistent})
+
 @app.route("/admin/accounts", methods=["GET"])
 @admin_required
 def view_accounts_dashboard(username):
@@ -1758,7 +1948,8 @@ def create_admin_account(username):
             "suggestions": True,
             "crashes": True,
             "contact": True,
-            "bans": True
+            "bans": True,
+            "servers": True
         }
     }
     save_admins(admins_data)
@@ -1786,7 +1977,8 @@ def update_admin_permissions(username):
         "suggestions": bool(payload.permissions.get("suggestions", True)),
         "crashes": bool(payload.permissions.get("crashes", True)),
         "contact": bool(payload.permissions.get("contact", True)),
-        "bans": bool(payload.permissions.get("bans", True))
+        "bans": bool(payload.permissions.get("bans", True)),
+        "servers": bool(payload.permissions.get("servers", True))
     }
     save_admins(admins_data)
     broadcast_update("accounts")

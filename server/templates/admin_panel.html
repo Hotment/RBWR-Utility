@@ -215,6 +215,19 @@
             </a>
             {% endif %}
 
+            {% if permissions.servers %}
+            <a href="/admin/servers" id="nav-servers"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'servers' %}bg-emerald-600/10 text-emerald-400 border border-emerald-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition shrink-0" fill="none"
+                    stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M5.25 14.25h13.5m-13.5 3h13.5m-13.5 3h13.5M5.25 3.75h13.5M5.25 6.75h13.5m-13.5 3h13.5">
+                    </path>
+                </svg>
+                <span class="whitespace-nowrap">Servers</span>
+            </a>
+            {% endif %}
+
             {% if is_root %}
             <a href="/admin/accounts" id="nav-accounts"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'accounts' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
@@ -531,6 +544,50 @@
             </div>
         </main>
 
+        <main id="view-servers"
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'servers' %}hidden{% endif %}">
+            <header
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-emerald-400 font-display whitespace-nowrap">Server Instances & Persistence</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Manage active, historical (48h retention), and persistent Roblox game servers.</p>
+                </div>
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div class="flex gap-3 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 font-mono whitespace-nowrap">
+                        <div>TOTAL: <span id="server-stat-total" class="text-white font-bold">0</span></div>
+                        <div class="text-slate-600">|</div>
+                        <div>ACTIVE: <span id="server-stat-active" class="text-emerald-400 font-bold">0</span></div>
+                        <div class="text-slate-600">|</div>
+                        <div>HISTORICAL: <span id="server-stat-historical" class="text-slate-400 font-bold">0</span></div>
+                        <div class="text-slate-600">|</div>
+                        <div>PERSISTENT: <span id="server-stat-persistent" class="text-amber-400 font-bold">0</span></div>
+                    </div>
+                    <a href="/servers"
+                        class="px-4 py-2 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 hover:text-emerald-200 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Public Server List</a>
+                </div>
+            </header>
+
+            <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div class="relative flex-1 max-w-md">
+                    <input type="search" id="adminServerSearch" oninput="filterAdminServers()" placeholder="Filter by Job ID..."
+                        class="premium-input w-full pl-9 pr-3 py-2 text-xs font-mono rounded-lg outline-none" />
+                    <svg class="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <div class="flex items-center gap-1 p-1 bg-black/40 rounded-lg border border-white/5 text-xs font-mono">
+                    <button type="button" onclick="setAdminServerFilter('all', this)" class="admin-server-filter-btn px-3 py-1 rounded bg-white/10 text-white font-semibold cursor-pointer">All</button>
+                    <button type="button" onclick="setAdminServerFilter('active', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Active</button>
+                    <button type="button" onclick="setAdminServerFilter('historical', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Historical</button>
+                    <button type="button" onclick="setAdminServerFilter('persistent', this)" class="admin-server-filter-btn px-3 py-1 rounded text-slate-400 hover:text-white cursor-pointer">Persistent</button>
+                </div>
+            </div>
+
+            <div id="admin-servers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <p class="text-sm text-slate-500 italic font-mono col-span-full">Loading servers...</p>
+            </div>
+        </main>
+
         {% if is_root %}
         <main id="view-accounts"
             class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'accounts' %}hidden{% endif %}">
@@ -695,6 +752,8 @@
                 navigateToView('contact', path, false);
             } else if (path === '/admin/bans') {
                 navigateToView('bans', path, false);
+            } else if (path === '/admin/servers') {
+                navigateToView('servers', path, false);
             } else if (path === '/admin/accounts') {
                 if (IS_ROOT) {
                     navigateToView('accounts', path, false);
@@ -727,6 +786,8 @@
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-purple-600/10 text-purple-400 border border-purple-500/20 transition group";
                 } else if (viewName === 'bans') {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-amber-600/10 text-amber-400 border border-amber-500/20 transition group";
+                } else if (viewName === 'servers') {
+                    activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 transition group";
                 } else {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-blue-600/10 text-blue-500 border border-blue-500/20 transition group";
                 }
@@ -738,7 +799,7 @@
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'accounts'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -790,6 +851,43 @@
             });
         }
 
+        let adminServerFilter = 'all';
+
+        function setAdminServerFilter(filter, btn) {
+            adminServerFilter = filter;
+            document.querySelectorAll('.admin-server-filter-btn').forEach(b => {
+                b.classList.remove('bg-white/10', 'text-white', 'font-semibold');
+                b.classList.add('text-slate-400');
+            });
+            if (btn) {
+                btn.classList.add('bg-white/10', 'text-white', 'font-semibold');
+                btn.classList.remove('text-slate-400');
+            }
+            filterAdminServers();
+        }
+
+        function filterAdminServers() {
+            const searchVal = (document.getElementById('adminServerSearch')?.value || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('.admin-server-card');
+            cards.forEach(card => {
+                const jobId = (card.getAttribute('data-job-id') || '').toLowerCase();
+                const isHistorical = card.getAttribute('data-is-historical') === 'true';
+                const isPersistent = card.getAttribute('data-is-persistent') === 'true';
+
+                let matchesFilter = true;
+                if (adminServerFilter === 'active') {
+                    matchesFilter = !isHistorical;
+                } else if (adminServerFilter === 'historical') {
+                    matchesFilter = isHistorical && !isPersistent;
+                } else if (adminServerFilter === 'persistent') {
+                    matchesFilter = isPersistent;
+                }
+
+                const matchesSearch = !searchVal || jobId.includes(searchVal);
+                card.style.display = (matchesFilter && matchesSearch) ? 'flex' : 'none';
+            });
+        }
+
         let ws;
         let reconnectDelay = 1000;
         let heartbeatInterval = null;
@@ -821,6 +919,7 @@
                         renderSuggestions(message.dashboard.suggestions);
                         renderCrashes(message.dashboard.crashes);
                         renderContactMessages(message.dashboard.contact_messages);
+                        renderServers(message.dashboard.servers, message.dashboard.persistent_servers);
 
                         if (IS_ROOT && message.accounts) {
                             renderAccounts(message.accounts.admins);
@@ -833,6 +932,7 @@
                         renderSuggestions(message.data.suggestions);
                         renderCrashes(message.data.crashes);
                         renderContactMessages(message.data.contact_messages);
+                        renderServers(message.data.servers, message.data.persistent_servers);
                     } else if (message.type === 'accounts') {
                         if (IS_ROOT && message.data) {
                             renderAccounts(message.data.admins);
@@ -899,6 +999,21 @@
                     unreadBadge.classList.add('hidden');
                 }
             }
+
+            const servers = data.servers || [];
+            const totalServers = servers.length;
+            const persistentCount = servers.filter(s => s.is_persistent).length;
+            const historicalCount = servers.filter(s => s.is_historical && !s.is_persistent).length;
+            const activeCount = servers.filter(s => !s.is_historical).length;
+
+            const sTot = document.getElementById('server-stat-total');
+            if (sTot) sTot.innerText = totalServers;
+            const sAct = document.getElementById('server-stat-active');
+            if (sAct) sAct.innerText = activeCount;
+            const sHist = document.getElementById('server-stat-historical');
+            if (sHist) sHist.innerText = historicalCount;
+            const sPers = document.getElementById('server-stat-persistent');
+            if (sPers) sPers.innerText = persistentCount;
         }
 
         function formatTimestamp(isoStr) {
@@ -1407,6 +1522,114 @@
             }
         }
 
+        function renderServers(servers, persistentMap = {}) {
+            const container = document.getElementById('admin-servers-container');
+            if (!container) return;
+
+            if (!servers || servers.length === 0) {
+                container.innerHTML = `<div class="cyber-panel p-8 rounded-xl text-center text-slate-500 font-mono text-sm col-span-full">No server instances recorded.</div>`;
+                return;
+            }
+
+            container.innerHTML = servers.map(s => {
+                const isPrivate = Boolean(s.is_private);
+                const isPersistent = Boolean(s.is_persistent);
+                const isHistorical = Boolean(s.is_historical);
+                const pCount = s.player_count || 0;
+                const maxP = s.max_players || 12;
+
+                const persistInfo = persistentMap[s.job_id] || {};
+                const markedBy = persistInfo.marked_by ? `by ${escapeHtml(persistInfo.marked_by)}` : '';
+                const markedAt = persistInfo.marked_at ? formatTimestamp(persistInfo.marked_at) : '';
+
+                return `
+                    <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60')} flex flex-col justify-between gap-4 transition-all"
+                        data-job-id="${escapeHtml(s.job_id)}"
+                        data-is-private="${isPrivate}"
+                        data-is-historical="${isHistorical}"
+                        data-is-persistent="${isPersistent}">
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-start justify-between gap-2 border-b border-white/5 pb-2.5">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
+                                        ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
+                                        ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : (isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical (48h)</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>')}
+                                    </div>
+                                    <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold mt-1" title="${escapeHtml(s.job_id)}">
+                                        ${escapeHtml(s.job_id)}
+                                    </div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold shrink-0">
+                                    ${s.snapshot_count || 0} snaps
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                    <span class="text-slate-500 text-[10px]">U1 APRM</span>
+                                    <span class="text-white font-bold">${(s.unit1 && s.unit1.aprm !== undefined) ? Number(s.unit1.aprm).toFixed(2) : '0.00'}%</span>
+                                </div>
+                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                    <span class="text-slate-500 text-[10px]">U2 APRM</span>
+                                    <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
+                                </div>
+                                <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
+                                    <span class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                                        👥 Player Count
+                                    </span>
+                                    <span class="font-bold ${pCount > 0 ? 'text-emerald-400' : 'text-slate-400'}">
+                                        ${pCount} / ${maxP} Players
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                                <span>Last Heartbeat:</span>
+                                <span class="text-slate-300 font-semibold">${escapeHtml(s.latest_timestamp || 'N/A')}</span>
+                            </div>
+                            ${isPersistent && (markedBy || markedAt) ? `
+                                <div class="text-[10px] text-amber-400/80 font-mono bg-amber-950/30 p-2 rounded border border-amber-500/20">
+                                    Marked persistent ${markedBy} ${markedAt ? 'on ' + markedAt : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2 border-t border-white/5 pt-3 font-mono text-xs">
+                            <a href="/servers/${escapeHtml(s.job_id)}" target="_blank"
+                                class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs transition flex items-center gap-1.5">
+                                <span>Analytics</span>
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+
+                            <button onclick="toggleAdminServerPersist('${escapeHtml(s.job_id)}', ${!isPersistent})"
+                                class="px-3 py-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1.5 ${isPersistent ? 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border-amber-500/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/40'}">
+                                <span>${isPersistent ? 'Unmark Persistent' : 'Make Persistent'}</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            filterAdminServers();
+        }
+
+        async function toggleAdminServerPersist(jobId, shouldPersist) {
+            try {
+                const response = await fetch('/admin/servers/persist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_id: jobId, persistent: shouldPersist })
+                });
+                const resData = await response.json();
+                if (!response.ok) {
+                    alert(resData.detail || resData.message || 'Failed to update server persistence.');
+                }
+            } catch (err) {
+                alert('Network error updating server persistence.');
+            }
+        }
+
         if (IS_ROOT) {
             function renderAccounts(admins) {
                 const container = document.getElementById('accounts-list-container');
@@ -1450,6 +1673,10 @@
                                         <input type="checkbox" id="perm-bans-${u}" ${perms.bans ? 'checked' : ''} class="accent-amber-500">
                                         <span>Banned IPs</span>
                                     </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-servers-${u}" ${perms.servers !== false ? 'checked' : ''} class="accent-emerald-500">
+                                        <span>Servers</span>
+                                    </label>
                                 </div>
                                 <div class="flex justify-end mt-2.5">
                                     <button onclick="saveAdminPermissions('${u}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg uppercase font-bold text-[11px] transition shadow-md">Save Permissions</button>
@@ -1466,6 +1693,7 @@
                 const crashEl = document.getElementById(`perm-crash-${username}`);
                 const contactEl = document.getElementById(`perm-contact-${username}`);
                 const bansEl = document.getElementById(`perm-bans-${username}`);
+                const serversEl = document.getElementById(`perm-servers-${username}`);
 
                 const payload = {
                     username: username,
@@ -1473,7 +1701,8 @@
                         suggestions: sugEl ? sugEl.checked : true,
                         crashes: crashEl ? crashEl.checked : true,
                         contact: contactEl ? contactEl.checked : true,
-                        bans: bansEl ? bansEl.checked : true
+                        bans: bansEl ? bansEl.checked : true,
+                        servers: serversEl ? serversEl.checked : true
                     }
                 };
 

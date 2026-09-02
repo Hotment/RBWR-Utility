@@ -124,22 +124,36 @@
                 active servers</p>
         </div>
 
-        <div class="w-full sm:w-auto sm:min-w-[340px] relative">
-            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div
+                class="flex items-center gap-1 p-1 bg-[#121217] rounded-xl border border-white/10 text-xs font-mono shrink-0">
+                <button type="button" onclick="setStatusFilter('all', this)"
+                    class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-300 transition-all cursor-pointer active bg-white/10 text-white font-semibold">All</button>
+                <button type="button" onclick="setStatusFilter('active', this)"
+                    class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Active</button>
+                <button type="button" onclick="setStatusFilter('historical', this)"
+                    class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Historical</button>
+                <button type="button" onclick="setStatusFilter('persistent', this)"
+                    class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Persistent</button>
             </div>
-            <input type="search" id="serverSearch" placeholder="Search by Job ID or Server ID..."
-                class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-amber-500/50" />
-            <button type="button" id="clearSearchBtn" onclick="clearSearch()"
-                class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
-                    </path>
-                </svg>
-            </button>
+
+            <div class="relative min-w-[280px] sm:min-w-[320px]">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="search" id="serverSearch" placeholder="Search by Job ID or Server ID..."
+                    class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-amber-500/50" />
+                <button type="button" id="clearSearchBtn" onclick="clearSearch()"
+                    class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -147,12 +161,14 @@
         {% if servers and servers|length > 0 %}
         {% for server in servers %}
         <div class="server-card premium-glass rounded-2xl p-5 shadow-xl border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-5 interactive-card"
-            data-job-id="{{ server.job_id }}" data-is-private="{{ 'true' if server.is_private else 'false' }}" {% if
-            server.is_private %}style="display: none;" {% endif %}>
+            data-job-id="{{ server.job_id }}" data-is-private="{{ 'true' if server.is_private else 'false' }}"
+            data-is-historical="{{ 'true' if server.is_historical else 'false' }}"
+            data-is-persistent="{{ 'true' if server.is_persistent else 'false' }}" {% if server.is_private
+            %}style="display: none;" {% endif %}>
             <div class="flex flex-col gap-3">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 flex-wrap">
                             <span
                                 class="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold">Job
                                 ID</span>
@@ -160,6 +176,22 @@
                             <span
                                 class="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[10px] font-mono font-bold">
                                 Private
+                            </span>
+                            {% endif %}
+                            {% if server.is_persistent %}
+                            <span
+                                class="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-mono font-bold">
+                                Persistent
+                            </span>
+                            {% elif server.is_historical %}
+                            <span
+                                class="px-2 py-0.5 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-[10px] font-mono font-bold">
+                                Historical
+                            </span>
+                            {% else %}
+                            <span
+                                class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
+                                Active
                             </span>
                             {% endif %}
                         </div>
@@ -198,6 +230,17 @@
                         </span>
                         <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm)
                             }}%</span>
+                    </div>
+
+                    <div
+                        class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex items-center justify-between col-span-2">
+                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                            Player Count
+                        </span>
+                        <span
+                            class="font-mono font-bold text-xs {% if server.player_count > 0 %}text-emerald-400{% else %}text-slate-400{% endif %}">
+                            {{ server.player_count }} / {{ server.max_players }} Players
+                        </span>
                     </div>
                 </div>
 
@@ -262,13 +305,43 @@
         }, 300);
     }
 
-    const searchInput = document.getElementById('serverSearch');
-    const clearSearchBtn = document.getElementById('clearSearchBtn');
-    const serverCards = Array.from(document.querySelectorAll('.server-card'));
-    const serverCountLabel = document.getElementById('serverCountLabel');
-    const noResultsNotice = document.getElementById('noResultsNotice');
+    let searchInput = null;
+    let clearSearchBtn = null;
+    let serverCards = [];
+    let serverCountLabel = null;
+    let noResultsNotice = null;
+    let currentStatusFilter = 'all';
+
+    function setStatusFilter(status, btn) {
+        currentStatusFilter = status;
+        document.querySelectorAll('.status-filter-btn').forEach(b => {
+            b.classList.remove('active', 'bg-white/10', 'text-white', 'font-semibold');
+            b.classList.add('text-gray-400');
+        });
+        if (btn) {
+            btn.classList.add('active', 'bg-white/10', 'text-white', 'font-semibold');
+            btn.classList.remove('text-gray-400');
+        }
+        filterServers();
+    }
 
     function filterServers() {
+        if (!searchInput) {
+            searchInput = document.getElementById('serverSearch');
+        }
+        if (!clearSearchBtn) {
+            clearSearchBtn = document.getElementById('clearSearchBtn');
+        }
+        if (!serverCards || serverCards.length === 0) {
+            serverCards = Array.from(document.querySelectorAll('.server-card'));
+        }
+        if (!serverCountLabel) {
+            serverCountLabel = document.getElementById('serverCountLabel');
+        }
+        if (!noResultsNotice) {
+            noResultsNotice = document.getElementById('noResultsNotice');
+        }
+
         const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
         let visibleCount = 0;
 
@@ -279,12 +352,23 @@
         serverCards.forEach(card => {
             const jobId = (card.dataset.jobId || '').toLowerCase();
             const isPrivate = card.dataset.isPrivate === 'true';
+            const isHistorical = card.dataset.isHistorical === 'true';
+            const isPersistent = card.dataset.isPersistent === 'true';
+
+            let matchesStatus = true;
+            if (currentStatusFilter === 'active') {
+                matchesStatus = !isHistorical;
+            } else if (currentStatusFilter === 'historical') {
+                matchesStatus = isHistorical && !isPersistent;
+            } else if (currentStatusFilter === 'persistent') {
+                matchesStatus = isPersistent;
+            }
 
             let isVisible = false;
             if (query.length === 0) {
-                isVisible = !isPrivate;
+                isVisible = !isPrivate && matchesStatus;
             } else {
-                isVisible = jobId.includes(query);
+                isVisible = jobId.includes(query) && matchesStatus;
             }
 
             card.style.display = isVisible ? '' : 'none';
@@ -292,7 +376,7 @@
         });
 
         if (serverCountLabel) {
-            if (query.length === 0) {
+            if (query.length === 0 && currentStatusFilter === 'all') {
                 serverCountLabel.textContent = `Showing ${visibleCount} active server${visibleCount === 1 ? '' : 's'}`;
             } else {
                 serverCountLabel.textContent = `Showing ${visibleCount} matching server${visibleCount === 1 ? '' : 's'}`;
@@ -311,6 +395,9 @@
     }
 
     function clearSearch() {
+        if (!searchInput) {
+            searchInput = document.getElementById('serverSearch');
+        }
         if (searchInput) {
             searchInput.value = '';
             filterServers();
@@ -318,11 +405,17 @@
         }
     }
 
-    if (searchInput) {
-        searchInput.addEventListener('input', filterServers);
-    }
-
     document.addEventListener('DOMContentLoaded', () => {
+        searchInput = document.getElementById('serverSearch');
+        clearSearchBtn = document.getElementById('clearSearchBtn');
+        serverCards = Array.from(document.querySelectorAll('.server-card'));
+        serverCountLabel = document.getElementById('serverCountLabel');
+        noResultsNotice = document.getElementById('noResultsNotice');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterServers);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const q = urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId');
         if (q && searchInput) {
@@ -332,8 +425,46 @@
     });
 
     {% if charts and charts | length > 0 %}
-    let globalChartInstance = null;
-    let currentGlobalWindowSeconds = null;
+    var globalChartInstance = null;
+    var currentGlobalWindowSeconds = null;
+
+    function setGlobalTimeWindow(seconds, btnElement) {
+        currentGlobalWindowSeconds = seconds;
+
+        document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
+
+        if (globalChartInstance) {
+            if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
+            globalChartInstance.options.scales.x.min = 0;
+            const limitMax = globalChartInstance._maxAvailableX || 0;
+            if (seconds === null) {
+                globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+            } else {
+                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
+            }
+            globalChartInstance.update('none');
+        }
+
+        try {
+            localStorage.setItem('rbwr_global_time_window', seconds !== null ? String(seconds) : 'all');
+        } catch (e) { }
+    }
+
+    function resetGlobalZoom() {
+        if (!globalChartInstance) return;
+        if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
+        globalChartInstance.options.scales.x.min = 0;
+        const limitMax = globalChartInstance._maxAvailableX || 0;
+        if (currentGlobalWindowSeconds === null) {
+            globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+        } else {
+            globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(currentGlobalWindowSeconds, limitMax) : currentGlobalWindowSeconds;
+        }
+        globalChartInstance.update('none');
+    }
 
     (function () {
         const chartData = {{ charts[0] | tojson
@@ -350,13 +481,72 @@
         return `${Math.floor(s / 86400)}d ago`;
     }
 
-    function formatAxisTick(sec) {
+    function formatSingleTick(sec, step) {
         const s = Math.max(0, Math.round(sec));
         if (s === 0) return 'Now';
-        if (s < 60) return `${s}s`;
-        if (s < 3600) return `${Math.round(s / 60)}m ago`;
-        if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+
+        if (s < 60) {
+            return `${s}s`;
+        }
+
+        if (s < 3600) {
+            if (step < 60) {
+                const m = Math.floor(s / 60);
+                const remS = s % 60;
+                return remS > 0 ? `${m}m ${remS}s ago` : `${m}m ago`;
+            }
+            return `${Math.round(s / 60)}m ago`;
+        }
+
+        if (s < 86400) {
+            if (step < 3600) {
+                const h = Math.floor(s / 3600);
+                const remM = Math.round((s % 3600) / 60);
+                return remM > 0 ? `${h}h ${remM}m ago` : `${h}h ago`;
+            }
+            return `${Math.round(s / 3600)}h ago`;
+        }
+
+        if (step < 86400) {
+            const d = Math.floor(s / 86400);
+            const remH = Math.round((s % 86400) / 3600);
+            return remH > 0 ? `${d}d ${remH}h ago` : `${d}d ago`;
+        }
         return `${Math.round(s / 86400)}d ago`;
+    }
+
+    function formatAxisTick(sec, index, ticks) {
+        let step = 60;
+        if (ticks && ticks.length > 1) {
+            let minDiff = Infinity;
+            for (let i = 1; i < ticks.length; i++) {
+                const diff = Math.abs(ticks[i].value - ticks[i - 1].value);
+                if (diff > 0 && diff < minDiff) minDiff = diff;
+            }
+            if (minDiff < Infinity) step = minDiff;
+        }
+
+        const label = formatSingleTick(sec, step);
+
+        if (ticks && typeof index === 'number' && index > 0) {
+            const prevLabel = formatSingleTick(ticks[index - 1].value, step);
+            if (label === prevLabel) {
+                const s = Math.max(0, Math.round(sec));
+                if (s < 3600) {
+                    const m = Math.floor(s / 60);
+                    const remS = s % 60;
+                    return remS > 0 ? `${m}m ${remS}s ago` : `${m}m ago`;
+                }
+                if (s < 86400) {
+                    const h = Math.floor(s / 3600);
+                    const remM = Math.round((s % 3600) / 60);
+                    return remM > 0 ? `${h}h ${remM}m ago` : `${h}h ago`;
+                }
+                return '';
+            }
+        }
+
+        return label;
     }
 
     let totalGlobalPoints = 0;
@@ -460,8 +650,8 @@
                     ticks: {
                         color: '#9ca3af',
                         font: { family: 'JetBrains Mono', size: 10 },
-                        callback: function (val) {
-                            return formatAxisTick(val);
+                        callback: function (val, index, ticks) {
+                            return formatAxisTick(val, index, ticks);
                         },
                         autoSkip: true,
                         maxTicksLimit: 8
@@ -495,44 +685,6 @@
         }
     } catch (e) { }
     }) ();
-
-    function setGlobalTimeWindow(seconds, btnElement) {
-        currentGlobalWindowSeconds = seconds;
-
-        document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
-        if (btnElement) {
-            btnElement.classList.add('active');
-        }
-
-        if (globalChartInstance) {
-            if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
-            globalChartInstance.options.scales.x.min = 0;
-            const limitMax = globalChartInstance._maxAvailableX || 0;
-            if (seconds === null) {
-                globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
-            } else {
-                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
-            }
-            globalChartInstance.update('none');
-        }
-
-        try {
-            localStorage.setItem('rbwr_global_time_window', seconds !== null ? String(seconds) : 'all');
-        } catch (e) { }
-    }
-
-    function resetGlobalZoom() {
-        if (!globalChartInstance) return;
-        if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
-        globalChartInstance.options.scales.x.min = 0;
-        const limitMax = globalChartInstance._maxAvailableX || 0;
-        if (currentGlobalWindowSeconds === null) {
-            globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
-        } else {
-            globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(currentGlobalWindowSeconds, limitMax) : currentGlobalWindowSeconds;
-        }
-        globalChartInstance.update('none');
-    }
     {% endif %}
 </script>
 {% endblock %}

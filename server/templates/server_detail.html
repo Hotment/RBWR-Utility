@@ -46,9 +46,38 @@
                     {{ job_id }}
                 </h1>
                 {% if is_private %}
-                <span class="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold">
+                <span
+                    class="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold">
                     Private Server
                 </span>
+                {% endif %}
+                {% if is_persistent %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold">
+                    Persistent Server
+                </span>
+                {% elif is_historical %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-xs font-mono font-bold">
+                    Historical Server
+                </span>
+                {% else %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
+                    Active Server
+                </span>
+                {% endif %}
+                <span
+                    class="px-2.5 py-1 rounded-full {% if player_count > 0 %}bg-emerald-500/15 border border-emerald-500/30 text-emerald-300{% else %}bg-slate-500/15 border border-slate-500/30 text-slate-400{% endif %} text-xs font-mono font-bold flex items-center gap-1.5">
+                    {{ player_count }}/{{ max_players }} Players
+                </span>
+                {% if is_admin %}
+                <button type="button"
+                    onclick="toggleServerPersist('{{ job_id }}', {{ 'false' if is_persistent else 'true' }})"
+                    id="btnPersistToggle"
+                    class="px-3 py-1 rounded-xl {% if is_persistent %}bg-amber-500/20 text-amber-300 border-amber-500/40{% else %}bg-white/5 text-gray-300 border-white/10 hover:bg-white/10{% endif %} border text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span>{{ '★ Marked Persistent' if is_persistent else '☆ Mark Persistent' }}</span>
+                </button>
                 {% endif %}
                 <button type="button" onclick="copyText('{{ job_id }}', this)"
                     class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-amber-300 transition-colors shrink-0"
@@ -80,7 +109,31 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-emerald-400 font-semibold">Active
+                    Players</span>
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col items-center justify-center py-2">
+                <span class="text-xs text-gray-400 font-mono">Current Players Online</span>
+                <span
+                    class="text-3xl sm:text-4xl font-mono font-bold {% if player_count > 0 %}text-emerald-300{% else %}text-slate-400{% endif %} tracking-tight mt-0.5">
+                    {{ player_count }} / {{ max_players }}
+                </span>
+            </div>
+            <div
+                class="text-[11px] font-mono text-center {% if is_persistent %}text-amber-400{% elif is_historical %}text-slate-500{% else %}text-emerald-400{% endif %}">
+                {% if is_persistent %}Persistent Server (Saved permanently){% elif is_historical %}Historical (Retained
+                up to 48 hours){% else %}Live Server Instance{% endif %}
+            </div>
+        </div>
+
         <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col gap-3">
             <div class="flex items-center justify-between">
                 <span class="text-xs uppercase tracking-wider font-mono text-blue-400 font-semibold">SCRAM
@@ -294,16 +347,76 @@
         return h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
     }
 
-    function formatAxisTick(sec) {
+    function formatSingleTick(sec, step) {
         const s = Math.max(0, Math.round(sec));
         if (s === 0) return 'Now';
-        if (s < 60) return `${s}s`;
-        if (s < 3600) return `${Math.round(s / 60)}m ago`;
-        if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+
+        if (s < 60) {
+            return `${s}s`;
+        }
+
+        if (s < 3600) {
+            if (step < 60) {
+                const m = Math.floor(s / 60);
+                const remS = s % 60;
+                return remS > 0 ? `${m}m ${remS}s ago` : `${m}m ago`;
+            }
+            return `${Math.round(s / 60)}m ago`;
+        }
+
+        if (s < 86400) {
+            if (step < 3600) {
+                const h = Math.floor(s / 3600);
+                const remM = Math.round((s % 3600) / 60);
+                return remM > 0 ? `${h}h ${remM}m ago` : `${h}h ago`;
+            }
+            return `${Math.round(s / 3600)}h ago`;
+        }
+
+        if (step < 86400) {
+            const d = Math.floor(s / 86400);
+            const remH = Math.round((s % 86400) / 3600);
+            return remH > 0 ? `${d}d ${remH}h ago` : `${d}d ago`;
+        }
         return `${Math.round(s / 86400)}d ago`;
     }
 
+    function formatAxisTick(sec, index, ticks) {
+        let step = 60;
+        if (ticks && ticks.length > 1) {
+            let minDiff = Infinity;
+            for (let i = 1; i < ticks.length; i++) {
+                const diff = Math.abs(ticks[i].value - ticks[i - 1].value);
+                if (diff > 0 && diff < minDiff) minDiff = diff;
+            }
+            if (minDiff < Infinity) step = minDiff;
+        }
+
+        const label = formatSingleTick(sec, step);
+
+        if (ticks && typeof index === 'number' && index > 0) {
+            const prevLabel = formatSingleTick(ticks[index - 1].value, step);
+            if (label === prevLabel) {
+                const s = Math.max(0, Math.round(sec));
+                if (s < 3600) {
+                    const m = Math.floor(s / 60);
+                    const remS = s % 60;
+                    return remS > 0 ? `${m}m ${remS}s ago` : `${m}m ago`;
+                }
+                if (s < 86400) {
+                    const h = Math.floor(s / 3600);
+                    const remM = Math.round((s % 3600) / 60);
+                    return remM > 0 ? `${h}h ${remM}m ago` : `${h}h ago`;
+                }
+                return '';
+            }
+        }
+
+        return label;
+    }
+
     const chartsData = {{ charts | tojson }};
+    const lastHeartbeatAge = {{ last_heartbeat_age | default(0) | tojson }};
     const chartInstances = [];
     let currentWindowSeconds = null;
 
@@ -313,11 +426,14 @@
 
         let totalPoints = 0;
         let chartMaxX = 0;
+        let chartMinX = null;
+
+        const isPlayerCount = chart.metric && chart.metric.toLowerCase().includes('player');
 
         const datasets = (chart.datasets || []).map(ds => {
             const isUnit1 = ds.label && ds.label.includes('1');
-            const color = isUnit1 ? '#3b82f6' : '#f59e0b';
-            const bgColor = isUnit1 ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+            let color = isPlayerCount ? '#10b981' : (isUnit1 ? '#3b82f6' : '#f59e0b');
+            let bgColor = isPlayerCount ? 'rgba(16, 185, 129, 0.08)' : (isUnit1 ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)');
 
             const points = (ds.data || []).map(item => {
                 if (typeof item === 'object' && item !== null && 'x' in item && 'y' in item) {
@@ -329,6 +445,7 @@
             totalPoints += points.length;
             points.forEach(p => {
                 if (p.x > chartMaxX) chartMaxX = p.x;
+                if (chartMinX === null || p.x < chartMinX) chartMinX = p.x;
             });
 
             return {
@@ -352,6 +469,13 @@
         if (pointsLabel) {
             pointsLabel.textContent = `${totalPoints} points`;
         }
+
+        const serverMinX = (typeof lastHeartbeatAge === 'number' && !isNaN(lastHeartbeatAge)) ? lastHeartbeatAge : null;
+        let effectiveMinX = chartMinX !== null ? chartMinX : (serverMinX !== null ? serverMinX : 0);
+        if (serverMinX !== null) {
+            effectiveMinX = Math.min(effectiveMinX, serverMinX);
+        }
+        let effectiveMaxX = chartMaxX > effectiveMinX ? chartMaxX : (effectiveMinX + 60);
 
         const chartInstance = new Chart(ctx, {
             type: 'line',
@@ -389,6 +513,9 @@
                                 return formatTimeAgo(xVal);
                             },
                             label: function (context) {
+                                if (isPlayerCount) {
+                                    return ` ${context.dataset.label}: ${Math.round(context.parsed.y)} players`;
+                                }
                                 return ` ${context.dataset.label}: ${context.parsed.y}`;
                             }
                         }
@@ -405,7 +532,7 @@
                             mode: 'x'
                         },
                         limits: {
-                            x: { min: 0, max: chartMaxX > 0 ? chartMaxX : undefined }
+                            x: { min: effectiveMinX, max: effectiveMaxX }
                         }
                     }
                 },
@@ -413,13 +540,13 @@
                     x: {
                         type: 'linear',
                         reverse: true,
-                        min: 0,
-                        max: chartMaxX > 0 ? chartMaxX : undefined,
+                        min: effectiveMinX,
+                        max: effectiveMaxX,
                         ticks: {
                             color: '#9ca3af',
                             font: { family: 'JetBrains Mono', size: 10 },
-                            callback: function (val) {
-                                return formatAxisTick(val);
+                            callback: function (val, index, ticks) {
+                                return formatAxisTick(val, index, ticks);
                             },
                             autoSkip: true,
                             maxTicksLimit: 8
@@ -427,9 +554,15 @@
                         grid: { color: 'rgba(255, 255, 255, 0.04)' }
                     },
                     y: {
+                        beginAtZero: isPlayerCount,
                         ticks: {
                             color: '#9ca3af',
-                            font: { family: 'JetBrains Mono', size: 10 }
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            precision: isPlayerCount ? 0 : 2,
+                            callback: function (val) {
+                                if (isPlayerCount) return Math.round(val) + ' players';
+                                return val;
+                            }
                         },
                         grid: { color: 'rgba(255, 255, 255, 0.04)' }
                     }
@@ -437,7 +570,8 @@
             }
         });
 
-        chartInstance._maxAvailableX = chartMaxX;
+        chartInstance._minAvailableX = effectiveMinX;
+        chartInstance._maxAvailableX = effectiveMaxX;
         chartInstances.push(chartInstance);
     });
 
@@ -451,12 +585,14 @@
 
         chartInstances.forEach(chart => {
             if (chart.resetZoom) chart.resetZoom('none');
-            chart.options.scales.x.min = 0;
-            const limitMax = chart._maxAvailableX || 0;
+            const limitMin = chart._minAvailableX !== undefined ? chart._minAvailableX : 0;
+            const limitMax = chart._maxAvailableX !== undefined ? chart._maxAvailableX : (limitMin + 60);
+            chart.options.scales.x.min = limitMin;
             if (seconds === null) {
-                chart.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+                chart.options.scales.x.max = limitMax;
             } else {
-                chart.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
+                const targetMax = limitMin + seconds;
+                chart.options.scales.x.max = limitMax > limitMin ? Math.min(targetMax, limitMax) : targetMax;
             }
             chart.update('none');
         });
@@ -470,18 +606,42 @@
         const chart = chartInstances[index];
         if (!chart) return;
         if (chart.resetZoom) chart.resetZoom('none');
-        chart.options.scales.x.min = 0;
-        const limitMax = chart._maxAvailableX || 0;
+        const limitMin = chart._minAvailableX !== undefined ? chart._minAvailableX : 0;
+        const limitMax = chart._maxAvailableX !== undefined ? chart._maxAvailableX : (limitMin + 60);
+        chart.options.scales.x.min = limitMin;
         if (currentWindowSeconds === null) {
-            chart.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+            chart.options.scales.x.max = limitMax;
         } else {
-            chart.options.scales.x.max = limitMax > 0 ? Math.min(currentWindowSeconds, limitMax) : currentWindowSeconds;
+            const targetMax = limitMin + currentWindowSeconds;
+            chart.options.scales.x.max = limitMax > limitMin ? Math.min(targetMax, limitMax) : targetMax;
         }
         chart.update('none');
     }
 
     function resetAllZooms() {
         chartInstances.forEach((_, idx) => resetSingleChartZoom(idx));
+    }
+
+    async function toggleServerPersist(jobId, shouldPersist) {
+        const btn = document.getElementById('btnPersistToggle');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/admin/servers/persist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_id: jobId, persistent: shouldPersist })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                alert(data.detail || data.message || 'Failed to update server persistence');
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            alert('Error toggling server persistence: ' + err);
+            if (btn) btn.disabled = false;
+        }
     }
 
     try {
