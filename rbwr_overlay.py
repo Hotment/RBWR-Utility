@@ -18,10 +18,10 @@ IS_LINUX = sys.platform.startswith('linux')
 IS_WINDOWS = sys.platform == 'win32' or os.name == 'nt'
 IS_MAC = sys.platform == 'darwin'
 
-__version__ = "2.0.2"
+__version__ = "2.0.3"
 
 # --- Update Server Configuration ---
-SUGGESTIONS_SERVER_URL = "https://rbwr.hotment.dev"
+BACKEND_SERVER_URL = "https://rbwr.hotment.dev"
 UPDATE_HTTP_HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
 try:
@@ -233,7 +233,7 @@ def show_crash_dialog(tb_text):
                 try:
                     data_bytes = json.dumps(payload).encode('utf-8')
                     req = urllib.request.Request(
-                        f"{SUGGESTIONS_SERVER_URL}/crashes",
+                        f"{BACKEND_SERVER_URL}/crashes",
                         data=data_bytes,
                         headers={
                             "Content-Type": "application/json",
@@ -388,6 +388,8 @@ if IS_WINDOWS:
 BG_MAIN = "#07080a"       # Deep tactical carbon matte
 BG_CARD = "#11141a"       # Cyber deck plate dark gray
 BG_HEADER = "#030405"     # Pure terminal dark black
+TRANS_COLOR = "#010203"   # Pure transparent chroma key for Windows overlay
+WIN_BG = TRANS_COLOR if IS_WINDOWS else BG_MAIN
 ACCENT_CYAN = "#00f0ff"   # Tactical laser cyan
 ACCENT_GREEN = "#39ff14"  # Glow radioactive neon green
 TEXT_LIGHT = "#ffffff"    # High contrast display white
@@ -498,6 +500,48 @@ class Calculator:
 
 
 class OverlayApp:
+    def make_popup_draggable(self, popup, *widgets):
+        drag_data = {"win_x": 0, "win_y": 0, "mouse_x": 0, "mouse_y": 0}
+
+        def start_drag(event):
+            try:
+                drag_data["win_x"] = popup.winfo_x()
+                drag_data["win_y"] = popup.winfo_y()
+                drag_data["mouse_x"] = event.x_root
+                drag_data["mouse_y"] = event.y_root
+            except Exception:
+                pass
+
+        def do_drag(event):
+            try:
+                if not drag_data.get("mouse_x"):
+                    return
+                dx = event.x_root - drag_data["mouse_x"]
+                dy = event.y_root - drag_data["mouse_y"]
+                px = drag_data["win_x"] + dx
+                py = drag_data["win_y"] + dy
+
+                if IS_WINDOWS:
+                    try:
+                        hid = popup.winfo_id()
+                        p = ctypes.windll.user32.GetParent(hid)
+                        hwnd = p if p else hid
+                        SWP_NOSIZE = 0x0001
+                        SWP_NOZORDER = 0x0004
+                        SWP_NOACTIVATE = 0x0010
+                        ctypes.windll.user32.SetWindowPos(hwnd, 0, px, py, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+                    except Exception:
+                        popup.geometry(f"+{px}+{py}")
+                else:
+                    popup.geometry(f"+{px}+{py}")
+            except Exception:
+                pass
+
+        for w in widgets:
+            if w:
+                w.bind("<Button-1>", start_drag, add="+")
+                w.bind("<B1-Motion>", do_drag, add="+")
+
     def show_custom_message(self, title, message, is_error=False):
         if hasattr(self, 'custom_message_window') and self.custom_message_window and self.custom_message_window.winfo_exists():
             try:
@@ -531,29 +575,15 @@ class OverlayApp:
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-            
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = popup.winfo_x() + dx
-            py = popup.winfo_y() + dy
-            popup.geometry(f"+{px}+{py}")
-            
         title_bar = tk.Frame(popup, bg=BG_HEADER, height=30)
         title_bar.pack(fill="x", side="top")
-        title_bar.bind("<Button-1>", start_drag)
-        title_bar.bind("<B1-Motion>", do_drag)
         
         prefix = " ERROR" if is_error else " INFO"
         title_lbl = tk.Label(title_bar, text=f"{prefix}: {title.upper()}", bg=BG_HEADER, fg=accent_color,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
-        title_lbl.bind("<Button-1>", start_drag)
-        title_lbl.bind("<B1-Motion>", do_drag)
+        
+        self.make_popup_draggable(popup, title_bar, title_lbl)
         
         btn_close_top = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
         btn_close_top.pack(side="right", fill="y")
@@ -615,27 +645,13 @@ class OverlayApp:
 
         popup.geometry(f"{w}x{h}+{x}+{y}")
 
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = popup.winfo_x() + dx
-            py = popup.winfo_y() + dy
-            popup.geometry(f"+{px}+{py}")
-
         title_bar = tk.Frame(popup, bg=BG_HEADER, height=30)
         title_bar.pack(fill="x", side="top")
-        title_bar.bind("<Button-1>", start_drag)
-        title_bar.bind("<B1-Motion>", do_drag)
 
         title_lbl = tk.Label(title_bar, text="LIVE SERVER SYNC", bg=BG_HEADER, fg=ACCENT_CYAN, font=("Consolas", 8, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
-        title_lbl.bind("<Button-1>", start_drag)
-        title_lbl.bind("<B1-Motion>", do_drag)
+
+        self.make_popup_draggable(popup, title_bar, title_lbl)
 
         btn_close_top = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
         btn_close_top.pack(side="right", fill="y")
@@ -824,7 +840,7 @@ class OverlayApp:
 
             try:
                 req = urllib.request.Request(
-                    "https://rbwr.hotment.dev/api/servers/latest",
+                    f"{BACKEND_SERVER_URL}/api/servers/latest",
                     headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
                 )
                 with urllib.request.urlopen(req, timeout=5) as resp:
@@ -932,6 +948,9 @@ class OverlayApp:
     def connect_overlay_server_async(self, is_user_initiated=False):
         if is_user_initiated:
             self.overlay_sync_failed = False
+            self._demand_changed_waiting_heartbeat = False
+            self._last_synced_demand = None
+            self._last_synced_heartbeat_timestamp = 0.0
 
         if getattr(self, 'overlay_sync_failed', False):
             return
@@ -958,7 +977,7 @@ class OverlayApp:
 
             try:
                 req = urllib.request.Request(
-                    "https://rbwr.hotment.dev/api/servers/latest",
+                    f"{BACKEND_SERVER_URL}/api/servers/latest",
                     headers={"User-Agent": "RBWR-Overlay-Client/1.0"}
                 )
                 with urllib.request.urlopen(req, timeout=10) as resp:
@@ -1031,7 +1050,6 @@ class OverlayApp:
     def _on_overlay_server_connected(self, srv, is_cached=False):
         self.active_overlay_server = srv
         self.overlay_sync_failed = False
-        self.overlay_next_demand_switched = False
         
         hb_str = srv.get("lastHeartbeat")
         now = time.time()
@@ -1101,53 +1119,79 @@ class OverlayApp:
             
         thresh = getattr(self, 'next_demand_threshold_seconds', 60)
 
+        u_st = u1_st if self.calc.selected_unit == 1 else u2_st
+        cur_dem = None
+        for key in ["DemandU1", "DemandU2", "Demand", "demand"]:
+            if key in u_st and u_st[key] is not None:
+                try:
+                    cur_dem = float(u_st[key])
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        next_dem = None
+        for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
+            if key in u_st and u_st[key] is not None:
+                try:
+                    next_dem = float(u_st[key])
+                    break
+                except (ValueError, TypeError):
+                    pass
+
         if getattr(self, 'overlay_next_demand_switched', False):
-            u_st = u1_st if self.calc.selected_unit == 1 else u2_st
-            new_next_dem = None
-            for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
-                if key in u_st and u_st[key] is not None:
-                    try:
-                        new_next_dem = float(u_st[key])
-                        break
-                    except (ValueError, TypeError):
-                        pass
-            if new_next_dem is not None and new_next_dem != getattr(self, '_last_switched_next_demand', None):
+            if next_dem is not None and next_dem != getattr(self, '_last_switched_next_demand', None):
                 self.overlay_next_demand_switched = False
-                log.info(f"New upcoming demand detected ({new_next_dem} MWe) — updating Next Demand display.")
+                log.info(f"New upcoming demand detected ({next_dem} MWe) — updating Next Demand display.")
             elif live_dtl > thresh:
                 self.overlay_next_demand_switched = False
 
-        if live_dtl >= thresh:
-            u_st = u1_st if self.calc.selected_unit == 1 else u2_st
-            cur_dem = None
-            for key in ["DemandU1", "DemandU2", "Demand", "demand"]:
-                if key in u_st and u_st[key] is not None:
-                    try:
-                        cur_dem = float(u_st[key])
-                        break
-                    except (ValueError, TypeError):
-                        pass
-            if cur_dem is not None:
-                calc_val = 0.0 if cur_dem < 0 else max(0.0, cur_dem)
-                self.var_demand.set(str(int(calc_val)))
-                self.update_calculations(source="demand")
-        else:
-            if not getattr(self, 'overlay_next_demand_switched', False):
-                self.overlay_next_demand_switched = True
-                u_st = u1_st if self.calc.selected_unit == 1 else u2_st
-                next_dem = None
-                for key in ["NextDemandU1", "NextDemandU2", "Next Demand", "next_demand"]:
-                    if key in u_st and u_st[key] is not None:
-                        try:
-                            next_dem = float(u_st[key])
-                            break
-                        except (ValueError, TypeError):
-                            pass
-                if next_dem is not None:
-                    calc_val = 0.0 if next_dem < 0 else max(0.0, next_dem)
-                    self._last_switched_next_demand = next_dem
+        last_hb_ts = getattr(self, '_last_synced_heartbeat_timestamp', 0.0)
+        last_synced_dem = getattr(self, '_last_synced_demand', None)
+        pending_dem = getattr(self, '_pending_demand_value', None)
+        is_waiting = getattr(self, '_demand_changed_waiting_heartbeat', False)
+
+        is_new_heartbeat = (hb_age < 120 and self.overlay_heartbeat_timestamp > (last_hb_ts + 0.001))
+        has_new_demand = False
+        if cur_dem is not None:
+            if last_synced_dem is None:
+                has_new_demand = True
+            elif cur_dem != last_synced_dem:
+                has_new_demand = True
+            elif pending_dem is not None and abs(cur_dem - pending_dem) < 1.0:
+                has_new_demand = True
+            elif live_dtl > thresh and is_new_heartbeat:
+                has_new_demand = True
+
+        if is_waiting:
+            if is_new_heartbeat and has_new_demand:
+                self._demand_changed_waiting_heartbeat = False
+                self.overlay_next_demand_switched = False
+                self._last_synced_heartbeat_timestamp = self.overlay_heartbeat_timestamp
+                self._last_synced_demand = cur_dem
+                if cur_dem is not None:
+                    calc_val = 0.0 if cur_dem < 0 else max(0.0, cur_dem)
                     self.var_demand.set(str(int(calc_val)))
                     self.update_calculations(source="demand")
+            else:
+                pass
+        else:
+            if live_dtl >= thresh:
+                if cur_dem is not None:
+                    calc_val = 0.0 if cur_dem < 0 else max(0.0, cur_dem)
+                    self._last_synced_heartbeat_timestamp = self.overlay_heartbeat_timestamp
+                    self._last_synced_demand = cur_dem
+                    self.var_demand.set(str(int(calc_val)))
+                    self.update_calculations(source="demand")
+            else:
+                if not getattr(self, 'overlay_next_demand_switched', False):
+                    self.overlay_next_demand_switched = True
+                    self._demand_changed_waiting_heartbeat = True
+                    if next_dem is not None:
+                        calc_val = 0.0 if next_dem < 0 else max(0.0, next_dem)
+                        self._last_switched_next_demand = next_dem
+                        self._pending_demand_value = calc_val
+                        self.var_demand.set(str(int(calc_val)))
+                        self.update_calculations(source="demand")
 
         self._tick_overlay_dtl_countdown()
 
@@ -1221,10 +1265,18 @@ class OverlayApp:
         thresh = getattr(self, 'next_demand_threshold_seconds', 60)
         if live_dtl <= thresh and not getattr(self, 'overlay_next_demand_switched', False):
             self.overlay_next_demand_switched = True
+            self._demand_changed_waiting_heartbeat = True
+            if next_dem is not None:
+                calc_val = 0.0 if next_dem < 0 else max(0.0, next_dem)
+                self._last_switched_next_demand = next_dem
+                self._pending_demand_value = calc_val
+                self.var_demand.set(str(int(calc_val)))
+                self.update_calculations(source="demand")
             self.connect_overlay_server_async()
 
         if live_dtl <= 0.0 and not getattr(self, 'overlay_0s_refetch_done', False):
             self.overlay_0s_refetch_done = True
+            self._demand_changed_waiting_heartbeat = True
             self.connect_overlay_server_async()
 
         if getattr(self, 'overlay_next_demand_switched', False):
@@ -1255,23 +1307,45 @@ class OverlayApp:
         self._last_api_request_timestamp: float = 0.0
         self._last_60s_poll_timestamp: float = 0.0
         self._turbine_health_alert_triggered: bool = False
+        self._last_synced_heartbeat_timestamp: float = 0.0
+        self._last_synced_demand: float | None = None
+        self._demand_changed_waiting_heartbeat: bool = False
+        self._pending_demand_value: float | None = None
         
         if IS_LINUX:
             self.win = tk.Toplevel(self.root)
             self.win.title(f"RBWR APRM Calculator v{__version__}")
             self.win.overrideredirect(True)
+            self.bg_win = None
+            self.win.attributes("-topmost", self.is_topmost)
+            self.win.attributes("-alpha", settings["opacity"])
+            self.win.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         elif IS_MAC:
             self.win = self.root
             self.win.title(f"RBWR APRM Calculator v{__version__}")
             self.win.overrideredirect(True)
+            self.bg_win = None
+            self.win.attributes("-topmost", self.is_topmost)
+            self.win.attributes("-alpha", settings["opacity"])
+            self.win.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
         else:
             self.root.withdraw()
-            self.win = self.root
-            self.win.overrideredirect(True)
+            self.bg_win = tk.Toplevel(self.root)
+            self.bg_win.title("RBWR Overlay Backdrop")
+            self.bg_win.overrideredirect(True)
+            self.bg_win.attributes("-topmost", self.is_topmost)
+            self.bg_win.attributes("-alpha", settings["opacity"])
+            self.bg_win.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
+            self.make_draggable(self.bg_win)
             
-        self.win.attributes("-topmost", self.is_topmost)
-        self.win.attributes("-alpha", settings["opacity"])
-        self.win.configure(bg=BG_MAIN, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
+            self.win = tk.Toplevel(self.root)
+            self.win.title(f"RBWR APRM Calculator v{__version__}")
+            self.win.overrideredirect(True)
+            self.win.attributes("-topmost", self.is_topmost)
+            self.win.attributes("-transparentcolor", WIN_BG)
+            self.win.attributes("-alpha", 1.0)
+            self.win.configure(bg=WIN_BG, highlightbackground=ACCENT_CYAN, highlightcolor=ACCENT_CYAN, highlightthickness=1)
+            self.win.lift(self.bg_win)
         
         self.root.option_add('*TCombobox*Listbox.background', BG_CARD)
         self.root.option_add('*TCombobox*Listbox.foreground', TEXT_LIGHT)
@@ -1384,6 +1458,8 @@ class OverlayApp:
         self.context_menu.add_command(label="Exit Application", command=self.quit_app)
         
         self.win.bind("<Button-3>", self.show_context_menu)
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.bind("<Button-3>", self.show_context_menu)
         
         if self.is_compact:
             self.center_window(self.width_compact, self.height_compact)
@@ -1407,24 +1483,88 @@ class OverlayApp:
         x = (screen_width - w) // 2
         y = (screen_height - h) // 2
         self.win.geometry(f"{w}x{h}+{x}+{y}")
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.geometry(f"{w}x{h}+{x}+{y}")
         self.start_x = x
         self.start_y = y
 
     def show_context_menu(self, event):
         try:
             self.win.attributes("-topmost", False)
+            if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                self.bg_win.attributes("-topmost", False)
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.context_menu.grab_release()
             self.win.attributes("-topmost", self.is_topmost)
+            if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                self.bg_win.attributes("-topmost", self.is_topmost)
+            self.ensure_z_order()
+
+    def ensure_z_order(self):
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            try:
+                if IS_WINDOWS:
+                    def get_hwnd(w):
+                        hid = w.winfo_id()
+                        p = ctypes.windll.user32.GetParent(hid)
+                        return p if p else hid
+                    hwnd_bg = get_hwnd(self.bg_win)
+                    hwnd_fg = get_hwnd(self.win)
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_NOACTIVATE = 0x0010
+                    ctypes.windll.user32.SetWindowPos(hwnd_bg, hwnd_fg, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+                self.win.lift(self.bg_win)
+            except Exception:
+                pass
+
+    def sync_bg_window(self, width=None, height=None):
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            try:
+                w = width or (self.width_compact if self.is_compact else self.width_detailed)
+                h = height or (self.height_compact if self.is_compact else self.height_detailed)
+                x = self.win.winfo_x()
+                y = self.win.winfo_y()
+                self.bg_win.geometry(f"{w}x{h}+{x}+{y}")
+                self.win.geometry(f"{w}x{h}+{x}+{y}")
+                self.win.update_idletasks()
+                self.bg_win.update_idletasks()
+                if IS_WINDOWS:
+                    try:
+                        def get_hwnd(widget):
+                            hid = widget.winfo_id()
+                            p = ctypes.windll.user32.GetParent(hid)
+                            return p if p else hid
+                        hwnd_bg = get_hwnd(self.bg_win)
+                        hwnd_fg = get_hwnd(self.win)
+                        SWP_NOZORDER = 0x0004
+                        SWP_NOACTIVATE = 0x0010
+                        SWP_FRAMECHANGED = 0x0020
+                        hdwp = ctypes.windll.user32.BeginDeferWindowPos(2)
+                        hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_bg, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+                        hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_fg, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+                        ctypes.windll.user32.EndDeferWindowPos(hdwp)
+
+                        flags = 0x0001 | 0x0100 | 0x0080 | 0x0400  # RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME
+                        ctypes.windll.user32.RedrawWindow(hwnd_bg, 0, 0, flags)
+                        ctypes.windll.user32.RedrawWindow(hwnd_fg, 0, 0, flags)
+                    except Exception:
+                        pass
+                self.ensure_z_order()
+            except Exception:
+                pass
 
     def setup_app_window_style(self):
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.deiconify()
         self.win.deiconify()
         try:
             if IS_WINDOWS:
                 GWL_EXSTYLE = -20
                 WS_EX_APPWINDOW = 0x00040000
                 WS_EX_TOOLWINDOW = 0x00000080
+                WS_EX_NOACTIVATE = 0x08000000
                 hwnd_to_use = self.win.winfo_id()
                 parent = ctypes.windll.user32.GetParent(hwnd_to_use)
                 hwnd = parent if parent else hwnd_to_use
@@ -1432,6 +1572,17 @@ class OverlayApp:
                 style = style & ~WS_EX_TOOLWINDOW
                 style = style | WS_EX_APPWINDOW
                 ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+
+                if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                    bg_hwnd_to_use = self.bg_win.winfo_id()
+                    bg_parent = ctypes.windll.user32.GetParent(bg_hwnd_to_use)
+                    bg_hwnd = bg_parent if bg_parent else bg_hwnd_to_use
+                    bg_style = ctypes.windll.user32.GetWindowLongW(bg_hwnd, GWL_EXSTYLE)
+                    bg_style = (bg_style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW
+                    ctypes.windll.user32.SetWindowLongW(bg_hwnd, GWL_EXSTYLE, bg_style)
+
+                    GWLP_HWNDPARENT = -8
+                    ctypes.windll.user32.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, bg_hwnd)
             elif IS_LINUX:
                 try:
                     self.win.attributes('-type', 'utility')
@@ -1448,7 +1599,8 @@ class OverlayApp:
         y = getattr(self, 'start_y', 0)
         
         self.win.geometry(f"{w}x{h}+{x}+{y}")
-        self.win.lift()
+        self.sync_bg_window(w, h)
+        self.ensure_z_order()
         self.win.focus_force()
 
     def create_widgets(self):
@@ -1468,19 +1620,50 @@ class OverlayApp:
         widget.bind("<B1-Motion>", self.do_drag)
 
     def start_drag(self, event):
-        self._drag_data["x"] = event.x
-        self._drag_data["y"] = event.y
+        self._drag_data["win_start_x"] = self.win.winfo_x()
+        self._drag_data["win_start_y"] = self.win.winfo_y()
+        self._drag_data["mouse_start_x"] = event.x_root
+        self._drag_data["mouse_start_y"] = event.y_root
 
     def do_drag(self, event):
-        delta_x = event.x - self._drag_data["x"]
-        delta_y = event.y - self._drag_data["y"]
-        x = self.win.winfo_x() + delta_x
-        y = self.win.winfo_y() + delta_y
-        self.win.geometry(f"+{x}+{y}")
+        if "win_start_x" not in self._drag_data or "mouse_start_x" not in self._drag_data:
+            return
+        dx = event.x_root - self._drag_data["mouse_start_x"]
+        dy = event.y_root - self._drag_data["mouse_start_y"]
+        x = self._drag_data["win_start_x"] + dx
+        y = self._drag_data["win_start_y"] + dy
+
+        if IS_WINDOWS and hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            try:
+                def get_hwnd(w):
+                    hid = w.winfo_id()
+                    p = ctypes.windll.user32.GetParent(hid)
+                    return p if p else hid
+
+                hwnd_bg = get_hwnd(self.bg_win)
+                hwnd_fg = get_hwnd(self.win)
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+                SWP_NOACTIVATE = 0x0010
+
+                hdwp = ctypes.windll.user32.BeginDeferWindowPos(2)
+                hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_bg, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+                hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_fg, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+                ctypes.windll.user32.EndDeferWindowPos(hdwp)
+            except Exception:
+                self.win.geometry(f"+{x}+{y}")
+                self.bg_win.geometry(f"+{x}+{y}")
+        else:
+            self.win.geometry(f"+{x}+{y}")
+            if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                self.bg_win.geometry(f"+{x}+{y}")
 
     def toggle_topmost(self):
         self.is_topmost = not self.is_topmost
         self.win.attributes("-topmost", self.is_topmost)
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.attributes("-topmost", self.is_topmost)
+        self.ensure_z_order()
         symbol = "📌" if self.is_topmost else "📍"
         if hasattr(self, 'btn_topmost') and self.btn_topmost and self.btn_topmost.winfo_exists():
             self.btn_topmost.config(text=symbol)
@@ -1501,109 +1684,152 @@ class OverlayApp:
                 self.tray.update_menu()
             except Exception:
                 pass
-        if self.is_compact:
-            self.win.geometry(f"{self.width_compact}x{self.height_compact}")
-            self.create_widgets()
-            self.update_calculations(source="demand")
-        else:
-            self.win.geometry(f"{self.width_detailed}x{self.height_detailed}")
-            self.create_widgets()
-            self.update_calculations(source="demand")
+        w = self.width_compact if self.is_compact else self.width_detailed
+        h = self.height_compact if self.is_compact else self.height_detailed
+        x = self.win.winfo_x()
+        y = self.win.winfo_y()
+
+        self.win.geometry(f"{w}x{h}+{x}+{y}")
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.geometry(f"{w}x{h}+{x}+{y}")
+
+        self.create_widgets()
+        self.update_calculations(source="demand")
+
+        self.win.update_idletasks()
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.update_idletasks()
+
+        if IS_WINDOWS and hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            try:
+                def get_hwnd(widget):
+                    hid = widget.winfo_id()
+                    p = ctypes.windll.user32.GetParent(hid)
+                    return p if p else hid
+
+                hwnd_bg = get_hwnd(self.bg_win)
+                hwnd_fg = get_hwnd(self.win)
+                SWP_NOZORDER = 0x0004
+                SWP_NOACTIVATE = 0x0010
+                SWP_FRAMECHANGED = 0x0020
+
+                hdwp = ctypes.windll.user32.BeginDeferWindowPos(2)
+                hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_bg, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+                hdwp = ctypes.windll.user32.DeferWindowPos(hdwp, hwnd_fg, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+                ctypes.windll.user32.EndDeferWindowPos(hdwp)
+
+                flags = 0x0001 | 0x0100 | 0x0080 | 0x0400  # RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME
+                ctypes.windll.user32.RedrawWindow(hwnd_bg, 0, 0, flags)
+                ctypes.windll.user32.RedrawWindow(hwnd_fg, 0, 0, flags)
+            except Exception:
+                pass
 
     def build_detailed_layout(self):
-        title_bar = tk.Frame(self.win, bg=BG_HEADER, height=36)
-        title_bar.pack(fill="x", side="top")
+        title_bar = tk.Frame(self.win, bg=WIN_BG, height=36)
+        title_bar.pack(fill="x", side="top", padx=6, pady=(6, 4))
         title_bar.pack_propagate(False)
         self.make_draggable(title_bar)
 
-        title_lbl = tk.Label(title_bar, text=f" APRM Calculator v{__version__}", bg=BG_HEADER, fg=ACCENT_CYAN,
+        title_lbl = tk.Label(title_bar, text=f" APRM Calculator v{__version__}", bg=WIN_BG, fg=ACCENT_CYAN,
                              font=("Consolas", 9, "bold"))
-        title_lbl.pack(side="left", padx=5)
+        title_lbl.pack(side="left", padx=(2, 5), pady=(2, 4))
         self.make_draggable(title_lbl)
 
-        btn_close = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"))
-        btn_close.pack(side="right", fill="y")
+        btn_close = tk.Label(title_bar, text="✕", bg=BG_CARD, fg=TEXT_MUTED, width=3, font=("Segoe UI", 9, "bold"),
+                             cursor="hand2", bd=1, relief="solid", pady=3)
+        btn_close.pack(side="right", padx=(2, 0), pady=(2, 4))
         btn_close.bind("<Button-1>", lambda e: self.quit_app())
         btn_close.bind("<Enter>", lambda e: btn_close.config(bg=ACCENT_RED, fg=TEXT_LIGHT))
-        btn_close.bind("<Leave>", lambda e: btn_close.config(bg=BG_HEADER, fg=TEXT_MUTED))
+        btn_close.bind("<Leave>", lambda e: btn_close.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        btn_settings = tk.Label(title_bar, text="⚙", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11))
-        btn_settings.pack(side="right", fill="y")
+        btn_settings = tk.Label(title_bar, text="⚙", bg=BG_CARD, fg=TEXT_MUTED, width=3, font=("Segoe UI", 9),
+                                cursor="hand2", bd=1, relief="solid", pady=3)
+        btn_settings.pack(side="right", padx=2, pady=(2, 4))
         btn_settings.bind("<Button-1>", lambda e: self.open_settings_dialog())
-        btn_settings.bind("<Enter>", lambda e: btn_settings.config(bg=BG_CARD, fg=ACCENT_CYAN))
-        btn_settings.bind("<Leave>", lambda e: btn_settings.config(bg=BG_HEADER, fg=TEXT_MUTED))
+        btn_settings.bind("<Enter>", lambda e: btn_settings.config(bg="#1f2937", fg=ACCENT_CYAN))
+        btn_settings.bind("<Leave>", lambda e: btn_settings.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        btn_server_sync = tk.Label(title_bar, text="🌐", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 10), cursor="hand2")
-        btn_server_sync.pack(side="right", fill="y")
+        btn_server_sync = tk.Label(title_bar, text="🌐", bg=BG_CARD, fg=TEXT_MUTED, width=3, font=("Segoe UI", 10),
+                                   cursor="hand2", bd=1, relief="solid", pady=2)
+        btn_server_sync.pack(side="right", padx=2, pady=(2, 4))
         btn_server_sync.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
-        btn_server_sync.bind("<Enter>", lambda e: btn_server_sync.config(bg=BG_CARD, fg=ACCENT_CYAN))
-        btn_server_sync.bind("<Leave>", lambda e: btn_server_sync.config(bg=BG_HEADER, fg=TEXT_MUTED))
+        btn_server_sync.bind("<Enter>", lambda e: btn_server_sync.config(bg="#1f2937", fg=ACCENT_CYAN))
+        btn_server_sync.bind("<Leave>", lambda e: btn_server_sync.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        btn_comp = tk.Label(title_bar, text="⛶", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11))
-        btn_comp.pack(side="right", fill="y")
+        btn_comp = tk.Label(title_bar, text="⛶", bg=BG_CARD, fg=TEXT_MUTED, width=3, font=("Segoe UI", 9),
+                            cursor="hand2", bd=1, relief="solid", pady=3)
+        btn_comp.pack(side="right", padx=2, pady=(2, 4))
         btn_comp.bind("<Button-1>", lambda e: self.toggle_compact())
-        btn_comp.bind("<Enter>", lambda e: btn_comp.config(bg=BG_CARD, fg=ACCENT_CYAN))
-        btn_comp.bind("<Leave>", lambda e: btn_comp.config(bg=BG_HEADER, fg=TEXT_MUTED))
+        btn_comp.bind("<Enter>", lambda e: btn_comp.config(bg="#1f2937", fg=ACCENT_CYAN))
+        btn_comp.bind("<Leave>", lambda e: btn_comp.config(bg=BG_CARD, fg=TEXT_MUTED))
 
         symbol = "📌" if self.is_topmost else "📍"
-        self.btn_topmost = tk.Label(title_bar, text=symbol, bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 10))
-        self.btn_topmost.pack(side="right", fill="y")
+        self.btn_topmost = tk.Label(title_bar, text=symbol, bg=BG_CARD, fg=TEXT_MUTED, width=3, font=("Segoe UI", 10),
+                                    cursor="hand2", bd=1, relief="solid", pady=2)
+        self.btn_topmost.pack(side="right", padx=2, pady=(2, 4))
         self.btn_topmost.bind("<Button-1>", lambda e: self.toggle_topmost())
-        self.btn_topmost.bind("<Enter>", lambda e: self.btn_topmost.config(bg=BG_CARD, fg=ACCENT_CYAN))
-        self.btn_topmost.bind("<Leave>", lambda e: self.btn_topmost.config(bg=BG_HEADER, fg=TEXT_MUTED))
+        self.btn_topmost.bind("<Enter>", lambda e: self.btn_topmost.config(bg="#1f2937", fg=ACCENT_CYAN))
+        self.btn_topmost.bind("<Leave>", lambda e: self.btn_topmost.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        self.lbl_recirc_indicator = tk.Label(title_bar, text="", bg=BG_HEADER, fg=ACCENT_GOLD,
-                                             font=("Segoe UI", 8, "bold"), cursor="hand2")
+        self.lbl_recirc_indicator = tk.Label(title_bar, text="", bg=BG_CARD, fg=ACCENT_GOLD,
+                                             font=("Segoe UI", 8, "bold"), cursor="hand2", bd=1, relief="solid", padx=4, pady=3)
         self.lbl_recirc_indicator.bind("<Button-1>", lambda e: self.reset_recirc_override())
 
-        container = tk.Frame(self.win, bg=BG_MAIN, padx=15, pady=15)
+        container = tk.Frame(self.win, bg=WIN_BG, padx=12, pady=10)
         container.pack(fill="both", expand=True)
         self.make_draggable(container)
 
-        unit_frame = tk.Frame(container, bg=BG_MAIN)
-        unit_frame.pack(fill="x", pady=(0, 10))
+        unit_frame = tk.Frame(container, bg=WIN_BG)
+        unit_frame.pack(fill="x", pady=(0, 8))
         self.make_draggable(unit_frame)
 
         self.btn_u1 = tk.Label(unit_frame, text="UNIT 1", bg=BG_CARD, fg=ACCENT_CYAN, font=("Segoe UI", 9, "bold"),
-                               pady=6, width=14, bd=1, relief="flat", cursor="hand2")
+                               pady=5, width=13, bd=1, relief="solid", cursor="hand2")
         self.btn_u1.pack(side="left", fill="x", padx=(0, 4))
         self.btn_u1.bind("<Button-1>", lambda e: self.select_unit(1))
+        self.btn_u1.bind("<Enter>", lambda e: self.btn_u1.config(bg="#1f2937", fg=TEXT_LIGHT) if self.calc.selected_unit != 1 else None)
+        self.btn_u1.bind("<Leave>", lambda e: self.update_unit_ui_state())
 
-        self.btn_u2 = tk.Label(unit_frame, text="UNIT 2", bg=BG_MAIN, fg=TEXT_MUTED, font=("Segoe UI", 9, "bold"),
-                               pady=6, width=14, bd=1, relief="flat", cursor="hand2")
+        self.btn_u2 = tk.Label(unit_frame, text="UNIT 2", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 9, "bold"),
+                               pady=5, width=13, bd=1, relief="solid", cursor="hand2")
         self.btn_u2.pack(side="left", fill="x", padx=(4, 4))
         self.btn_u2.bind("<Button-1>", lambda e: self.select_unit(2))
+        self.btn_u2.bind("<Enter>", lambda e: self.btn_u2.config(bg="#1f2937", fg=TEXT_LIGHT) if self.calc.selected_unit != 2 else None)
+        self.btn_u2.bind("<Leave>", lambda e: self.update_unit_ui_state())
 
-        self.lbl_sync_dtl = tk.Label(unit_frame, text="Next: -- MWe", bg=BG_MAIN, fg=ACCENT_GOLD, font=("Segoe UI", 8, "bold"), cursor="hand2")
+        self.lbl_sync_dtl = tk.Label(unit_frame, text="Next: -- MWe", bg=BG_CARD, fg=ACCENT_GOLD, font=("Segoe UI", 8, "bold"),
+                                     cursor="hand2", bd=1, relief="solid", padx=6, pady=5)
         self.lbl_sync_dtl.pack(side="right", padx=(4, 0))
         self.lbl_sync_dtl.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
+        self.lbl_sync_dtl.bind("<Enter>", lambda e: self.lbl_sync_dtl.config(bg="#1f2937", fg=ACCENT_CYAN))
+        self.lbl_sync_dtl.bind("<Leave>", lambda e: self.lbl_sync_dtl.config(bg=BG_CARD, fg=ACCENT_GOLD))
 
         self.update_unit_ui_state()
 
-        input_card = tk.Frame(container, bg=BG_MAIN, bd=1, relief="solid")
-        input_card.pack(fill="both", expand=True, pady=(5, 5))
+        input_card = tk.Frame(container, bg=WIN_BG, bd=0)
+        input_card.pack(fill="both", expand=True, pady=(2, 2))
         self.make_draggable(input_card)
 
         input_card.grid_columnconfigure(0, weight=1)
         input_card.grid_columnconfigure(1, weight=1)
 
-        lbl_in_header = tk.Label(input_card, text="INPUTS", bg=BG_MAIN, fg=ACCENT_GREEN, font=("Consolas", 8, "bold"))
-        lbl_in_header.grid(row=0, column=0, pady=(6, 6), sticky="w", padx=10)
+        lbl_in_header = tk.Label(input_card, text="INPUTS", bg=WIN_BG, fg=ACCENT_GREEN, font=("Consolas", 8, "bold"))
+        lbl_in_header.grid(row=0, column=0, pady=(4, 4), sticky="w", padx=10)
         self.make_draggable(lbl_in_header)
 
-        lbl_demand = tk.Label(input_card, text="DEMAND LOAD (MWt)", bg=BG_MAIN, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
+        lbl_demand = tk.Label(input_card, text="DEMAND LOAD (MWt)", bg=WIN_BG, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
         lbl_demand.grid(row=1, column=0, sticky="w", pady=2, padx=10)
         self.make_draggable(lbl_demand)
 
-        demand_adj_frame = tk.Frame(input_card, bg=BG_MAIN)
-        demand_adj_frame.grid(row=2, column=0, sticky="w", pady=(0, 10), padx=10)
+        demand_adj_frame = tk.Frame(input_card, bg=WIN_BG)
+        demand_adj_frame.grid(row=2, column=0, sticky="w", pady=(0, 8), padx=10)
         self.make_draggable(demand_adj_frame)
 
         btn_min10 = tk.Label(demand_adj_frame, text="-10", bg=BG_CARD, fg=ACCENT_CYAN, 
-                             font=("Consolas", 8, "bold"), padx=5, pady=2, cursor="hand2")
+                             font=("Consolas", 8, "bold"), padx=6, pady=3, cursor="hand2", bd=1, relief="solid")
         btn_min10.pack(side="left", padx=(0, 2))
         btn_min10.bind("<Button-1>", lambda e: self.adjust_demand(-10))
-        btn_min10.bind("<Enter>", lambda e: btn_min10.config(bg=BG_HEADER, fg=TEXT_LIGHT))
+        btn_min10.bind("<Enter>", lambda e: btn_min10.config(bg="#1f2937", fg=TEXT_LIGHT))
         btn_min10.bind("<Leave>", lambda e: btn_min10.config(bg=BG_CARD, fg=ACCENT_CYAN))
 
         self.ent_demand = tk.Entry(demand_adj_frame, textvariable=self.var_demand, bg=BG_CARD, fg=TEXT_LIGHT, 
@@ -1613,14 +1839,14 @@ class OverlayApp:
         self.ent_demand.pack(side="left", padx=2)
 
         btn_add10 = tk.Label(demand_adj_frame, text="+10", bg=BG_CARD, fg=ACCENT_CYAN, 
-                             font=("Consolas", 8, "bold"), padx=5, pady=2, cursor="hand2")
+                             font=("Consolas", 8, "bold"), padx=6, pady=3, cursor="hand2", bd=1, relief="solid")
         btn_add10.pack(side="left", padx=(2, 0))
         btn_add10.bind("<Button-1>", lambda e: self.adjust_demand(10))
-        btn_add10.bind("<Enter>", lambda e: btn_add10.config(bg=BG_HEADER, fg=TEXT_LIGHT))
+        btn_add10.bind("<Enter>", lambda e: btn_add10.config(bg="#1f2937", fg=TEXT_LIGHT))
         btn_add10.bind("<Leave>", lambda e: btn_add10.config(bg=BG_CARD, fg=ACCENT_CYAN))
 
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
-        self.lbl_rtp_in = tk.Label(input_card, text=f"CORE POWER ({unit_suffix}%)", bg=BG_MAIN, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
+        self.lbl_rtp_in = tk.Label(input_card, text=f"CORE POWER ({unit_suffix}%)", bg=WIN_BG, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
         self.lbl_rtp_in.grid(row=3, column=0, sticky="w", pady=2, padx=10)
         self.make_draggable(self.lbl_rtp_in)
 
@@ -1628,133 +1854,140 @@ class OverlayApp:
                                 insertbackground=TEXT_LIGHT, font=("Consolas", 11, "bold"), bd=0, 
                                 highlightthickness=1, highlightcolor=ACCENT_CYAN, highlightbackground=BG_CARD, 
                                 width=12, justify="center")
-        self.ent_rtp.grid(row=4, column=0, sticky="w", pady=(0, 10), padx=10)
+        self.ent_rtp.grid(row=4, column=0, sticky="w", pady=(0, 8), padx=10)
 
-        lbl_out_header = tk.Label(input_card, text="OUTPUTS", bg=BG_MAIN, fg=ACCENT_CYAN, font=("Consolas", 8, "bold"))
-        lbl_out_header.grid(row=0, column=1, pady=(6, 6), sticky="w", padx=10)
+        lbl_out_header = tk.Label(input_card, text="OUTPUTS", bg=WIN_BG, fg=ACCENT_CYAN, font=("Consolas", 8, "bold"))
+        lbl_out_header.grid(row=0, column=1, pady=(4, 4), sticky="w", padx=10)
         self.make_draggable(lbl_out_header)
 
-        lbl_gen = tk.Label(input_card, text="GENERATOR LOAD", bg=BG_MAIN, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
+        lbl_gen = tk.Label(input_card, text="GENERATOR LOAD", bg=WIN_BG, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
         lbl_gen.grid(row=1, column=1, sticky="w", pady=2, padx=10)
         self.make_draggable(lbl_gen)
         
-        self.lbl_gen_val = tk.Label(input_card, text="0.00 MWe", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
-        self.lbl_gen_val.grid(row=2, column=1, sticky="w", pady=(0, 10), padx=10)
+        self.lbl_gen_val = tk.Label(input_card, text="0.00 MWe", bg=WIN_BG, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
+        self.lbl_gen_val.grid(row=2, column=1, sticky="w", pady=(0, 8), padx=10)
         self.make_draggable(self.lbl_gen_val)
 
-        lbl_feed = tk.Label(input_card, text="FEEDWATER FLOW", bg=BG_MAIN, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
+        lbl_feed = tk.Label(input_card, text="FEEDWATER FLOW", bg=WIN_BG, fg=TEXT_MUTED, font=("Consolas", 8, "bold"))
         lbl_feed.grid(row=3, column=1, sticky="w", pady=2, padx=10)
         self.make_draggable(lbl_feed)
         
-        self.lbl_feed_val = tk.Label(input_card, text="0.00 kg/s", bg=BG_MAIN, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
-        self.lbl_feed_val.grid(row=4, column=1, sticky="w", pady=(0, 10), padx=10)
+        self.lbl_feed_val = tk.Label(input_card, text="0.00 kg/s", bg=WIN_BG, fg=TEXT_LIGHT, font=("Consolas", 11, "bold"))
+        self.lbl_feed_val.grid(row=4, column=1, sticky="w", pady=(0, 8), padx=10)
         self.make_draggable(self.lbl_feed_val)
 
-        self.btn_feedback = tk.Label(container, text="Feedback & Suggestions", bg=BG_MAIN, fg=TEXT_MUTED,
-                                     font=("Segoe UI", 8, "bold"), cursor="hand2")
-        self.btn_feedback.pack(side="bottom", pady=(3, 3))
+        self.btn_feedback = tk.Label(container, text="Feedback & Suggestions", bg=BG_CARD, fg=TEXT_MUTED,
+                                     font=("Segoe UI", 8, "bold"), cursor="hand2", bd=1, relief="solid", padx=8, pady=3)
+        self.btn_feedback.pack(side="bottom", pady=(4, 0))
         self.btn_feedback.bind("<Button-1>", lambda e: self.open_suggestions_dialog())
-        self.btn_feedback.bind("<Enter>", lambda e: self.btn_feedback.config(fg=ACCENT_CYAN))
-        self.btn_feedback.bind("<Leave>", lambda e: self.btn_feedback.config(fg=TEXT_MUTED))
+        self.btn_feedback.bind("<Enter>", lambda e: self.btn_feedback.config(bg="#1f2937", fg=ACCENT_CYAN))
+        self.btn_feedback.bind("<Leave>", lambda e: self.btn_feedback.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        self.neon_frame = tk.Frame(container, bg=BG_CARD, padx=8, pady=8, bd=1, relief="solid")
-        self.neon_frame.pack(fill="x", side="bottom", pady=(5, 0))
+        self.neon_frame = tk.Frame(container, bg=WIN_BG, padx=8, pady=6, bd=0)
+        self.neon_frame.pack(fill="x", side="bottom", pady=(4, 0))
         self.make_draggable(self.neon_frame)
 
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
-        self.lbl_neon_rtp = tk.Label(self.neon_frame, text=f"0.00% {unit_suffix}", bg=BG_CARD, fg=ACCENT_CYAN, 
+        self.lbl_neon_rtp = tk.Label(self.neon_frame, text=f"0.00% {unit_suffix}", bg=WIN_BG, fg=ACCENT_CYAN, 
                                      font=("Consolas", 18, "bold"))
         self.lbl_neon_rtp.pack(anchor="center")
         self.make_draggable(self.lbl_neon_rtp)
 
-        self.lbl_neon_sub = tk.Label(self.neon_frame, text="APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED, 
+        self.lbl_neon_sub = tk.Label(self.neon_frame, text="APRM REACTOR POWER STATUS", bg=WIN_BG, fg=TEXT_MUTED, 
                                      font=("Consolas", 8, "bold"))
         self.lbl_neon_sub.pack(anchor="center", pady=(2, 0))
         self.make_draggable(self.lbl_neon_sub)
 
     def build_compact_layout(self):
-        compact_frame = tk.Frame(self.win, bg=BG_HEADER, padx=8, pady=5)
+        compact_frame = tk.Frame(self.win, bg=WIN_BG, padx=6, pady=4)
         compact_frame.pack(fill="both", expand=True)
         self.make_draggable(compact_frame)
         compact_frame.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
         # Pack right-side control buttons first so they are never clipped/hidden when layout expands
-        btn_close = tk.Label(compact_frame, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 9, "bold"), cursor="hand2")
-        btn_close.pack(side="right", padx=2)
+        btn_close = tk.Label(compact_frame, text="✕", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 9, "bold"),
+                             cursor="hand2", bd=1, relief="solid", padx=5, pady=1)
+        btn_close.pack(side="right", padx=(2, 2), pady=2)
         btn_close.bind("<Button-1>", lambda e: self.quit_app())
-        btn_close.bind("<Enter>", lambda e: btn_close.config(fg=ACCENT_RED))
-        btn_close.bind("<Leave>", lambda e: btn_close.config(fg=TEXT_MUTED))
+        btn_close.bind("<Enter>", lambda e: btn_close.config(bg=ACCENT_RED, fg=TEXT_LIGHT))
+        btn_close.bind("<Leave>", lambda e: btn_close.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        btn_exp = tk.Label(compact_frame, text="⛶", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 9), cursor="hand2")
-        btn_exp.pack(side="right", padx=4)
+        btn_exp = tk.Label(compact_frame, text="⛶", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 9),
+                           cursor="hand2", bd=1, relief="solid", padx=5, pady=1)
+        btn_exp.pack(side="right", padx=2, pady=2)
         btn_exp.bind("<Button-1>", lambda e: self.toggle_compact())
-        btn_exp.bind("<Enter>", lambda e: btn_exp.config(fg=ACCENT_CYAN))
-        btn_exp.bind("<Leave>", lambda e: btn_exp.config(fg=TEXT_MUTED))
+        btn_exp.bind("<Enter>", lambda e: btn_exp.config(bg="#1f2937", fg=ACCENT_CYAN))
+        btn_exp.bind("<Leave>", lambda e: btn_exp.config(bg=BG_CARD, fg=TEXT_MUTED))
 
-        self.lbl_compact_sync_dtl = tk.Label(compact_frame, text="--", bg=BG_HEADER, fg=ACCENT_GOLD, font=("Consolas", 8, "bold"), cursor="hand2")
-        self.lbl_compact_sync_dtl.pack(side="right", padx=4)
+        self.lbl_compact_sync_dtl = tk.Label(compact_frame, text="--", bg=BG_CARD, fg=ACCENT_GOLD,
+                                             font=("Consolas", 8, "bold"), cursor="hand2", bd=1, relief="solid", padx=4, pady=1)
+        self.lbl_compact_sync_dtl.pack(side="right", padx=2, pady=2)
         self.lbl_compact_sync_dtl.bind("<Button-1>", lambda e: self.open_server_sync_dialog())
-        self.lbl_compact_sync_dtl.bind("<Enter>", lambda e: self.lbl_compact_sync_dtl.config(fg=ACCENT_CYAN))
-        self.lbl_compact_sync_dtl.bind("<Leave>", lambda e: self.lbl_compact_sync_dtl.config(fg=ACCENT_GOLD))
+        self.lbl_compact_sync_dtl.bind("<Enter>", lambda e: self.lbl_compact_sync_dtl.config(bg="#1f2937", fg=ACCENT_CYAN))
+        self.lbl_compact_sync_dtl.bind("<Leave>", lambda e: self.lbl_compact_sync_dtl.config(bg=BG_CARD, fg=ACCENT_GOLD))
 
-        handle = tk.Label(compact_frame, text="⋮⋮", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 12, "bold"), cursor="fleur")
-        handle.pack(side="left", padx=(0, 5))
+        handle = tk.Label(compact_frame, text="⋮⋮", bg=WIN_BG, fg=TEXT_MUTED, font=("Segoe UI", 11, "bold"), cursor="fleur")
+        handle.pack(side="left", padx=(2, 4))
         self.make_draggable(handle)
         handle.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
-        self.btn_compact_u1 = tk.Label(compact_frame, text="U1", bg=BG_HEADER, fg=TEXT_MUTED,
-                                       font=("Segoe UI", 8, "bold"), padx=4, pady=2, cursor="hand2")
-        self.btn_compact_u1.pack(side="left", padx=(2, 1))
+        self.btn_compact_u1 = tk.Label(compact_frame, text="U1", bg=BG_CARD, fg=TEXT_MUTED,
+                                       font=("Segoe UI", 8, "bold"), padx=4, pady=1, cursor="hand2", bd=1, relief="solid")
+        self.btn_compact_u1.pack(side="left", padx=(1, 1), pady=2)
         self.btn_compact_u1.bind("<Button-1>", lambda e: self.select_unit(1))
+        self.btn_compact_u1.bind("<Enter>", lambda e: self.btn_compact_u1.config(bg="#1f2937", fg=TEXT_LIGHT) if self.calc.selected_unit != 1 else None)
+        self.btn_compact_u1.bind("<Leave>", lambda e: self.update_unit_ui_state())
 
-        self.btn_compact_u2 = tk.Label(compact_frame, text="U2", bg=BG_HEADER, fg=TEXT_MUTED,
-                                       font=("Segoe UI", 8, "bold"), padx=4, pady=2, cursor="hand2")
-        self.btn_compact_u2.pack(side="left", padx=(1, 2))
+        self.btn_compact_u2 = tk.Label(compact_frame, text="U2", bg=BG_CARD, fg=TEXT_MUTED,
+                                       font=("Segoe UI", 8, "bold"), padx=4, pady=1, cursor="hand2", bd=1, relief="solid")
+        self.btn_compact_u2.pack(side="left", padx=(1, 2), pady=2)
         self.btn_compact_u2.bind("<Button-1>", lambda e: self.select_unit(2))
+        self.btn_compact_u2.bind("<Enter>", lambda e: self.btn_compact_u2.config(bg="#1f2937", fg=TEXT_LIGHT) if self.calc.selected_unit != 2 else None)
+        self.btn_compact_u2.bind("<Leave>", lambda e: self.update_unit_ui_state())
 
-        lbl_mw = tk.Label(compact_frame, text="MWt:", bg=BG_HEADER, fg=TEXT_MUTED, font=("Segoe UI", 8, "bold"))
+        lbl_mw = tk.Label(compact_frame, text="MWt:", bg=WIN_BG, fg=TEXT_MUTED, font=("Segoe UI", 8, "bold"))
         lbl_mw.pack(side="left", padx=2)
         self.make_draggable(lbl_mw)
 
         btn_min10 = tk.Label(compact_frame, text="-", bg=BG_CARD, fg=ACCENT_CYAN, 
-                             font=("Segoe UI", 9, "bold"), padx=4, pady=1, cursor="hand2")
-        btn_min10.pack(side="left", padx=(2, 1))
+                             font=("Segoe UI", 9, "bold"), padx=5, pady=1, cursor="hand2", bd=1, relief="solid")
+        btn_min10.pack(side="left", padx=(2, 1), pady=2)
         btn_min10.bind("<Button-1>", lambda e: self.adjust_demand(-10))
-        btn_min10.bind("<Enter>", lambda e: btn_min10.config(fg=TEXT_LIGHT))
-        btn_min10.bind("<Leave>", lambda e: btn_min10.config(fg=ACCENT_CYAN))
+        btn_min10.bind("<Enter>", lambda e: btn_min10.config(bg="#1f2937", fg=TEXT_LIGHT))
+        btn_min10.bind("<Leave>", lambda e: btn_min10.config(bg=BG_CARD, fg=ACCENT_CYAN))
 
-        self.ent_demand = tk.Entry(compact_frame, textvariable=self.var_demand, bg=BG_MAIN, fg=TEXT_LIGHT,
+        self.ent_demand = tk.Entry(compact_frame, textvariable=self.var_demand, bg=BG_CARD, fg=TEXT_LIGHT,
                                    insertbackground=TEXT_LIGHT, font=("Consolas", 10, "bold"), bd=0,
                                    highlightthickness=1, highlightcolor=ACCENT_CYAN, highlightbackground=BG_CARD,
                                    width=6, justify="center")
-        self.ent_demand.pack(side="left", padx=2)
+        self.ent_demand.pack(side="left", padx=2, pady=2)
 
         btn_add10 = tk.Label(compact_frame, text="+", bg=BG_CARD, fg=ACCENT_CYAN, 
-                             font=("Segoe UI", 9, "bold"), padx=4, pady=1, cursor="hand2")
-        btn_add10.pack(side="left", padx=(1, 2))
+                             font=("Segoe UI", 9, "bold"), padx=5, pady=1, cursor="hand2", bd=1, relief="solid")
+        btn_add10.pack(side="left", padx=(1, 2), pady=2)
         btn_add10.bind("<Button-1>", lambda e: self.adjust_demand(10))
-        btn_add10.bind("<Enter>", lambda e: btn_add10.config(fg=TEXT_LIGHT))
-        btn_add10.bind("<Leave>", lambda e: btn_add10.config(fg=ACCENT_CYAN))
+        btn_add10.bind("<Enter>", lambda e: btn_add10.config(bg="#1f2937", fg=TEXT_LIGHT))
+        btn_add10.bind("<Leave>", lambda e: btn_add10.config(bg=BG_CARD, fg=ACCENT_CYAN))
 
-        self.lbl_arrow_ref = tk.Label(compact_frame, text="➔", bg=BG_HEADER, fg=ACCENT_CYAN, font=("Segoe UI", 10, "bold"))
+        self.lbl_arrow_ref = tk.Label(compact_frame, text="➔", bg=WIN_BG, fg=ACCENT_CYAN, font=("Segoe UI", 10, "bold"))
         self.lbl_arrow_ref.pack(side="left", padx=2)
         self.make_draggable(self.lbl_arrow_ref)
         self.lbl_arrow_ref.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
         # Stack RTP and Flow vertically to save horizontal space
-        self.telemetry_frame = tk.Frame(compact_frame, bg=BG_HEADER)
+        self.telemetry_frame = tk.Frame(compact_frame, bg=WIN_BG)
         self.telemetry_frame.pack(side="left", padx=(2, 0))
         self.make_draggable(self.telemetry_frame)
         self.telemetry_frame.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
-        self.lbl_compact_rtp = tk.Label(self.telemetry_frame, text=f"0.0% {unit_suffix}", bg=BG_HEADER, fg=ACCENT_CYAN,
+        self.lbl_compact_rtp = tk.Label(self.telemetry_frame, text=f"0.0% {unit_suffix}", bg=WIN_BG, fg=ACCENT_CYAN,
                                          font=("Consolas", 10, "bold"))
         self.lbl_compact_rtp.pack(side="top", anchor="center")
         self.make_draggable(self.lbl_compact_rtp)
         self.lbl_compact_rtp.bind("<Double-Button-1>", lambda e: self.toggle_compact())
 
-        self.lbl_compact_flow = tk.Label(self.telemetry_frame, text="[0 kg/s]", bg=BG_HEADER, fg=TEXT_MUTED,
+        self.lbl_compact_flow = tk.Label(self.telemetry_frame, text="[0 kg/s]", bg=WIN_BG, fg=TEXT_MUTED,
                                          font=("Consolas", 8))
         self.lbl_compact_flow.pack(side="top", anchor="center")
         self.make_draggable(self.lbl_compact_flow)
@@ -1768,10 +2001,13 @@ class OverlayApp:
         except ValueError:
             val = 0.0
         new_val = max(0.0, val + amount)
+        self._demand_changed_waiting_heartbeat = True
+        self._pending_demand_value = new_val
         self.var_demand.set(f"{new_val:.2f}" if not self.is_compact else f"{int(new_val)}")
 
     def select_unit(self, unit):
         self.calc.selected_unit = unit
+        self._demand_changed_waiting_heartbeat = False
         if hasattr(self, 'active_overlay_server') and self.active_overlay_server:
             st = self.active_overlay_server.get("state", {})
             u_st = st.get("Unit1", {}) if unit == 1 else st.get("Unit2", {})
@@ -1785,6 +2021,7 @@ class OverlayApp:
                     except (ValueError, TypeError):
                         pass
             if dem_val is not None:
+                self._last_synced_demand = dem_val
                 self.var_demand.set(str(dem_val))
 
         self.update_unit_ui_state()
@@ -1845,9 +2082,10 @@ class OverlayApp:
 
     def save_settings(self):
         try:
+            current_opacity = self.bg_win.attributes("-alpha") if (hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists()) else self.win.attributes("-alpha")
             data = {
                 "usage": self.calc.usage,
-                "opacity": self.win.attributes("-alpha"),
+                "opacity": current_opacity,
                 "selected_unit": self.calc.selected_unit,
                 "is_compact": self.is_compact,
                 "is_topmost": self.is_topmost,
@@ -1865,9 +2103,14 @@ class OverlayApp:
             pass
 
     def restore_window(self):
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.deiconify()
         self.win.deiconify()
-        self.win.lift()
+        self.sync_bg_window()
         self.win.attributes("-topmost", self.is_topmost)
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            self.bg_win.attributes("-topmost", self.is_topmost)
+        self.ensure_z_order()
         if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
             self.settings_window.lift(self.win)
         if hasattr(self, 'suggestions_window') and self.suggestions_window and self.suggestions_window.winfo_exists():
@@ -1892,6 +2135,11 @@ class OverlayApp:
                 self.tray.stop()
             except Exception:
                 pass
+        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+            try:
+                self.bg_win.destroy()
+            except Exception:
+                pass
         self.root.destroy()
         os._exit(0)
 
@@ -1899,18 +2147,18 @@ class OverlayApp:
         if hasattr(self, 'btn_u1') and hasattr(self, 'btn_u2') and self.btn_u1.winfo_exists() and self.btn_u2.winfo_exists():
             if self.calc.selected_unit == 1:
                 self.btn_u1.config(bg=BG_CARD, fg=ACCENT_CYAN, text="❖ UNIT 01 ❖", bd=1, relief="solid")
-                self.btn_u2.config(bg=BG_MAIN, fg=TEXT_MUTED, text="  UNIT 02  ", bd=0, relief="flat")
+                self.btn_u2.config(bg=BG_CARD, fg=TEXT_MUTED, text="  UNIT 02  ", bd=1, relief="solid")
             else:
-                self.btn_u1.config(bg=BG_MAIN, fg=TEXT_MUTED, text="  UNIT 01  ", bd=0, relief="flat")
+                self.btn_u1.config(bg=BG_CARD, fg=TEXT_MUTED, text="  UNIT 01  ", bd=1, relief="solid")
                 self.btn_u2.config(bg=BG_CARD, fg=ACCENT_CYAN, text="❖ UNIT 02 ❖", bd=1, relief="solid")
 
         if hasattr(self, 'btn_compact_u1') and hasattr(self, 'btn_compact_u2') and self.btn_compact_u1.winfo_exists() and self.btn_compact_u2.winfo_exists():
             if self.calc.selected_unit == 1:
-                self.btn_compact_u1.config(bg=ACCENT_CYAN, fg=BG_MAIN)
-                self.btn_compact_u2.config(bg=BG_HEADER, fg=TEXT_MUTED)
+                self.btn_compact_u1.config(bg=ACCENT_CYAN, fg=BG_MAIN, bd=1, relief="solid")
+                self.btn_compact_u2.config(bg=BG_CARD, fg=TEXT_MUTED, bd=1, relief="solid")
             else:
-                self.btn_compact_u1.config(bg=BG_HEADER, fg=TEXT_MUTED)
-                self.btn_compact_u2.config(bg=ACCENT_CYAN, fg=BG_MAIN)
+                self.btn_compact_u1.config(bg=BG_CARD, fg=TEXT_MUTED, bd=1, relief="solid")
+                self.btn_compact_u2.config(bg=ACCENT_CYAN, fg=BG_MAIN, bd=1, relief="solid")
 
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
         if hasattr(self, 'lbl_rtp_in') and self.lbl_rtp_in and self.lbl_rtp_in.winfo_exists():
@@ -1941,29 +2189,14 @@ class OverlayApp:
 
         settings_win.geometry(f"{w}x{h}+{x}+{y}")
 
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-            
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = settings_win.winfo_x() + dx
-            py = settings_win.winfo_y() + dy
-
-            settings_win.geometry(f"+{px}+{py}")
-
         title_bar = tk.Frame(settings_win, bg=BG_HEADER, height=30)
         title_bar.pack(fill="x", side="top")
-        title_bar.bind("<Button-1>", start_drag)
-        title_bar.bind("<B1-Motion>", do_drag)
 
         title_lbl = tk.Label(title_bar, text="CONFIGURATION SETTINGS", bg=BG_HEADER, fg=ACCENT_CYAN,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
-        title_lbl.bind("<Button-1>", start_drag)
-        title_lbl.bind("<B1-Motion>", do_drag)
+
+        self.make_popup_draggable(settings_win, title_bar, title_lbl)
 
         btn_close = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
         btn_close.pack(side="right", fill="y")
@@ -1995,7 +2228,8 @@ class OverlayApp:
         lbl_opacity = tk.Label(content_frame, text="Overlay Opacity:", bg=BG_CARD, fg=TEXT_LIGHT, font=("Segoe UI", 9))
         lbl_opacity.grid(row=2, column=0, sticky="w", pady=4)
 
-        self.slider_opacity = ttk.Scale(content_frame, from_=0.3, to=1.0, value=self.win.attributes("-alpha"),
+        current_opacity = self.bg_win.attributes("-alpha") if (hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists()) else self.win.attributes("-alpha")
+        self.slider_opacity = ttk.Scale(content_frame, from_=0.1, to=1.0, value=current_opacity,
                                          orient="horizontal", command=self.on_opacity_change)
         self.slider_opacity.grid(row=2, column=1, sticky="we", padx=10, pady=4)
 
@@ -2100,6 +2334,7 @@ class OverlayApp:
             if event.widget == settings_win:
                 self.settings_window = None
                 self.update_topmost_state()
+                self.ensure_z_order()
 
         settings_win.bind("<Destroy>", on_settings_destroy)
         settings_win.focus_force()
@@ -2120,7 +2355,11 @@ class OverlayApp:
     def on_opacity_change(self, value):
         try:
             alpha = float(value)
-            self.win.attributes("-alpha", alpha)
+            if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                self.bg_win.attributes("-alpha", alpha)
+                self.ensure_z_order()
+            else:
+                self.win.attributes("-alpha", alpha)
             self.save_settings()
         except ValueError:
             pass
@@ -2224,7 +2463,7 @@ class OverlayApp:
 
         try:
             for child in self.root.winfo_children():
-                if isinstance(child, tk.Toplevel) and child != self.win and child.winfo_exists():
+                if isinstance(child, tk.Toplevel) and child != self.win and child != getattr(self, 'bg_win', None) and child.winfo_exists():
                     return True
         except Exception:
             pass
@@ -2239,6 +2478,9 @@ class OverlayApp:
             if self.is_topmost:
                 if not self.win.attributes("-topmost"):
                     self.win.attributes("-topmost", True)
+                    if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                        self.bg_win.attributes("-topmost", True)
+                    self.ensure_z_order()
             elif self.topmost_on_roblox:
                 is_roblox = False
                 is_ours = False
@@ -2322,28 +2564,30 @@ class OverlayApp:
                 if hwnd != getattr(self, '_last_logged_foreground_hwnd', None) or self.is_roblox_active != getattr(self, '_last_logged_roblox_state', None):
                     self._last_logged_foreground_hwnd = hwnd
                     self._last_logged_roblox_state = self.is_roblox_active
-                    log.info(
-                        f"[TopmostOnRoblox] is_roblox={is_roblox} | is_ours={is_ours} -> "
-                        f"is_roblox_active={self.is_roblox_active} (setting_enabled={self.topmost_on_roblox})"
-                    )
 
                 if self.is_roblox_active:
                     if not self.win.attributes("-topmost"):
                         self.win.attributes("-topmost", True)
-                        self.win.lift()
-                        log.info("[TopmostOnRoblox] Window raised to TOPMOST (Roblox is active)")
+                        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                            self.bg_win.attributes("-topmost", True)
+                        self.ensure_z_order()
                 else:
                     if self.win.attributes("-topmost"):
                         self.win.attributes("-topmost", False)
+                        if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                            self.bg_win.attributes("-topmost", False)
+                            self.bg_win.lower()
                         self.win.lower()
                         if IS_WINDOWS and our_hwnd:
                             ctypes.windll.user32.SetWindowPos(our_hwnd, -2, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
                             ctypes.windll.user32.SetWindowPos(our_hwnd, 1, 0, 0, 0, 0, 0x0010 | 0x0002 | 0x0001)
-                        log.info("[TopmostOnRoblox] Window lowered from TOPMOST (Roblox not active)")
             else:
                 self.is_roblox_active = False
                 if self.win.attributes("-topmost"):
                     self.win.attributes("-topmost", False)
+                    if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
+                        self.bg_win.attributes("-topmost", False)
+                        self.bg_win.lower()
                     self.win.lower()
                     if IS_WINDOWS:
                         try:
@@ -2433,29 +2677,14 @@ class OverlayApp:
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-            
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = popup.winfo_x() + dx
-            py = popup.winfo_y() + dy
-
-            popup.geometry(f"+{px}+{py}")
-            
         title_bar = tk.Frame(popup, bg=BG_HEADER, height=30)
         title_bar.pack(fill="x", side="top")
-        title_bar.bind("<Button-1>", start_drag)
-        title_bar.bind("<B1-Motion>", do_drag)
         
         title_lbl = tk.Label(title_bar, text="SYSTEM UPDATE AVAILABLE", bg=BG_HEADER, fg=ACCENT_GOLD,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
-        title_lbl.bind("<Button-1>", start_drag)
-        title_lbl.bind("<B1-Motion>", do_drag)
+
+        self.make_popup_draggable(popup, title_bar, title_lbl)
 
         btn_close = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
         btn_close.pack(side="right", fill="y")
@@ -2562,30 +2791,15 @@ class OverlayApp:
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-            
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = popup.winfo_x() + dx
-            py = popup.winfo_y() + dy
-
-            popup.geometry(f"+{px}+{py}")
-            
         title_bar = tk.Frame(popup, bg=BG_HEADER, height=30)
         title_bar.pack(fill="x", side="top")
-        title_bar.bind("<Button-1>", start_drag)
-        title_bar.bind("<B1-Motion>", do_drag)
         
         title_lbl = tk.Label(title_bar, text="SUBMIT FEEDBACK & SUGGESTIONS", bg=BG_HEADER, fg=ACCENT_CYAN,
                              font=("Consolas", 9, "bold"))
         title_lbl.pack(side="left", padx=10, pady=5)
-        title_lbl.bind("<Button-1>", start_drag)
-        title_lbl.bind("<B1-Motion>", do_drag)
-        
+
+        self.make_popup_draggable(popup, title_bar, title_lbl)
+
         btn_close = tk.Label(title_bar, text="✕", bg=BG_HEADER, fg=TEXT_MUTED, width=3, font=("Segoe UI", 11, "bold"), cursor="hand2")
         btn_close.pack(side="right", fill="y")
         btn_close.bind("<Button-1>", lambda e: popup.destroy())
@@ -2686,7 +2900,7 @@ class OverlayApp:
                 try:
                     data_bytes = json.dumps(payload).encode('utf-8')
                     req = urllib.request.Request(
-                        f"{SUGGESTIONS_SERVER_URL}/suggestions",
+                        f"{BACKEND_SERVER_URL}/suggestions",
                         data=data_bytes,
                         headers={
                             "Content-Type": "application/json",
@@ -2778,31 +2992,13 @@ class OverlayApp:
         
         loading.geometry(f"{w}x{h}+{x}+{y}")
         
-        drag_data = {"x": 0, "y": 0}
-        def start_drag(event):
-            drag_data["x"] = event.x
-            drag_data["y"] = event.y
-            
-        def do_drag(event):
-            dx = event.x - drag_data["x"]
-            dy = event.y - drag_data["y"]
-            px = loading.winfo_x() + dx
-            py = loading.winfo_y() + dy
-
-            loading.geometry(f"+{px}+{py}")
-            
-        loading.bind("<Button-1>", start_drag)
-        loading.bind("<B1-Motion>", do_drag)
-        
         lbl_status = tk.Label(loading, text="DOWNLOADING SYSTEM UPDATE...", bg=BG_CARD, fg=ACCENT_CYAN, font=("Consolas", 10, "bold"))
         lbl_status.pack(pady=(25, 5))
-        lbl_status.bind("<Button-1>", start_drag)
-        lbl_status.bind("<B1-Motion>", do_drag)
         
         lbl_sub = tk.Label(loading, text=f"Fetching v{latest_version}...", bg=BG_CARD, fg=TEXT_MUTED, font=("Consolas", 8))
         lbl_sub.pack(pady=(0, 15))
-        lbl_sub.bind("<Button-1>", start_drag)
-        lbl_sub.bind("<B1-Motion>", do_drag)
+
+        self.make_popup_draggable(loading, loading, lbl_status, lbl_sub)
         
         def do_download():
             import urllib.request
@@ -2853,6 +3049,12 @@ class OverlayApp:
     def on_input_update(self, source):
         if self.updating_fields:
             return
+        if source == "demand":
+            self._demand_changed_waiting_heartbeat = True
+            try:
+                self._pending_demand_value = float(self.var_demand.get())
+            except (ValueError, TypeError):
+                self._pending_demand_value = None
         self.update_calculations(source=source)
 
     def update_calculations(self, source="demand"):
@@ -2928,9 +3130,9 @@ class OverlayApp:
                 self.lbl_neon_rtp.config(bg="#2a0c0e", fg=ACCENT_RED)
                 self.lbl_neon_sub.config(text=f"OVERPOWER SCRAM RISK (>{limit}%)", bg="#2a0c0e", fg=ACCENT_RED)
             else:
-                self.neon_frame.config(bg=BG_CARD, highlightbackground=BG_CARD, bd=0)
-                self.lbl_neon_rtp.config(bg=BG_CARD, fg=ACCENT_CYAN)
-                self.lbl_neon_sub.config(text="APRM REACTOR POWER STATUS", bg=BG_CARD, fg=TEXT_MUTED)
+                self.neon_frame.config(bg=WIN_BG, highlightbackground=WIN_BG, bd=0)
+                self.lbl_neon_rtp.config(bg=WIN_BG, fg=ACCENT_CYAN)
+                self.lbl_neon_sub.config(text="APRM REACTOR POWER STATUS", bg=WIN_BG, fg=TEXT_MUTED)
         else:
             if thermal > limit:
                 self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_RED)
@@ -2944,9 +3146,9 @@ class OverlayApp:
             self.lbl_gen_val.config(text="ERROR", fg=ACCENT_RED)
             self.lbl_feed_val.config(text="ERROR", fg=ACCENT_RED)
             self.lbl_neon_rtp.config(text="ERR", fg=ACCENT_RED)
-            self.neon_frame.config(bg=BG_CARD, bd=0)
-            self.lbl_neon_rtp.config(bg=BG_CARD)
-            self.lbl_neon_sub.config(text="VALUE OUT OF RANGE", bg=BG_CARD, fg=ACCENT_RED)
+            self.neon_frame.config(bg=WIN_BG, bd=0)
+            self.lbl_neon_rtp.config(bg=WIN_BG)
+            self.lbl_neon_sub.config(text="VALUE OUT OF RANGE", bg=WIN_BG, fg=ACCENT_RED)
         else:
             self.lbl_compact_rtp.config(text="ERR", fg=ACCENT_RED)
             self.lbl_compact_flow.config(text="[---]", fg=TEXT_MUTED)
@@ -2958,7 +3160,7 @@ class OverlayApp:
             if override_active:
                 val = self.calc.recirc_override
                 self.lbl_recirc_indicator.config(text=f"OVR: {val:.0f}%")
-                self.lbl_recirc_indicator.pack(side="right", padx=5)
+                self.lbl_recirc_indicator.pack(side="right", padx=5, pady=(2, 4))
             else:
                 self.lbl_recirc_indicator.pack_forget()
                 
