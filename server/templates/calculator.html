@@ -74,7 +74,7 @@
                         </button>
                         <div class="relative flex-grow min-w-0">
                             <input type="number" id="web-demand" step="any" min="0" placeholder="1000"
-                                oninput="onInputDemand()"
+                                oninput="onUserEditDemand()"
                                 class="premium-input w-full px-3 sm:px-4 text-center text-sm border-y border-x-0 h-full font-mono">
                         </div>
                         <button type="button" onclick="adjustDemand(10)"
@@ -149,7 +149,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-6 mt-auto z-10 pt-4 border-t border-white/5">
+                <div class="grid grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-6 mt-auto z-10 pt-4 border-t border-white/5">
                     <div class="flex flex-col gap-1.5">
                         <span
                             class="text-[10px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Coolant
@@ -175,15 +175,6 @@
                         <div class="font-mono text-base sm:text-lg text-gray-200 font-medium whitespace-nowrap">
                             <span id="display-usage">0.00</span>
                             <span class="text-xs text-gray-500 font-normal">MW</span>
-                        </div>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <span
-                            class="text-[10px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Expected
-                            Pump Speed</span>
-                        <div class="font-mono text-base sm:text-lg text-gray-200 font-medium whitespace-nowrap">
-                            <span id="display-recirc">28.00</span>
-                            <span class="text-xs text-gray-500 font-normal">%</span>
                         </div>
                     </div>
                 </div>
@@ -340,8 +331,10 @@
         }
 
         if (typeof activeCalcServer !== 'undefined' && activeCalcServer) {
+            demandChangedWaitingHeartbeat = false;
             const syncedDem = nextDemandSwitched ? getNextDemandValue(activeCalcServer, unit) : getCurrentDemandValue(activeCalcServer, unit);
             if (syncedDem !== null) {
+                lastSyncedDemand = syncedDem;
                 document.getElementById('web-demand').value = syncedDem;
                 const statusEl = document.getElementById('calc-sync-status');
                 if (statusEl) {
@@ -394,12 +387,21 @@
         onInputDemand();
     }
 
+    function onUserEditDemand() {
+        demandChangedWaitingHeartbeat = true;
+        const input = document.getElementById('web-demand');
+        pendingDemandValue = parseFloat(input.value) || 0;
+        onInputDemand();
+    }
+
     function adjustDemand(amount) {
         const input = document.getElementById('web-demand');
         let val = parseFloat(input.value);
         if (isNaN(val)) val = 0;
         val = Math.max(0, val + amount);
         input.value = val;
+        demandChangedWaitingHeartbeat = true;
+        pendingDemandValue = val;
         onInputDemand();
     }
 
@@ -469,9 +471,6 @@
         document.getElementById('display-gen').innerText = genLoad.toFixed(2);
         document.getElementById('display-usage').innerText = calc.usage.toFixed(2);
 
-        const currentRecirc = calc.recirc_override !== null ? calc.recirc_override : getRecircPumpSpeed(thermal);
-        document.getElementById('display-recirc').innerText = currentRecirc.toFixed(2);
-
         displayRtp.innerHTML = `${thermal.toFixed(2)}<span class="text-3xl md:text-4xl text-gray-500 font-medium ml-1">%</span>`;
 
         if (thermal > limit) {
@@ -500,6 +499,10 @@
     let calcRecheckTimer = null;
     let nextDemandSwitched = false;
     let lastCalcFetchTime = 0;
+    let lastSyncedHeartbeat = null;
+    let lastSyncedDemand = null;
+    let demandChangedWaitingHeartbeat = false;
+    let pendingDemandValue = null;
 
     async function fetchCalcServersApi() {
         const now = Date.now();
@@ -626,6 +629,10 @@
 
         if (errorAlert) errorAlert.classList.add('hidden');
         nextDemandSwitched = false;
+        lastSyncedHeartbeat = null;
+        lastSyncedDemand = null;
+        demandChangedWaitingHeartbeat = false;
+        pendingDemandValue = null;
         statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
         statusEl.innerText = "Synced: " + activeCalcServer.jobId.slice(0, 8) + "...";
         if (countdownBar) countdownBar.classList.remove('hidden');
@@ -656,26 +663,63 @@
         const elapsedInitial = (nowInitial - hbTime) / 1000.0;
         const initialLiveDTL = Math.max(0, dtlRaw - elapsedInitial);
 
-        if (initialLiveDTL >= 60) {
-            const curDem = getCurrentDemandValue(activeCalcServer, calc.selected_unit);
+        const curDem = getCurrentDemandValue(activeCalcServer, calc.selected_unit);
+        const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
+        const hbTimeStr = activeCalcServer.lastHeartbeat;
+
+        let isNewHeartbeatWithNewDemand = false;
+        if (lastSyncedHeartbeat === null) {
+            isNewHeartbeatWithNewDemand = true;
+        } else if (hbTimeStr !== lastSyncedHeartbeat) {
             if (curDem !== null) {
-                const calcVal = curDem < 0 ? 0 : Math.max(0, curDem);
-                document.getElementById('web-demand').value = calcVal;
-                onInputDemand();
-                statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
-                statusEl.innerText = `Synced Demand (${formatDemandLabel(curDem)})`;
+                if (lastSyncedDemand === null || curDem !== lastSyncedDemand) {
+                    isNewHeartbeatWithNewDemand = true;
+                } else if (pendingDemandValue !== null && Math.abs(curDem - pendingDemandValue) < 1.0) {
+                    isNewHeartbeatWithNewDemand = true;
+                } else if (initialLiveDTL >= 60) {
+                    isNewHeartbeatWithNewDemand = true;
+                }
             }
-        } else if (!nextDemandSwitched) {
-            nextDemandSwitched = true;
-            const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
-            if (nextDem !== null) {
-                const calcVal = nextDem < 0 ? 0 : Math.max(0, nextDem);
-                document.getElementById('web-demand').value = calcVal;
-                onInputDemand();
-                statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
-                statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDem)})`;
+        }
+
+        if (demandChangedWaitingHeartbeat) {
+            if (isNewHeartbeatWithNewDemand) {
+                demandChangedWaitingHeartbeat = false;
+                nextDemandSwitched = false;
+                lastSyncedHeartbeat = hbTimeStr;
+                lastSyncedDemand = curDem;
+                if (curDem !== null && initialLiveDTL >= 60) {
+                    const calcVal = curDem < 0 ? 0 : Math.max(0, curDem);
+                    document.getElementById('web-demand').value = calcVal;
+                    onInputDemand();
+                    statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+                    statusEl.innerText = `Synced Demand (${formatDemandLabel(curDem)})`;
+                }
             }
-            calcRecheckTimer = setTimeout(recheckCalcServerSync, 150000);
+        } else {
+            if (initialLiveDTL >= 60) {
+                lastSyncedHeartbeat = hbTimeStr;
+                lastSyncedDemand = curDem;
+                if (curDem !== null) {
+                    const calcVal = curDem < 0 ? 0 : Math.max(0, curDem);
+                    document.getElementById('web-demand').value = calcVal;
+                    onInputDemand();
+                    statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
+                    statusEl.innerText = `Synced Demand (${formatDemandLabel(curDem)})`;
+                }
+            } else if (!nextDemandSwitched) {
+                nextDemandSwitched = true;
+                demandChangedWaitingHeartbeat = true;
+                if (nextDem !== null) {
+                    const calcVal = nextDem < 0 ? 0 : Math.max(0, nextDem);
+                    pendingDemandValue = calcVal;
+                    document.getElementById('web-demand').value = calcVal;
+                    onInputDemand();
+                    statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
+                    statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDem)})`;
+                }
+                calcRecheckTimer = setTimeout(recheckCalcServerSync, 150000);
+            }
         }
 
         calcCountdownTimer = setInterval(() => {
@@ -687,13 +731,15 @@
 
             if (liveDTL < 60 && !nextDemandSwitched) {
                 nextDemandSwitched = true;
-                const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
-                if (nextDem !== null) {
-                    const calcVal = nextDem < 0 ? 0 : Math.max(0, nextDem);
+                demandChangedWaitingHeartbeat = true;
+                const nextDemVal = getNextDemandValue(activeCalcServer, calc.selected_unit);
+                if (nextDemVal !== null) {
+                    const calcVal = nextDemVal < 0 ? 0 : Math.max(0, nextDemVal);
+                    pendingDemandValue = calcVal;
                     document.getElementById('web-demand').value = calcVal;
                     onInputDemand();
                     statusEl.className = "text-[10px] font-mono text-amber-300 font-bold animate-pulse";
-                    statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDem)})`;
+                    statusEl.innerText = `Pre-loaded Next Demand (${formatDemandLabel(nextDemVal)})`;
                 }
 
                 calcRecheckTimer = setTimeout(recheckCalcServerSync, 150000);
@@ -711,7 +757,6 @@
         const updated = findServerByIdOrJobId(calcServersList, activeCalcServer.jobId);
         if (updated && updated.state) {
             activeCalcServer = updated;
-            nextDemandSwitched = false;
             statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
             statusEl.innerText = "Synced: " + activeCalcServer.jobId.slice(0, 8) + "...";
             startCalcDemandCountdown();
