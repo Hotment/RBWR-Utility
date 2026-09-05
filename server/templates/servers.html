@@ -55,7 +55,16 @@
     </div>
 
     {% if charts and charts|length > 0 %}
-    <div class="premium-glass rounded-2xl p-5 md:p-6 shadow-xl border border-white/10 flex flex-col gap-4">
+    <div class="premium-glass rounded-2xl p-5 md:p-6 shadow-xl border border-white/10 flex flex-col gap-4 relative">
+        <div id="tabPausedOverlay"
+            class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 rounded-2xl cursor-pointer transition-all"
+            onclick="resumePageSync()">
+            <div
+                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-2xl mb-3 animate-pulse shadow-lg shadow-amber-500/10">
+                ⏸</div>
+            <h3 class="text-white font-bold text-lg sm:text-xl mb-1 whitespace-nowrap font-display">Sync Paused (Tab Inactive)</h3>
+            <p class="text-gray-300 text-xs sm:text-sm max-w-sm font-mono">Click anywhere or switch back to this tab to resume auto-syncing.</p>
+        </div>
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-3">
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
@@ -239,6 +248,36 @@
         setTimeout(() => {
             window.location.reload();
         }, 300);
+    }
+
+    let isTabFocused = true;
+    let pausedWhileHidden = false;
+
+    function checkTabFocus() {
+        const active = !document.hidden;
+        const overlay = document.getElementById('tabPausedOverlay');
+
+        if (!active) {
+            isTabFocused = false;
+            pausedWhileHidden = true;
+            if (overlay) overlay.classList.remove('hidden');
+        } else if (!isTabFocused) {
+            resumePageSync();
+        }
+    }
+
+    function resumePageSync() {
+        isTabFocused = true;
+        const overlay = document.getElementById('tabPausedOverlay');
+        if (overlay) overlay.classList.add('hidden');
+        if (pausedWhileHidden) {
+            pausedWhileHidden = false;
+            if (currentStatusFilter === 'historical') {
+                fetchHistoricalPage(currentPage);
+            } else {
+                refreshData();
+            }
+        }
     }
 
     const PAGE_SIZE = 20;
@@ -820,6 +859,20 @@
             }
             filterServers(true);
         }
+
+        window.addEventListener('focus', checkTabFocus);
+        window.addEventListener('blur', checkTabFocus);
+        document.addEventListener('visibilitychange', checkTabFocus);
+
+        setInterval(() => {
+            if (isTabFocused && !document.hidden) {
+                if (currentStatusFilter === 'historical') {
+                    fetchHistoricalPage(currentPage);
+                } else {
+                    refreshData();
+                }
+            }
+        }, 60000);
     });
 
     {% if charts and charts | length > 0 %}

@@ -102,9 +102,9 @@
                 </svg>
                 <span>Refresh Data</span>
             </button>
-            <div
+            <div id="autoRefreshBadge"
                 class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs font-mono flex items-center gap-2">
-                <span>Auto-refresh: 30s</span>
+                <span id="autoRefreshLabel">Auto-refresh: 30s</span>
             </div>
         </div>
     </div>
@@ -216,7 +216,19 @@
         </div>
     </div>
 
-    <div class="flex flex-col gap-5">
+    <div class="flex flex-col gap-5 relative">
+        <div id="tabPausedOverlay"
+            class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 rounded-2xl cursor-pointer transition-all"
+            onclick="resumePageSync()">
+            <div
+                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-2xl mb-3 animate-pulse shadow-lg shadow-amber-500/10">
+                ⏸</div>
+            <h3 class="text-white font-bold text-lg sm:text-xl mb-1 whitespace-nowrap font-display">Sync Paused (Tab
+                Inactive)</h3>
+            <p class="text-gray-300 text-xs sm:text-sm max-w-sm font-mono">Click anywhere or switch back to this tab to
+                resume live metric updates.</p>
+        </div>
+
         <div
             class="premium-glass rounded-2xl p-4 sm:p-5 shadow-xl border border-white/10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div class="flex flex-col gap-1">
@@ -295,6 +307,9 @@
 
 {% block scripts %}
 <script>
+    let isTabFocused = true;
+    let pausedWhileHidden = false;
+
     function copyText(text, btn) {
         if (!navigator.clipboard) return;
         navigator.clipboard.writeText(text).then(() => {
@@ -312,8 +327,41 @@
         }, 300);
     }
 
+    function checkTabFocus() {
+        const active = !document.hidden;
+        const overlay = document.getElementById('tabPausedOverlay');
+        const autoRefreshLabel = document.getElementById('autoRefreshLabel');
+
+        if (!active) {
+            isTabFocused = false;
+            pausedWhileHidden = true;
+            if (overlay) overlay.classList.remove('hidden');
+            if (autoRefreshLabel) autoRefreshLabel.textContent = 'Sync Paused (Tab Inactive)';
+        } else if (!isTabFocused) {
+            resumePageSync();
+        }
+    }
+
+    function resumePageSync() {
+        isTabFocused = true;
+        const overlay = document.getElementById('tabPausedOverlay');
+        if (overlay) overlay.classList.add('hidden');
+        const autoRefreshLabel = document.getElementById('autoRefreshLabel');
+        if (autoRefreshLabel) autoRefreshLabel.textContent = 'Auto-refresh: 30s';
+        if (pausedWhileHidden) {
+            pausedWhileHidden = false;
+            refreshPage();
+        }
+    }
+
+    window.addEventListener('focus', checkTabFocus);
+    window.addEventListener('blur', checkTabFocus);
+    document.addEventListener('visibilitychange', checkTabFocus);
+
     setInterval(function () {
-        window.location.reload();
+        if (isTabFocused && !document.hidden) {
+            window.location.reload();
+        }
     }, 30000);
 
     const dtl = {{ time_to_next_demand | tojson }};
@@ -322,6 +370,7 @@
         const startTime = Date.now();
         const initialDtl = dtl;
         const updateTimer = () => {
+            if (!isTabFocused) return;
             const elapsed = (Date.now() - startTime) / 1000;
             const remaining = Math.max(0, initialDtl - elapsed);
             timerElem.textContent = Math.round(remaining) + 's';
@@ -416,7 +465,7 @@
     }
 
     const chartsData = {{ charts | tojson }};
-    const lastHeartbeatAge = {{ last_heartbeat_age | default(0) | tojson }};
+    const lastHeartbeatAge = {{ last_heartbeat_age | default (0) | tojson }};
     const chartInstances = [];
     let currentWindowSeconds = null;
 
