@@ -805,7 +805,11 @@ def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=F
         return job_id not in _sc_public_server_ids
     return False
 
-def get_server_player_count(job_id, snapshots=None, latest_state=None):
+def get_server_player_count(job_id, snapshots=None, latest_state=None, is_private=None):
+    if is_private is True:
+        return None
+    if is_private is None and get_server_visibility(job_id, snapshots, latest_state):
+        return None
     if job_id in _sc_public_servers_info:
         return int(_sc_public_servers_info[job_id].get("playing", 0))
     if latest_state and latest_state.get("PlayerCount", 0) > 0:
@@ -994,10 +998,6 @@ def pull_server_checker_data():
             if "Misc" in state:
                 del state["Misc"]
 
-            info = _sc_public_servers_info.get(job_id, {})
-            player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else 0
-            state["PlayerCount"] = player_count
-
             # Track visibility and last player count in metadata
             if _sc_public_server_ids:
                 is_priv = job_id not in _sc_public_server_ids
@@ -1007,13 +1007,24 @@ def pull_server_checker_data():
                         _sc_server_meta[job_id] = {}
                     _sc_server_meta[job_id]["is_private"] = is_priv
                     meta_dirty = True
+            elif job_id in _sc_server_meta and "is_private" in _sc_server_meta[job_id]:
+                is_priv = bool(_sc_server_meta[job_id]["is_private"])
+                state["IsPrivate"] = is_priv
+            else:
+                is_priv = False
+
+            info = _sc_public_servers_info.get(job_id, {})
+            if is_priv:
+                if "PlayerCount" in state:
+                    del state["PlayerCount"]
+            else:
+                player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else 0
+                state["PlayerCount"] = player_count
                 if player_count > 0:
                     if job_id not in _sc_server_meta:
                         _sc_server_meta[job_id] = {}
                     _sc_server_meta[job_id]["last_player_count"] = player_count
                     meta_dirty = True
-            elif job_id in _sc_server_meta and "is_private" in _sc_server_meta[job_id]:
-                state["IsPrivate"] = _sc_server_meta[job_id]["is_private"]
 
             for unit in ("Unit1", "Unit2"):
                 unit_state = state.get(unit)
@@ -1164,12 +1175,18 @@ def build_server_cards(data, search_query=None):
         unit2 = latest_state.get("Unit2", {})
 
         info = _sc_public_servers_info.get(job_id, {})
-        player_count = get_server_player_count(job_id, snapshots, latest_state)
-        max_players = info.get("maxPlayers", 12)
-
+        age_sec = convert_ISO_to_secs(latest_timestamp)
         is_persistent = job_id in persistent_ids
-        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(not is_historical))
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+
+        if is_private:
+            is_historical = (age_sec > 600)
+            player_count = None
+            max_players = None
+        else:
+            is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
+            max_players = info.get("maxPlayers", 12)
 
         if is_historical and not is_persistent:
             if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
@@ -1177,7 +1194,6 @@ def build_server_cards(data, search_query=None):
 
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-        age_sec = convert_ISO_to_secs(latest_timestamp)
 
         cards.append({
             "job_id": job_id,
@@ -1274,33 +1290,36 @@ def build_chart_payload(job_id, snapshots):
             "state": state,
         })
 
-    player_points = []
-    for entry in ordered_snapshots:
-        sec_ago = entry["seconds_ago"]
-        st = entry["state"]
-        p_val = st.get("PlayerCount")
-        if p_val is None:
-            p_val = st.get("Players")
-        if p_val is None:
-            p_val = st.get("playing")
-        if p_val is not None and isinstance(p_val, (int, float)):
-            player_points.append((sec_ago, float(p_val)))
+    is_private = get_server_visibility(job_id, snapshots)
 
-    if not player_points and ordered_snapshots:
-        cur_p = _sc_public_servers_info.get(job_id, {}).get("playing", 0)
-        player_points.append((ordered_snapshots[-1]["seconds_ago"], float(cur_p)))
+    if not is_private:
+        player_points = []
+        for entry in ordered_snapshots:
+            sec_ago = entry["seconds_ago"]
+            st = entry["state"]
+            p_val = st.get("PlayerCount")
+            if p_val is None:
+                p_val = st.get("Players")
+            if p_val is None:
+                p_val = st.get("playing")
+            if p_val is not None and isinstance(p_val, (int, float)):
+                player_points.append((sec_ago, float(p_val)))
 
-    if player_points:
-        c_players = compress_points(player_points, precision=0)
-        chart_payload.append({
-            "metric": "Player Count",
-            "datasets": [{
-                "label": "Players",
-                "data": c_players,
-                "borderColor": "#10b981",
-                "backgroundColor": "rgba(16, 185, 129, 0.08)",
-            }]
-        })
+        if not player_points and ordered_snapshots:
+            cur_p = _sc_public_servers_info.get(job_id, {}).get("playing", 0)
+            player_points.append((ordered_snapshots[-1]["seconds_ago"], float(cur_p)))
+
+        if player_points:
+            c_players = compress_points(player_points, precision=0)
+            chart_payload.append({
+                "metric": "Player Count",
+                "datasets": [{
+                    "label": "Players",
+                    "data": c_players,
+                    "borderColor": "#10b981",
+                    "backgroundColor": "rgba(16, 185, 129, 0.08)",
+                }]
+            })
 
     for metric_key, metric_cfg in metrics.items():
         unit_type = metric_cfg[0]
@@ -1479,11 +1498,19 @@ def server_detail_page(job_id):
     is_persistent = job_id in persistent_data.get("persistent", {})
 
     info = _sc_public_servers_info.get(job_id, {})
-    latest_state = snapshots.get(max(snapshots.keys()), {}) if snapshots else {}
-    player_count = get_server_player_count(job_id, snapshots, latest_state)
-    max_players = info.get("maxPlayers", 12)
-    is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
-    is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(not is_historical))
+    latest_ts = max(snapshots.keys()) if snapshots else None
+    latest_state = snapshots.get(latest_ts, {}) if latest_ts else {}
+    age_sec = convert_ISO_to_secs(latest_ts) if latest_ts else 0
+
+    is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+    if is_private:
+        is_historical = (age_sec > 600)
+        player_count = None
+        max_players = None
+    else:
+        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+        player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
+        max_players = info.get("maxPlayers", 12)
     is_admin = bool(get_authenticated_user())
 
     if not server:
@@ -1610,11 +1637,20 @@ def get_historical_servers_api():
             continue
         latest_timestamp = max(snapshots.keys())
         latest_state = snapshots[latest_timestamp]
+        age_sec = convert_ISO_to_secs(latest_timestamp)
 
         info = _sc_public_servers_info.get(job_id, {})
-        player_count = get_server_player_count(job_id, snapshots, latest_state)
         is_persistent = job_id in persistent_ids
-        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+
+        if is_private:
+            is_historical = (age_sec > 600)
+            player_count = None
+            max_players = None
+        else:
+            is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
+            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
+            max_players = info.get("maxPlayers", 12)
 
         if not is_historical or is_persistent:
             continue
@@ -1638,9 +1674,6 @@ def get_historical_servers_api():
 
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
-        max_players = info.get("maxPlayers", 12)
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=False)
-        age_sec = convert_ISO_to_secs(latest_timestamp)
 
         historical_cards.append({
             "job_id": job_id,
@@ -1668,13 +1701,13 @@ def get_historical_servers_api():
 
     sort_option = request.args.get("sort", "newest").strip().lower()
     if sort_option == "players_desc":
-        historical_cards.sort(key=lambda c: (c.get("player_count", 0), c.get("snapshot_count", 0)), reverse=True)
+        historical_cards.sort(key=lambda c: (c.get("player_count") or 0, c.get("snapshot_count", 0)), reverse=True)
     elif sort_option == "players_asc":
-        historical_cards.sort(key=lambda c: (c.get("player_count", 0), c.get("snapshot_count", 0)))
+        historical_cards.sort(key=lambda c: (c.get("player_count") or 0, c.get("snapshot_count", 0)))
     elif sort_option == "snapshots_desc":
-        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count", 0)), reverse=True)
+        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0), reverse=True)
     elif sort_option == "snapshots_asc":
-        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count", 0)))
+        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0))
     elif sort_option == "oldest":
         historical_cards.sort(key=lambda c: c.get("raw_timestamp", ""))
     else:  # newest

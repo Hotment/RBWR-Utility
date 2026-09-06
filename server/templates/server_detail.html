@@ -67,10 +67,12 @@
                     Active Server
                 </span>
                 {% endif %}
+                {% if not is_private %}
                 <span
-                    class="px-2.5 py-1 rounded-full {% if player_count > 0 %}bg-emerald-500/15 border border-emerald-500/30 text-emerald-300{% else %}bg-slate-500/15 border border-slate-500/30 text-slate-400{% endif %} text-xs font-mono font-bold flex items-center gap-1.5">
+                    class="px-2.5 py-1 rounded-full {% if player_count and player_count > 0 %}bg-emerald-500/15 border border-emerald-500/30 text-emerald-300{% else %}bg-slate-500/15 border border-slate-500/30 text-slate-400{% endif %} text-xs font-mono font-bold flex items-center gap-1.5">
                     {{ player_count }}/{{ max_players }} Players
                 </span>
+                {% endif %}
                 {% if is_admin %}
                 <button type="button"
                     onclick="toggleServerPersist('{{ job_id }}', {{ 'false' if is_persistent else 'true' }})"
@@ -112,6 +114,12 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
         <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-3">
             <div class="flex items-center justify-between">
+                {% if is_private %}
+                <span class="text-xs uppercase tracking-wider font-mono text-purple-400 font-semibold">Instance Privacy</span>
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                {% else %}
                 <span class="text-xs uppercase tracking-wider font-mono text-emerald-400 font-semibold">Active
                     Players</span>
                 <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,13 +127,22 @@
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
                     </path>
                 </svg>
+                {% endif %}
             </div>
             <div class="flex flex-col items-center justify-center py-2">
+                {% if is_private %}
+                <span class="text-xs text-gray-400 font-mono">Server Access</span>
+                <span
+                    class="text-2xl sm:text-3xl font-mono font-bold text-purple-300 tracking-tight mt-0.5">
+                    Private Server
+                </span>
+                {% else %}
                 <span class="text-xs text-gray-400 font-mono">Current Players Online</span>
                 <span
-                    class="text-3xl sm:text-4xl font-mono font-bold {% if player_count > 0 %}text-emerald-300{% else %}text-slate-400{% endif %} tracking-tight mt-0.5">
+                    class="text-3xl sm:text-4xl font-mono font-bold {% if player_count and player_count > 0 %}text-emerald-300{% else %}text-slate-400{% endif %} tracking-tight mt-0.5">
                     {{ player_count }} / {{ max_players }}
                 </span>
+                {% endif %}
             </div>
             <div
                 class="text-[11px] font-mono text-center {% if is_persistent %}text-amber-400{% elif is_historical %}text-slate-500{% else %}text-emerald-400{% endif %}">

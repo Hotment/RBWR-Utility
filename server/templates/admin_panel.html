@@ -1970,7 +1970,7 @@
                     data-is-private="${isPrivate}"
                     data-is-historical="${isHistorical}"
                     data-is-persistent="${isPersistent}"
-                    data-player-count="${pCount}"
+                    data-player-count="${isPrivate ? '' : pCount}"
                     data-snapshot-count="${s.snapshot_count || 0}"
                     data-age-seconds="${s.age_seconds || 0}"
                     data-raw-timestamp="${escapeHtml(s.raw_timestamp || '')}">
@@ -2001,6 +2001,7 @@
                                 <span class="text-slate-500 text-[10px]">U2 APRM</span>
                                 <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
                             </div>
+                            ${!isPrivate ? `
                             <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
                                 <span class="text-slate-400 text-[11px] flex items-center gap-1.5">
                                     👥 Player Count
@@ -2008,7 +2009,7 @@
                                 <span class="font-bold ${pCount > 0 ? 'text-emerald-400' : 'text-slate-400'}">
                                     ${pCount} / ${maxP} Players
                                 </span>
-                            </div>
+                            </div>` : ''}
                         </div>
 
                         <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">

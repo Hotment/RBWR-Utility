@@ -3,7 +3,7 @@
     data-is-private="{{ 'true' if server.is_private else 'false' }}"
     data-is-historical="{{ 'true' if server.is_historical else 'false' }}"
     data-is-persistent="{{ 'true' if server.is_persistent else 'false' }}"
-    data-player-count="{{ server.player_count }}"
+    data-player-count="{{ server.player_count if (server.player_count is not none and not server.is_private) else '' }}"
     data-snapshot-count="{{ server.snapshot_count }}"
     data-age-seconds="{{ server.age_seconds }}"
     data-raw-timestamp="{{ server.raw_timestamp }}">
@@ -78,15 +78,17 @@
                 <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm) }}%</span>
             </div>
 
+            {% if not server.is_private %}
             <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex items-center justify-between col-span-2">
                 <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
                     Player Count
                 </span>
                 <span
-                    class="font-mono font-bold text-xs {% if server.player_count > 0 %}text-emerald-400{% else %}text-slate-400{% endif %}">
+                    class="font-mono font-bold text-xs {% if server.player_count and server.player_count > 0 %}text-emerald-400{% else %}text-slate-400{% endif %}">
                     {{ server.player_count }} / {{ server.max_players }} Players
                 </span>
             </div>
+            {% endif %}
         </div>
 
         <div class="flex items-center justify-between text-xs text-gray-400 font-mono px-1">
