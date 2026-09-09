@@ -4,6 +4,7 @@ rbwr_overlay.dist
 settings.json
 *.log
 *test.py
+tests/
 .env
 
 server/files

@@ -971,9 +971,7 @@ def pull_server_checker_data():
                 _sc_server_ids.append(job_id)
                 found_new_server = True
         
-        success_public = False
-        if found_new_server or not _sc_public_server_ids:
-            success_public = update_public_roblox_servers()
+        success_public = update_public_roblox_servers()
 
         _sc_latest_data.clear()
         _sc_latest_data.update(resp_json)
@@ -1055,7 +1053,7 @@ def pull_server_checker_data():
                 continue
             latest_ts = max(snaps.keys())
             latest_snap = snaps[latest_ts]
-            p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else latest_snap.get("PlayerCount", 0)
+            p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else 0
             if p_count == 0:
                 age_seconds = convert_ISO_to_secs(latest_ts)
                 if age_seconds > max_retention_seconds:
@@ -1157,6 +1155,44 @@ def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
 
     return False
 
+def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=None, age_sec=None):
+    """
+    Determines if a server is historical.
+    - For private servers: marked historical if heartbeat age > 600s.
+    - For public servers: checked against the public servers list from the Roblox API.
+      If the Roblox API public list is loaded and the server is not there, or has 0 players,
+      or heartbeat age > 600s, it is marked historical.
+    """
+    if age_sec is None:
+        if snapshots:
+            latest_ts = max(snapshots.keys())
+            age_sec = convert_ISO_to_secs(latest_ts)
+        else:
+            age_sec = 0
+
+    if latest_state is None and snapshots:
+        latest_ts = max(snapshots.keys())
+        latest_state = snapshots.get(latest_ts, {})
+    if latest_state is None:
+        latest_state = {}
+
+    if is_private is None:
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+
+    if is_private:
+        return (age_sec > 600)
+
+    # Public server: check public servers list we get from the Roblox API
+    info = _sc_public_servers_info.get(job_id)
+    if _sc_public_server_ids:
+        # Roblox API returned public servers: if not present in the list, mark as historical
+        if info is None or job_id not in _sc_public_servers_info:
+            return True
+        return info.get("playing", 0) == 0 or age_sec > 600
+
+    # Fallback if Roblox public servers list could not be retrieved
+    return (age_sec > 600) or (latest_state.get("PlayerCount", 0) == 0)
+
 def build_server_cards(data, search_query=None):
     cards = []
     if not data:
@@ -1179,14 +1215,13 @@ def build_server_cards(data, search_query=None):
         is_persistent = job_id in persistent_ids
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
 
+        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
         if is_private:
-            is_historical = (age_sec > 600)
             player_count = None
             max_players = None
         else:
-            is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
             player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12)
+            max_players = info.get("maxPlayers", 12) if info else 12
 
         if is_historical and not is_persistent:
             if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
@@ -1228,14 +1263,13 @@ def parse_label_seconds(label, fallback_idx=0):
     except Exception:
         return float(fallback_idx)
 
-def compress_points(points, precision=2):
+def compress_points_raw(points, precision=2):
     """
     Compress collinear points where points is a list of (x, y) tuples.
-    x is seconds_ago (float), y is metric value (float).
-    precision controls the number of decimal places for y (default 2, None for unrounded).
+    Returns list of retained (x, y) tuples.
     """
     if len(points) <= 2:
-        return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in points]
+        return list(points)
 
     compressed = [points[0]]
     for i in range(1, len(points) - 1):
@@ -1244,7 +1278,10 @@ def compress_points(points, precision=2):
         x3, y3 = points[i + 1]
 
         try:
-            cross_product = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2)
+            ry1 = round(y1, precision) if precision is not None else y1
+            ry2 = round(y2, precision) if precision is not None else y2
+            ry3 = round(y3, precision) if precision is not None else y3
+            cross_product = (x2 - x1) * (ry3 - ry2) - (ry2 - ry1) * (x3 - x2)
         except Exception:
             cross_product = 1.0
 
@@ -1252,7 +1289,49 @@ def compress_points(points, precision=2):
             compressed.append(points[i])
 
     compressed.append(points[-1])
-    return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in compressed]
+    return compressed
+
+def compress_points(points, precision=2):
+    """
+    Compress collinear points where points is a list of (x, y) tuples.
+    x is seconds_ago (float), y is metric value (float).
+    precision controls the number of decimal places for y (default 2, None for unrounded).
+    """
+    raw = compress_points_raw(points, precision=precision)
+    return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in raw]
+
+def compress_paired_points(u1_points, u2_points, precision=2):
+    """
+    Compresses u1_points and u2_points (lists of (x, y) tuples).
+    If a point in one unit is kept, but the other unit had its point at that timestamp removed
+    due to compression, the other unit keeps and shows that point anyway.
+    Points that are collinear in both units are compressed away.
+    Returns (c_u1, c_u2) where each is a list of {"x": ..., "y": ...} dicts.
+    """
+    if not u1_points and not u2_points:
+        return [], []
+    if not u1_points:
+        return [], compress_points(u2_points, precision=precision)
+    if not u2_points:
+        return compress_points(u1_points, precision=precision), []
+
+    raw1 = compress_points_raw(u1_points, precision=precision)
+    raw2 = compress_points_raw(u2_points, precision=precision)
+
+    kept_x = {round(x, 1) for x, _ in raw1} | {round(x, 1) for x, _ in raw2}
+
+    res_u1 = [
+        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
+        for x, y in u1_points
+        if round(x, 1) in kept_x
+    ]
+    res_u2 = [
+        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
+        for x, y in u2_points
+        if round(x, 1) in kept_x
+    ]
+
+    return res_u1, res_u2
 
 def build_chart_payload(job_id, snapshots):
     metrics = {
@@ -1360,23 +1439,38 @@ def build_chart_payload(job_id, snapshots):
                     u2_points.append((sec_ago, float(v2) * scale_factor))
 
         datasets = []
-        if u1_points and unit_type in ("1", "3"):
-            c_u1 = compress_points(u1_points, precision=precision)
+        if u1_points and u2_points and unit_type == "3":
+            c_u1, c_u2 = compress_paired_points(u1_points, u2_points, precision=precision)
             datasets.append({
                 "label": "Unit 1",
                 "data": c_u1,
                 "borderColor": "#3b82f6",
                 "backgroundColor": "rgba(59, 130, 246, 0.08)",
             })
-
-        if u2_points and unit_type in ("2", "3"):
-            c_u2 = compress_points(u2_points, precision=precision)
             datasets.append({
                 "label": "Unit 2",
                 "data": c_u2,
                 "borderColor": "#f59e0b",
                 "backgroundColor": "rgba(245, 158, 11, 0.08)",
             })
+        else:
+            if u1_points and unit_type in ("1", "3"):
+                c_u1 = compress_points(u1_points, precision=precision)
+                datasets.append({
+                    "label": "Unit 1",
+                    "data": c_u1,
+                    "borderColor": "#3b82f6",
+                    "backgroundColor": "rgba(59, 130, 246, 0.08)",
+                })
+
+            if u2_points and unit_type in ("2", "3"):
+                c_u2 = compress_points(u2_points, precision=precision)
+                datasets.append({
+                    "label": "Unit 2",
+                    "data": c_u2,
+                    "borderColor": "#f59e0b",
+                    "backgroundColor": "rgba(245, 158, 11, 0.08)",
+                })
 
         chart_payload.append({
             "metric": metric_title,
@@ -1392,9 +1486,8 @@ def build_chart_payload(job_id, snapshots):
         "charts": chart_payload,
     }
 
-def build_global_chart_payload(snapshots):
+def build_global_chart_payload(snapshots, max_history_seconds=7 * 24 * 3600):
     chart_payload = []
-    ordered_snapshots = []
 
     if not snapshots:
         return {
@@ -1402,21 +1495,14 @@ def build_global_chart_payload(snapshots):
             "charts": [],
         }
 
-    for timestamp, data in sorted(snapshots.items()):
-        sec_ago = convert_ISO_to_secs(timestamp)
-        ordered_snapshots.append({
-            "timestamp": timestamp,
-            "seconds_ago": sec_ago,
-            "display_time": f"{sec_ago}s ago",
-            "data": data,
-        })
-
     u1_points = []
     u2_points = []
 
-    for entry in ordered_snapshots:
-        sec_ago = entry["seconds_ago"]
-        data_entry = entry.get("data", {})
+    for timestamp in sorted(snapshots.keys()):
+        sec_ago = convert_ISO_to_secs(timestamp)
+        if max_history_seconds is not None and sec_ago > max_history_seconds:
+            continue
+        data_entry = snapshots[timestamp] or {}
         unit1 = data_entry.get("unit1", {})
         unit2 = data_entry.get("unit2", {})
 
@@ -1428,17 +1514,31 @@ def build_global_chart_payload(snapshots):
             u2_points.append((sec_ago, float(v2)))
 
     datasets = []
-    if u1_points:
+    if u1_points and u2_points:
+        c_u1, c_u2 = compress_paired_points(u1_points, u2_points, precision=2)
         datasets.append({
             "label": "Unit 1",
-            "data": compress_points(u1_points),
+            "data": c_u1,
             "borderColor": "#3b82f6",
             "backgroundColor": "rgba(59, 130, 246, 0.08)",
         })
-    if u2_points:
         datasets.append({
             "label": "Unit 2",
-            "data": compress_points(u2_points),
+            "data": c_u2,
+            "borderColor": "#f59e0b",
+            "backgroundColor": "rgba(245, 158, 11, 0.08)",
+        })
+    elif u1_points:
+        datasets.append({
+            "label": "Unit 1",
+            "data": compress_points(u1_points, precision=2),
+            "borderColor": "#3b82f6",
+            "backgroundColor": "rgba(59, 130, 246, 0.08)",
+        })
+    elif u2_points:
+        datasets.append({
+            "label": "Unit 2",
+            "data": compress_points(u2_points, precision=2),
             "borderColor": "#f59e0b",
             "backgroundColor": "rgba(245, 158, 11, 0.08)",
         })
@@ -1449,7 +1549,7 @@ def build_global_chart_payload(snapshots):
     })
 
     return {
-        "snapshots": ordered_snapshots,
+        "snapshots": [],
         "charts": chart_payload,
     }
 
@@ -1503,14 +1603,13 @@ def server_detail_page(job_id):
     age_sec = convert_ISO_to_secs(latest_ts) if latest_ts else 0
 
     is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+    is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
     if is_private:
-        is_historical = (age_sec > 600)
         player_count = None
         max_players = None
     else:
-        is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
         player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-        max_players = info.get("maxPlayers", 12)
+        max_players = info.get("maxPlayers", 12) if info else 12
     is_admin = bool(get_authenticated_user())
 
     if not server:
@@ -1608,9 +1707,9 @@ def lookup_server_api():
 @app.route("/api/servers/historical", methods=["GET"])
 def get_historical_servers_api():
     page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    per_page = request.args.get("per_page", 21, type=int)
     if per_page <= 0 or per_page > 100:
-        per_page = 20
+        per_page = 21
     if page <= 0:
         page = 1
 
@@ -1643,14 +1742,13 @@ def get_historical_servers_api():
         is_persistent = job_id in persistent_ids
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
 
+        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
         if is_private:
-            is_historical = (age_sec > 600)
             player_count = None
             max_players = None
         else:
-            is_historical = (info.get("playing", 0) == 0 and latest_state.get("PlayerCount", 0) == 0)
             player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12)
+            max_players = info.get("maxPlayers", 12) if info else 12
 
         if not is_historical or is_persistent:
             continue

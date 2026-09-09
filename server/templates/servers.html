@@ -94,6 +94,8 @@
                         class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">6h</button>
                     <button type="button" onclick="setGlobalTimeWindow(86400, this)"
                         class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">24h</button>
+                    <button type="button" onclick="setGlobalTimeWindow(604800, this)"
+                        class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer">7d</button>
                     <button type="button" onclick="setGlobalTimeWindow(null, this)" id="btnGlobalRangeAll"
                         class="time-range-btn px-2.5 py-1 rounded-lg hover:bg-white/10 text-gray-300 transition-all cursor-pointer active">All</button>
                 </div>
@@ -280,7 +282,7 @@
         }
     }
 
-    const PAGE_SIZE = 20;
+    const PAGE_SIZE = 21;
     let currentPage = 1;
     let searchInput = null;
     let clearSearchBtn = null;
@@ -1026,9 +1028,11 @@
             borderColor: color,
             backgroundColor: bgGrad,
             fill: true,
-            tension: 0.15,
+            tension: 0.1,
             spanGaps: true,
+            normalized: true,
             pointRadius: 0,
+            pointHitRadius: 10,
             pointHoverRadius: 6,
             pointHoverBackgroundColor: color,
             pointHoverBorderColor: '#ffffff',
