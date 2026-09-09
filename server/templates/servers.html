@@ -159,8 +159,10 @@
                 </div>
                 <select id="serverSort" onchange="setSortOption(this.value)"
                     class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-amber-500/50 appearance-none cursor-pointer">
-                    <option value="newest">Sort: Newest First</option>
-                    <option value="oldest">Sort: Oldest First</option>
+                    <option value="newest">Sort: Newest Servers</option>
+                    <option value="oldest">Sort: Oldest Servers</option>
+                    <option value="public_first">Sort: Public Servers First</option>
+                    <option value="private_first">Sort: Private Servers First</option>
                     <option value="players_desc">Sort: Most Players</option>
                     <option value="players_asc">Sort: Fewest Players</option>
                     <option value="snapshots_desc">Sort: Most Snapshots</option>
@@ -341,6 +343,14 @@
         }
         const m = card.textContent.match(/(\d+)s\s*ago/i);
         if (m) return Date.now() - (parseInt(m[1], 10) * 1000);
+        return 0;
+    }
+
+    function getCardUptime(card) {
+        if (card.dataset.uptimeSeconds !== undefined && card.dataset.uptimeSeconds !== '') {
+            const u = parseFloat(card.dataset.uptimeSeconds);
+            if (!isNaN(u)) return u;
+        }
         return 0;
     }
 
@@ -591,6 +601,7 @@
                 matchesStatus = isPersistent;
             }
 
+            const showPrivate = (query.length > 0) || (currentSort === 'private_first') || (currentSort === 'public_first');
             let isVisible = false;
 
             if (isHistorical && !isPersistent) {
@@ -601,7 +612,7 @@
                 }
             } else {
                 if (query.length === 0) {
-                    isVisible = !isPrivate && matchesStatus;
+                    isVisible = (showPrivate || !isPrivate) && matchesStatus;
                 } else {
                     const matchesSearch = jobId.includes(query) || (shortId && shortId.includes(query));
                     isVisible = matchesSearch && matchesStatus;
@@ -624,20 +635,29 @@
             const sB = getCardSnapshotCount(b);
             const tA = getCardTimestamp(a);
             const tB = getCardTimestamp(b);
+            const uA = getCardUptime(a);
+            const uB = getCardUptime(b);
+            const privA = a.dataset.isPrivate === 'true' ? 1 : 0;
+            const privB = b.dataset.isPrivate === 'true' ? 1 : 0;
 
             if (currentSort === 'players_desc') {
-                return (pB - pA) || (sB - sA) || (tB - tA);
+                return (pB - pA) || (sB - sA) || (uB - uA);
             } else if (currentSort === 'players_asc') {
-                return (pA - pB) || (sA - sB) || (tA - tB);
+                return (pA - pB) || (sA - sB) || (uA - uB);
             } else if (currentSort === 'snapshots_desc') {
-                return (sB - sA) || (pB - pA) || (tB - tA);
+                return (sB - sA) || (pB - pA) || (uB - uA);
             } else if (currentSort === 'snapshots_asc') {
-                return (sA - sB) || (pA - pB) || (tA - tB);
+                return (sA - sB) || (pA - pB) || (uA - uB);
             } else if (currentSort === 'oldest') {
-                return (tA - tB) || (pB - pA);
+                return (uB - uA) || (pB - pA) || (tA - tB);
+            } else if (currentSort === 'newest') {
+                return (uA - uB) || (pB - pA) || (tB - tA);
+            } else if (currentSort === 'public_first') {
+                return (privA - privB) || (uB - uA) || (pB - pA);
+            } else if (currentSort === 'private_first') {
+                return (privB - privA) || (uB - uA) || (pB - pA);
             } else {
-                // newest
-                return (tB - tA) || (pB - pA);
+                return (uA - uB) || (pB - pA);
             }
         });
 

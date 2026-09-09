@@ -1115,6 +1115,36 @@ def convert_ISO_to_secs(timestamp_str):
     except Exception:
         return 0
 
+def format_uptime_duration(seconds: float) -> str:
+    s = max(0, int(round(seconds)))
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        m = s // 60
+        rem_s = s % 60
+        return f"{m}m {rem_s}s" if rem_s > 0 else f"{m}m"
+    if s < 86400:
+        h = s // 3600
+        rem_m = (s % 3600) // 60
+        return f"{h}h {rem_m}m" if rem_m > 0 else f"{h}h"
+    d = s // 86400
+    rem_h = (s % 86400) // 3600
+    return f"{d}d {rem_h}h" if rem_h > 0 else f"{d}d"
+
+def get_server_uptime_seconds(snapshots, is_historical, age_sec=None):
+    if not snapshots:
+        return 0
+    try:
+        first_ts = min(snapshots.keys())
+        latest_ts = max(snapshots.keys())
+        first_sec_ago = convert_ISO_to_secs(first_ts)
+        latest_sec_ago = convert_ISO_to_secs(latest_ts) if age_sec is None else age_sec
+        if is_historical:
+            return max(0, first_sec_ago - latest_sec_ago)
+        return max(0, first_sec_ago)
+    except Exception:
+        return 0
+
 def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
     """
     Returns True ONLY if query is an exact match for:
@@ -1223,6 +1253,10 @@ def build_server_cards(data, search_query=None):
             if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
                 continue
 
+        first_timestamp = min(snapshots.keys())
+        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
+        uptime_str = format_uptime_duration(uptime_sec)
+
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
 
@@ -1235,8 +1269,11 @@ def build_server_cards(data, search_query=None):
             "player_count": player_count,
             "max_players": max_players,
             "raw_timestamp": latest_timestamp,
+            "first_timestamp": first_timestamp,
             "age_seconds": age_sec,
             "latest_timestamp": f"{age_sec}s ago",
+            "uptime_seconds": uptime_sec,
+            "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
@@ -1608,6 +1645,10 @@ def server_detail_page(job_id):
         max_players = info.get("maxPlayers", 12) if info else 12
     is_admin = bool(get_authenticated_user())
 
+    first_ts = min(snapshots.keys()) if snapshots else None
+    uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
+    uptime_str = format_uptime_duration(uptime_sec)
+
     if not server:
         latest_ts = max(snapshots.keys()) if snapshots else None
         latest_st = snapshots.get(latest_ts, {}) if latest_ts else {}
@@ -1621,6 +1662,9 @@ def server_detail_page(job_id):
             "is_admin": is_admin,
             "player_count": player_count,
             "max_players": max_players,
+            "first_timestamp": first_ts,
+            "uptime_seconds": uptime_sec,
+            "uptime_str": uptime_str,
             "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
             "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
@@ -1655,6 +1699,9 @@ def server_detail_page(job_id):
         "is_admin": is_admin,
         "player_count": player_count,
         "max_players": max_players,
+        "first_timestamp": first_ts,
+        "uptime_seconds": uptime_sec,
+        "uptime_str": uptime_str,
         "scram_reason_u1": scram_reasonU1 or "N/A",
         "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
@@ -1766,6 +1813,10 @@ def get_historical_servers_api():
             if not matches:
                 continue
 
+        first_timestamp = min(snapshots.keys())
+        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
+        uptime_str = format_uptime_duration(uptime_sec)
+
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
 
@@ -1778,8 +1829,11 @@ def get_historical_servers_api():
             "player_count": player_count,
             "max_players": max_players,
             "raw_timestamp": latest_timestamp,
+            "first_timestamp": first_timestamp,
             "age_seconds": age_sec,
             "latest_timestamp": f"{age_sec}s ago",
+            "uptime_seconds": uptime_sec,
+            "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
@@ -1803,9 +1857,13 @@ def get_historical_servers_api():
     elif sort_option == "snapshots_asc":
         historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0))
     elif sort_option == "oldest":
-        historical_cards.sort(key=lambda c: c.get("raw_timestamp", ""))
+        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), c.get("player_count") or 0), reverse=True)
+    elif sort_option == "public_first":
+        historical_cards.sort(key=lambda c: (1 if c.get("is_private") else 0, -c.get("uptime_seconds", 0)))
+    elif sort_option == "private_first":
+        historical_cards.sort(key=lambda c: (0 if c.get("is_private") else 1, -c.get("uptime_seconds", 0)))
     else:  # newest
-        historical_cards.sort(key=lambda c: c.get("raw_timestamp", ""), reverse=True)
+        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), -(c.get("player_count") or 0)))
 
     total = len(historical_cards)
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1

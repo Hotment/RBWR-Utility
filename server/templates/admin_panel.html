@@ -598,6 +598,8 @@
                             class="premium-input w-full pl-3 pr-7 py-1.5 text-xs font-mono rounded-lg bg-black/40 text-slate-200 border border-white/5 focus:border-emerald-500/50 appearance-none cursor-pointer">
                             <option value="newest">Sort: Newest First</option>
                             <option value="oldest">Sort: Oldest First</option>
+                            <option value="public_first">Sort: Public First</option>
+                            <option value="private_first">Sort: Private First</option>
                             <option value="players_desc">Sort: Most Players</option>
                             <option value="players_asc">Sort: Fewest Players</option>
                             <option value="snapshots_desc">Sort: Most Snapshots</option>
@@ -1133,7 +1135,7 @@
                 if (adminServerFilter === 'active') {
                     matchesFilter = !isHistorical;
                 } else if (adminServerFilter === 'historical') {
-                    matchesFilter = isHistorical && !isPersistent;
+                    matchesFilter = isHistorical;
                 } else if (adminServerFilter === 'persistent') {
                     matchesFilter = isPersistent;
                 }
@@ -1155,19 +1157,29 @@
                 const sB = getAdminCardSnapshotCount(b);
                 const tA = getAdminCardTimestamp(a);
                 const tB = getAdminCardTimestamp(b);
+                const uA = parseFloat(a.dataset.uptimeSeconds || 0);
+                const uB = parseFloat(b.dataset.uptimeSeconds || 0);
+                const privA = a.dataset.isPrivate === 'true' ? 1 : 0;
+                const privB = b.dataset.isPrivate === 'true' ? 1 : 0;
 
                 if (adminCurrentSort === 'players_desc') {
-                    return (pB - pA) || (sB - sA) || (tB - tA);
+                    return (pB - pA) || (sB - sA) || (uB - uA);
                 } else if (adminCurrentSort === 'players_asc') {
-                    return (pA - pB) || (sA - sB) || (tA - tB);
+                    return (pA - pB) || (sA - sB) || (uA - uB);
                 } else if (adminCurrentSort === 'snapshots_desc') {
-                    return (sB - sA) || (pB - pA) || (tB - tA);
+                    return (sB - sA) || (pB - pA) || (uB - uA);
                 } else if (adminCurrentSort === 'snapshots_asc') {
-                    return (sA - sB) || (pA - pB) || (tA - tB);
+                    return (sA - sB) || (pA - pB) || (uA - uB);
                 } else if (adminCurrentSort === 'oldest') {
-                    return (tA - tB) || (pB - pA);
+                    return (uB - uA) || (pB - pA) || (tA - tB);
+                } else if (adminCurrentSort === 'newest') {
+                    return (uA - uB) || (pB - pA) || (tB - tA);
+                } else if (adminCurrentSort === 'public_first') {
+                    return (privA - privB) || (uB - uA) || (pB - pA);
+                } else if (adminCurrentSort === 'private_first') {
+                    return (privB - privA) || (uB - uA) || (pB - pA);
                 } else {
-                    return (tB - tA) || (pB - pA);
+                    return (uA - uB) || (pB - pA);
                 }
             });
 
@@ -1973,24 +1985,24 @@
                     data-player-count="${isPrivate ? '' : pCount}"
                     data-snapshot-count="${s.snapshot_count || 0}"
                     data-age-seconds="${s.age_seconds || 0}"
+                    data-uptime-seconds="${s.uptime_seconds || 0}"
                     data-raw-timestamp="${escapeHtml(s.raw_timestamp || '')}">
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-start justify-between gap-2 border-b border-white/5 pb-2.5">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-1.5 flex-wrap">
-                                    <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
-                                    ${shortId ? `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold">ID: ${escapeHtml(shortId)}</span>` : ''}
-                                    ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
-                                    ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : ''}
-                                    ${isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>'}
-                                </div>
-                                <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold mt-1" title="${escapeHtml(s.job_id)}">
-                                    ${escapeHtml(s.job_id)}
-                                </div>
+                    <div class="flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                            <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
+                                ${shortId ? `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold">ID: ${escapeHtml(shortId)}</span>` : ''}
+                                ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
+                                ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : ''}
+                                ${isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>'}
                             </div>
                             <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold shrink-0">
                                 ${s.snapshot_count || 0} snaps
                             </span>
+                        </div>
+
+                        <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold" title="${escapeHtml(s.job_id)}">
+                            ${escapeHtml(s.job_id)}
                         </div>
 
                         <div class="grid grid-cols-2 gap-2 text-xs font-mono">
@@ -2013,15 +2025,20 @@
                             </div>` : ''}
                         </div>
 
-                        <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                            <span>Last Heartbeat:</span>
-                            <span class="text-slate-300 font-semibold">${escapeHtml(s.latest_timestamp || 'N/A')}</span>
+                        <div class="flex flex-col gap-1 text-[11px] text-slate-400 font-mono pt-1 border-t border-white/5">
+                            <div class="flex items-center justify-between">
+                                <span>Server Uptime:</span>
+                                <span class="text-blue-300 font-semibold">${escapeHtml(s.uptime_str || 'N/A')}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px]">
+                                <span>Last Heartbeat:</span>
+                                <span class="text-slate-300 font-semibold">${escapeHtml(s.latest_timestamp || 'N/A')}</span>
+                            </div>
                         </div>
                         ${isPersistent && (markedBy || markedAt) ? `
                             <div class="text-[10px] text-amber-400/80 font-mono bg-amber-950/30 p-2 rounded border border-amber-500/20">
                                 Marked persistent ${markedBy} ${markedAt ? 'on ' + markedAt : ''}
                             </div>
-                        ` : ''}
                     </div>
 
                     <div class="flex items-center justify-between gap-2 border-t border-white/5 pt-3 font-mono text-xs flex-wrap">

@@ -74,6 +74,15 @@
                     {{ player_count }}/{{ max_players }} Players
                 </span>
                 {% endif %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-mono font-bold flex items-center gap-1.5"
+                    title="Server Uptime">
+                    <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Uptime: {{ uptime_str }}</span>
+                </span>
                 {% if is_admin %}
                 <button type="button"
                     onclick="toggleServerPersist('{{ job_id }}', {{ 'false' if is_persistent else 'true' }})"
@@ -167,6 +176,11 @@
                 is_persistent %}Persistent Server (Active · Saved permanently){% elif is_historical %}Historical
                 (Retained
                 up to 48 hours){% else %}Live Server Instance{% endif %}
+            </div>
+            <div
+                class="text-[11px] font-mono text-center text-blue-300/90 pt-2 border-t border-white/5 flex items-center justify-center gap-1.5">
+                <span class="text-gray-400">Server Uptime:</span>
+                <span class="font-bold text-blue-300">{{ uptime_str }}</span>
             </div>
         </div>
 
