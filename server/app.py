@@ -996,7 +996,6 @@ def pull_server_checker_data():
             if "Misc" in state:
                 del state["Misc"]
 
-            # Track visibility and last player count in metadata
             if _sc_public_server_ids:
                 is_priv = job_id not in _sc_public_server_ids
                 state["IsPrivate"] = is_priv
@@ -1182,15 +1181,12 @@ def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=N
     if is_private:
         return (age_sec > 600)
 
-    # Public server: check public servers list we get from the Roblox API
     info = _sc_public_servers_info.get(job_id)
     if _sc_public_server_ids:
-        # Roblox API returned public servers: if not present in the list, mark as historical
         if info is None or job_id not in _sc_public_servers_info:
             return True
         return info.get("playing", 0) == 0 or age_sec > 600
 
-    # Fallback if Roblox public servers list could not be retrieved
     return (age_sec > 600) or (latest_state.get("PlayerCount", 0) == 0)
 
 def build_server_cards(data, search_query=None):
@@ -1750,7 +1746,7 @@ def get_historical_servers_api():
             player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
             max_players = info.get("maxPlayers", 12) if info else 12
 
-        if not is_historical or is_persistent:
+        if not is_historical:
             continue
 
         j_parts = [p for p in job_id.split("-") if p]
@@ -1777,7 +1773,7 @@ def get_historical_servers_api():
             "job_id": job_id,
             "short_id": short_id,
             "is_private": is_private,
-            "is_persistent": False,
+            "is_persistent": is_persistent,
             "is_historical": True,
             "player_count": player_count,
             "max_players": max_players,

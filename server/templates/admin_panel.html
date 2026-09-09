@@ -1428,7 +1428,7 @@
                 const servers = data.servers || [];
                 const totalServers = servers.length;
                 const persistentCount = servers.filter(s => s.is_persistent).length;
-                const historicalCount = servers.filter(s => s.is_historical && !s.is_persistent).length;
+                const historicalCount = servers.filter(s => s.is_historical).length;
                 const activeCount = servers.filter(s => !s.is_historical).length;
 
                 const sTot = document.getElementById('server-stat-total');
@@ -1981,7 +1981,8 @@
                                     <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">JOB ID</span>
                                     ${shortId ? `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold">ID: ${escapeHtml(shortId)}</span>` : ''}
                                     ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
-                                    ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : (isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical (48h)</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>')}
+                                    ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : ''}
+                                    ${isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>'}
                                 </div>
                                 <div class="font-mono text-xs text-slate-200 truncate select-all font-semibold mt-1" title="${escapeHtml(s.job_id)}">
                                     ${escapeHtml(s.job_id)}
