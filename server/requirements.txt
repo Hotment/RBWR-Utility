@@ -5,3 +5,4 @@ requests
 gunicorn
 flask-sock
 cli-ih
+orjson>=3.10.0

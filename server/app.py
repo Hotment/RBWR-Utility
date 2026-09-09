@@ -2,6 +2,20 @@ from flask import Flask, request, jsonify, send_from_directory, redirect, Respon
 from pydantic import BaseModel, Field, ValidationError
 import os
 import json
+try:
+    import orjson
+    def _json_dumps(obj):
+        return orjson.dumps(obj)
+    def _json_loads(b):
+        return orjson.loads(b)
+except ImportError:
+    orjson = None
+    def _json_dumps(obj):
+        return json.dumps(obj).encode("utf-8")
+    def _json_loads(b):
+        if isinstance(b, (bytes, bytearray)):
+            return json.loads(b.decode("utf-8"))
+        return json.loads(b)
 import secrets
 import requests
 import hashlib
@@ -824,20 +838,59 @@ def get_server_player_count(job_id, snapshots=None, latest_state=None, is_privat
                 return int(p)
     return 0
 
+_sc_file_cache = {}
+_sc_cache_lock = threading.Lock()
+
+_sc_historical_cards_base = None
+_sc_historical_cards_key = None
+_sc_historical_lock = threading.Lock()
+
+_sc_active_cards_base = None
+_sc_active_cards_key = None
+_sc_active_lock = threading.Lock()
+
+def invalidate_historical_cards_cache():
+    global _sc_historical_cards_base, _sc_historical_cards_key
+    global _sc_active_cards_base, _sc_active_cards_key
+    with _sc_historical_lock:
+        _sc_historical_cards_base = None
+        _sc_historical_cards_key = None
+    with _sc_active_lock:
+        _sc_active_cards_base = None
+        _sc_active_cards_key = None
+
 def get_sc_data(filename: str, max_retries: int = 6):
     filepath = os.path.join(DATA_DIR, filename)
     if not os.path.exists(filepath):
         return {}
+
+    try:
+        current_mtime = os.path.getmtime(filepath)
+    except OSError:
+        current_mtime = None
+
+    if current_mtime is not None:
+        with _sc_cache_lock:
+            cached_entry = _sc_file_cache.get(filename)
+            if cached_entry and cached_entry[0] == current_mtime:
+                return cached_entry[1]
+
     for attempt in range(max_retries):
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (PermissionError, json.JSONDecodeError):
+            with open(filepath, "rb") as f:
+                data = _json_loads(f.read())
+            try:
+                mtime_after = os.path.getmtime(filepath)
+            except OSError:
+                mtime_after = current_mtime
+            with _sc_cache_lock:
+                _sc_file_cache[filename] = (mtime_after, data)
+            return data
+        except (PermissionError, Exception) as e:
             if attempt < max_retries - 1:
-                time.sleep(0.05 * (attempt + 1))
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(0.05)
+                time.sleep(0.04 * (attempt + 1))
+            else:
+                logger.error(f"Error loading sc data from {filename}: {e}")
     return {}
 
 def save_sc_data(data, filename: str, max_retries: int = 10):
@@ -847,21 +900,38 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
     temp_path = f"{filepath}.{unique_id}.tmp"
     
     try:
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        raw_bytes = _json_dumps(data)
+        with open(temp_path, "wb") as f:
+            f.write(raw_bytes)
             f.flush()
             
         for attempt in range(max_retries):
             try:
                 os.replace(temp_path, filepath)
+                try:
+                    new_mtime = os.path.getmtime(filepath)
+                except OSError:
+                    new_mtime = time.time()
+                with _sc_cache_lock:
+                    _sc_file_cache[filename] = (new_mtime, data)
+                if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
+                    invalidate_historical_cards_cache()
                 return True
             except PermissionError:
                 if attempt < max_retries - 1:
                     time.sleep(0.04 * (attempt + 1))
                 else:
                     try:
-                        with open(filepath, "w", encoding="utf-8") as f:
-                            json.dump(data, f)
+                        with open(filepath, "wb") as f:
+                            f.write(raw_bytes)
+                        try:
+                            new_mtime = os.path.getmtime(filepath)
+                        except OSError:
+                            new_mtime = time.time()
+                        with _sc_cache_lock:
+                            _sc_file_cache[filename] = (new_mtime, data)
+                        if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
+                            invalidate_historical_cards_cache()
                         return True
                     except Exception as fallback_err:
                         logger.error(f"Error in direct save fallback for {filename}: {fallback_err}")
@@ -1042,24 +1112,37 @@ def pull_server_checker_data():
             heartbeat = server.get('lastHeartbeat', datetime.now(timezone.utc).isoformat())
             current_data[job_id][heartbeat] = state
 
-        max_retention_seconds = 48 * 3600
+        servers_dirty = bool(servers_list)
+        now_utc = datetime.now(timezone.utc)
+        cutoff_dt = now_utc - timedelta(hours=48)
+        cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
+
         for s_id in list(current_data.keys()):
             if s_id in persistent_ids:
                 continue
             snaps = current_data.get(s_id, {})
             if not snaps:
                 del current_data[s_id]
+                servers_dirty = True
                 continue
             latest_ts = max(snaps.keys())
-            latest_snap = snaps[latest_ts]
             p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else 0
-            if p_count == 0:
-                age_seconds = convert_ISO_to_secs(latest_ts)
-                if age_seconds > max_retention_seconds:
-                    del current_data[s_id]
-                    logger.info(f"Pruned historical server {s_id} (age: {age_seconds}s > 48h)")
+            if p_count == 0 and latest_ts < cutoff_iso:
+                del current_data[s_id]
+                servers_dirty = True
+                logger.info(f"Pruned historical server {s_id} (latest: {latest_ts} < cutoff: {cutoff_iso})")
+                continue
 
-        save_sc_data(current_data, "servers.json")
+            earliest_ts = min(snaps.keys())
+            if earliest_ts < cutoff_iso:
+                expired_keys = [ts for ts in snaps.keys() if ts < cutoff_iso]
+                if expired_keys:
+                    for ts in expired_keys:
+                        del snaps[ts]
+                    servers_dirty = True
+
+        if servers_dirty:
+            save_sc_data(current_data, "servers.json")
         if meta_dirty:
             save_server_meta()
 
@@ -1090,6 +1173,11 @@ def start_server_checker_worker():
         if _sc_worker_started:
             return
         
+        if os.environ.get("DISABLE_SC_WORKER") == "1":
+            return
+        if "unittest" in sys.modules:
+            return
+
         is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
         if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
             return
@@ -1099,17 +1187,16 @@ def start_server_checker_worker():
         _sc_worker_thread.start()
         logger.info("Started background server checker worker thread.")
 
-start_server_checker_worker()
-
 @app.before_request
 def ensure_server_checker_worker():
     if not _sc_worker_started:
         start_server_checker_worker()
 
-def convert_ISO_to_secs(timestamp_str):
+def convert_ISO_to_secs(timestamp_str, now=None):
     try:
         dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
+        if now is None:
+            now = datetime.now(timezone.utc)
         age_seconds = (now - dt).total_seconds()
         return max(0, round(age_seconds))
     except Exception:
@@ -1219,15 +1306,92 @@ def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=N
 
     return (age_sec > 600) or (latest_state.get("PlayerCount", 0) == 0)
 
-def build_server_cards(data, search_query=None):
+def get_active_cards_base(servers_data, persistent_ids):
+    global _sc_active_cards_base, _sc_active_cards_key
+    cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
+    with _sc_active_lock:
+        if _sc_active_cards_base is not None and _sc_active_cards_key == cache_key:
+            return _sc_active_cards_base
+
+    now_utc = datetime.now(timezone.utc)
     cards = []
+    for job_id, snapshots in sorted(servers_data.items()):
+        if not snapshots:
+            continue
+        latest_timestamp = max(snapshots.keys())
+        latest_state = snapshots[latest_timestamp]
+        info = _sc_public_servers_info.get(job_id, {})
+        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
+        is_persistent = job_id in persistent_ids
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
+
+        if is_historical and not is_persistent:
+            continue
+
+        if is_private:
+            player_count = None
+            max_players = None
+        else:
+            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
+            max_players = info.get("maxPlayers", 12) if info else 12
+
+        first_timestamp = min(snapshots.keys())
+        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
+        uptime_str = format_uptime_duration(uptime_sec)
+
+        j_parts = [p for p in job_id.split("-") if p]
+        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+
+        unit1 = latest_state.get("Unit1", {})
+        unit2 = latest_state.get("Unit2", {})
+
+        cards.append({
+            "job_id": job_id,
+            "short_id": short_id,
+            "is_private": is_private,
+            "is_persistent": is_persistent,
+            "is_historical": is_historical,
+            "player_count": player_count,
+            "max_players": max_players,
+            "raw_timestamp": latest_timestamp,
+            "first_timestamp": first_timestamp,
+            "age_seconds": age_sec,
+            "latest_timestamp": f"{age_sec}s ago",
+            "uptime_seconds": uptime_sec,
+            "uptime_str": uptime_str,
+            "snapshot_count": len(snapshots),
+            "unit1": {
+                "demand_time_left": unit1.get("Demand Time Left", 0),
+                "aprm": unit1.get("APRM", 0),
+                "reactor_temp": unit1.get("Reactor Temp", 0),
+            },
+            "unit2": {
+                "demand_time_left": unit2.get("Demand Time Left", 0),
+                "aprm": unit2.get("APRM", 0),
+                "reactor_temp": unit2.get("Reactor Temp", 0),
+            },
+        })
+
+    with _sc_active_lock:
+        _sc_active_cards_base = cards
+        _sc_active_cards_key = cache_key
+
+    return cards
+
+def build_server_cards(data, search_query=None):
     if not data:
-        return cards
+        return []
 
     persistent_data = load_persistent_servers()
     persistent_ids = set(persistent_data.get("persistent", {}).keys())
     clean_query = (search_query or "").strip()
 
+    if not clean_query:
+        return list(get_active_cards_base(data, persistent_ids))
+
+    cards = []
+    now_utc = datetime.now(timezone.utc)
     for job_id, snapshots in sorted(data.items()):
         if not snapshots:
             continue
@@ -1237,7 +1401,7 @@ def build_server_cards(data, search_query=None):
         unit2 = latest_state.get("Unit2", {})
 
         info = _sc_public_servers_info.get(job_id, {})
-        age_sec = convert_ISO_to_secs(latest_timestamp)
+        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
         is_persistent = job_id in persistent_ids
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
 
@@ -1250,7 +1414,7 @@ def build_server_cards(data, search_query=None):
             max_players = info.get("maxPlayers", 12) if info else 12
 
         if is_historical and not is_persistent:
-            if not clean_query or not is_exact_job_or_server_id_match(clean_query, job_id):
+            if not is_exact_job_or_server_id_match(clean_query, job_id):
                 continue
 
         first_timestamp = min(snapshots.keys())
@@ -1747,6 +1911,80 @@ def lookup_server_api():
         "card_html": card_html
     })
 
+def get_historical_cards_base(servers_data, persistent_ids):
+    global _sc_historical_cards_base, _sc_historical_cards_key
+    cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
+    with _sc_historical_lock:
+        if _sc_historical_cards_base is not None and _sc_historical_cards_key == cache_key:
+            return _sc_historical_cards_base
+
+    now_utc = datetime.now(timezone.utc)
+    base_cards = []
+    for job_id, snapshots in servers_data.items():
+        if not snapshots:
+            continue
+        latest_timestamp = max(snapshots.keys())
+        latest_state = snapshots[latest_timestamp]
+        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
+
+        info = _sc_public_servers_info.get(job_id, {})
+        is_persistent = job_id in persistent_ids
+        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
+
+        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
+        if not is_historical:
+            continue
+
+        if is_private:
+            player_count = None
+            max_players = None
+        else:
+            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
+            max_players = info.get("maxPlayers", 12) if info else 12
+
+        j_parts = [p for p in job_id.split("-") if p]
+        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+
+        first_timestamp = min(snapshots.keys())
+        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
+        uptime_str = format_uptime_duration(uptime_sec)
+
+        unit1 = latest_state.get("Unit1", {})
+        unit2 = latest_state.get("Unit2", {})
+
+        base_cards.append({
+            "job_id": job_id,
+            "short_id": short_id,
+            "is_private": is_private,
+            "is_persistent": is_persistent,
+            "is_historical": True,
+            "player_count": player_count,
+            "max_players": max_players,
+            "raw_timestamp": latest_timestamp,
+            "first_timestamp": first_timestamp,
+            "age_seconds": age_sec,
+            "latest_timestamp": f"{age_sec}s ago",
+            "uptime_seconds": uptime_sec,
+            "uptime_str": uptime_str,
+            "snapshot_count": len(snapshots),
+            "unit1": {
+                "demand_time_left": unit1.get("Demand Time Left", 0),
+                "aprm": unit1.get("APRM", 0),
+                "reactor_temp": unit1.get("Reactor Temp", 0),
+            },
+            "unit2": {
+                "demand_time_left": unit2.get("Demand Time Left", 0),
+                "aprm": unit2.get("APRM", 0),
+                "reactor_temp": unit2.get("Reactor Temp", 0),
+            },
+        })
+
+    with _sc_historical_lock:
+        _sc_historical_cards_base = base_cards
+        _sc_historical_cards_key = cache_key
+
+    return base_cards
+
 @app.route("/api/servers/historical", methods=["GET"])
 def get_historical_servers_api():
     page = request.args.get("page", 1, type=int)
@@ -1773,34 +2011,14 @@ def get_historical_servers_api():
     persistent_data = load_persistent_servers()
     persistent_ids = set(persistent_data.get("persistent", {}).keys())
 
-    historical_cards = []
-    for job_id, snapshots in servers_data.items():
-        if not snapshots:
-            continue
-        latest_timestamp = max(snapshots.keys())
-        latest_state = snapshots[latest_timestamp]
-        age_sec = convert_ISO_to_secs(latest_timestamp)
+    base_cards = get_historical_cards_base(servers_data, persistent_ids)
 
-        info = _sc_public_servers_info.get(job_id, {})
-        is_persistent = job_id in persistent_ids
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-
-        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
-        if is_private:
-            player_count = None
-            max_players = None
-        else:
-            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12) if info else 12
-
-        if not is_historical:
-            continue
-
-        j_parts = [p for p in job_id.split("-") if p]
-        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-
-        if query:
-            clean_q = query.replace("-", "")
+    if query:
+        clean_q = query.replace("-", "")
+        historical_cards = []
+        for c in base_cards:
+            job_id = c.get("job_id", "")
+            short_id = c.get("short_id", "")
             clean_jid = job_id.lower().replace("-", "")
             clean_sid = short_id.lower().replace("-", "")
             matches = (
@@ -1810,42 +2028,10 @@ def get_historical_servers_api():
                 (clean_sid and clean_q in clean_sid) or
                 is_exact_job_or_server_id_match(query, job_id)
             )
-            if not matches:
-                continue
-
-        first_timestamp = min(snapshots.keys())
-        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
-        uptime_str = format_uptime_duration(uptime_sec)
-
-        unit1 = latest_state.get("Unit1", {})
-        unit2 = latest_state.get("Unit2", {})
-
-        historical_cards.append({
-            "job_id": job_id,
-            "short_id": short_id,
-            "is_private": is_private,
-            "is_persistent": is_persistent,
-            "is_historical": True,
-            "player_count": player_count,
-            "max_players": max_players,
-            "raw_timestamp": latest_timestamp,
-            "first_timestamp": first_timestamp,
-            "age_seconds": age_sec,
-            "latest_timestamp": f"{age_sec}s ago",
-            "uptime_seconds": uptime_sec,
-            "uptime_str": uptime_str,
-            "snapshot_count": len(snapshots),
-            "unit1": {
-                "demand_time_left": unit1.get("Demand Time Left", 0),
-                "aprm": unit1.get("APRM", 0),
-                "reactor_temp": unit1.get("Reactor Temp", 0),
-            },
-            "unit2": {
-                "demand_time_left": unit2.get("Demand Time Left", 0),
-                "aprm": unit2.get("APRM", 0),
-                "reactor_temp": unit2.get("Reactor Temp", 0),
-            },
-        })
+            if matches:
+                historical_cards.append(c)
+    else:
+        historical_cards = list(base_cards)
 
     sort_option = request.args.get("sort", "newest").strip().lower()
     if sort_option == "players_desc":
@@ -2701,4 +2887,5 @@ if __name__ == "__main__":
     except ValueError:
         port = 8400
         
+    start_server_checker_worker()
     app.run(host=host, port=port, debug=False)
