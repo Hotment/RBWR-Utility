@@ -28,6 +28,7 @@
                         border: 'rgba(255, 255, 255, 0.08)',
                         borderHover: 'rgba(255, 255, 255, 0.15)',
                         primary: '#3b82f6',
+                        discord: '#5865F2',
                     }
                 }
             }
@@ -45,29 +46,6 @@
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-        }
-
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #0a0a0c;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(59, 130, 246, 0.25);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(59, 130, 246, 0.5);
-        }
-
-        * {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(59, 130, 246, 0.25) #0a0a0c;
         }
 
         .premium-glass {
@@ -96,47 +74,46 @@
 <body
     class="min-h-screen flex items-center justify-center p-4 sm:p-6 select-none font-sans max-w-full overflow-x-hidden">
 
-    <div class="max-w-md w-full flex flex-col gap-8 relative">
+    <div class="max-w-md w-full flex flex-col gap-6 relative">
 
-        <div class="absolute -inset-10 bg-blue-500/10 blur-3xl rounded-full opacity-30 -z-10">
-        </div>
+        <div class="absolute -inset-10 bg-[#5865F2]/10 blur-3xl rounded-full opacity-35 -z-10"></div>
 
         <div class="text-center flex flex-col items-center gap-2">
             <div class="relative w-24 h-24 mb-2 flex items-center justify-center">
                 <div
-                    class="absolute inset-0 rounded-full border-2 border-dashed border-blue-500 animate-[spin_25s_linear_infinite] opacity-60">
+                    class="absolute inset-0 rounded-full border-2 border-dashed border-[#5865F2] animate-[spin_25s_linear_infinite] opacity-60">
                 </div>
-                <div class="absolute inset-3 rounded-full border border-blue-500/30 animate-ping opacity-45"></div>
+                <div class="absolute inset-3 rounded-full border border-[#5865F2]/30 animate-ping opacity-45"></div>
                 <div
-                    class="w-14 h-14 rounded-full bg-blue-950/40 border border-blue-500/50 flex items-center justify-center backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                    <svg class="w-7 h-7 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse"
-                        fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"
+                    class="w-14 h-14 rounded-full bg-[#5865F2]/20 border border-[#5865F2]/50 flex items-center justify-center backdrop-blur-md shadow-[0_0_20px_rgba(88,101,242,0.3)]">
+                    <svg class="w-7 h-7 text-[#5865F2] fill-current" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z">
-                        </path>
+                        <path
+                            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                     </svg>
                 </div>
             </div>
 
             <h1
                 class="font-display font-semibold text-3xl tracking-wide text-white uppercase select-none whitespace-nowrap">
-                Admin Login</h1>
-            <span class="text-[10px] text-slate-500 font-mono tracking-[0.25em] block whitespace-nowrap">// APRM
-                Calculator Admin //</span>
+                Admin Portal</h1>
+            <span class="text-[10px] text-slate-500 font-mono tracking-[0.25em] block whitespace-nowrap">// RBWR
+                UTILITY SECURITY //</span>
         </div>
 
         <div class="premium-glass p-5 sm:p-8 rounded-2xl flex flex-col gap-6">
             <div class="border-b border-white/5 pb-4">
                 <h2 class="text-sm font-semibold tracking-wide text-white font-display uppercase whitespace-nowrap">
-                    Login</h2>
-                <p class="text-xs text-slate-400 font-mono mt-1.5 leading-relaxed">Enter your administrator credentials
-                    to log in.</p>
+                    Discord Authentication
+                </h2>
+                <p class="text-xs text-slate-400 font-mono mt-1.5 leading-relaxed">
+                    Administrators are required to authenticate with an authorized Discord account.
+                </p>
             </div>
 
             {% if error %}
             <div
-                class="relative overflow-hidden rounded-lg bg-rose-950/20 border border-rose-500/20 p-4 shadow-[0_0_15px_rgba(244,63,94,0.05)] flex gap-3.5 items-start">
+                class="relative overflow-hidden rounded-xl bg-rose-950/30 border border-rose-500/30 p-4 shadow-[0_0_15px_rgba(244,63,94,0.08)] flex gap-3.5 items-start">
                 <div class="absolute top-0 left-0 bottom-0 w-1 bg-rose-500"></div>
                 <svg class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2"
                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -145,81 +122,56 @@
                     </path>
                 </svg>
                 <div class="flex flex-col gap-0.5">
-                    <span class="text-[10px] font-mono font-bold text-rose-500 tracking-widest">ERROR</span>
-                    <p class="text-xs text-slate-300 font-mono font-medium leading-relaxed">{{ error }}</p>
+                    <span class="text-[10px] font-mono font-bold text-rose-500 tracking-widest">AUTHENTICATION
+                        FAILED</span>
+                    <p class="text-xs text-slate-200 font-mono leading-relaxed">{{ error }}</p>
                 </div>
             </div>
             {% endif %}
 
-            <form action="/admin/login" method="POST" class="flex flex-col gap-6" onsubmit="handleSubmit(event)">
-                <input type="hidden" name="next" value="{{ next_url or '/admin' }}">
-
-                <div class="flex flex-col gap-2">
-                    <label for="username"
-                        class="text-[10px] font-mono font-bold text-slate-400 tracking-wider">USERNAME</label>
-                    <div class="input-container flex items-center rounded-xl px-4 py-0.5">
-                        <svg class="w-5 h-5 text-slate-500 shrink-0 mr-3" fill="none" stroke="currentColor"
-                            stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z">
-                            </path>
-                        </svg>
-                        <input type="text" id="username" name="username" required autocomplete="username"
-                            placeholder="Enter username"
-                            class="bg-transparent w-full py-3.5 text-sm text-white placeholder-slate-600 outline-none">
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-2">
-                    <label for="password"
-                        class="text-[10px] font-mono font-bold text-slate-400 tracking-wider">PASSWORD</label>
-                    <div class="input-container flex items-center rounded-xl px-4 py-0.5">
-                        <svg class="w-5 h-5 text-slate-500 shrink-0 mr-3" fill="none" stroke="currentColor"
-                            stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z">
-                            </path>
-                        </svg>
-                        <input type="password" id="password" name="password" required autocomplete="current-password"
-                            placeholder="Enter password"
-                            class="bg-transparent w-full py-3.5 text-sm text-white placeholder-slate-600 outline-none">
-                        <button type="button" onclick="togglePasswordVisibility()"
-                            class="text-slate-500 hover:text-blue-500 focus:outline-none transition p-1 ml-2">
-                            <svg id="eye-open" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"
-                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z">
-                                </path>
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                            <svg id="eye-closed" class="w-5 h-5 hidden" fill="none" stroke="currentColor"
-                                stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88">
-                                </path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                <button type="submit" id="submit-btn"
-                    class="relative group overflow-hidden px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition duration-300 text-sm tracking-wider uppercase font-mono mt-3 shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2">
-                    <span
-                        class="absolute inset-0 w-full h-full bg-white/10 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></span>
-
-                    <svg id="submit-spinner" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white hidden"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                        </circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
+            <div class="flex flex-col gap-4">
+                <a href="{{ discord_login_url }}"
+                    class="relative group overflow-hidden px-6 py-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition duration-200 text-sm tracking-wide font-mono shadow-lg shadow-[#5865F2]/25 flex items-center justify-center gap-3">
+                    <svg class="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                     </svg>
+                    <span>LOG IN WITH DISCORD</span>
+                </a>
+            </div>
 
-                    <span id="submit-text">LOG IN</span>
+            <div class="border-t border-white/5 pt-4">
+                <button type="button" onclick="toggleLegacyLogin()"
+                    class="text-[11px] text-slate-500 hover:text-slate-400 font-mono flex items-center justify-between w-full transition">
+                    <span>Legacy Server Key Fallback</span>
+                    <span id="legacy-toggle-icon">&plus;</span>
                 </button>
-            </form>
+
+                <div id="legacy-login-container" class="hidden mt-4 pt-2">
+                    <form action="/admin/login" method="POST" class="flex flex-col gap-4">
+                        <input type="hidden" name="next" value="{{ next_url or '/admin' }}">
+
+                        <div class="flex flex-col gap-1.5">
+                            <label for="username"
+                                class="text-[10px] font-mono font-bold text-slate-400 tracking-wider">USERNAME</label>
+                            <input type="text" id="username" name="username" placeholder="username"
+                                class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label for="password"
+                                class="text-[10px] font-mono font-bold text-slate-400 tracking-wider">PASSWORD</label>
+                            <input type="password" id="password" name="password" placeholder="password"
+                                class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
+                        </div>
+
+                        <button type="submit"
+                            class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-slate-300 hover:text-white rounded-xl text-xs font-mono font-semibold transition mt-1">
+                            Verify Legacy Credentials
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="text-center flex justify-center items-center gap-4 text-xs font-mono text-slate-500">
@@ -229,31 +181,16 @@
     </div>
 
     <script>
-        function togglePasswordVisibility() {
-            const pwdInput = document.getElementById('password');
-            const eyeOpen = document.getElementById('eye-open');
-            const eyeClosed = document.getElementById('eye-closed');
-
-            if (pwdInput.type === 'password') {
-                pwdInput.type = 'text';
-                eyeOpen.classList.add('hidden');
-                eyeClosed.classList.remove('hidden');
+        function toggleLegacyLogin() {
+            const container = document.getElementById('legacy-login-container');
+            const icon = document.getElementById('legacy-toggle-icon');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                icon.innerHTML = '&minus;';
             } else {
-                pwdInput.type = 'password';
-                eyeOpen.classList.remove('hidden');
-                eyeClosed.classList.add('hidden');
+                container.classList.add('hidden');
+                icon.innerHTML = '&plus;';
             }
-        }
-
-        function handleSubmit(e) {
-            const btn = document.getElementById('submit-btn');
-            const spinner = document.getElementById('submit-spinner');
-            const text = document.getElementById('submit-text');
-
-            btn.disabled = true;
-            btn.classList.add('opacity-75', 'cursor-not-allowed');
-            spinner.classList.remove('hidden');
-            text.innerText = 'LOGGING IN...';
         }
     </script>
 </body>

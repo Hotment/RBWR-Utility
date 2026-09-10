@@ -2,8 +2,6 @@
 
 {% block title %}RBWR Utility - Suggestions & Feedback{% endblock %}
 
-
-
 {% block content %}
 <main class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6 overflow-x-hidden">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
@@ -16,14 +14,35 @@
             </p>
         </div>
 
-        <a href="#submit-section"
-            class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-xs tracking-wide shrink-0 whitespace-nowrap">
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
-            </svg>
-            Submit Suggestion
-        </a>
+        <div class="flex items-center gap-3 shrink-0">
+            {% if discord_user %}
+            <div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25">
+                <img src="{{ discord_user.avatar_url }}" alt="Avatar"
+                    class="w-6 h-6 rounded-full border border-white/10 shrink-0">
+                <span class="text-xs font-medium text-white">{{ discord_user.global_name }}</span>
+                <a href="/auth/discord/logout?next=/suggestions"
+                    class="text-[10px] text-gray-400 hover:text-rose-400 font-mono underline ml-1">Sign Out</a>
+            </div>
+            {% else %}
+            <a href="/auth/discord/login?next=/suggestions"
+                class="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/20 text-xs tracking-wide shrink-0 whitespace-nowrap">
+                <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                </svg>
+                Log in with Discord
+            </a>
+            {% endif %}
+
+            <a href="#submit-section"
+                class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-xs tracking-wide shrink-0 whitespace-nowrap">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+                </svg>
+                Submit Suggestion
+            </a>
+        </div>
     </div>
 
     <div
@@ -36,6 +55,9 @@
             Private Contact Form &rarr;
         </a>
     </div>
+
+    <div id="url-error-banner"
+        class="hidden p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
 
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
@@ -122,22 +144,80 @@
 
         <div class="premium-glass p-4 sm:p-5 md:p-6 rounded-2xl border border-white/5">
             <form id="public-suggestion-form" class="flex flex-col gap-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                    <div class="flex flex-col gap-1.5 group">
-                        <label for="submit-name"
-                            class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">Your
-                            Name / Handle (Optional)</label>
-                        <input type="text" id="submit-name" placeholder="Leave blank for Anonymous"
-                            class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono h-10">
+                {% if discord_user %}
+                <div
+                    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-lg shadow-[#5865F2]/5">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                        <img src="{{ discord_user.avatar_url }}" alt="Discord Avatar"
+                            class="w-10 h-10 rounded-full border border-[#5865F2]/40 shadow-md shrink-0">
+                        <div class="flex flex-col gap-0.5 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-mono font-semibold text-gray-300">Submitting as:</span>
+                                <span class="text-sm font-bold text-white tracking-wide truncate">{{
+                                    discord_user.global_name }}</span>
+                                <span
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30 text-[10px] font-mono rounded font-semibold shrink-0">
+                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                                        <path
+                                            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                                    </svg>
+                                    Verified Discord
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 text-[11px] text-gray-400">
+                                <span>@{{ discord_user.username }}</span>
+                                <span>&bull;</span>
+                                <a href="/auth/discord/logout?next=/suggestions"
+                                    class="text-rose-400 hover:text-rose-300 underline font-mono text-[10px]">Sign out /
+                                    Switch account</a>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex items-center pt-1 md:pt-4">
+
+                    <div class="flex items-center shrink-0">
                         <label
-                            class="flex items-center gap-2.5 cursor-pointer group text-xs font-medium text-gray-400 hover:text-gray-300 transition-colors whitespace-nowrap">
+                            class="flex items-center gap-2.5 cursor-pointer group text-xs font-medium text-gray-300 hover:text-white transition-colors bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 rounded-xl border border-white/10">
                             <input type="checkbox" id="submit-anonymous" class="premium-checkbox">
-                            <span>Submit as Anonymous</span>
+                            <span>Submit as Anonymous (Hide username publicly)</span>
                         </label>
                     </div>
                 </div>
+                {% else %}
+                <div
+                    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-lg shadow-[#5865F2]/5">
+                    <div class="flex items-center gap-3.5">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8"
+                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-semibold text-gray-300">Identity:</span>
+                                <span
+                                    class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-white/10 text-gray-200 border border-white/15 uppercase">Anonymous</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 leading-snug">
+                                You are not signed in. Your suggestion will be posted as <strong
+                                    class="text-gray-200">Anonymous</strong> without a verified badge.
+                            </p>
+                        </div>
+                    </div>
+
+                    <a href="/auth/discord/login?next=/suggestions"
+                        class="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/25 text-xs tracking-wide shrink-0 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]">
+                        <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                        </svg>
+                        Log in with Discord
+                    </a>
+                </div>
+                {% endif %}
 
                 <div class="flex flex-col gap-1.5 group">
                     <label class="text-xs font-medium text-gray-400">Target Project / Category</label>
@@ -216,6 +296,15 @@
             if (searchInput) {
                 searchInput.value = searchParam;
                 searchQuery = searchParam.toLowerCase().trim();
+            }
+        }
+
+        const errorParam = urlParams.get('error');
+        if (errorParam) {
+            const errorBanner = document.getElementById('url-error-banner');
+            if (errorBanner) {
+                errorBanner.innerText = `Discord Auth Notice: ${errorParam}`;
+                errorBanner.classList.remove('hidden');
             }
         }
 
@@ -372,17 +461,35 @@
                 </div>
             ` : '';
 
+            const isDiscord = Boolean(item.is_discord_user);
+            const avatarUrl = item.discord_avatar;
+            const displayName = escapeHtml(item.name || 'Anonymous');
+
+            const avatarBlock = avatarUrl ? `
+                <img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="w-8 h-8 rounded-full border border-white/10 shrink-0">
+            ` : `
+                <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono text-gray-300 font-bold shrink-0">
+                    ${displayName.charAt(0).toUpperCase()}
+                </div>
+            `;
+
+            const discordTag = isDiscord ? `
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 rounded text-[9px] font-mono font-semibold" title="Verified Discord Account">
+                    <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028z"/></svg>
+                    Discord
+                </span>
+            ` : '';
+
             return `
                 <div class="premium-glass interactive-card p-6 rounded-2xl flex flex-col justify-between gap-4 border border-white/5">
                     <div class="flex flex-col gap-3">
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono text-gray-300 font-bold">
-                                    ${escapeHtml(item.name.charAt(0).toUpperCase())}
-                                </div>
+                                ${avatarBlock}
                                 <div class="flex flex-col gap-0.5">
                                     <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="text-sm font-semibold text-white tracking-wide">${escapeHtml(item.name)}</span>
+                                        <span class="text-sm font-semibold text-white tracking-wide">${displayName}</span>
+                                        ${discordTag}
                                         ${targetBadge}
                                     </div>
                                     <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
@@ -406,7 +513,6 @@
     async function handleFormSubmit(e) {
         e.preventDefault();
 
-        const nameInput = document.getElementById('submit-name');
         const anonCheckbox = document.getElementById('submit-anonymous');
         const targetRadio = document.querySelector('input[name="submit-target"]:checked');
         const selectedTarget = targetRadio ? targetRadio.value : "overlay";
@@ -414,10 +520,11 @@
         const statusDiv = document.getElementById('submit-form-status');
         const submitBtn = document.getElementById('submit-form-btn');
 
+        const isAnon = anonCheckbox ? anonCheckbox.checked : false;
+
         const payload = {
-            name: anonCheckbox.checked ? "Anonymous" : nameInput.value.trim(),
             suggestion: sugInput.value.trim(),
-            anonymous: anonCheckbox.checked,
+            anonymous: isAnon,
             target: selectedTarget,
             is_server_checker: selectedTarget === "server_checker"
         };
@@ -440,10 +547,8 @@
                 statusDiv.innerText = "Success: Suggestion submitted successfully!";
                 statusDiv.classList.remove('hidden');
 
-                nameInput.value = '';
                 sugInput.value = '';
-                anonCheckbox.checked = false;
-                if (serverCheckerCheckbox) serverCheckerCheckbox.checked = false;
+                if (anonCheckbox) anonCheckbox.checked = false;
 
                 const refreshRes = await fetch('/api/suggestions');
                 if (refreshRes.ok) {

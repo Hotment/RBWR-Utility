@@ -411,6 +411,82 @@
                 </div>
             </header>
 
+            <div
+                class="cyber-panel p-4 sm:p-5 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5 flex flex-col gap-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-9 h-9 rounded-xl bg-[#5865F2]/20 border border-[#5865F2]/40 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-[#5865F2] fill-current" viewBox="0 0 24 24">
+                                <path
+                                    d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3
+                                class="text-xs font-bold text-white font-display uppercase tracking-wider flex items-center gap-2">
+                                <span>Discord DM Notifier</span>
+                                <span
+                                    class="px-2 py-0.5 bg-[#5865F2]/20 text-[#5865F2] text-[9px] rounded font-mono font-bold uppercase border border-[#5865F2]/30">Live
+                                    Bot</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-400 font-mono">The authorized Discord Bot will DM your
+                                Discord account when new suggestions are submitted in selected categories.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <label
+                            class="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-200 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5 hover:border-white/10 transition">
+                            <input type="checkbox" id="notifier-toggle" class="accent-[#5865F2] w-4 h-4 cursor-pointer">
+                            <span class="font-bold">Enable DM Notifications</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="notifier-settings-panel" class="flex flex-col gap-3 pt-3 border-t border-white/5">
+                    <div class="flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <span class="text-[10px] uppercase font-bold text-slate-400">Categories:</span>
+                            <label
+                                class="flex items-center gap-1.5 cursor-pointer text-blue-300 hover:text-white transition">
+                                <input type="checkbox" id="notif-cat-overlay" value="overlay" checked
+                                    class="accent-blue-500">
+                                <span>APRM Overlay</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-1.5 cursor-pointer text-emerald-300 hover:text-white transition">
+                                <input type="checkbox" id="notif-cat-point_graph" value="point_graph" checked
+                                    class="accent-emerald-500">
+                                <span>Point Graph</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-1.5 cursor-pointer text-amber-300 hover:text-white transition">
+                                <input type="checkbox" id="notif-cat-server_checker" value="server_checker" checked
+                                    class="accent-amber-500">
+                                <span>Server Checker</span>
+                            </label>
+                            <label
+                                class="flex items-center gap-1.5 cursor-pointer text-purple-300 hover:text-white transition">
+                                <input type="checkbox" id="notif-cat-general" value="general" checked
+                                    class="accent-purple-500">
+                                <span>General</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button type="button" onclick="sendTestNotification()" id="test-notif-btn"
+                                class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-slate-300 hover:text-white rounded-lg text-xs font-mono font-medium transition border border-zinc-700">
+                                Send Test DM
+                            </button>
+                            <button type="button" onclick="saveNotifierPreferences()" id="save-notif-btn"
+                                class="px-4 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg text-xs font-mono font-bold transition shadow-md shadow-[#5865F2]/20">
+                                Save Preferences
+                            </button>
+                        </div>
+                    </div>
+                    <div id="notifier-status-msg" class="hidden text-xs font-mono p-2.5 rounded-lg"></div>
+                </div>
+            </div>
+
             <div class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div
@@ -660,23 +736,33 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div class="cyber-panel p-6 rounded-xl border border-white/5 flex flex-col gap-4">
-                    <h3 class="text-xs font-bold tracking-wider text-blue-400 font-display mb-2 uppercase">Create New
-                        Admin</h3>
+                    <h3
+                        class="text-xs font-bold tracking-wider text-blue-400 font-display mb-2 uppercase flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865F2] fill-current" viewBox="0 0 24 24">
+                            <path
+                                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                        </svg>
+                        <span>Add Admin by Discord ID</span>
+                    </h3>
                     <form id="create-admin-form" onsubmit="handleCreateAdmin(event)"
                         class="flex flex-col gap-4 text-xs font-mono">
                         <div class="flex flex-col gap-1">
-                            <label class="text-slate-500 uppercase">Username</label>
-                            <input type="text" id="new-admin-username" required placeholder="Enter username"
-                                class="premium-input p-3 rounded-lg outline-none">
+                            <label class="text-slate-400 uppercase font-bold text-[10px]">Discord User ID (17-20
+                                digits)</label>
+                            <input type="text" id="new-admin-discord-id" required placeholder="e.g. 238192849201948201"
+                                class="premium-input p-3 rounded-lg outline-none font-mono">
+                            <span class="text-[10px] text-slate-500">Right-click user profile in Discord &rarr; Copy
+                                User ID.</span>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-slate-500 uppercase">Password (min 8 chars)</label>
-                            <input type="password" id="new-admin-password" required placeholder="Enter password"
+                            <label class="text-slate-400 uppercase font-bold text-[10px]">Admin Label / Note
+                                (Optional)</label>
+                            <input type="text" id="new-admin-username" placeholder="e.g. Moderator John"
                                 class="premium-input p-3 rounded-lg outline-none">
                         </div>
                         <button type="submit" id="create-admin-btn"
-                            class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg uppercase tracking-wider transition mt-2 shadow-lg shadow-blue-500/10">
-                            Create Account
+                            class="px-4 py-3 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-lg uppercase tracking-wider transition mt-2 shadow-lg shadow-[#5865F2]/20 font-mono font-bold">
+                            Authorize Admin
                         </button>
                     </form>
                 </div>
@@ -785,6 +871,7 @@
             }
 
             connectWebSocket();
+            initNotifierSettings();
         });
 
         function bindNavLink(id, viewName, path) {
@@ -1570,6 +1657,36 @@
                     ? `<button onclick="unbanIP('${s.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
                     : `<button onclick="openBanModal('${s.ip}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Ban IP</button>`;
 
+                let authorHtml = '';
+                const isAnon = Boolean(s.anonymous);
+                const hasDiscord = Boolean(s.discord_id);
+
+                if (hasDiscord) {
+                    const avatarImg = s.discord_avatar ? `<img src="${escapeHtml(s.discord_avatar)}" class="w-5 h-5 rounded-full border border-[#5865F2]/40 shrink-0" alt="">` : '';
+                    authorHtml = `
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${avatarImg}
+                            <span class="text-sm font-bold text-slate-100 font-display">${escapeHtml(s.discord_username || s.name || 'Discord User')}</span>
+                            <span class="px-2 py-0.5 rounded bg-[#5865F2]/20 text-[#5865F2] text-[10px] font-mono font-bold border border-[#5865F2]/30 flex items-center gap-1">
+                                <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                                <span>Discord User</span>
+                            </span>
+                            <span class="px-2 py-0.5 rounded bg-black/50 text-slate-300 hover:text-white text-[10px] font-mono border border-white/10 select-all cursor-pointer transition flex items-center gap-1" title="Click to copy Discord ID" onclick="navigator.clipboard.writeText('${escapeHtml(s.discord_id)}'); alert('Copied Discord ID: ${escapeHtml(s.discord_id)}');">
+                                <span class="text-slate-500">ID:</span>
+                                <code>${escapeHtml(s.discord_id)}</code>
+                            </span>
+                            ${isAnon ? '<span class="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30 text-[9px] font-mono font-bold uppercase" title="Submitted anonymously on public site">Public Anonymous</span>' : ''}
+                        </div>
+                    `;
+                } else {
+                    authorHtml = `
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-bold text-slate-200 font-display">${escapeHtml(s.name || (isAnon ? 'Anonymous' : 'Guest'))}</span>
+                            <span class="text-[10px] text-slate-500 font-mono">${isAnon ? 'Anonymous Guest' : 'Guest'}</span>
+                        </div>
+                    `;
+                }
+
                 const commentDisplay = hasComment ? `
                     <div class="bg-blue-950/20 border border-blue-500/20 rounded-lg p-3 text-xs font-mono text-blue-200 flex flex-col gap-1">
                         <div class="flex justify-between items-center text-[10px] text-blue-400 font-bold uppercase">
@@ -1584,7 +1701,7 @@
                     <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}" data-target="${targetAttr}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2.5 flex-wrap">
-                                <span class="text-sm font-bold text-slate-200">${escapeHtml(s.name || 'Anonymous')}</span>
+                                ${authorHtml}
                                 ${targetTag}
                                 ${hiddenTag}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
@@ -2038,7 +2155,7 @@
                         ${isPersistent && (markedBy || markedAt) ? `
                             <div class="text-[10px] text-amber-400/80 font-mono bg-amber-950/30 p-2 rounded border border-amber-500/20">
                                 Marked persistent ${markedBy} ${markedAt ? 'on ' + markedAt : ''}
-                            </div>
+                            </div>` : ''}
                     </div>
 
                     <div class="flex items-center justify-between gap-2 border-t border-white/5 pt-3 font-mono text-xs flex-wrap">
@@ -2066,7 +2183,7 @@
                         </button>
                     </div>
                 </div>
-            `;
+            `
         }
 
         function renderServers(servers, persistentMap = {}) {
@@ -2108,11 +2225,138 @@
             }
         }
 
+        const INITIAL_NOTIFIER_CFG = {{ notifier | default ({}) | tojson | safe }};
+
+        function initNotifierSettings() {
+            const toggle = document.getElementById('notifier-toggle');
+            if (!toggle) return;
+
+            const enabled = Boolean(INITIAL_NOTIFIER_CFG && INITIAL_NOTIFIER_CFG.enabled);
+            toggle.checked = enabled;
+
+            const cats = (INITIAL_NOTIFIER_CFG && INITIAL_NOTIFIER_CFG.categories) || ['overlay', 'point_graph', 'server_checker', 'general'];
+            ['overlay', 'point_graph', 'server_checker', 'general'].forEach(cat => {
+                const el = document.getElementById(`notif-cat-${cat}`);
+                if (el) el.checked = cats.includes(cat);
+            });
+        }
+
+        async function saveNotifierPreferences() {
+            const toggle = document.getElementById('notifier-toggle');
+            const saveBtn = document.getElementById('save-notif-btn');
+            const statusEl = document.getElementById('notifier-status-msg');
+
+            const cats = [];
+            ['overlay', 'point_graph', 'server_checker', 'general'].forEach(cat => {
+                const el = document.getElementById(`notif-cat-${cat}`);
+                if (el && el.checked) cats.push(cat);
+            });
+
+            const payload = {
+                enabled: toggle ? toggle.checked : false,
+                categories: cats
+            };
+
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+            }
+
+            try {
+                const res = await fetch('/api/admin/notifier', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (statusEl) {
+                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-emerald-950/40 text-emerald-300 border border-emerald-500/30';
+                        statusEl.textContent = '✅ Notifier preferences saved successfully!';
+                        statusEl.classList.remove('hidden');
+                        setTimeout(() => statusEl.classList.add('hidden'), 4000);
+                    } else {
+                        alert(data.message || 'Notifier preferences saved.');
+                    }
+                } else {
+                    if (statusEl) {
+                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
+                        statusEl.textContent = `❌ ${data.detail || 'Failed to save notifier preferences.'}`;
+                        statusEl.classList.remove('hidden');
+                    } else {
+                        alert(data.detail || 'Failed to save notifier preferences.');
+                    }
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
+                    statusEl.textContent = '❌ Network error saving preferences.';
+                    statusEl.classList.remove('hidden');
+                } else {
+                    alert('Network error saving preferences.');
+                }
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Preferences';
+                }
+            }
+        }
+
+        async function sendTestNotification() {
+            const testBtn = document.getElementById('test-notif-btn');
+            const statusEl = document.getElementById('notifier-status-msg');
+
+            if (testBtn) {
+                testBtn.disabled = true;
+                testBtn.textContent = 'Sending DM...';
+            }
+
+            try {
+                const res = await fetch('/api/admin/notifier/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (statusEl) {
+                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-blue-950/40 text-blue-300 border border-blue-500/30';
+                        statusEl.textContent = '📨 ' + (data.message || 'Test DM sent! Check your Discord direct messages.');
+                        statusEl.classList.remove('hidden');
+                        setTimeout(() => statusEl.classList.add('hidden'), 6000);
+                    } else {
+                        alert(data.message || 'Test DM sent!');
+                    }
+                } else {
+                    if (statusEl) {
+                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
+                        statusEl.textContent = `❌ ${data.detail || 'Failed to send test DM.'}`;
+                        statusEl.classList.remove('hidden');
+                    } else {
+                        alert(data.detail || 'Failed to send test DM.');
+                    }
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
+                    statusEl.textContent = '❌ Network error sending test DM.';
+                    statusEl.classList.remove('hidden');
+                } else {
+                    alert('Network error sending test DM.');
+                }
+            } finally {
+                if (testBtn) {
+                    testBtn.disabled = false;
+                    testBtn.textContent = 'Send Test DM';
+                }
+            }
+        }
+
         if (IS_ROOT) {
             function renderAccounts(admins) {
                 const container = document.getElementById('accounts-list-container');
                 if (!container) return;
-                if (admins.length === 0) {
+                if (!admins || admins.length === 0) {
                     container.innerHTML = '<p class="text-xs text-slate-500 italic font-mono">No custom administrator accounts configured.</p>';
                     return;
                 }
@@ -2120,44 +2364,49 @@
                 let html = '';
                 for (const admin of admins) {
                     const timeStr = formatTimestamp(admin.created_at);
-                    const perms = admin.permissions || { suggestions: true, crashes: true, contact: true, bans: true };
-                    const u = escapeHtml(admin.username);
+                    const perms = admin.permissions || { suggestions: true, crashes: true, contact: true, bans: true, servers: true };
+                    const dId = escapeHtml(admin.discord_id || admin.key || '');
+                    const label = escapeHtml(admin.username || 'Admin');
 
                     html += `
                         <div class="bg-black/20 p-4 rounded-lg border border-white/5 flex flex-col gap-3 text-xs font-mono">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <span class="font-bold text-slate-200 text-sm">${u}</span>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">Created: ${timeStr}</div>
+                            <div class="flex justify-between items-start sm:items-center gap-2 flex-wrap">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-slate-100 text-sm font-display">${label}</span>
+                                    <span class="px-2 py-0.5 rounded bg-[#5865F2]/20 text-[#5865F2] text-[10px] font-mono font-bold border border-[#5865F2]/30 flex items-center gap-1 cursor-pointer" title="Click to copy Discord ID" onclick="navigator.clipboard.writeText('${dId}'); alert('Copied Discord ID: ${dId}');">
+                                        <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                                        <span>ID: ${dId}</span>
+                                    </span>
+                                    <div class="text-[10px] text-slate-500">Added: ${timeStr}</div>
                                 </div>
-                                <button onclick="deleteAdmin('${u}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg uppercase border border-rose-500/20 font-bold transition text-[11px]">Delete Account</button>
+                                <button onclick="deleteAdmin('${dId}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg uppercase border border-rose-500/20 font-bold transition text-[11px]">Remove Admin</button>
                             </div>
                             <div class="border-t border-white/5 pt-3">
                                 <span class="text-[10px] uppercase font-bold text-slate-400 block mb-2">Section View Permissions:</span>
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                                     <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-                                        <input type="checkbox" id="perm-sug-${u}" ${perms.suggestions ? 'checked' : ''} class="accent-blue-500">
+                                        <input type="checkbox" id="perm-sug-${dId}" ${perms.suggestions ? 'checked' : ''} class="accent-blue-500">
                                         <span>Suggestions</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-                                        <input type="checkbox" id="perm-crash-${u}" ${perms.crashes ? 'checked' : ''} class="accent-rose-500">
+                                        <input type="checkbox" id="perm-crash-${dId}" ${perms.crashes ? 'checked' : ''} class="accent-rose-500">
                                         <span>Crash Logs</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-                                        <input type="checkbox" id="perm-contact-${u}" ${perms.contact ? 'checked' : ''} class="accent-purple-500">
-                                        <span>Private Messages</span>
+                                        <input type="checkbox" id="perm-contact-${dId}" ${perms.contact ? 'checked' : ''} class="accent-purple-500">
+                                        <span>Messages</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-                                        <input type="checkbox" id="perm-bans-${u}" ${perms.bans ? 'checked' : ''} class="accent-amber-500">
+                                        <input type="checkbox" id="perm-bans-${dId}" ${perms.bans ? 'checked' : ''} class="accent-amber-500">
                                         <span>Banned IPs</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-                                        <input type="checkbox" id="perm-servers-${u}" ${perms.servers !== false ? 'checked' : ''} class="accent-emerald-500">
+                                        <input type="checkbox" id="perm-servers-${dId}" ${perms.servers !== false ? 'checked' : ''} class="accent-emerald-500">
                                         <span>Servers</span>
                                     </label>
                                 </div>
                                 <div class="flex justify-end mt-2.5">
-                                    <button onclick="saveAdminPermissions('${u}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg uppercase font-bold text-[11px] transition shadow-md">Save Permissions</button>
+                                    <button onclick="saveAdminPermissions('${dId}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg uppercase font-bold text-[11px] transition shadow-md">Save Permissions</button>
                                 </div>
                             </div>
                         </div>
@@ -2166,15 +2415,15 @@
                 container.innerHTML = html;
             }
 
-            window.saveAdminPermissions = async function (username) {
-                const sugEl = document.getElementById(`perm-sug-${username}`);
-                const crashEl = document.getElementById(`perm-crash-${username}`);
-                const contactEl = document.getElementById(`perm-contact-${username}`);
-                const bansEl = document.getElementById(`perm-bans-${username}`);
-                const serversEl = document.getElementById(`perm-servers-${username}`);
+            window.saveAdminPermissions = async function (discordId) {
+                const sugEl = document.getElementById(`perm-sug-${discordId}`);
+                const crashEl = document.getElementById(`perm-crash-${discordId}`);
+                const contactEl = document.getElementById(`perm-contact-${discordId}`);
+                const bansEl = document.getElementById(`perm-bans-${discordId}`);
+                const serversEl = document.getElementById(`perm-servers-${discordId}`);
 
                 const payload = {
-                    username: username,
+                    discord_id: String(discordId),
                     permissions: {
                         suggestions: sugEl ? sugEl.checked : true,
                         crashes: crashEl ? crashEl.checked : true,
@@ -2203,15 +2452,15 @@
 
             window.handleCreateAdmin = async function (e) {
                 e.preventDefault();
+                const discordIdInput = document.getElementById('new-admin-discord-id');
                 const usernameInput = document.getElementById('new-admin-username');
-                const passwordInput = document.getElementById('new-admin-password');
                 const btn = document.getElementById('create-admin-btn');
 
-                const username = usernameInput.value.trim();
-                const password = passwordInput.value;
+                const discord_id = discordIdInput.value.trim();
+                const username = usernameInput ? usernameInput.value.trim() : '';
 
-                if (password.length < 8) {
-                    alert('Password must be at least 8 characters long.');
+                if (!discord_id || !/^\d{15,25}$/.test(discord_id)) {
+                    alert('Please provide a valid numeric Discord User ID (15-25 digits).');
                     return;
                 }
 
@@ -2222,15 +2471,15 @@
                     const response = await fetch('/admin/accounts/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify({ discord_id, username })
                     });
                     const resData = await response.json();
                     if (response.ok) {
-                        usernameInput.value = '';
-                        passwordInput.value = '';
-                        alert(resData.message);
+                        discordIdInput.value = '';
+                        if (usernameInput) usernameInput.value = '';
+                        alert(resData.message || 'Admin authorized successfully.');
                     } else {
-                        alert(resData.detail || 'Failed to create account.');
+                        alert(resData.detail || 'Failed to add admin.');
                     }
                 } catch (err) {
                     alert('Network error creating admin account.');
@@ -2240,8 +2489,8 @@
                 }
             };
 
-            window.deleteAdmin = async function (username) {
-                if (!confirm(`Are you sure you want to remove admin account '${username}'?`)) {
+            window.deleteAdmin = async function (discordId) {
+                if (!confirm(`Are you sure you want to remove admin with Discord ID '${discordId}' ?`)) {
                     return;
                 }
 
@@ -2249,11 +2498,11 @@
                     const response = await fetch('/admin/accounts/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username })
+                        body: JSON.stringify({ discord_id: String(discordId) })
                     });
                     const resData = await response.json();
                     if (response.ok) {
-                        alert(resData.message);
+                        alert(resData.message || 'Admin removed successfully.');
                     } else {
                         alert(resData.detail || 'Failed to delete account.');
                     }

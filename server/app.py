@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session
+from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context
 from pydantic import BaseModel, Field, ValidationError
 import os
 import json
@@ -111,7 +111,11 @@ def get_dashboard_payload_data(username=None):
                 "comment_timestamp": s.get("comment_timestamp", ""),
                 "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
                 "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
-                "hidden": bool(s.get("hidden", False))
+                "hidden": bool(s.get("hidden", False)),
+                "anonymous": bool(s.get("anonymous", False)),
+                "discord_id": s.get("discord_id") or "",
+                "discord_username": s.get("discord_username") or "",
+                "discord_avatar": s.get("discord_avatar") or ""
             })
 
     banned_ips = {}
@@ -156,15 +160,23 @@ def get_dashboard_payload_data(username=None):
 def get_accounts_payload_data():
     admins_data = load_admins()
     admins_list = []
-    for u, info in admins_data.get("admins", {}).items():
+    for admin_key, info in admins_data.get("admins", {}).items():
+        discord_id = info.get("discord_id") or (admin_key if admin_key.isdigit() else "")
         admins_list.append({
-            "username": u,
+            "key": admin_key,
+            "discord_id": discord_id,
+            "username": info.get("username") or admin_key,
             "created_at": info.get("created_at"),
             "permissions": info.get("permissions") or {
                 "suggestions": True,
                 "crashes": True,
                 "contact": True,
-                "bans": True
+                "bans": True,
+                "servers": True
+            },
+            "notifier": info.get("notifier") or {
+                "enabled": False,
+                "categories": ["overlay", "point_graph", "server_checker", "general"]
             }
         })
     return {"admins": admins_list}
@@ -269,6 +281,33 @@ if not os.environ.get("ADMIN_USERNAME") or not os.environ.get("ADMIN_PASSWORD"):
         "A random secure credential has been dynamically generated for this server session."
     )
 
+DISCORD_API_BASE = "https://discord.com/api/v10"
+DISCORD_OAUTH_AUTHORIZE_URL = "https://discord.com/api/oauth2/authorize"
+DISCORD_OAUTH_TOKEN_URL = "https://discord.com/api/v10/oauth2/token"
+
+def get_discord_redirect_uri(req):
+    custom_uri = os.environ.get("DISCORD_REDIRECT_URI", "").strip()
+    if custom_uri:
+        return custom_uri
+    host_url = get_host_url(req)
+    return f"{host_url}/auth/discord/callback"
+
+def get_discord_avatar_url(user_id, avatar_hash):
+    if not avatar_hash:
+        try:
+            default_idx = (int(user_id) >> 22) % 6
+        except Exception:
+            default_idx = 0
+        return f"https://cdn.discordapp.com/embed/avatars/{default_idx}.png"
+    ext = "gif" if str(avatar_hash).startswith("a_") else "png"
+    return f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.{ext}"
+
+def get_root_discord_ids() -> list[str]:
+    root_env = os.environ.get("ROOT_DISCORD_ID", "").strip()
+    if not root_env:
+        return []
+    return [x.strip() for x in root_env.replace(",", " ").split() if x.strip()]
+
 def get_admin_credentials():
     username = os.environ.get("ADMIN_USERNAME")
     password = os.environ.get("ADMIN_PASSWORD")
@@ -302,17 +341,41 @@ def save_admins(data):
     with open(ADMINS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
-def is_root_user(username: str) -> bool:
+def is_root_user(user_identifier: str) -> bool:
+    if not user_identifier:
+        return False
+    discord_id = str(user_identifier).strip()
+    if has_request_context():
+        try:
+            if session.get("is_root") and session.get("admin_logged_in"):
+                return True
+            discord_id = session.get("discord_id") or discord_id
+        except Exception:
+            pass
+    root_ids = get_root_discord_ids()
+    if root_ids and discord_id in root_ids:
+        return True
     root_user, _ = get_admin_credentials()
-    return secrets.compare_digest(username, root_user)
+    return secrets.compare_digest(str(user_identifier), root_user)
 
-def get_user_permissions(username: str) -> dict:
-    if not username:
+def get_user_permissions(user_identifier: str) -> dict:
+    if not user_identifier:
         return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
-    if is_root_user(username):
+    if is_root_user(user_identifier):
         return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+    
     admins_data = load_admins()
-    admin_info = admins_data.get("admins", {}).get(username, {})
+    admins_dict = admins_data.get("admins", {})
+    admin_info = admins_dict.get(str(user_identifier))
+    if not admin_info:
+        for k, v in admins_dict.items():
+            if v.get("username") == user_identifier or v.get("discord_id") == user_identifier:
+                admin_info = v
+                break
+                
+    if not admin_info:
+        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+        
     perms = admin_info.get("permissions")
     if perms is None:
         return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
@@ -324,24 +387,220 @@ def get_user_permissions(username: str) -> dict:
         "servers": bool(perms.get("servers", True))
     }
 
-def has_permission(username: str, section: str) -> bool:
-    if not username:
+def has_permission(user_identifier: str, section: str) -> bool:
+    if not user_identifier:
         return False
-    if is_root_user(username):
+    if is_root_user(user_identifier):
         return True
-    return get_user_permissions(username).get(section, True)
+    return get_user_permissions(user_identifier).get(section, True)
+
+def get_admin_notifier_config(user_identifier: str) -> dict:
+    admins_data = load_admins()
+    admin_info = admins_data.get("admins", {}).get(str(user_identifier))
+    if not admin_info:
+        for k, v in admins_data.get("admins", {}).items():
+            if v.get("username") == user_identifier or v.get("discord_id") == user_identifier:
+                admin_info = v
+                break
+    
+    if admin_info and "notifier" in admin_info:
+        return admin_info["notifier"]
+    
+    if is_root_user(user_identifier):
+        root_cfg = admins_data.get("root_notifier", {})
+        if root_cfg:
+            return root_cfg
+    
+    return {
+        "enabled": False,
+        "categories": ["overlay", "point_graph", "server_checker", "general"]
+    }
+
+def save_admin_notifier_config(user_identifier: str, notifier_config: dict):
+    admins_data = load_admins()
+    saved = False
+    
+    admin_info = admins_data.get("admins", {}).get(str(user_identifier))
+    if admin_info:
+        admin_info["notifier"] = notifier_config
+        saved = True
+    else:
+        for k, v in admins_data.get("admins", {}).items():
+            if v.get("username") == user_identifier or v.get("discord_id") == user_identifier:
+                v["notifier"] = notifier_config
+                saved = True
+                break
+    
+    if is_root_user(user_identifier) or not saved:
+        admins_data["root_notifier"] = notifier_config
+        discord_id = str(user_identifier)
+        username_val = "Root"
+        if has_request_context():
+            try:
+                discord_id = session.get("discord_id") or discord_id
+                username_val = session.get("username") or username_val
+            except Exception:
+                pass
+        if discord_id.isdigit():
+            if discord_id in admins_data.get("admins", {}):
+                admins_data["admins"][discord_id]["notifier"] = notifier_config
+            else:
+                admins_data.setdefault("admins", {})[discord_id] = {
+                    "discord_id": discord_id,
+                    "username": username_val,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "permissions": {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True},
+                    "notifier": notifier_config
+                }
+    
+    save_admins(admins_data)
+
+def send_discord_dm(recipient_id: str, embed: dict) -> tuple[bool, str]:
+    bot_token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+    if not bot_token:
+        return False, "DISCORD_BOT_TOKEN is not configured on the server."
+    
+    headers = {
+        "Authorization": f"Bot {bot_token}",
+        "Content-Type": "application/json"
+    }
+    try:
+        channel_res = requests.post(
+            f"{DISCORD_API_BASE}/users/@me/channels",
+            headers=headers,
+            json={"recipient_id": str(recipient_id).strip()},
+            timeout=8
+        )
+        if channel_res.status_code not in (200, 201):
+            err_text = channel_res.text
+            logger.warning(f"[Discord DM] Failed to create DM channel with {recipient_id}: {channel_res.status_code} {err_text}")
+            return False, f"Could not create DM channel (status {channel_res.status_code}). Ensure bot shares a mutual server with user."
+        
+        dm_channel_id = channel_res.json().get("id")
+        if not dm_channel_id:
+            return False, "DM channel ID missing from Discord API response."
+        
+        msg_res = requests.post(
+            f"{DISCORD_API_BASE}/channels/{dm_channel_id}/messages",
+            headers=headers,
+            json={"embeds": [embed]},
+            timeout=8
+        )
+        if msg_res.status_code not in (200, 201):
+            err_text = msg_res.text
+            logger.warning(f"[Discord DM] Failed to send message to channel {dm_channel_id}: {msg_res.status_code} {err_text}")
+            return False, f"Failed to send DM (status {msg_res.status_code}). User may have DMs disabled."
+        
+        return True, "Notification sent successfully."
+    except Exception as e:
+        logger.error(f"[Discord DM] Error sending notification to {recipient_id}: {e}", exc_info=True)
+        return False, str(e)
+
+def notify_admins_on_new_suggestion(suggestion: dict):
+    def _worker():
+        try:
+            target = suggestion.get("target") or "overlay"
+            sug_id = suggestion.get("id")
+            name = suggestion.get("name", "Anonymous")
+            text = suggestion.get("suggestion", "")
+            is_anon = bool(suggestion.get("anonymous"))
+            discord_id = suggestion.get("discord_id", "")
+            discord_username = suggestion.get("discord_username", "")
+            
+            target_labels = {
+                "overlay": "APRM Overlay",
+                "point_graph": "Point History Graph",
+                "server_checker": "Server Checker",
+                "general": "General"
+            }
+            target_colors = {
+                "overlay": 0x3B82F6,
+                "point_graph": 0x10B981,
+                "server_checker": 0xF59E0B,
+                "general": 0xA855F7
+            }
+            
+            author_text = f"{discord_username} (ID: `{discord_id}`)" if discord_id else name
+            if is_anon and discord_id:
+                author_text += " *(Submitted anonymously to public)*"
+            elif is_anon:
+                author_text = "Anonymous Guest"
+            
+            embed = {
+                "title": f"💡 New Suggestion #{sug_id}",
+                "description": text[:2000],
+                "color": target_colors.get(target, 0x3B82F6),
+                "fields": [
+                    {"name": "Category", "value": target_labels.get(target, target), "inline": True},
+                    {"name": "Submitted By", "value": author_text, "inline": True},
+                    {"name": "Status", "value": "Pending", "inline": True}
+                ],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "footer": {"text": "RBWR Utility Admin Notifier"}
+            }
+            
+            admins_data = load_admins()
+            notified_ids = set()
+            
+            root_discord_ids = get_root_discord_ids()
+            for r_id in root_discord_ids:
+                r_info = admins_data.get("admins", {}).get(r_id, {})
+                notifier_cfg = r_info.get("notifier") or admins_data.get("root_notifier") or {"enabled": True, "categories": ["overlay", "point_graph", "server_checker", "general"]}
+                if notifier_cfg.get("enabled", False):
+                    cats = notifier_cfg.get("categories", ["overlay", "point_graph", "server_checker", "general"])
+                    if target in cats:
+                        ok, msg = send_discord_dm(r_id, embed)
+                        logger.info(f"[Discord DM] Dispatched DM for suggestion #{sug_id} to Root Admin {r_id} (target: {target}, ok: {ok}, res: {msg})")
+                        notified_ids.add(r_id)
+                    else:
+                        logger.info(f"[Discord DM] Root Admin {r_id} skipped: category '{target}' not in subscribed {cats}")
+            
+            for admin_key, admin_info in admins_data.get("admins", {}).items():
+                admin_discord_id = admin_info.get("discord_id") or (admin_key if admin_key.isdigit() else "")
+                if not admin_discord_id or admin_discord_id in notified_ids:
+                    continue
+                perms = admin_info.get("permissions") or {}
+                if not perms.get("suggestions", True):
+                    continue
+                notifier_cfg = admin_info.get("notifier") or {}
+                if notifier_cfg.get("enabled", False):
+                    cats = notifier_cfg.get("categories", ["overlay", "point_graph", "server_checker", "general"])
+                    if target in cats:
+                        ok, msg = send_discord_dm(admin_discord_id, embed)
+                        logger.info(f"[Discord DM] Dispatched DM for suggestion #{sug_id} to Admin {admin_discord_id} (target: {target}, ok: {ok}, res: {msg})")
+                        notified_ids.add(admin_discord_id)
+                    else:
+                        logger.info(f"[Discord DM] Admin {admin_discord_id} skipped: category '{target}' not in subscribed {cats}")
+        except Exception as e:
+            logger.error(f"[Discord DM Dispatch] Error in suggestion notifier worker: {e}", exc_info=True)
+    
+    threading.Thread(target=_worker, daemon=True).start()
 
 def get_authenticated_user():
-    username = session.get("username")
-    if session.get("admin_logged_in") and username:
-        root_user, _ = get_admin_credentials()
-        if secrets.compare_digest(username, root_user):
-            return username
-        admins_data = load_admins()
-        if username in admins_data.get("admins", {}):
-            return username
-        
-    auth = request.authorization
+    if has_request_context():
+        try:
+            if session.get("admin_logged_in"):
+                discord_id = session.get("discord_id")
+                username = session.get("username")
+                if discord_id and (discord_id in get_root_discord_ids() or is_root_user(discord_id)):
+                    return username or discord_id
+                if discord_id:
+                    admins_data = load_admins()
+                    if discord_id in admins_data.get("admins", {}):
+                        return username or discord_id
+                if username:
+                    if is_root_user(username):
+                        return username
+                    admins_data = load_admins()
+                    if username in admins_data.get("admins", {}):
+                        return username
+                    for k, v in admins_data.get("admins", {}).items():
+                        if v.get("username") == username or v.get("discord_id") == username:
+                            return username
+        except Exception:
+            pass
+
+    auth = request.authorization if has_request_context() else None
     if auth and auth.username and auth.password:
         root_user, root_pass = get_admin_credentials()
         is_root_username = secrets.compare_digest(auth.username, root_user)
@@ -464,9 +723,12 @@ def get_public_suggestions():
     for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
         if s.get("hidden"):
             continue
+        is_anon = bool(s.get("anonymous")) or (s.get("name") or "").lower() == "anonymous"
+        pub_name = "Anonymous" if is_anon else (s.get("name") or "Anonymous")
+        pub_avatar = None if is_anon else s.get("discord_avatar")
         public_list.append({
             "id": s.get("id"),
-            "name": s.get("name", "Anonymous"),
+            "name": pub_name,
             "suggestion": s.get("suggestion", ""),
             "timestamp": s.get("timestamp", ""),
             "status": s.get("status", "pending"),
@@ -474,7 +736,10 @@ def get_public_suggestions():
             "comment_by": s.get("comment_by", ""),
             "comment_timestamp": s.get("comment_timestamp", ""),
             "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
-            "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker"))
+            "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
+            "anonymous": is_anon,
+            "discord_avatar": pub_avatar,
+            "is_discord_user": bool(s.get("discord_id")) and not is_anon
         })
     return public_list
 
@@ -531,7 +796,7 @@ def is_ip_banned(ip: str) -> bool:
 class SuggestionPayload(BaseModel):
     name: str = Field(default="", max_length=50)
     suggestion: str = Field(..., max_length=2000)
-    anonymous: bool
+    anonymous: bool = Field(default=False)
     target: str = Field(default="overlay", max_length=50)
     is_server_checker: bool = Field(default=False)
 
@@ -2186,7 +2451,12 @@ def suggestions_route():
     if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
         return jsonify({"suggestions": get_public_suggestions()})
         
-    return render_template("suggestions.html", suggestions=get_public_suggestions())
+    return render_template(
+        "suggestions.html",
+        suggestions=get_public_suggestions(),
+        discord_user=session.get("discord_user"),
+        discord_configured=bool(os.environ.get("DISCORD_CLIENT_ID", "").strip())
+    )
 
 @app.route("/api/suggestions", methods=["GET"])
 def get_suggestions_api():
@@ -2213,7 +2483,7 @@ def submit_suggestion():
     data = load_suggestions()
     suggestions = data.setdefault("suggestions", [])
     
-    if ip != "unknown":
+    if ip != "unknown" and ip != "127.0.0.1":
         now = datetime.now(timezone.utc)
         limit_period = timedelta(minutes=30)
         for s in suggestions:
@@ -2224,7 +2494,7 @@ def submit_suggestion():
                         time_left = limit_period - (now - s_time)
                         hours_left = int(time_left.total_seconds() // 3600)
                         mins_left = int((time_left.total_seconds() % 3600) // 60)
-                        msg = f"Rate limit: Try again in {f"{hours_left}h " if hours_left > 0 else ""}{mins_left}m."
+                        msg = f"Rate limit: Try again in {f'{hours_left}h ' if hours_left > 0 else ''}{mins_left}m."
                         return jsonify({"detail": msg}), 429
                 except (ValueError, TypeError):
                     continue
@@ -2233,7 +2503,24 @@ def submit_suggestion():
     if suggestions:
         new_id = max(s.get("id", 0) for s in suggestions) + 1
         
-    name = "Anonymous" if payload.anonymous or not payload.name.strip() else payload.name.strip()
+    discord_user = session.get("discord_user") or {}
+    discord_id = discord_user.get("id") or None
+    discord_username = discord_user.get("global_name") or discord_user.get("username") or None
+    discord_avatar = discord_user.get("avatar_url") or None
+    
+    if not discord_id:
+        name = "Anonymous"
+        is_anon = True
+        discord_id = None
+        discord_username = None
+        discord_avatar = None
+    else:
+        is_anon = bool(payload.anonymous)
+        if is_anon:
+            name = "Anonymous"
+        else:
+            name = discord_username or "Discord User"
+        
     if payload.target in ["point_graph", "points_graph", "point_history"]:
         target_val = "point_graph"
     elif payload.target == "server_checker" or payload.is_server_checker:
@@ -2251,11 +2538,17 @@ def submit_suggestion():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
         "target": target_val,
-        "is_server_checker": target_val == "server_checker"
+        "is_server_checker": target_val == "server_checker",
+        "anonymous": is_anon,
+        "discord_id": discord_id,
+        "discord_username": discord_username,
+        "discord_avatar": discord_avatar,
+        "hidden": False
     }
     suggestions.append(new_sug)
     save_suggestions(data)
     broadcast_update("dashboard")
+    notify_admins_on_new_suggestion(new_sug)
     return jsonify({"message": "Feedback submitted successfully.", "id": new_id})
 
 @app.route("/crashes", methods=["POST"])
@@ -2301,7 +2594,7 @@ class VisibilitySuggestionPayload(BaseModel):
     hidden: bool
 
 class UpdateAdminPermissionsPayload(BaseModel):
-    username: str
+    discord_id: str
     permissions: dict[str, bool]
 
 @app.route("/admin/crashes/status", methods=["POST"])
@@ -2384,19 +2677,12 @@ def update_suggestion_comment(username):
     suggestions = data.get("suggestions", [])
     for s in suggestions:
         if s.get("id") == payload.id:
-            comment_str = payload.comment.strip()
-            s["admin_comment"] = comment_str
-            s["comment_by"] = username if comment_str else ""
-            s["comment_timestamp"] = datetime.now(timezone.utc).isoformat() if comment_str else ""
+            s["admin_comment"] = payload.comment.strip()
+            s["comment_by"] = username
+            s["comment_timestamp"] = datetime.now(timezone.utc).isoformat()
             save_suggestions(data)
             broadcast_update("dashboard")
-            return jsonify({
-                "message": "Comment updated successfully.",
-                "id": payload.id,
-                "admin_comment": comment_str,
-                "comment_by": s.get("comment_by", ""),
-                "comment_timestamp": s.get("comment_timestamp", "")
-            })
+            return jsonify({"message": "Admin comment saved successfully.", "id": payload.id, "comment": payload.comment.strip(), "comment_by": username})
     return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
 
 @app.route("/admin/suggestions/visibility", methods=["POST"])
@@ -2441,7 +2727,7 @@ def delete_suggestion(username):
         broadcast_update("dashboard")
         return jsonify({"message": f"Suggestion #{payload.id} deleted successfully.", "id": payload.id})
 
-    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+    return jsonify({"detail": f"Suggestion with ID {payload.id} not found."}), 404
 
 @app.route("/admin/suggestions/ban", methods=["POST"])
 @admin_required
@@ -2454,21 +2740,26 @@ def ban_ip(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
+    ip_to_ban = payload.ip.strip()
+    if not ip_to_ban or ip_to_ban == "unknown":
+        return jsonify({"detail": "Invalid IP address."}), 400
+
     data = load_banned_ips()
     banned = data.setdefault("banned", {})
     
     expires_at = None
-    if payload.duration_minutes is not None:
+    if payload.duration_minutes is not None and payload.duration_minutes > 0:
         expires_at = (datetime.now(timezone.utc) + timedelta(minutes=payload.duration_minutes)).isoformat()
-        
-    banned[payload.ip] = {
+
+    banned[ip_to_ban] = {
+        "banned_by": username,
         "banned_at": datetime.now(timezone.utc).isoformat(),
         "expires_at": expires_at,
         "reason": payload.reason.strip() or "No reason provided"
     }
     save_banned_ips(data)
     broadcast_update("dashboard")
-    return jsonify({"message": f"IP {payload.ip} banned successfully.", "ip": payload.ip})
+    return jsonify({"message": f"IP {ip_to_ban} has been banned.", "ip": ip_to_ban})
 
 @app.route("/admin/suggestions/unban", methods=["POST"])
 @admin_required
@@ -2495,33 +2786,83 @@ def unban_ip(username):
 def view_suggestions_dashboard(username):
     if not has_permission(username, "suggestions"):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="suggestions", is_root=is_root_user(username), permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="suggestions",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 @app.route("/admin/crashes", methods=["GET"])
 @admin_required
 def view_crashes_dashboard(username):
     if not has_permission(username, "crashes"):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="crashes", is_root=is_root_user(username), permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="crashes",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 @app.route("/admin/contact", methods=["GET"])
 @admin_required
 def view_contact_dashboard(username):
     if not has_permission(username, "contact"):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="contact", is_root=is_root_user(username), permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="contact",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 @app.route("/admin/bans", methods=["GET"])
 @admin_required
 def view_bans_dashboard(username):
     if not has_permission(username, "bans"):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="bans", is_root=is_root_user(username), permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="bans",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_root(username):
-    return render_template("admin_panel.html", username=username, active_view="overview", is_root=is_root_user(username), permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="overview",
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 @app.route("/admin/servers", methods=["GET"])
 @admin_required
@@ -2531,14 +2872,18 @@ def view_servers_dashboard(username):
     servers_data = get_sc_data("servers.json")
     server_cards = build_server_cards(servers_data)
     initial_tab = request.args.get("status") or request.args.get("tab") or "all"
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
     return render_template(
         "admin_panel.html",
         username=username,
+        discord_id=session.get("discord_id") or "",
         active_view="servers",
         initial_server_tab=initial_tab,
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
-        servers=server_cards
+        servers=server_cards,
+        notifier=notifier_cfg
     )
 
 @app.route("/admin/servers/persist", methods=["POST"])
@@ -2581,14 +2926,28 @@ def toggle_server_persistence(username):
 def view_accounts_dashboard(username):
     if not is_root_user(username):
         return redirect("/admin")
-    return render_template("admin_panel.html", username=username, active_view="accounts", is_root=True, permissions=get_user_permissions(username))
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="accounts",
+        is_root=True,
+        permissions=get_user_permissions(username),
+        notifier=notifier_cfg
+    )
 
 class CreateAdminPayload(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=8, max_length=100)
+    discord_id: str = Field(..., min_length=15, max_length=25)
+    username: str = Field(default="", max_length=50)
 
 class DeleteAdminPayload(BaseModel):
-    username: str
+    discord_id: str
+
+class NotifierConfigPayload(BaseModel):
+    enabled: bool
+    categories: list[str] = Field(default=["overlay", "point_graph", "server_checker", "general"])
 
 @app.route("/admin/accounts/create", methods=["POST"])
 @admin_required
@@ -2601,18 +2960,23 @@ def create_admin_account(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
-    new_user = payload.username.strip()
-    root_user, _ = get_admin_credentials()
-    if secrets.compare_digest(new_user.lower(), root_user.lower()):
-        return jsonify({"detail": "Cannot create an account with the root username."}), 400
+    discord_id = payload.discord_id.strip()
+    if not discord_id.isdigit():
+        return jsonify({"detail": "Invalid Discord ID: must be numeric digits (17-20 characters)."}), 400
+
+    root_ids = get_root_discord_ids()
+    if discord_id in root_ids:
+        return jsonify({"detail": "This Discord ID is already configured as the Root Administrator."}), 400
 
     admins_data = load_admins()
     admins = admins_data.setdefault("admins", {})
-    if new_user in admins:
-        return jsonify({"detail": f"Admin account '{new_user}' already exists."}), 400
+    if discord_id in admins:
+        return jsonify({"detail": f"Admin with Discord ID '{discord_id}' already exists."}), 400
 
-    admins[new_user] = {
-        "password_hash": hash_password(payload.password),
+    admin_label = payload.username.strip() or f"Admin ({discord_id})"
+    admins[discord_id] = {
+        "discord_id": discord_id,
+        "username": admin_label,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "permissions": {
             "suggestions": True,
@@ -2620,11 +2984,15 @@ def create_admin_account(username):
             "contact": True,
             "bans": True,
             "servers": True
+        },
+        "notifier": {
+            "enabled": False,
+            "categories": ["overlay", "point_graph", "server_checker", "general"]
         }
     }
     save_admins(admins_data)
     broadcast_update("accounts")
-    return jsonify({"message": f"Admin account '{new_user}' created successfully."})
+    return jsonify({"message": f"Admin with Discord ID '{discord_id}' added successfully."})
 
 @app.route("/admin/accounts/permissions", methods=["POST"])
 @admin_required
@@ -2637,13 +3005,21 @@ def update_admin_permissions(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
-    target_user = payload.username.strip()
+    target_id = payload.discord_id.strip()
     admins_data = load_admins()
     admins = admins_data.get("admins", {})
-    if target_user not in admins:
-        return jsonify({"detail": f"Admin account '{target_user}' not found."}), 404
+    
+    admin_entry = admins.get(target_id)
+    if not admin_entry:
+        for k, v in admins.items():
+            if k == target_id or v.get("username") == target_id or v.get("discord_id") == target_id:
+                admin_entry = v
+                break
+                
+    if not admin_entry:
+        return jsonify({"detail": f"Admin account '{target_id}' not found."}), 404
 
-    admins[target_user]["permissions"] = {
+    admin_entry["permissions"] = {
         "suggestions": bool(payload.permissions.get("suggestions", True)),
         "crashes": bool(payload.permissions.get("crashes", True)),
         "contact": bool(payload.permissions.get("contact", True)),
@@ -2653,7 +3029,7 @@ def update_admin_permissions(username):
     save_admins(admins_data)
     broadcast_update("accounts")
     broadcast_update("dashboard")
-    return jsonify({"message": f"Permissions for '{target_user}' updated successfully."})
+    return jsonify({"message": f"Permissions for admin '{target_id}' updated successfully."})
 
 @app.route("/admin/accounts/delete", methods=["POST"])
 @admin_required
@@ -2666,15 +3042,262 @@ def delete_admin_account(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
-    target_user = payload.username.strip()
+    target_id = payload.discord_id.strip()
     admins_data = load_admins()
     admins = admins_data.get("admins", {})
-    if target_user in admins:
-        del admins[target_user]
+    
+    key_to_delete = None
+    if target_id in admins:
+        key_to_delete = target_id
+    else:
+        for k, v in admins.items():
+            if k == target_id or v.get("username") == target_id or v.get("discord_id") == target_id:
+                key_to_delete = k
+                break
+                
+    if key_to_delete:
+        del admins[key_to_delete]
         save_admins(admins_data)
         broadcast_update("accounts")
-        return jsonify({"message": f"Admin account '{target_user}' removed successfully."})
-    return jsonify({"detail": f"Admin account '{target_user}' not found."}), 404
+        return jsonify({"message": f"Admin account '{target_id}' removed successfully."})
+    return jsonify({"detail": f"Admin account '{target_id}' not found."}), 404
+
+@app.route("/api/admin/notifier", methods=["GET"])
+@admin_required
+def get_notifier_api(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions"}), 403
+    discord_id = session.get("discord_id") or username
+    cfg = get_admin_notifier_config(discord_id)
+    return jsonify({"notifier": cfg, "discord_id": session.get("discord_id") or ""})
+
+@app.route("/api/admin/notifier", methods=["POST"])
+@admin_required
+def save_notifier_api(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions"}), 403
+    try:
+        req_json = request.get_json() or {}
+        payload = NotifierConfigPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+    
+    discord_id = session.get("discord_id") or username
+    save_admin_notifier_config(discord_id, {
+        "enabled": payload.enabled,
+        "categories": payload.categories
+    })
+    return jsonify({"success": True, "message": "Notifier preferences saved successfully."})
+
+@app.route("/api/admin/notifier/test", methods=["POST"])
+@admin_required
+def test_notifier_api(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for suggestions"}), 403
+    
+    discord_id = session.get("discord_id")
+    if not discord_id:
+        admins_data = load_admins()
+        for k, v in admins_data.get("admins", {}).items():
+            if k == username or v.get("username") == username:
+                discord_id = v.get("discord_id") or (k if k.isdigit() else "")
+                break
+    
+    if not discord_id:
+        root_ids = get_root_discord_ids()
+        if root_ids:
+            discord_id = root_ids[0]
+
+    if not discord_id:
+        return jsonify({
+            "success": False,
+            "detail": "No Discord ID associated with your session. Please log in with Discord or configure ROOT_DISCORD_ID."
+        }), 400
+    
+    test_embed = {
+        "title": "🧪 RBWR Notifier - Test Notification",
+        "description": "Your Discord DM notifier is successfully configured! You will receive notifications here whenever new suggestions matching your subscribed categories are submitted.",
+        "color": 0x3B82F6,
+        "fields": [
+            {"name": "Admin Recipient", "value": f"<@{discord_id}>", "inline": True},
+            {"name": "Status", "value": "✅ Operational", "inline": True}
+        ],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "footer": {"text": "RBWR APRM Calculator Admin Notifier"}
+    }
+    
+    success, msg = send_discord_dm(discord_id, test_embed)
+    if success:
+        return jsonify({"success": True, "message": "Test DM sent successfully! Check your Discord direct messages."})
+    else:
+        return jsonify({"success": False, "detail": f"Failed to send test DM: {msg}"}), 400
+
+@app.route("/auth/discord/login", methods=["GET"])
+def discord_login():
+    client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+    next_url = request.args.get("next") or request.referrer or "/suggestions"
+    if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
+        next_url = "/suggestions"
+        
+    if not client_id:
+        if next_url.startswith("/admin"):
+            return render_template("admin_login.html", error="Discord OAuth2 is not configured on the server yet (DISCORD_CLIENT_ID missing in .env).", next_url=next_url), 500
+        return render_template("suggestions.html", suggestions=get_public_suggestions(), error="Discord OAuth2 is not configured on the server yet (DISCORD_CLIENT_ID missing in .env)."), 500
+
+    state = secrets.token_hex(16)
+    session["oauth_state"] = state
+    session["oauth_next"] = next_url
+    
+    redirect_uri = get_discord_redirect_uri(request)
+    from urllib.parse import urlencode
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "identify",
+        "state": state,
+        "prompt": "consent"
+    }
+    auth_url = f"{DISCORD_OAUTH_AUTHORIZE_URL}?{urlencode(params)}"
+    return redirect(auth_url)
+
+@app.route("/auth/discord/callback", methods=["GET"])
+def discord_callback():
+    error_code = request.args.get("error")
+    if error_code:
+        err_desc = request.args.get("error_description") or "Authorization was cancelled or denied by Discord."
+        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        if next_dest.startswith("/admin"):
+            return redirect(f"/admin/login?error={quote(err_desc)}")
+        return redirect(f"/suggestions?error={quote(err_desc)}")
+
+    state = request.args.get("state")
+    saved_state = session.pop("oauth_state", None)
+    if not state or state != saved_state:
+        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        if next_dest.startswith("/admin"):
+            return redirect(f"/admin/login?error={quote('OAuth state verification failed. Please try logging in again.')}")
+        return redirect(f"/suggestions?error={quote('OAuth state verification failed. Please try logging in again.')}")
+
+    code = request.args.get("code")
+    if not code:
+        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        return redirect(f"{next_dest}?error={quote('Missing authorization code from Discord.')}")
+
+    client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("DISCORD_CLIENT_SECRET", "").strip()
+    redirect_uri = get_discord_redirect_uri(request)
+
+    if not client_id or not client_secret:
+        return "Discord OAuth2 configuration incomplete on server.", 500
+
+    token_payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    try:
+        token_res = requests.post(DISCORD_OAUTH_TOKEN_URL, data=token_payload, headers=headers, timeout=10)
+        if token_res.status_code != 200:
+            logger.warning(f"[Discord OAuth] Token exchange failed: {token_res.status_code} {token_res.text}")
+            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            if next_dest.startswith("/admin"):
+                return redirect(f"/admin/login?error={quote('Discord token exchange failed. Please verify credentials in .env.')}")
+            return redirect(f"/suggestions?error={quote('Failed to authenticate with Discord.')}")
+
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            return redirect(f"{next_dest}?error={quote('No access token received from Discord.')}")
+
+        user_res = requests.get(
+            f"{DISCORD_API_BASE}/users/@me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        )
+        if user_res.status_code != 200:
+            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            return redirect(f"{next_dest}?error={quote('Failed to fetch Discord user profile.')}")
+
+        user_data = user_res.json()
+        d_id = str(user_data.get("id"))
+        d_username = user_data.get("username", "")
+        d_global_name = user_data.get("global_name") or d_username
+        d_avatar = user_data.get("avatar")
+        d_avatar_url = get_discord_avatar_url(d_id, d_avatar)
+
+        discord_user_obj = {
+            "id": d_id,
+            "username": d_username,
+            "global_name": d_global_name,
+            "avatar": d_avatar,
+            "avatar_url": d_avatar_url
+        }
+        session["discord_user"] = discord_user_obj
+
+        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        if not next_dest.startswith("/") or next_dest.startswith("//") or next_dest.startswith("/\\"):
+            next_dest = "/suggestions"
+
+        root_ids = get_root_discord_ids()
+        is_root = (d_id in root_ids)
+        admins_data = load_admins()
+        is_admin = is_root or (d_id in admins_data.get("admins", {}))
+
+        if next_dest.startswith("/admin"):
+            if is_admin:
+                session.permanent = True
+                session["admin_logged_in"] = True
+                session["discord_id"] = d_id
+                session["username"] = d_global_name or d_username
+                session["is_root"] = is_root
+                if d_id in admins_data.get("admins", {}):
+                    admins_data["admins"][d_id]["username"] = d_global_name or d_username
+                    admins_data["admins"][d_id]["avatar_url"] = d_avatar_url
+                    save_admins(admins_data)
+                return redirect(next_dest)
+            else:
+                return redirect(f"/admin/login?error={quote(f'Access Denied: Discord user {d_global_name} (ID: {d_id}) is not an authorized administrator. Please contact Root.')}")
+
+        if is_admin:
+            session.permanent = True
+            session["admin_logged_in"] = True
+            session["discord_id"] = d_id
+            session["username"] = d_global_name or d_username
+            session["is_root"] = is_root
+
+        return redirect(next_dest)
+
+    except Exception as e:
+        logger.error(f"[Discord OAuth] Exception during callback: {e}", exc_info=True)
+        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        return redirect(f"{next_dest}?error={quote(f'Internal OAuth error: {str(e)}')}")
+
+@app.route("/auth/discord/logout", methods=["GET"])
+def discord_logout():
+    session.pop("discord_user", None)
+    session.pop("admin_logged_in", None)
+    session.pop("discord_id", None)
+    session.pop("username", None)
+    session.pop("is_root", None)
+    next_url = request.args.get("next") or request.referrer or "/suggestions"
+    if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
+        next_url = "/suggestions"
+    return redirect(next_url)
+
+@app.route("/api/auth/me", methods=["GET"])
+def api_auth_me():
+    return jsonify({
+        "logged_in": bool(session.get("discord_user")),
+        "user": session.get("discord_user"),
+        "is_admin": bool(session.get("admin_logged_in")),
+        "is_root": bool(session.get("is_root")),
+        "discord_id": session.get("discord_id") or ""
+    })
 
 @app.route("/admin/contact/delete/<msg_id>", methods=["POST"])
 @admin_required
@@ -2729,7 +3352,7 @@ def clear_login_attempts(ip: str):
 
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
-    error = None
+    error = request.args.get("error")
     next_url = request.args.get("next") or request.form.get("next") or "/admin"
     
     ip = request.remote_addr or "unknown"
@@ -2740,6 +3363,9 @@ def admin_login():
     if is_ip_banned(ip):
         return render_template("admin_login.html", error="Your IP is banned.", next_url=next_url), 403
         
+    discord_client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+    discord_login_url = f"/auth/discord/login?next={quote(next_url)}"
+    
     if request.method == "POST":
         origin = request.headers.get("Origin")
         referer = request.headers.get("Referer")
@@ -2754,10 +3380,10 @@ def admin_login():
             origin_ok = False
             
         if not origin_ok:
-            return render_template("admin_login.html", error="CSRF verification failed - Same origin required.", next_url=next_url), 403
+            return render_template("admin_login.html", error="CSRF verification failed - Same origin required.", next_url=next_url, discord_login_url=discord_login_url, discord_configured=bool(discord_client_id)), 403
             
         if is_login_rate_limited(ip):
-            return render_template("admin_login.html", error="Too many login attempts. Please try again in 1 minute.", next_url=next_url), 429
+            return render_template("admin_login.html", error="Too many login attempts. Please try again in 1 minute.", next_url=next_url, discord_login_url=discord_login_url, discord_configured=bool(discord_client_id)), 429
             
         username = request.form.get("username", "")
         password = request.form.get("password", "")
@@ -2784,15 +3410,22 @@ def admin_login():
             session.permanent = True
             session["admin_logged_in"] = True
             session["username"] = username
+            session["is_root"] = is_root_user(username)
             
             if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
                 next_url = "/admin"
             return redirect(next_url)
         else:
             record_login_attempt(ip)
-            error = "Invalid username or secret key credentials."
+            error = "Invalid username or secret key credentials. Note: Admins are required to authenticate with Discord."
             
-    return render_template("admin_login.html", error=error, next_url=next_url)
+    return render_template(
+        "admin_login.html",
+        error=error,
+        next_url=next_url,
+        discord_login_url=discord_login_url,
+        discord_configured=bool(discord_client_id)
+    )
 
 @app.route("/admin/logout", methods=["GET"])
 def admin_logout():
