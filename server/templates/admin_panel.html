@@ -162,15 +162,15 @@
             </a>
 
             {% if permissions.suggestions %}
-            <a href="/admin/suggestions" id="nav-suggestions"
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'suggestions' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+            <a href="/admin/tickets" id="nav-suggestions"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view in ['suggestions', 'tickets'] %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition shrink-0" fill="none"
                     stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.95 2.68 3.22 1.24.22 2.5.34 3.79.34 1.29 0 2.55-.12 3.79-.34 1.56-.27 2.68-1.63 2.68-3.22V8.25A3.75 3.75 0 0012.75 4.5h-1.5a3.75 3.75 0 00-3.75 3.75v5.27h-.001z">
                     </path>
                 </svg>
-                <span class="whitespace-nowrap">Suggestions</span>
+                <span class="whitespace-nowrap">Tickets</span>
             </a>
             {% endif %}
 
@@ -298,7 +298,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 grow-0">
                 {% if permissions.suggestions %}
-                <a href="/admin/suggestions" id="card-link-suggestions"
+                <a href="/admin/tickets" id="card-link-suggestions"
                     class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
                     <div
                         class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition duration-300 shrink-0">
@@ -312,10 +312,11 @@
                     <div>
                         <h2
                             class="text-xl font-bold tracking-wide font-display text-white group-hover:text-blue-400 transition duration-300 whitespace-nowrap">
-                            Suggestions Feed</h2>
+                            Tickets Feed</h2>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
-                        Review incoming user suggestions, accept or decline proposals, and ban or unban user IPs.
+                        Review incoming user tickets, bug reports & suggestions, chat directly with authors, update
+                        status, and manage user bans.
                     </p>
                 </a>
                 {% endif %}
@@ -392,138 +393,85 @@
         </main>
 
         <main id="view-suggestions"
-            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'suggestions' %}hidden{% endif %}">
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view in ['suggestions', 'tickets'] %}{% else %}hidden{% endif %}">
             <header
                 class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Suggestions
+                    <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Tickets & Bug
+                        Reports
                     </h2>
-                    <p class="text-xs text-slate-500 font-mono mt-1">Review feedback and manage user requests.</p>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Review feedback, bug reports, and chat directly
+                        with authors.</p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div
                         class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
-                        <div>TOTAL ENTRIES: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
+                        <div>TOTAL: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>BUGS: <span id="sug-stat-bugs" class="text-rose-400">0</span></div>
+                        <div class="w-px bg-white/5 self-stretch"></div>
+                        <div>SUGGESTIONS: <span id="sug-stat-suggestions" class="text-emerald-400">0</span></div>
                     </div>
-                    <a href="/"
-                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Home
-                        Site</a>
+                    <a href="/tickets" target="_blank"
+                        class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Public
+                        Portal &rarr;</a>
                 </div>
             </header>
 
-            <div
-                class="cyber-panel p-4 sm:p-5 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5 flex flex-col gap-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="w-9 h-9 rounded-xl bg-[#5865F2]/20 border border-[#5865F2]/40 flex items-center justify-center shrink-0">
-                            <svg class="w-5 h-5 text-[#5865F2] fill-current" viewBox="0 0 24 24">
-                                <path
-                                    d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h3
-                                class="text-xs font-bold text-white font-display uppercase tracking-wider flex items-center gap-2">
-                                <span>Discord DM Notifier</span>
-                                <span
-                                    class="px-2 py-0.5 bg-[#5865F2]/20 text-[#5865F2] text-[9px] rounded font-mono font-bold uppercase border border-[#5865F2]/30">Live
-                                    Bot</span>
-                            </h3>
-                            <p class="text-[11px] text-slate-400 font-mono">The authorized Discord Bot will DM your
-                                Discord account when new suggestions are submitted in selected categories.</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <label
-                            class="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-200 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5 hover:border-white/10 transition">
-                            <input type="checkbox" id="notifier-toggle" class="accent-[#5865F2] w-4 h-4 cursor-pointer">
-                            <span class="font-bold">Enable DM Notifications</span>
-                        </label>
-                    </div>
-                </div>
 
-                <div id="notifier-settings-panel" class="flex flex-col gap-3 pt-3 border-t border-white/5">
-                    <div class="flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-                        <div class="flex flex-wrap items-center gap-4">
-                            <span class="text-[10px] uppercase font-bold text-slate-400">Categories:</span>
-                            <label
-                                class="flex items-center gap-1.5 cursor-pointer text-blue-300 hover:text-white transition">
-                                <input type="checkbox" id="notif-cat-overlay" value="overlay" checked
-                                    class="accent-blue-500">
-                                <span>APRM Overlay</span>
-                            </label>
-                            <label
-                                class="flex items-center gap-1.5 cursor-pointer text-emerald-300 hover:text-white transition">
-                                <input type="checkbox" id="notif-cat-point_graph" value="point_graph" checked
-                                    class="accent-emerald-500">
-                                <span>Point Graph</span>
-                            </label>
-                            <label
-                                class="flex items-center gap-1.5 cursor-pointer text-amber-300 hover:text-white transition">
-                                <input type="checkbox" id="notif-cat-server_checker" value="server_checker" checked
-                                    class="accent-amber-500">
-                                <span>Server Checker</span>
-                            </label>
-                            <label
-                                class="flex items-center gap-1.5 cursor-pointer text-purple-300 hover:text-white transition">
-                                <input type="checkbox" id="notif-cat-general" value="general" checked
-                                    class="accent-purple-500">
-                                <span>General</span>
-                            </label>
-                        </div>
-                        <div class="flex items-center gap-2.5">
-                            <button type="button" onclick="sendTestNotification()" id="test-notif-btn"
-                                class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-slate-300 hover:text-white rounded-lg text-xs font-mono font-medium transition border border-zinc-700">
-                                Send Test DM
-                            </button>
-                            <button type="button" onclick="saveNotifierPreferences()" id="save-notif-btn"
-                                class="px-4 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg text-xs font-mono font-bold transition shadow-md shadow-[#5865F2]/20">
-                                Save Preferences
-                            </button>
-                        </div>
-                    </div>
-                    <div id="notifier-status-msg" class="hidden text-xs font-mono p-2.5 rounded-lg"></div>
-                </div>
-            </div>
 
             <div class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div
                         class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
-                        <button onclick="filterTarget('all')" id="target-tab-all"
-                            class="px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                        <button onclick="filterTicketType('all')" id="ticket-type-all"
+                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
                             Types</button>
+                        <button onclick="filterTicketType('suggestion')" id="ticket-type-suggestion"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Suggestions</button>
+                        <button onclick="filterTicketType('bug_report')" id="ticket-type-bug_report"
+                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Bug
+                            Reports</button>
+                    </div>
+
+                    <div
+                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        <button onclick="filterTarget('all')" id="target-tab-all"
+                            class="px-3 py-2 bg-amber-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                            Categories</button>
                         <button onclick="filterTarget('general')" id="target-tab-general"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">General</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">General</button>
                         <button onclick="filterTarget('overlay')" id="target-tab-overlay"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Overlay</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Overlay</button>
                         <button onclick="filterTarget('point_graph')" id="target-tab-point_graph"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Point
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Point
                             Graph</button>
                         <button onclick="filterTarget('server_checker')" id="target-tab-server_checker"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Server
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Server
                             Checker</button>
                     </div>
 
                     <div
                         class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
                         <button onclick="filterStatus('all')" id="tab-all"
-                            class="px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                            class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
                             Status</button>
                         <button onclick="filterStatus('pending')" id="tab-pending"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending
+                            / Open</button>
                         <button onclick="filterStatus('considering')" id="tab-considering"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
                         <button onclick="filterStatus('accepted')" id="tab-accepted"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted
+                            / Resolved</button>
                         <button onclick="filterStatus('declined')" id="tab-declined"
-                            class="px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined
+                            / Closed</button>
                     </div>
                 </div>
 
                 <div id="feed-container" class="flex flex-col gap-4">
-                    <p class="text-sm text-slate-500 italic font-mono">Loading suggestions...</p>
+                    <p class="text-sm text-slate-500 italic font-mono">Loading tickets...</p>
                 </div>
             </div>
         </main>
@@ -819,12 +767,13 @@
         let latestData = null;
         let currentFilter = 'all';
         let currentTargetFilter = 'all';
+        let currentTicketTypeFilter = 'all';
         let bannedIps = {};
         let activeView = '{{ active_view }}';
 
         document.addEventListener('DOMContentLoaded', () => {
             bindNavLink('nav-overview', 'overview', '/admin');
-            bindNavLink('nav-suggestions', 'suggestions', '/admin/suggestions');
+            bindNavLink('nav-suggestions', 'suggestions', '/admin/tickets');
             bindNavLink('nav-crashes', 'crashes', '/admin/crashes');
             bindNavLink('nav-contact', 'contact', '/admin/contact');
             bindNavLink('nav-bans', 'bans', '/admin/bans');
@@ -845,7 +794,7 @@
             if (cardSug) {
                 cardSug.addEventListener('click', (e) => {
                     e.preventDefault();
-                    navigateToView('suggestions', '/admin/suggestions');
+                    navigateToView('suggestions', '/admin/tickets');
                 });
             }
             const cardCrash = document.getElementById('card-link-crashes');
@@ -871,7 +820,6 @@
             }
 
             connectWebSocket();
-            initNotifierSettings();
         });
 
         function bindNavLink(id, viewName, path) {
@@ -895,7 +843,7 @@
             const path = window.location.pathname;
             if (path === '/admin/crashes') {
                 navigateToView('crashes', path, false);
-            } else if (path === '/admin/suggestions') {
+            } else if (path === '/admin/suggestions' || path === '/admin/tickets') {
                 navigateToView('suggestions', path, false);
             } else if (path === '/admin/contact') {
                 navigateToView('contact', path, false);
@@ -957,14 +905,27 @@
             });
         }
 
+        function filterTicketType(type) {
+            currentTicketTypeFilter = type;
+            ['all', 'suggestion', 'bug_report'].forEach(t => {
+                const btn = document.getElementById('ticket-type-' + t);
+                if (btn) {
+                    btn.className = (t === type)
+                        ? "px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase"
+                        : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+                }
+            });
+            applyFilter();
+        }
+
         function filterTarget(target) {
             currentTargetFilter = target;
             ['all', 'general', 'overlay', 'point_graph', 'server_checker'].forEach(t => {
                 const btn = document.getElementById('target-tab-' + t);
                 if (btn) {
                     btn.className = (t === target)
-                        ? "px-4 py-2 bg-amber-600 text-white transition rounded-lg uppercase"
-                        : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+                        ? "px-3 py-2 bg-amber-600 text-white transition rounded-lg uppercase"
+                        : "px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
                 }
             });
             applyFilter();
@@ -976,8 +937,8 @@
                 const tab = document.getElementById('tab-' + s);
                 if (tab) {
                     tab.className = (s === status)
-                        ? "px-4 py-2 bg-blue-600 text-white transition rounded-lg uppercase"
-                        : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
+                        ? "px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase"
+                        : "px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
                 }
             });
             applyFilter();
@@ -986,13 +947,24 @@
         function applyFilter() {
             const cards = document.querySelectorAll('.suggestion-card');
             cards.forEach(card => {
-                const cardStatus = card.getAttribute('data-status');
-                const cardTarget = card.getAttribute('data-target');
+                const cardType = card.getAttribute('data-type') || 'suggestion';
+                const cardStatus = (card.getAttribute('data-status') || 'pending').toLowerCase();
+                const cardTarget = card.getAttribute('data-target') || 'overlay';
 
-                const statusMatch = (currentFilter === 'all' || cardStatus === currentFilter);
+                const typeMatch = (currentTicketTypeFilter === 'all' || cardType === currentTicketTypeFilter);
+
+                let statusMatch = (currentFilter === 'all');
+                if (!statusMatch) {
+                    if (currentFilter === 'pending') statusMatch = ['pending', 'open'].includes(cardStatus);
+                    else if (currentFilter === 'considering') statusMatch = ['considering', 'investigating', 'in-progress'].includes(cardStatus);
+                    else if (currentFilter === 'accepted') statusMatch = ['accepted', 'resolved', 'completed'].includes(cardStatus);
+                    else if (currentFilter === 'declined') statusMatch = ['declined', 'closed', 'rejected'].includes(cardStatus);
+                    else statusMatch = (cardStatus === currentFilter);
+                }
+
                 const targetMatch = (currentTargetFilter === 'all' || cardTarget === currentTargetFilter);
 
-                if (statusMatch && targetMatch) {
+                if (typeMatch && statusMatch && targetMatch) {
                     card.style.display = 'flex';
                 } else {
                     card.style.display = 'none';
@@ -1479,8 +1451,15 @@
             const sugActiveBans = document.getElementById('sug-stat-active-bans');
             if (sugActiveBans) sugActiveBans.innerText = activeBans;
 
+            const tickets = data.suggestions || [];
             const sugTotal = document.getElementById('sug-stat-total-entries');
-            if (sugTotal) sugTotal.innerText = (data.suggestions || []).length;
+            if (sugTotal) sugTotal.innerText = tickets.length;
+
+            const sugBugs = document.getElementById('sug-stat-bugs');
+            if (sugBugs) sugBugs.innerText = tickets.filter(t => (t.type || '') === 'bug_report').length;
+
+            const sugSugs = document.getElementById('sug-stat-suggestions');
+            if (sugSugs) sugSugs.innerText = tickets.filter(t => (t.type || 'suggestion') === 'suggestion').length;
 
             const crashes = data.crashes || [];
             const openCrashes = crashes.filter(c => (c.status || '').toUpperCase() !== 'FIXED').length;
@@ -1611,7 +1590,7 @@
             const container = document.getElementById('feed-container');
             if (!container) return;
             if (suggestions.length === 0) {
-                container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No feedback or suggestions submitted yet.</p>';
+                container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No tickets or feedback submitted yet.</p>';
                 return;
             }
 
@@ -1620,12 +1599,15 @@
                 const timeStr = formatTimestamp(s.timestamp);
                 const isBanned = s.ip in bannedIps;
                 const hasComment = Boolean(s.admin_comment && s.admin_comment.trim());
+                const itemType = s.type || 'suggestion';
+                const isBug = itemType === 'bug_report';
 
                 let badgeClass = '';
-                if (s.status === 'pending') badgeClass = 'bg-amber-950/40 text-amber-400 border border-amber-500/20';
-                else if (s.status === 'considering') badgeClass = 'bg-blue-950/40 text-blue-400 border border-blue-500/20';
-                else if (s.status === 'accepted') badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
-                else if (s.status === 'declined') badgeClass = 'bg-rose-950/40 text-rose-400 border border-rose-500/20';
+                const st = (s.status || 'pending').toLowerCase();
+                if (['pending', 'open'].includes(st)) badgeClass = 'bg-amber-950/40 text-amber-400 border border-amber-500/20';
+                else if (['considering', 'investigating', 'in-progress'].includes(st)) badgeClass = 'bg-blue-950/40 text-blue-400 border border-blue-500/20';
+                else if (['accepted', 'resolved', 'completed'].includes(st)) badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
+                else if (['declined', 'closed', 'rejected'].includes(st)) badgeClass = 'bg-rose-950/40 text-rose-400 border border-rose-500/20';
 
                 let targetTag = '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold uppercase border border-blue-500/20">Overlay</span>';
                 let targetAttr = 'overlay';
@@ -1640,6 +1622,10 @@
                     targetTag = '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Checker</span>';
                     targetAttr = 'server_checker';
                 }
+
+                const typeBadge = isBug
+                    ? '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[10px] rounded font-bold font-mono uppercase border border-rose-500/20">Bug Report</span>'
+                    : '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold font-mono uppercase border border-blue-500/20">Suggestion</span>';
 
                 const bannedTag = isBanned
                     ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
@@ -1687,57 +1673,130 @@
                     `;
                 }
 
+                const titleDisplay = s.title ? `
+                    <h3 class="text-sm font-bold text-white font-display tracking-wide">${escapeHtml(s.title)}</h3>
+                ` : '';
+
                 const commentDisplay = hasComment ? `
                     <div class="bg-blue-950/20 border border-blue-500/20 rounded-lg p-3 text-xs font-mono text-blue-200 flex flex-col gap-1">
                         <div class="flex justify-between items-center text-[10px] text-blue-400 font-bold uppercase">
-                            <span>💬 Admin Response (${escapeHtml(s.comment_by || 'Admin')})</span>
+                            <span>Developer Note (${escapeHtml(s.comment_by || 'Admin')})</span>
                             <span>${formatTimestamp(s.comment_timestamp)}</span>
                         </div>
                         <p class="text-xs text-slate-300 whitespace-pre-wrap">${escapeHtml(s.admin_comment)}</p>
                     </div>
                 ` : '';
 
+                const messages = Array.isArray(s.messages) ? s.messages : [];
+                const messagesListHtml = messages.map(m => {
+                    const isAdminMsg = m.sender_type === 'admin';
+                    const bubbleBg = isAdminMsg ? 'bg-blue-950/30 border-blue-500/30' : 'bg-emerald-950/30 border-emerald-500/30';
+                    const tagColor = isAdminMsg ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+                    const senderRole = isAdminMsg ? 'Administrator' : 'Author';
+                    return `
+                        <div class="p-2.5 rounded-lg border ${bubbleBg} flex flex-col gap-1 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderRole}</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 font-mono">${formatTimestamp(m.timestamp)}</span>
+                            </div>
+                            <p class="text-xs text-slate-200 font-mono whitespace-pre-wrap pl-1">${escapeHtml(m.message)}</p>
+                        </div>
+                    `;
+                }).join('');
+
+                const discussionSection = `
+                    <div class="flex flex-col gap-2.5 bg-black/30 p-3.5 rounded-xl border border-white/5 font-mono">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                                <span>Live Conversation Thread</span>
+                                <span class="px-1.5 py-0.2 rounded bg-white/10 text-white text-[9px]">${messages.length} replies</span>
+                            </span>
+                            <span class="text-[10px] text-slate-500">Admins & Author Discussion</span>
+                        </div>
+
+                        <div class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+                            ${messagesListHtml.length > 0 ? messagesListHtml : '<p class="text-[11px] text-slate-500 italic py-1">No conversation replies yet. Post a message to author below.</p>'}
+                        </div>
+
+                        <div class="flex flex-col gap-2 pt-2 border-t border-white/5">
+                            <textarea id="admin-reply-input-${s.id}" rows="2" placeholder="Write reply to author as Admin..." class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none"></textarea>
+                            <div class="flex justify-end items-center gap-2">
+                                <button onclick="sendAdminTicketReply(${s.id})" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 shadow-md">
+                                    <span>Send Admin Reply</span>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const btnAccept = isBug
+                    ? `<button onclick="updateStatus(${s.id}, 'resolved')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Resolve</button>`
+                    : `<button onclick="updateStatus(${s.id}, 'accepted')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Accept</button>`;
+
+                const btnConsider = isBug
+                    ? `<button onclick="updateStatus(${s.id}, 'investigating')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Investigate</button>`
+                    : `<button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Consider</button>`;
+
+                const btnDecline = isBug
+                    ? `<button onclick="updateStatus(${s.id}, 'closed')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Close</button>`
+                    : `<button onclick="updateStatus(${s.id}, 'declined')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Decline</button>`;
+
+                const btnPending = isBug
+                    ? `<button onclick="updateStatus(${s.id}, 'open')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Open</button>`
+                    : `<button onclick="updateStatus(${s.id}, 'pending')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Pending</button>`;
+
                 html += `
-                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3" data-status="${s.status || 'pending'}" data-target="${targetAttr}">
+                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3.5" data-type="${itemType}" data-status="${s.status || 'pending'}" data-target="${targetAttr}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 ${authorHtml}
+                                ${typeBadge}
                                 ${targetTag}
                                 ${hiddenTag}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${badgeClass}">${s.status}</span>
                             </div>
                             <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                                <span>Ticket #${s.id}</span>
                                 ${bannedTag}
                             </div>
                         </div>
-                        <p class="text-sm text-slate-300 bg-black/20 p-4 rounded-lg border border-white/5 leading-relaxed font-mono whitespace-pre-wrap">${escapeHtml(s.suggestion)}</p>
+
+                        ${titleDisplay}
+
+                        <p class="text-sm text-slate-300 bg-black/20 p-4 rounded-lg border border-white/5 leading-relaxed font-mono whitespace-pre-wrap">${escapeHtml(s.suggestion || s.description)}</p>
                         
                         ${commentDisplay}
 
+                        ${discussionSection}
+
                         <div id="comment-box-${s.id}" class="hidden flex flex-col gap-2 bg-black/30 p-3 rounded-lg border border-white/5 font-mono">
-                            <label class="text-[10px] font-bold text-slate-400 uppercase">Admin Comment / Response</label>
-                            <textarea id="comment-input-${s.id}" rows="2" placeholder="Write response to user suggestion..." class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none">${escapeHtml(s.admin_comment || '')}</textarea>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Legacy Admin Note / Public Banner</label>
+                            <textarea id="comment-input-${s.id}" rows="2" placeholder="Write pinned admin note on this ticket..." class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none">${escapeHtml(s.admin_comment || '')}</textarea>
                             <div class="flex justify-end gap-2 text-xs">
                                 <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg font-medium uppercase border border-zinc-700">Cancel</button>
-                                ${hasComment ? `<button onclick="saveAdminComment(${s.id}, '')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg font-medium uppercase border border-rose-500/20">Delete</button>` : ''}
-                                <button onclick="submitCommentFromCard(${s.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium uppercase transition">Save Comment</button>
+                                ${hasComment ? `<button onclick="saveAdminComment(${s.id}, '')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg font-medium uppercase border border-rose-500/20">Delete Note</button>` : ''}
+                                <button onclick="submitCommentFromCard(${s.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium uppercase transition">Save Note</button>
                             </div>
                         </div>
 
                         <div class="flex flex-wrap justify-between items-center gap-4 mt-1 border-t border-white/5 pt-3 font-mono">
                             <div class="flex flex-wrap gap-2">
-                                <button onclick="updateStatus(${s.id}, 'accepted')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Accept</button>
-                                <button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Consider</button>
-                                <button onclick="updateStatus(${s.id}, 'declined')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Decline</button>
-                                <button onclick="updateStatus(${s.id}, 'pending')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Pending</button>
+                                ${btnAccept}
+                                ${btnConsider}
+                                ${btnDecline}
+                                ${btnPending}
                                 <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-indigo-500/20 transition flex items-center gap-1">
-                                    <span>💬</span> ${hasComment ? 'Edit Comment' : 'Add Comment'}
+                                    <span></span> ${hasComment ? 'Edit Note' : 'Add Note'}
                                 </button>
                                 ${visibilityBtn}
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Entry</button>
+                                <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Ticket</button>
                                 ${banBtn}
                             </div>
                         </div>
@@ -1748,38 +1807,60 @@
             applyFilter();
         }
 
+        async function sendAdminTicketReply(id) {
+            const input = document.getElementById(`admin-reply-input-${id}`);
+            if (!input || !input.value.trim()) return;
+
+            const text = input.value.trim();
+            try {
+                const response = await fetch(`/api/tickets/${id}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    input.value = '';
+                } else {
+                    alert(data.detail || 'Failed to post reply.');
+                }
+            } catch (err) {
+                alert('Network error posting reply.');
+            }
+        }
+
         async function toggleVisibility(id, hidden) {
             try {
-                const response = await fetch('/admin/suggestions/visibility', {
+                const response = await fetch('/admin/tickets/visibility', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id, hidden })
                 });
                 if (!response.ok) {
                     const data = await response.json();
-                    alert(data.detail || 'Failed to update suggestion visibility.');
+                    alert(data.detail || 'Failed to update visibility.');
                 }
             } catch (err) {
-                alert('Network error updating suggestion visibility.');
+                alert('Network error updating visibility.');
             }
         }
 
         async function deleteSuggestion(id) {
-            if (!confirm(`Are you sure you want to permanently delete suggestion #${id}?`)) {
+            if (!confirm(`Are you sure you want to permanently delete Ticket #${id}?`)) {
                 return;
             }
             try {
-                const response = await fetch('/admin/suggestions/delete', {
+                const response = await fetch('/admin/tickets/delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id })
                 });
                 if (!response.ok) {
                     const data = await response.json();
-                    alert(data.detail || 'Failed to delete suggestion.');
+                    alert(data.detail || 'Failed to delete ticket.');
                 }
             } catch (err) {
-                alert('Network error deleting suggestion.');
+                alert('Network error deleting ticket.');
             }
         }
 
@@ -1797,17 +1878,17 @@
 
         async function saveAdminComment(id, text) {
             try {
-                const response = await fetch('/admin/suggestions/comment', {
+                const response = await fetch('/admin/tickets/comment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: id, comment: text })
                 });
                 const data = await response.json();
                 if (!response.ok) {
-                    alert(data.detail || 'Failed to save comment.');
+                    alert(data.detail || 'Failed to save note.');
                 }
             } catch (err) {
-                alert('Network error saving comment.');
+                alert('Network error saving note.');
             }
         }
 
@@ -1933,7 +2014,7 @@
 
         async function updateStatus(id, status) {
             try {
-                const response = await fetch('/admin/suggestions/status', {
+                const response = await fetch('/admin/tickets/status', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id, status })
@@ -1948,7 +2029,7 @@
 
         async function unbanIP(ip) {
             try {
-                const response = await fetch('/admin/suggestions/unban', {
+                const response = await fetch('/admin/tickets/unban', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ip })
@@ -2134,7 +2215,7 @@
                             ${!isPrivate ? `
                             <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
                                 <span class="text-slate-400 text-[11px] flex items-center gap-1.5">
-                                    👥 Player Count
+                                    Player Count
                                 </span>
                                 <span class="font-bold ${pCount > 0 ? 'text-emerald-400' : 'text-slate-400'}">
                                     ${pCount} / ${maxP} Players
@@ -2222,133 +2303,6 @@
                 }
             } catch (err) {
                 alert('Network error updating server persistence.');
-            }
-        }
-
-        const INITIAL_NOTIFIER_CFG = {{ notifier | default ({}) | tojson | safe }};
-
-        function initNotifierSettings() {
-            const toggle = document.getElementById('notifier-toggle');
-            if (!toggle) return;
-
-            const enabled = Boolean(INITIAL_NOTIFIER_CFG && INITIAL_NOTIFIER_CFG.enabled);
-            toggle.checked = enabled;
-
-            const cats = (INITIAL_NOTIFIER_CFG && INITIAL_NOTIFIER_CFG.categories) || ['overlay', 'point_graph', 'server_checker', 'general'];
-            ['overlay', 'point_graph', 'server_checker', 'general'].forEach(cat => {
-                const el = document.getElementById(`notif-cat-${cat}`);
-                if (el) el.checked = cats.includes(cat);
-            });
-        }
-
-        async function saveNotifierPreferences() {
-            const toggle = document.getElementById('notifier-toggle');
-            const saveBtn = document.getElementById('save-notif-btn');
-            const statusEl = document.getElementById('notifier-status-msg');
-
-            const cats = [];
-            ['overlay', 'point_graph', 'server_checker', 'general'].forEach(cat => {
-                const el = document.getElementById(`notif-cat-${cat}`);
-                if (el && el.checked) cats.push(cat);
-            });
-
-            const payload = {
-                enabled: toggle ? toggle.checked : false,
-                categories: cats
-            };
-
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Saving...';
-            }
-
-            try {
-                const res = await fetch('/api/admin/notifier', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    if (statusEl) {
-                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-emerald-950/40 text-emerald-300 border border-emerald-500/30';
-                        statusEl.textContent = '✅ Notifier preferences saved successfully!';
-                        statusEl.classList.remove('hidden');
-                        setTimeout(() => statusEl.classList.add('hidden'), 4000);
-                    } else {
-                        alert(data.message || 'Notifier preferences saved.');
-                    }
-                } else {
-                    if (statusEl) {
-                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
-                        statusEl.textContent = `❌ ${data.detail || 'Failed to save notifier preferences.'}`;
-                        statusEl.classList.remove('hidden');
-                    } else {
-                        alert(data.detail || 'Failed to save notifier preferences.');
-                    }
-                }
-            } catch (err) {
-                if (statusEl) {
-                    statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
-                    statusEl.textContent = '❌ Network error saving preferences.';
-                    statusEl.classList.remove('hidden');
-                } else {
-                    alert('Network error saving preferences.');
-                }
-            } finally {
-                if (saveBtn) {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = 'Save Preferences';
-                }
-            }
-        }
-
-        async function sendTestNotification() {
-            const testBtn = document.getElementById('test-notif-btn');
-            const statusEl = document.getElementById('notifier-status-msg');
-
-            if (testBtn) {
-                testBtn.disabled = true;
-                testBtn.textContent = 'Sending DM...';
-            }
-
-            try {
-                const res = await fetch('/api/admin/notifier/test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    if (statusEl) {
-                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-blue-950/40 text-blue-300 border border-blue-500/30';
-                        statusEl.textContent = '📨 ' + (data.message || 'Test DM sent! Check your Discord direct messages.');
-                        statusEl.classList.remove('hidden');
-                        setTimeout(() => statusEl.classList.add('hidden'), 6000);
-                    } else {
-                        alert(data.message || 'Test DM sent!');
-                    }
-                } else {
-                    if (statusEl) {
-                        statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
-                        statusEl.textContent = `❌ ${data.detail || 'Failed to send test DM.'}`;
-                        statusEl.classList.remove('hidden');
-                    } else {
-                        alert(data.detail || 'Failed to send test DM.');
-                    }
-                }
-            } catch (err) {
-                if (statusEl) {
-                    statusEl.className = 'text-xs font-mono p-2.5 rounded-lg bg-rose-950/40 text-rose-300 border border-rose-500/30';
-                    statusEl.textContent = '❌ Network error sending test DM.';
-                    statusEl.classList.remove('hidden');
-                } else {
-                    alert('Network error sending test DM.');
-                }
-            } finally {
-                if (testBtn) {
-                    testBtn.disabled = false;
-                    testBtn.textContent = 'Send Test DM';
-                }
             }
         }
 

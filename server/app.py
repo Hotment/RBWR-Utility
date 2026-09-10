@@ -16,6 +16,7 @@ except ImportError:
         if isinstance(b, (bytes, bytearray)):
             return json.loads(b.decode("utf-8"))
         return json.loads(b)
+from urllib.parse import quote, urlencode
 import secrets
 import requests
 import hashlib
@@ -25,7 +26,9 @@ import time
 import threading
 from datetime import datetime, timezone, timedelta
 from functools import wraps
-from urllib.parse import quote
+import asyncio
+import disnake
+from disnake.ext import commands
 from flask_sock import Sock
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -101,8 +104,11 @@ def get_dashboard_payload_data(username=None):
         for s in sorted(raw_sugs, key=lambda x: x.get("timestamp", ""), reverse=True):
             suggestions.append({
                 "id": s.get("id"),
+                "type": s.get("type", "suggestion"),
+                "title": s.get("title", ""),
                 "name": s.get("name", "Anonymous"),
                 "suggestion": s.get("suggestion", ""),
+                "description": s.get("description") or s.get("suggestion", ""),
                 "ip": s.get("ip", ""),
                 "timestamp": s.get("timestamp", ""),
                 "status": s.get("status", "pending"),
@@ -115,7 +121,9 @@ def get_dashboard_payload_data(username=None):
                 "anonymous": bool(s.get("anonymous", False)),
                 "discord_id": s.get("discord_id") or "",
                 "discord_username": s.get("discord_username") or "",
-                "discord_avatar": s.get("discord_avatar") or ""
+                "discord_avatar": s.get("discord_avatar") or "",
+                "messages": s.get("messages", []),
+                "messages_count": len(s.get("messages", []))
             })
 
     banned_ips = {}
@@ -203,6 +211,58 @@ def broadcast_update(data_type):
             ws.send(json.dumps(payload))
         except Exception:
             active_connections.discard(conn)
+
+active_ticket_connections = set()
+
+def broadcast_ticket_update(ticket_id: int, new_message: dict, full_messages: list, ticket_discord_id: str|None = None, is_anonymous: bool = False):
+    """
+    Broadcasts real-time ticket messages to connected web users on tickets.html.
+    """
+    for conn in list(active_ticket_connections):
+        ws = conn[0] if isinstance(conn, tuple) else conn
+        user_d_id = conn[1] if isinstance(conn, tuple) else ""
+        is_admin_user = conn[2] if isinstance(conn, tuple) else False
+        
+        can_view = is_admin_user or (user_d_id and ticket_discord_id and str(user_d_id) == str(ticket_discord_id) and not is_anonymous)
+        if not can_view:
+            continue
+            
+        try:
+            payload = {
+                "type": "ticket_message",
+                "ticket_id": ticket_id,
+                "new_message": new_message,
+                "messages": full_messages
+            }
+            ws.send(json.dumps(payload))
+        except Exception:
+            active_ticket_connections.discard(conn)
+
+@sock.route('/ws/tickets')
+def tickets_ws(ws):
+    discord_user = session.get("discord_user") or {}
+    user_d_id = str(discord_user.get("id") or "")
+    is_admin_user = bool(session.get("admin_logged_in"))
+    
+    conn_tuple = (ws, user_d_id, is_admin_user)
+    active_ticket_connections.add(conn_tuple)
+    
+    try:
+        ws.send(json.dumps({"type": "ready", "connected": True}))
+        while True:
+            msg = ws.receive()
+            if msg is None:
+                break
+            try:
+                data = json.loads(msg)
+                if data.get("type") == "ping":
+                    ws.send(json.dumps({"type": "pong"}))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    finally:
+        active_ticket_connections.discard(conn_tuple)
 
 @sock.route('/admin/ws')
 def admin_ws(ws):
@@ -455,126 +515,215 @@ def save_admin_notifier_config(user_identifier: str, notifier_config: dict):
     
     save_admins(admins_data)
 
-def send_discord_dm(recipient_id: str, embed: dict) -> tuple[bool, str]:
+disnake_bot: commands.Bot | None = None
+disnake_bot_loop: asyncio.AbstractEventLoop | None = None
+
+DISCORD_TICKETS_CATEGORY_ID = os.environ.get("DISCORD_TICKETS_CATEGORY_ID", "1547529007334162432").strip()
+DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1547514559097733141").strip()
+
+def create_discord_ticket_channel(ticket: dict) -> str | None:
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        logger.warning("[Disnake Channel] Disnake bot is not ready; cannot create ticket channel.")
+        return None
+
+    ticket_id = ticket.get("id")
+    ticket_type = ticket.get("type", "suggestion")
+    raw_title = ticket.get("title") or ticket.get("suggestion") or ticket.get("description") or f"ticket-{ticket_id}"
+    
+    slug = "".join(c if c.isalnum() else "-" for c in raw_title.lower()).strip("-")
+    slug = "-".join(part for part in slug.split("-") if part)[:25]
+    prefix = "bug" if ticket_type == "bug_report" else "ticket"
+    channel_name = f"{prefix}-{ticket_id}"
+    if slug:
+        channel_name += f"-{slug}"
+    channel_name = channel_name[:95]
+
+    author_name = ticket.get("name", "Anonymous")
+    discord_id = ticket.get("discord_id")
+    discord_username = ticket.get("discord_username")
+    is_anon = bool(ticket.get("anonymous"))
+
+    target_labels = {
+        "overlay": "APRM Overlay",
+        "point_graph": "Point History Graph",
+        "server_checker": "Server Checker",
+        "general": "General"
+    }
+    target = ticket.get("target") or "overlay"
+
+    is_bug = (ticket_type == "bug_report")
+    embed_color = disnake.Color.red() if is_bug else disnake.Color.blurple()
+    author_display = f"{discord_username} (ID: `{discord_id}`)" if discord_id and not is_anon else author_name
+    if is_anon and discord_id:
+        author_display += " *(Submitted anonymously to public)*"
+
+    async def _create_async():
+        guild_id = int(DISCORD_GUILD_ID)
+        guild = disnake_bot.get_guild(guild_id)
+        if not guild:
+            guild = await disnake_bot.fetch_guild(guild_id)
+        
+        cat_id = int(DISCORD_TICKETS_CATEGORY_ID)
+        category = disnake_bot.get_channel(cat_id)
+        if not category:
+            try:
+                category = await disnake_bot.fetch_channel(cat_id)
+            except Exception:
+                category = None
+        
+        cat_obj = category if isinstance(category, disnake.CategoryChannel) else None
+        ch = await guild.create_text_channel(
+            name=channel_name,
+            category=cat_obj,
+            topic=f"Ticket #{ticket_id} ({ticket_type.upper()}) | Author: {discord_username or author_name}"
+        )
+        
+        embed = disnake.Embed(
+            title=f"{'Bug Report' if is_bug else 'Feature Suggestion'} #{ticket_id}: {ticket.get('title') or (ticket.get('suggestion') or '')[:50]}",
+            description=(ticket.get('suggestion') or ticket.get('description') or '')[:3500],
+            color=embed_color,
+            timestamp=datetime.now(timezone.utc)
+        )
+        embed.add_field(name="Type", value="Bug Report" if is_bug else "Suggestion", inline=True)
+        embed.add_field(name="Category", value=target_labels.get(target, target), inline=True)
+        embed.add_field(name="Status", value=(ticket.get("status") or ("open" if is_bug else "pending")).upper(), inline=True)
+        embed.add_field(name="Author", value=author_display, inline=True)
+        embed.add_field(name="Admin Replies", value="Type any message in this channel to send a reply directly to the ticket author. When the author replies on the website, their message will appear here in real time.", inline=False)
+        embed.set_footer(text=f"RBWR Utility Ticket #{ticket_id}")
+
+        await ch.send(embed=embed)
+        return str(ch.id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(_create_async(), disnake_bot_loop)
+        channel_id = future.result(timeout=10)
+        logger.info(f"[Disnake Channel] Created Discord channel #{channel_name} ({channel_id}) for ticket #{ticket_id}")
+        return channel_id
+    except Exception as ex:
+        logger.error(f"[Disnake Channel] Error creating channel: {ex}", exc_info=True)
+        return None
+
+def run_disnake_bot():
+    """
+    Runs the Disnake Discord Bot inside an asyncio event loop in a dedicated background daemon thread.
+    Handles real-time gateway events (on_message) for sub-second admin reply ingestion from ticket channels.
+    """
+    global disnake_bot, disnake_bot_loop
     bot_token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
     if not bot_token:
-        return False, "DISCORD_BOT_TOKEN is not configured on the server."
-    
-    headers = {
-        "Authorization": f"Bot {bot_token}",
-        "Content-Type": "application/json"
-    }
-    try:
-        channel_res = requests.post(
-            f"{DISCORD_API_BASE}/users/@me/channels",
-            headers=headers,
-            json={"recipient_id": str(recipient_id).strip()},
-            timeout=8
-        )
-        if channel_res.status_code not in (200, 201):
-            err_text = channel_res.text
-            logger.warning(f"[Discord DM] Failed to create DM channel with {recipient_id}: {channel_res.status_code} {err_text}")
-            return False, f"Could not create DM channel (status {channel_res.status_code}). Ensure bot shares a mutual server with user."
-        
-        dm_channel_id = channel_res.json().get("id")
-        if not dm_channel_id:
-            return False, "DM channel ID missing from Discord API response."
-        
-        msg_res = requests.post(
-            f"{DISCORD_API_BASE}/channels/{dm_channel_id}/messages",
-            headers=headers,
-            json={"embeds": [embed]},
-            timeout=8
-        )
-        if msg_res.status_code not in (200, 201):
-            err_text = msg_res.text
-            logger.warning(f"[Discord DM] Failed to send message to channel {dm_channel_id}: {msg_res.status_code} {err_text}")
-            return False, f"Failed to send DM (status {msg_res.status_code}). User may have DMs disabled."
-        
-        return True, "Notification sent successfully."
-    except Exception as e:
-        logger.error(f"[Discord DM] Error sending notification to {recipient_id}: {e}", exc_info=True)
-        return False, str(e)
+        logger.warning("[Disnake Bot] DISCORD_BOT_TOKEN is not configured; Disnake bot is disabled.")
+        return
 
-def notify_admins_on_new_suggestion(suggestion: dict):
-    def _worker():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    disnake_bot_loop = loop
+
+    intents = disnake.Intents.default()
+    intents.message_content = True
+    intents.guilds = True
+
+    bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
+    disnake_bot = bot
+
+    @bot.event
+    async def on_ready():
+        logger.info(f"[Disnake Bot] Connected and active as {bot.user} (ID: {bot.user.id})")
+
+    @bot.event
+    async def on_message(message: disnake.Message):
+        if not message.guild or message.author.bot:
+            return
+        if bot.user and message.author.id == bot.user.id:
+            return
+
+        cat_id = str(getattr(message.channel, "category_id", "") or "")
+        target_cat_id = str(DISCORD_TICKETS_CATEGORY_ID).strip()
+        ch_id = str(message.channel.id)
+
+        data = load_suggestions()
+        suggestions = data.get("suggestions", [])
+        
+        target_ticket = None
+        for s in suggestions:
+            if str(s.get("discord_channel_id", "")) == ch_id:
+                target_ticket = s
+                break
+
+        if not target_ticket and cat_id != target_cat_id:
+            return
+
+        if not target_ticket and cat_id == target_cat_id:
+            ch_name = getattr(message.channel, "name", "")
+            for s in suggestions:
+                if f"ticket-{s.get('id')}" in ch_name or f"bug-{s.get('id')}" in ch_name:
+                    target_ticket = s
+                    target_ticket["discord_channel_id"] = ch_id
+                    break
+
+        if not target_ticket:
+            return
+
+        d_msg_id = str(message.id)
+        messages = target_ticket.setdefault("messages", [])
+        for m in messages:
+            if str(m.get("discord_message_id", "")) == d_msg_id:
+                return
+
+        msg_content = (message.clean_content or message.content or "").strip()
+        if not msg_content and message.attachments:
+            msg_content = "\n".join(a.url for a in message.attachments)
+        if not msg_content:
+            return
+
+        sender_name = message.author.display_name or getattr(message.author, "global_name", None) or message.author.name or "Administrator"
+        sender_discord_id = str(message.author.id)
+        sender_avatar = str(message.author.display_avatar.url) if message.author.display_avatar else ""
+
+        new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
+        new_msg_obj = {
+            "id": new_msg_id,
+            "sender_type": "admin",
+            "sender_name": sender_name,
+            "sender_discord_id": sender_discord_id,
+            "sender_avatar": sender_avatar,
+            "message": msg_content,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "discord_message_id": d_msg_id
+        }
+        messages.append(new_msg_obj)
+        save_suggestions(data)
+        broadcast_update("dashboard")
+
+        logger.info(f"[Disnake Bot] Ingested admin reply from #{getattr(message.channel, 'name', ch_id)} (Author: {sender_name}) for ticket #{target_ticket.get('id')}")
+
         try:
-            target = suggestion.get("target") or "overlay"
-            sug_id = suggestion.get("id")
-            name = suggestion.get("name", "Anonymous")
-            text = suggestion.get("suggestion", "")
-            is_anon = bool(suggestion.get("anonymous"))
-            discord_id = suggestion.get("discord_id", "")
-            discord_username = suggestion.get("discord_username", "")
-            
-            target_labels = {
-                "overlay": "APRM Overlay",
-                "point_graph": "Point History Graph",
-                "server_checker": "Server Checker",
-                "general": "General"
-            }
-            target_colors = {
-                "overlay": 0x3B82F6,
-                "point_graph": 0x10B981,
-                "server_checker": 0xF59E0B,
-                "general": 0xA855F7
-            }
-            
-            author_text = f"{discord_username} (ID: `{discord_id}`)" if discord_id else name
-            if is_anon and discord_id:
-                author_text += " *(Submitted anonymously to public)*"
-            elif is_anon:
-                author_text = "Anonymous Guest"
-            
-            embed = {
-                "title": f"💡 New Suggestion #{sug_id}",
-                "description": text[:2000],
-                "color": target_colors.get(target, 0x3B82F6),
-                "fields": [
-                    {"name": "Category", "value": target_labels.get(target, target), "inline": True},
-                    {"name": "Submitted By", "value": author_text, "inline": True},
-                    {"name": "Status", "value": "Pending", "inline": True}
-                ],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "footer": {"text": "RBWR Utility Admin Notifier"}
-            }
-            
-            admins_data = load_admins()
-            notified_ids = set()
-            
-            root_discord_ids = get_root_discord_ids()
-            for r_id in root_discord_ids:
-                r_info = admins_data.get("admins", {}).get(r_id, {})
-                notifier_cfg = r_info.get("notifier") or admins_data.get("root_notifier") or {"enabled": True, "categories": ["overlay", "point_graph", "server_checker", "general"]}
-                if notifier_cfg.get("enabled", False):
-                    cats = notifier_cfg.get("categories", ["overlay", "point_graph", "server_checker", "general"])
-                    if target in cats:
-                        ok, msg = send_discord_dm(r_id, embed)
-                        logger.info(f"[Discord DM] Dispatched DM for suggestion #{sug_id} to Root Admin {r_id} (target: {target}, ok: {ok}, res: {msg})")
-                        notified_ids.add(r_id)
-                    else:
-                        logger.info(f"[Discord DM] Root Admin {r_id} skipped: category '{target}' not in subscribed {cats}")
-            
-            for admin_key, admin_info in admins_data.get("admins", {}).items():
-                admin_discord_id = admin_info.get("discord_id") or (admin_key if admin_key.isdigit() else "")
-                if not admin_discord_id or admin_discord_id in notified_ids:
-                    continue
-                perms = admin_info.get("permissions") or {}
-                if not perms.get("suggestions", True):
-                    continue
-                notifier_cfg = admin_info.get("notifier") or {}
-                if notifier_cfg.get("enabled", False):
-                    cats = notifier_cfg.get("categories", ["overlay", "point_graph", "server_checker", "general"])
-                    if target in cats:
-                        ok, msg = send_discord_dm(admin_discord_id, embed)
-                        logger.info(f"[Discord DM] Dispatched DM for suggestion #{sug_id} to Admin {admin_discord_id} (target: {target}, ok: {ok}, res: {msg})")
-                        notified_ids.add(admin_discord_id)
-                    else:
-                        logger.info(f"[Discord DM] Admin {admin_discord_id} skipped: category '{target}' not in subscribed {cats}")
-        except Exception as e:
-            logger.error(f"[Discord DM Dispatch] Error in suggestion notifier worker: {e}", exc_info=True)
-    
-    threading.Thread(target=_worker, daemon=True).start()
+            await message.add_reaction("📨")
+        except Exception:
+            pass
+
+        broadcast_ticket_update(
+            target_ticket.get("id"),
+            new_msg_obj,
+            messages,
+            target_ticket.get("discord_id"),
+            target_ticket.get("anonymous")
+        )
+
+    try:
+        loop.run_until_complete(bot.start(bot_token))
+    except disnake.errors.PrivilegedIntentsRequired:
+        logger.warning("[Disnake Bot] Privileged Message Content Intent is disabled in Discord Developer Portal. Retrying with basic intents...")
+        try:
+            intents.message_content = False
+            bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
+            disnake_bot = bot
+            loop.run_until_complete(bot.start(bot_token))
+        except Exception as retry_err:
+            logger.error(f"[Disnake Bot] Fallback start failed: {retry_err}")
+    except Exception as e:
+        logger.error(f"[Disnake Bot] Bot encountered error: {e}", exc_info=True)
+
+threading.Thread(target=run_disnake_bot, daemon=True, name="DisnakeBotThread").start()
 
 def get_authenticated_user():
     if has_request_context():
@@ -717,19 +866,45 @@ def save_contact_messages(data):
         json.dump(data, f, indent=4)
 
 def get_public_suggestions():
+    return get_public_tickets()
+
+def get_public_tickets():
     data = load_suggestions()
     suggestions = data.get("suggestions", [])
     public_list = []
+    
+    is_admin = False
+    current_discord_id = None
+    if has_request_context():
+        try:
+            is_admin = bool(session.get("admin_logged_in"))
+            discord_user = session.get("discord_user") or {}
+            current_discord_id = str(discord_user.get("id") or "")
+        except Exception:
+            pass
+
     for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
         if s.get("hidden"):
             continue
         is_anon = bool(s.get("anonymous")) or (s.get("name") or "").lower() == "anonymous"
         pub_name = "Anonymous" if is_anon else (s.get("name") or "Anonymous")
         pub_avatar = None if is_anon else s.get("discord_avatar")
+        raw_text = s.get("suggestion") or s.get("description", "")
+        
+        ticket_discord_id = str(s.get("discord_id") or "")
+        is_author = bool(current_discord_id and ticket_discord_id and current_discord_id == ticket_discord_id and not is_anon)
+        
+        can_view_conversation = is_admin or is_author
+        ticket_messages = s.get("messages", []) if can_view_conversation else []
+        messages_count = len(s.get("messages", [])) if can_view_conversation else 0
+
         public_list.append({
             "id": s.get("id"),
+            "type": s.get("type", "suggestion"),
+            "title": s.get("title", ""),
             "name": pub_name,
-            "suggestion": s.get("suggestion", ""),
+            "suggestion": raw_text,
+            "description": raw_text,
             "timestamp": s.get("timestamp", ""),
             "status": s.get("status", "pending"),
             "admin_comment": s.get("admin_comment", ""),
@@ -739,7 +914,13 @@ def get_public_suggestions():
             "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
             "anonymous": is_anon,
             "discord_avatar": pub_avatar,
-            "is_discord_user": bool(s.get("discord_id")) and not is_anon
+            "discord_id": None if is_anon else (s.get("discord_id") or ""),
+            "discord_username": None if is_anon else (s.get("discord_username") or ""),
+            "is_discord_user": bool(s.get("discord_id")) and not is_anon,
+            "can_view_conversation": can_view_conversation,
+            "is_author": is_author,
+            "messages": ticket_messages,
+            "messages_count": messages_count
         })
     return public_list
 
@@ -795,10 +976,26 @@ def is_ip_banned(ip: str) -> bool:
 
 class SuggestionPayload(BaseModel):
     name: str = Field(default="", max_length=50)
-    suggestion: str = Field(..., max_length=2000)
+    suggestion: str = Field(default="", max_length=4000)
+    description: str = Field(default="", max_length=4000)
+    title: str = Field(default="", max_length=150)
+    type: str = Field(default="suggestion", max_length=50)
     anonymous: bool = Field(default=False)
     target: str = Field(default="overlay", max_length=50)
     is_server_checker: bool = Field(default=False)
+
+class TicketPayload(BaseModel):
+    type: str = Field(default="suggestion", max_length=50)
+    title: str = Field(default="", max_length=150)
+    suggestion: str = Field(default="", max_length=4000)
+    description: str = Field(default="", max_length=4000)
+    name: str = Field(default="", max_length=50)
+    anonymous: bool = Field(default=False)
+    target: str = Field(default="overlay", max_length=50)
+    is_server_checker: bool = Field(default=False)
+
+class TicketMessagePayload(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
 
 class CrashPayload(BaseModel):
     version: str = Field(..., max_length=20)
@@ -2443,49 +2640,226 @@ def download_version_file(version):
         
     return send_from_directory(FILES_DIR, filename, as_attachment=True)
 
+@app.route("/tickets", methods=["GET", "POST"])
+def tickets_route():
+    if request.method == "POST":
+        return submit_ticket()
+    
+    if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
+        return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
+        
+    return render_template(
+        "tickets.html",
+        tickets=get_public_tickets(),
+        suggestions=get_public_tickets(),
+        discord_user=session.get("discord_user"),
+        discord_configured=bool(os.environ.get("DISCORD_CLIENT_ID", "").strip()),
+        is_admin=bool(session.get("admin_logged_in"))
+    )
+
 @app.route("/suggestions", methods=["GET", "POST"])
 def suggestions_route():
     if request.method == "POST":
-        return submit_suggestion()
+        return submit_ticket()
     
     if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
-        return jsonify({"suggestions": get_public_suggestions()})
+        return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
         
-    return render_template(
-        "suggestions.html",
-        suggestions=get_public_suggestions(),
-        discord_user=session.get("discord_user"),
-        discord_configured=bool(os.environ.get("DISCORD_CLIENT_ID", "").strip())
-    )
+    return redirect("/tickets" + (f"?{request.query_string.decode('utf-8')}" if request.query_string else ""))
+
+@app.route("/api/tickets", methods=["GET"])
+def get_tickets_api():
+    return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
 
 @app.route("/api/suggestions", methods=["GET"])
 def get_suggestions_api():
-    return jsonify({"suggestions": get_public_suggestions()})
+    return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
 
-def submit_suggestion():
+@app.route("/api/tickets/<int:ticket_id>/messages", methods=["GET"])
+def get_ticket_messages_api(ticket_id):
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target_ticket = None
+    for s in suggestions:
+        if s.get("id") == ticket_id:
+            target_ticket = s
+            break
+
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    is_admin = bool(session.get("admin_logged_in"))
+    discord_user = session.get("discord_user") or {}
+    user_discord_id = str(discord_user.get("id") or "")
+    ticket_discord_id = str(target_ticket.get("discord_id") or "")
+
+    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id and not target_ticket.get("anonymous"))
+
+    if not is_admin and not is_author:
+        return jsonify({"detail": "Ticket discussions are private between the author and administrators."}), 403
+
+    return jsonify({"ticket_id": ticket_id, "messages": target_ticket.get("messages", [])})
+
+@app.route("/api/tickets/<int:ticket_id>/messages", methods=["POST"])
+def add_ticket_message_api(ticket_id):
     ip = request.remote_addr or "unknown"
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         ip = forwarded.split(",")[0].strip()
 
     if is_ip_banned(ip):
-        return jsonify({"detail": "Your IP is banned from submitting feedback."}), 403
+        return jsonify({"detail": "Your IP is banned from participating in ticket discussions."}), 403
     
     try:
         req_json = request.get_json() or {}
-        payload = SuggestionPayload(**req_json)
+        payload = TicketMessagePayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target_ticket = None
+    for s in suggestions:
+        if s.get("id") == ticket_id:
+            target_ticket = s
+            break
+
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    is_admin = bool(session.get("admin_logged_in"))
+    discord_user = session.get("discord_user") or {}
+    user_discord_id = str(discord_user.get("id") or "")
+    ticket_discord_id = str(target_ticket.get("discord_id") or "")
+
+    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id and not target_ticket.get("anonymous"))
+
+    if not is_admin and not is_author:
+        return jsonify({"detail": "Only the ticket author and administrators can post messages in this discussion."}), 403
+
+    msg_text = payload.message.strip()
+    if not msg_text:
+        return jsonify({"detail": "Message content cannot be empty."}), 400
+
+    messages = target_ticket.setdefault("messages", [])
+    new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
+
+    if is_admin:
+        admin_name = session.get("username") or "Administrator"
+        admin_d_id = session.get("discord_id") or ""
+        if not admin_d_id:
+            if is_root_user(admin_name):
+                r_ids = get_root_discord_ids()
+                if r_ids:
+                    admin_d_id = r_ids[0]
+            if not admin_d_id:
+                admins_data = load_admins()
+                for k, v in admins_data.get("admins", {}).items():
+                    if v.get("username") == admin_name or k == admin_name:
+                        admin_d_id = v.get("discord_id") or (k if k.isdigit() else "")
+                        break
+        admin_avatar = discord_user.get("avatar_url") if discord_user else None
+        msg_obj = {
+            "id": new_msg_id,
+            "sender_type": "admin",
+            "sender_name": admin_name,
+            "sender_discord_id": admin_d_id,
+            "sender_avatar": admin_avatar,
+            "message": msg_text,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    else:
+        author_name = discord_user.get("global_name") or discord_user.get("username") or "Author"
+        msg_obj = {
+            "id": new_msg_id,
+            "sender_type": "author",
+            "sender_name": author_name,
+            "sender_discord_id": user_discord_id,
+            "sender_avatar": discord_user.get("avatar_url"),
+            "message": msg_text,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    messages.append(msg_obj)
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    broadcast_ticket_update(
+        ticket_id,
+        msg_obj,
+        messages,
+        target_ticket.get("discord_id"),
+        target_ticket.get("anonymous")
+    )
+
+    discord_channel_id = target_ticket.get("discord_channel_id")
+    if discord_channel_id and disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
+        def _fwd_to_discord(ch_id, m_text, s_name, is_adm, current_msg_id):
+            sender_label = "Administrator" if is_adm else "Ticket Author"
+            content = f"**[{sender_label}] {s_name}**:\n{m_text}"
+            async def _send_fwd_async():
+                channel = disnake_bot.get_channel(int(ch_id))
+                if not channel:
+                    channel = await disnake_bot.fetch_channel(int(ch_id))
+                sent = await channel.send(content=content)
+                return str(sent.id)
+            try:
+                fut = asyncio.run_coroutine_threadsafe(_send_fwd_async(), disnake_bot_loop)
+                d_id = fut.result(timeout=8)
+                if d_id:
+                    d = load_suggestions()
+                    for s in d.get("suggestions", []):
+                        if s.get("id") == ticket_id:
+                            for m in s.get("messages", []):
+                                if m.get("id") == current_msg_id:
+                                    m["discord_message_id"] = d_id
+                                    break
+                            break
+                    save_suggestions(d)
+            except Exception as ex:
+                logger.warning(f"[Disnake Forward] Failed to forward message to Discord: {ex}")
+
+        threading.Thread(
+            target=_fwd_to_discord,
+            args=(discord_channel_id, msg_text, msg_obj.get("sender_name", "User"), is_admin, msg_obj.get("id")),
+            daemon=True
+        ).start()
+
+    return jsonify({
+        "message": "Reply posted successfully.",
+        "ticket_id": ticket_id,
+        "new_message": msg_obj,
+        "messages": messages
+    })
+
+def submit_suggestion():
+    return submit_ticket()
+
+def submit_ticket():
+    ip = request.remote_addr or "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+
+    if is_ip_banned(ip):
+        return jsonify({"detail": "Your IP is banned from submitting tickets."}), 403
+    
+    try:
+        req_json = request.get_json() or {}
+        payload = TicketPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
     
-    if not payload.suggestion.strip():
-        return jsonify({"detail": "Feedback details cannot be empty."}), 400
+    content = (payload.suggestion or payload.description or "").strip()
+    if not content:
+        return jsonify({"detail": "Ticket description/details cannot be empty."}), 400
     
     data = load_suggestions()
     suggestions = data.setdefault("suggestions", [])
     
     if ip != "unknown" and ip != "127.0.0.1":
         now = datetime.now(timezone.utc)
-        limit_period = timedelta(minutes=30)
+        limit_period = timedelta(minutes=15)
         for s in suggestions:
             if s.get("ip") == ip:
                 try:
@@ -2530,26 +2904,51 @@ def submit_suggestion():
     else:
         target_val = "overlay"
     
+    ticket_type = "bug_report" if payload.type in ["bug_report", "bug", "issue"] else "suggestion"
+    initial_status = "open" if ticket_type == "bug_report" else "pending"
+
     new_sug = {
         "id": new_id,
+        "type": ticket_type,
+        "title": payload.title.strip() if payload.title else "",
         "name": name,
-        "suggestion": payload.suggestion.strip(),
+        "suggestion": content,
+        "description": content,
         "ip": ip,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": "pending",
+        "status": initial_status,
         "target": target_val,
         "is_server_checker": target_val == "server_checker",
         "anonymous": is_anon,
-        "discord_id": discord_id,
+        "discord_id": str(discord_id) if discord_id else None,
         "discord_username": discord_username,
         "discord_avatar": discord_avatar,
-        "hidden": False
+        "hidden": False,
+        "messages": [],
+        "discord_channel_id": None
     }
     suggestions.append(new_sug)
     save_suggestions(data)
     broadcast_update("dashboard")
-    notify_admins_on_new_suggestion(new_sug)
-    return jsonify({"message": "Feedback submitted successfully.", "id": new_id})
+
+    def _create_channel_task(t_copy):
+        ch_id = create_discord_ticket_channel(t_copy)
+        if ch_id:
+            d = load_suggestions()
+            for s in d.get("suggestions", []):
+                if s.get("id") == t_copy.get("id"):
+                    s["discord_channel_id"] = ch_id
+                    break
+            save_suggestions(d)
+            broadcast_update("dashboard")
+
+    threading.Thread(target=_create_channel_task, args=(dict(new_sug),), daemon=True).start()
+
+    return jsonify({
+        "message": f"{'Bug report' if ticket_type == 'bug_report' else 'Suggestion'} submitted successfully.",
+        "id": new_id,
+        "type": ticket_type
+    })
 
 @app.route("/crashes", methods=["POST"])
 def submit_crash():
@@ -2641,11 +3040,12 @@ def delete_crash(username):
 
     return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
 
+@app.route("/admin/tickets/status", methods=["POST"])
 @app.route("/admin/suggestions/status", methods=["POST"])
 @admin_required
 def update_suggestion_status(username):
     if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions section"}), 403
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = StatusUpdatePayload(**req_json)
@@ -2660,13 +3060,14 @@ def update_suggestion_status(username):
             save_suggestions(data)
             broadcast_update("dashboard")
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
-    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+    return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
+@app.route("/admin/tickets/comment", methods=["POST"])
 @app.route("/admin/suggestions/comment", methods=["POST"])
 @admin_required
 def update_suggestion_comment(username):
     if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions section"}), 403
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = CommentPayload(**req_json)
@@ -2683,13 +3084,14 @@ def update_suggestion_comment(username):
             save_suggestions(data)
             broadcast_update("dashboard")
             return jsonify({"message": "Admin comment saved successfully.", "id": payload.id, "comment": payload.comment.strip(), "comment_by": username})
-    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+    return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
+@app.route("/admin/tickets/visibility", methods=["POST"])
 @app.route("/admin/suggestions/visibility", methods=["POST"])
 @admin_required
 def update_suggestion_visibility(username):
     if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions section"}), 403
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = VisibilitySuggestionPayload(**req_json)
@@ -2703,14 +3105,15 @@ def update_suggestion_visibility(username):
             s["hidden"] = payload.hidden
             save_suggestions(data)
             broadcast_update("dashboard")
-            return jsonify({"message": f"Suggestion #{payload.id} visibility updated.", "id": payload.id, "hidden": payload.hidden})
-    return jsonify({"detail": f"Feedback/suggestion with ID {payload.id} not found."}), 404
+            return jsonify({"message": f"Ticket #{payload.id} visibility updated.", "id": payload.id, "hidden": payload.hidden})
+    return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
+@app.route("/admin/tickets/delete", methods=["POST"])
 @app.route("/admin/suggestions/delete", methods=["POST"])
 @admin_required
 def delete_suggestion(username):
     if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions section"}), 403
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
         payload = DeleteSuggestionPayload(**req_json)
@@ -2725,10 +3128,11 @@ def delete_suggestion(username):
     if len(data["suggestions"]) < initial_len:
         save_suggestions(data)
         broadcast_update("dashboard")
-        return jsonify({"message": f"Suggestion #{payload.id} deleted successfully.", "id": payload.id})
+        return jsonify({"message": f"Ticket #{payload.id} deleted successfully.", "id": payload.id})
 
-    return jsonify({"detail": f"Suggestion with ID {payload.id} not found."}), 404
+    return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
+@app.route("/admin/tickets/ban", methods=["POST"])
 @app.route("/admin/suggestions/ban", methods=["POST"])
 @admin_required
 def ban_ip(username):
@@ -2761,6 +3165,7 @@ def ban_ip(username):
     broadcast_update("dashboard")
     return jsonify({"message": f"IP {ip_to_ban} has been banned.", "ip": ip_to_ban})
 
+@app.route("/admin/tickets/unban", methods=["POST"])
 @app.route("/admin/suggestions/unban", methods=["POST"])
 @admin_required
 def unban_ip(username):
@@ -2781,6 +3186,7 @@ def unban_ip(username):
         return jsonify({"message": f"IP {payload.ip} unbanned successfully.", "ip": payload.ip})
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
 
+@app.route("/admin/tickets", methods=["GET"])
 @app.route("/admin/suggestions", methods=["GET"])
 @admin_required
 def view_suggestions_dashboard(username):
@@ -3092,64 +3498,28 @@ def save_notifier_api(username):
 @app.route("/api/admin/notifier/test", methods=["POST"])
 @admin_required
 def test_notifier_api(username):
-    if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions"}), 403
-    
-    discord_id = session.get("discord_id")
-    if not discord_id:
-        admins_data = load_admins()
-        for k, v in admins_data.get("admins", {}).items():
-            if k == username or v.get("username") == username:
-                discord_id = v.get("discord_id") or (k if k.isdigit() else "")
-                break
-    
-    if not discord_id:
-        root_ids = get_root_discord_ids()
-        if root_ids:
-            discord_id = root_ids[0]
-
-    if not discord_id:
-        return jsonify({
-            "success": False,
-            "detail": "No Discord ID associated with your session. Please log in with Discord or configure ROOT_DISCORD_ID."
-        }), 400
-    
-    test_embed = {
-        "title": "🧪 RBWR Notifier - Test Notification",
-        "description": "Your Discord DM notifier is successfully configured! You will receive notifications here whenever new suggestions matching your subscribed categories are submitted.",
-        "color": 0x3B82F6,
-        "fields": [
-            {"name": "Admin Recipient", "value": f"<@{discord_id}>", "inline": True},
-            {"name": "Status", "value": "✅ Operational", "inline": True}
-        ],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "footer": {"text": "RBWR APRM Calculator Admin Notifier"}
-    }
-    
-    success, msg = send_discord_dm(discord_id, test_embed)
-    if success:
-        return jsonify({"success": True, "message": "Test DM sent successfully! Check your Discord direct messages."})
-    else:
-        return jsonify({"success": False, "detail": f"Failed to send test DM: {msg}"}), 400
+    return jsonify({
+        "success": True,
+        "message": "Direct DMs have been retired in favor of automated Discord ticket channels under category 1547529007334162432."
+    })
 
 @app.route("/auth/discord/login", methods=["GET"])
 def discord_login():
     client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
-    next_url = request.args.get("next") or request.referrer or "/suggestions"
+    next_url = request.args.get("next") or request.referrer or "/tickets"
     if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
-        next_url = "/suggestions"
+        next_url = "/tickets"
         
     if not client_id:
         if next_url.startswith("/admin"):
             return render_template("admin_login.html", error="Discord OAuth2 is not configured on the server yet (DISCORD_CLIENT_ID missing in .env).", next_url=next_url), 500
-        return render_template("suggestions.html", suggestions=get_public_suggestions(), error="Discord OAuth2 is not configured on the server yet (DISCORD_CLIENT_ID missing in .env)."), 500
+        return render_template("tickets.html", tickets=get_public_tickets(), error="Discord OAuth2 is not configured on the server yet (DISCORD_CLIENT_ID missing in .env)."), 500
 
     state = secrets.token_hex(16)
     session["oauth_state"] = state
     session["oauth_next"] = next_url
     
     redirect_uri = get_discord_redirect_uri(request)
-    from urllib.parse import urlencode
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
@@ -3166,22 +3536,22 @@ def discord_callback():
     error_code = request.args.get("error")
     if error_code:
         err_desc = request.args.get("error_description") or "Authorization was cancelled or denied by Discord."
-        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        next_dest = session.pop("oauth_next", None) or "/tickets"
         if next_dest.startswith("/admin"):
             return redirect(f"/admin/login?error={quote(err_desc)}")
-        return redirect(f"/suggestions?error={quote(err_desc)}")
+        return redirect(f"/tickets?error={quote(err_desc)}")
 
     state = request.args.get("state")
     saved_state = session.pop("oauth_state", None)
     if not state or state != saved_state:
-        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        next_dest = session.pop("oauth_next", None) or "/tickets"
         if next_dest.startswith("/admin"):
             return redirect(f"/admin/login?error={quote('OAuth state verification failed. Please try logging in again.')}")
-        return redirect(f"/suggestions?error={quote('OAuth state verification failed. Please try logging in again.')}")
+        return redirect(f"/tickets?error={quote('OAuth state verification failed. Please try logging in again.')}")
 
     code = request.args.get("code")
     if not code:
-        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        next_dest = session.pop("oauth_next", None) or "/tickets"
         return redirect(f"{next_dest}?error={quote('Missing authorization code from Discord.')}")
 
     client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
@@ -3203,15 +3573,15 @@ def discord_callback():
         token_res = requests.post(DISCORD_OAUTH_TOKEN_URL, data=token_payload, headers=headers, timeout=10)
         if token_res.status_code != 200:
             logger.warning(f"[Discord OAuth] Token exchange failed: {token_res.status_code} {token_res.text}")
-            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            next_dest = session.pop("oauth_next", None) or "/tickets"
             if next_dest.startswith("/admin"):
                 return redirect(f"/admin/login?error={quote('Discord token exchange failed. Please verify credentials in .env.')}")
-            return redirect(f"/suggestions?error={quote('Failed to authenticate with Discord.')}")
+            return redirect(f"/tickets?error={quote('Failed to authenticate with Discord.')}")
 
         token_data = token_res.json()
         access_token = token_data.get("access_token")
         if not access_token:
-            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            next_dest = session.pop("oauth_next", None) or "/tickets"
             return redirect(f"{next_dest}?error={quote('No access token received from Discord.')}")
 
         user_res = requests.get(
@@ -3220,7 +3590,7 @@ def discord_callback():
             timeout=10
         )
         if user_res.status_code != 200:
-            next_dest = session.pop("oauth_next", None) or "/suggestions"
+            next_dest = session.pop("oauth_next", None) or "/tickets"
             return redirect(f"{next_dest}?error={quote('Failed to fetch Discord user profile.')}")
 
         user_data = user_res.json()
@@ -3239,9 +3609,9 @@ def discord_callback():
         }
         session["discord_user"] = discord_user_obj
 
-        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        next_dest = session.pop("oauth_next", None) or "/tickets"
         if not next_dest.startswith("/") or next_dest.startswith("//") or next_dest.startswith("/\\"):
-            next_dest = "/suggestions"
+            next_dest = "/tickets"
 
         root_ids = get_root_discord_ids()
         is_root = (d_id in root_ids)
@@ -3274,7 +3644,7 @@ def discord_callback():
 
     except Exception as e:
         logger.error(f"[Discord OAuth] Exception during callback: {e}", exc_info=True)
-        next_dest = session.pop("oauth_next", None) or "/suggestions"
+        next_dest = session.pop("oauth_next", None) or "/tickets"
         return redirect(f"{next_dest}?error={quote(f'Internal OAuth error: {str(e)}')}")
 
 @app.route("/auth/discord/logout", methods=["GET"])
@@ -3284,9 +3654,9 @@ def discord_logout():
     session.pop("discord_id", None)
     session.pop("username", None)
     session.pop("is_root", None)
-    next_url = request.args.get("next") or request.referrer or "/suggestions"
+    next_url = request.args.get("next") or request.referrer or "/tickets"
     if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
-        next_url = "/suggestions"
+        next_url = "/tickets"
     return redirect(next_url)
 
 @app.route("/api/auth/me", methods=["GET"])

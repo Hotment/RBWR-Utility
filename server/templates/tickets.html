@@ -1,0 +1,1209 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Tickets & Feedback{% endblock %}
+
+{% block content %}
+<main class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
+        <div class="flex flex-col gap-1.5 max-w-2xl">
+            <div class="flex items-center gap-2">
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                    Community Portal
+                </span>
+                <span class="text-xs text-gray-500 font-mono">&bull; Suggestions & Bug Reports</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-display font-semibold tracking-tight text-white">
+                Tickets & Backlog
+            </h1>
+            <p class="text-gray-400 text-sm leading-relaxed">
+                Browse user proposals, report bugs, track resolution progress, or discuss features directly with
+                developers.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0 flex-wrap">
+            {% if discord_user %}
+            <div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25">
+                <img src="{{ discord_user.avatar_url }}" alt="Avatar"
+                    class="w-6 h-6 rounded-full border border-white/10 shrink-0">
+                <div class="flex flex-col">
+                    <span class="text-xs font-medium text-white">{{ discord_user.global_name }}</span>
+                    <span class="text-[10px] text-gray-400 font-mono">@{{ discord_user.username }}</span>
+                </div>
+                <a href="/auth/discord/logout?next=/tickets"
+                    class="text-[10px] text-gray-400 hover:text-rose-400 font-mono underline ml-1.5">Sign Out</a>
+            </div>
+            {% else %}
+            <a href="/auth/discord/login?next=/tickets"
+                class="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/20 text-xs tracking-wide shrink-0 whitespace-nowrap">
+                <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                </svg>
+                Log in with Discord
+            </a>
+            {% endif %}
+
+            <a href="#submit-section"
+                class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 text-xs tracking-wide shrink-0 whitespace-nowrap">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+                </svg>
+                Create New Ticket
+            </a>
+        </div>
+    </div>
+
+    <div
+        class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2">
+            <span>Need to send a confidential message, security vulnerability, or data deletion request?</span>
+        </div>
+        <a href="/contact"
+            class="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 rounded-lg font-medium transition shrink-0 text-xs whitespace-nowrap">
+            Private Contact Form &rarr;
+        </a>
+    </div>
+
+    <div id="url-error-banner"
+        class="hidden p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-gray-500 whitespace-nowrap">Total
+                Tickets</span>
+            <span id="stat-total" class="text-xl font-bold font-display text-white">0</span>
+        </div>
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span
+                class="text-[10px] font-mono uppercase tracking-wider text-blue-400 whitespace-nowrap">Suggestions</span>
+            <span id="stat-suggestions" class="text-xl font-bold font-display text-blue-400">0</span>
+        </div>
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-rose-400 whitespace-nowrap">Bug
+                Reports</span>
+            <span id="stat-bugs" class="text-xl font-bold font-display text-rose-400">0</span>
+        </div>
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80 whitespace-nowrap">Pending /
+                Open</span>
+            <span id="stat-pending" class="text-xl font-bold font-display text-amber-400">0</span>
+        </div>
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span
+                class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">Investigating</span>
+            <span id="stat-considering" class="text-xl font-bold font-display text-indigo-400">0</span>
+        </div>
+        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
+            <span
+                class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80 whitespace-nowrap">Resolved</span>
+            <span id="stat-accepted" class="text-xl font-bold font-display text-emerald-400">0</span>
+        </div>
+    </div>
+
+    <div
+        class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/5 pb-2">
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 fluid-nav-mobile">
+            <button onclick="switchTypeTab('suggestion')" id="tab-type-suggestion"
+                class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-blue-600 text-white whitespace-nowrap">
+                <span>Suggestions</span>
+                <span id="badge-count-suggestions"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">0</span>
+            </button>
+            <button onclick="switchTypeTab('bug_report')" id="tab-type-bug_report"
+                class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+                <span>Bug Reports</span>
+                <span id="badge-count-bugs"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/10 text-gray-300 font-mono">0</span>
+            </button>
+            <button onclick="switchTypeTab('all')" id="tab-type-all"
+                class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+                <span>All Tickets</span>
+                <span id="badge-count-all"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/10 text-gray-300 font-mono">0</span>
+            </button>
+            {% if discord_user %}
+            <button onclick="switchTypeTab('my_tickets')" id="tab-type-my_tickets"
+                class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-[#5865F2] hover:bg-[#5865F2]/10 whitespace-nowrap">
+                <span>My Tickets</span>
+                <span id="badge-count-my"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] bg-[#5865F2]/20 text-[#5865F2] font-mono">0</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="text-xs font-mono text-gray-500 flex items-center gap-2 shrink-0">
+            <span id="feed-results-count">Showing 0 tickets</span>
+        </div>
+    </div>
+
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="premium-glass p-1 rounded-xl flex flex-wrap gap-1 text-xs font-medium border border-white/5">
+                <button onclick="filterStatus('all')" id="tab-status-all"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All
+                    Status</button>
+                <button onclick="filterStatus('pending')" id="tab-status-pending"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending
+                    / Open</button>
+                <button onclick="filterStatus('considering')" id="tab-status-considering"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
+                <button onclick="filterStatus('accepted')" id="tab-status-accepted"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted
+                    / Resolved</button>
+                <button onclick="filterStatus('declined')" id="tab-status-declined"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined
+                    / Closed</button>
+            </div>
+
+            <div class="relative shrink-0 min-w-[150px]">
+                <select id="category-select" onchange="handleCategoryChange()"
+                    class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
+                    <option value="all">All Categories</option>
+                    <option value="overlay">APRM Overlay</option>
+                    <option value="point_graph">Point History Graph</option>
+                    <option value="server_checker">Server Checker</option>
+                    <option value="general">General</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+            <div class="relative flex-1 sm:w-64 min-w-0">
+                <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
+                </svg>
+                <input type="text" id="search-input" oninput="handleSearch()"
+                    placeholder="Search title, content, author..."
+                    class="premium-input pl-9 pr-4 py-1.5 rounded-xl text-xs w-full font-mono outline-none">
+            </div>
+
+            <div class="relative shrink-0 min-w-[140px]">
+                <select id="sort-select" onchange="handleSortChange()"
+                    class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
+                    <option value="desc">Newest First</option>
+                    <option value="asc">Oldest First</option>
+                    <option value="replies">Most Replies</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tickets-feed" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+    <div id="empty-state"
+        class="hidden text-center py-16 flex flex-col items-center gap-3 border border-white/5 rounded-2xl bg-surface/50">
+        <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
+        </svg>
+        <p class="text-sm text-gray-400 font-mono">No tickets found matching the current filters.</p>
+    </div>
+
+    <div id="submit-section" class="mt-4 border-t border-white/5 pt-6 flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+            <h2 class="text-xl font-display font-semibold text-white">Create a New Ticket</h2>
+            <p class="text-xs text-gray-400">Submit a feature idea or report a bug directly to our project backlog.</p>
+        </div>
+
+        <div class="premium-glass p-4 sm:p-5 md:p-6 rounded-2xl border border-white/5">
+            <form id="public-ticket-form" class="flex flex-col gap-4">
+                {% if discord_user %}
+                <div
+                    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-lg shadow-[#5865F2]/5">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                        <img src="{{ discord_user.avatar_url }}" alt="Discord Avatar"
+                            class="w-10 h-10 rounded-full border border-[#5865F2]/40 shadow-md shrink-0">
+                        <div class="flex flex-col gap-0.5 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-mono font-semibold text-gray-300">Submitting as:</span>
+                                <span class="text-sm font-bold text-white tracking-wide truncate">{{
+                                    discord_user.global_name }}</span>
+                                <span
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30 text-[10px] font-mono rounded font-semibold shrink-0">
+                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                                        <path
+                                            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                                    </svg>
+                                    Verified Discord
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 text-[11px] text-gray-400">
+                                <span>@{{ discord_user.username }}</span>
+                                <span>&bull;</span>
+                                <span class="text-emerald-400 font-mono">Two-way admin chat enabled</span>
+                                <span>&bull;</span>
+                                <a href="/auth/discord/logout?next=/tickets"
+                                    class="text-rose-400 hover:text-rose-300 underline font-mono text-[10px]">Sign
+                                    out</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center shrink-0">
+                        <label
+                            class="flex items-center gap-2.5 cursor-pointer group text-xs font-medium text-gray-300 hover:text-white transition-colors bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 rounded-xl border border-white/10"
+                            title="Hide your name publicly while preserving your ability to chat with admins">
+                            <input type="checkbox" id="submit-anonymous" class="premium-checkbox">
+                            <span>Submit as Anonymous (Hide username publicly)</span>
+                        </label>
+                    </div>
+                </div>
+                {% else %}
+                <div
+                    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-lg shadow-[#5865F2]/5">
+                    <div class="flex items-center gap-3.5">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8"
+                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-semibold text-gray-300">Identity:</span>
+                                <span
+                                    class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-white/10 text-gray-200 border border-white/15 uppercase">Guest
+                                    / Anonymous</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 leading-snug">
+                                Sign in with Discord to enable <strong class="text-white">two-way chat</strong> with
+                                developers on this ticket.
+                            </p>
+                        </div>
+                    </div>
+
+                    <a href="/auth/discord/login?next=/tickets"
+                        class="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/25 text-xs tracking-wide shrink-0 whitespace-nowrap">
+                        <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                        </svg>
+                        Log in with Discord
+                    </a>
+                </div>
+                {% endif %}
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-gray-400">Ticket Type</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                        <label
+                            class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-blue-500/40 cursor-pointer transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10">
+                            <input type="radio" name="submit-type" value="suggestion" checked
+                                onchange="updateFormPlaceholders()" class="premium-checkbox accent-blue-500">
+                            <div class="flex flex-col">
+                                <span class="text-white font-bold flex items-center gap-1.5">
+                                    <span>Feature Suggestion</span>
+                                </span>
+                                <span class="text-[11px] text-gray-400 font-sans">Propose a new feature, UX improvement,
+                                    or enhancement idea.</span>
+                            </div>
+                        </label>
+
+                        <label
+                            class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-rose-500/40 cursor-pointer transition has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10">
+                            <input type="radio" name="submit-type" value="bug_report"
+                                onchange="updateFormPlaceholders()" class="premium-checkbox accent-rose-500">
+                            <div class="flex flex-col">
+                                <span class="text-white font-bold flex items-center gap-1.5">
+                                    <span>Bug Report</span>
+                                </span>
+                                <span class="text-[11px] text-gray-400 font-sans">Report a defect, calculation
+                                    inaccuracy, crash, or unexpected behavior.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-gray-400">Target Project / Category</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs font-mono">
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-blue-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="overlay" checked
+                                class="premium-checkbox accent-blue-500">
+                            <span class="inline-flex items-center text-blue-300 font-medium whitespace-nowrap">
+                                APRM Overlay
+                            </span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-emerald-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="point_graph"
+                                class="premium-checkbox accent-emerald-500">
+                            <span class="inline-flex items-center text-emerald-300 font-medium whitespace-nowrap">
+                                Point History Graph
+                            </span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-amber-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="server_checker"
+                                class="premium-checkbox accent-amber-500">
+                            <span class="inline-flex items-center text-amber-300 font-medium whitespace-nowrap">
+                                Server Checker
+                            </span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-purple-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="general"
+                                class="premium-checkbox accent-purple-500">
+                            <span class="inline-flex items-center text-purple-300 font-medium whitespace-nowrap">
+                                General
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label for="submit-title" class="text-xs font-medium text-gray-400">
+                        Ticket Title / Short Summary <span class="text-gray-500 font-mono">(Optional)</span>
+                    </label>
+                    <input type="text" id="submit-title"
+                        placeholder="e.g. Add dark mode graph toggle or APRM reading mismatch on unit 2"
+                        class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
+                </div>
+
+                <div class="flex flex-col gap-1.5 group">
+                    <label for="submit-description" id="label-submit-description"
+                        class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">
+                        Ticket Details
+                    </label>
+                    <textarea id="submit-description" required rows="4"
+                        placeholder="Describe your suggestion or feature idea..."
+                        class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono resize-none"></textarea>
+                </div>
+
+                <div id="submit-form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
+
+                <div class="flex justify-end">
+                    <button type="submit" id="submit-form-btn"
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-xs tracking-wide shadow-lg shadow-blue-500/10 whitespace-nowrap">
+                        Submit Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const LOGGED_IN_DISCORD_USER = {{ discord_user | tojson | safe }};
+    const IS_ADMIN = {{ is_admin | tojson | safe }};
+    let allTickets = {{ tickets | tojson | safe }};
+
+    let currentTypeFilter = 'suggestion';
+    let currentStatusFilter = 'all';
+    let currentCategoryFilter = 'all';
+    let searchQuery = '';
+    let sortOrder = 'desc';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        const tabParam = urlParams.get('tab') || urlParams.get('type');
+        if (tabParam) {
+            if (['bugs', 'bug', 'bug_report', 'bug_reports'].includes(tabParam.toLowerCase())) {
+                currentTypeFilter = 'bug_report';
+            } else if (['all', 'all_tickets'].includes(tabParam.toLowerCase())) {
+                currentTypeFilter = 'all';
+            } else if (['my', 'my_tickets'].includes(tabParam.toLowerCase()) && LOGGED_IN_DISCORD_USER) {
+                currentTypeFilter = 'my_tickets';
+            } else {
+                currentTypeFilter = 'suggestion';
+            }
+        }
+
+        const searchParam = urlParams.get('q') || urlParams.get('search');
+        if (searchParam) {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.value = searchParam;
+                searchQuery = searchParam.toLowerCase().trim();
+            }
+        }
+
+        const errorParam = urlParams.get('error');
+        if (errorParam) {
+            const errorBanner = document.getElementById('url-error-banner');
+            if (errorBanner) {
+                errorBanner.innerText = `Discord Notice: ${errorParam}`;
+                errorBanner.classList.remove('hidden');
+            }
+        }
+
+        updateTypeTabsUI();
+        updateStats();
+        renderTickets();
+        initTicketWebSocket();
+
+        const ticketForm = document.getElementById('public-ticket-form');
+        if (ticketForm) {
+            ticketForm.addEventListener('submit', handleFormSubmit);
+        }
+    });
+
+    function updateFormPlaceholders() {
+        const typeRadio = document.querySelector('input[name="submit-type"]:checked');
+        const isBug = typeRadio && typeRadio.value === 'bug_report';
+        const label = document.getElementById('label-submit-description');
+        const textarea = document.getElementById('submit-description');
+        const submitBtn = document.getElementById('submit-form-btn');
+        const titleInput = document.getElementById('submit-title');
+
+        if (isBug) {
+            if (label) label.innerText = 'Bug Description & Steps to Reproduce';
+            if (textarea) textarea.placeholder = '1. Steps to reproduce the bug\n2. What happened vs what you expected\n3. Any relevant server error messages...';
+            if (titleInput) titleInput.placeholder = 'e.g. Core thermal multiplier spikes unexpectedly at 45% APRM';
+            if (submitBtn) submitBtn.innerText = 'Submit Bug Report';
+        } else {
+            if (label) label.innerText = 'Suggestion Details';
+            if (textarea) textarea.placeholder = 'Describe your feature idea, proposed workflow improvement, or enhancement...';
+            if (titleInput) titleInput.placeholder = 'e.g. Add quick snapshot export for operator tablet';
+            if (submitBtn) submitBtn.innerText = 'Submit Suggestion';
+        }
+    }
+
+    function switchTypeTab(type) {
+        currentTypeFilter = type;
+        updateTypeTabsUI();
+        renderTickets();
+    }
+
+    function updateTypeTabsUI() {
+        const tabs = ['suggestion', 'bug_report', 'all', 'my_tickets'];
+        tabs.forEach(t => {
+            const tabBtn = document.getElementById(`tab-type-${t}`);
+            if (!tabBtn) return;
+            if (t === currentTypeFilter) {
+                if (t === 'bug_report') {
+                    tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-rose-600 text-white whitespace-nowrap shadow-md";
+                } else if (t === 'my_tickets') {
+                    tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-[#5865F2] text-white whitespace-nowrap shadow-md";
+                } else {
+                    tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-blue-600 text-white whitespace-nowrap shadow-md";
+                }
+            } else {
+                tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
+            }
+        });
+    }
+
+    function updateStats() {
+        const total = allTickets.length;
+        const suggestions = allTickets.filter(t => (t.type || 'suggestion') === 'suggestion');
+        const bugs = allTickets.filter(t => (t.type || '') === 'bug_report');
+        const pending = allTickets.filter(t => ['pending', 'open'].includes((t.status || 'pending').toLowerCase()));
+        const considering = allTickets.filter(t => ['considering', 'investigating', 'in-progress'].includes((t.status || '').toLowerCase()));
+        const accepted = allTickets.filter(t => ['accepted', 'resolved', 'completed'].includes((t.status || '').toLowerCase()));
+
+        document.getElementById('stat-total').innerText = total;
+        document.getElementById('stat-suggestions').innerText = suggestions.length;
+        document.getElementById('stat-bugs').innerText = bugs.length;
+        document.getElementById('stat-pending').innerText = pending.length;
+        document.getElementById('stat-considering').innerText = considering.length;
+        document.getElementById('stat-accepted').innerText = accepted.length;
+
+        const badgeAll = document.getElementById('badge-count-all');
+        if (badgeAll) badgeAll.innerText = total;
+
+        const badgeSug = document.getElementById('badge-count-suggestions');
+        if (badgeSug) badgeSug.innerText = suggestions.length;
+
+        const badgeBugs = document.getElementById('badge-count-bugs');
+        if (badgeBugs) badgeBugs.innerText = bugs.length;
+
+        if (LOGGED_IN_DISCORD_USER) {
+            const myCount = allTickets.filter(t => String(t.discord_id) === String(LOGGED_IN_DISCORD_USER.id)).length;
+            const badgeMy = document.getElementById('badge-count-my');
+            if (badgeMy) badgeMy.innerText = myCount;
+        }
+    }
+
+    function filterStatus(status) {
+        currentStatusFilter = status;
+        const statuses = ['all', 'pending', 'considering', 'accepted', 'declined'];
+        statuses.forEach(s => {
+            const btn = document.getElementById(`tab-status-${s}`);
+            if (!btn) return;
+            if (s === status) {
+                btn.className = "px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white whitespace-nowrap";
+            } else {
+                btn.className = "px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
+            }
+        });
+        renderTickets();
+    }
+
+    function handleCategoryChange() {
+        currentCategoryFilter = document.getElementById('category-select').value;
+        renderTickets();
+    }
+
+    function handleSearch() {
+        searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+        renderTickets();
+    }
+
+    function handleSortChange() {
+        sortOrder = document.getElementById('sort-select').value;
+        renderTickets();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.innerText = text;
+        return div.innerHTML;
+    }
+
+    function formatTimestamp(isoStr) {
+        if (!isoStr) return 'Just now';
+        try {
+            const date = new Date(isoStr);
+            if (isNaN(date.getTime())) return 'Recently';
+            return date.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return 'Recently';
+        }
+    }
+
+    function getStatusBadge(status, type) {
+        const s = (status || 'pending').toLowerCase();
+        const isBug = type === 'bug_report';
+
+        if (['accepted', 'resolved', 'completed'].includes(s)) {
+            const label = isBug ? 'Resolved' : 'Accepted';
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${label}</span>`;
+        }
+        if (['considering', 'investigating', 'in-progress'].includes(s)) {
+            const label = isBug ? 'Investigating' : 'Considering';
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${label}</span>`;
+        }
+        if (['declined', 'closed', 'rejected'].includes(s)) {
+            const label = isBug ? 'Closed' : 'Declined';
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">${label}</span>`;
+        }
+        const label = isBug ? 'Open' : 'Pending';
+        return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">${label}</span>`;
+    }
+
+    function getTypeBadge(type) {
+        if (type === 'bug_report') {
+            return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">Bug Report</span>`;
+        }
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Suggestion</span>`;
+    }
+
+    function getCategoryBadge(target, isServerChecker) {
+        if (target === 'general') {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">General</span>`;
+        } else if (target === 'point_graph' || target === 'points_graph') {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Point History</span>`;
+        } else if (target === 'server_checker' || isServerChecker) {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">Server Checker</span>`;
+        }
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">APRM Overlay</span>`;
+    }
+
+    function renderTickets() {
+        const feed = document.getElementById('tickets-feed');
+        const emptyState = document.getElementById('empty-state');
+        const countDisplay = document.getElementById('feed-results-count');
+
+        let filtered = allTickets.filter(item => {
+            const itemType = item.type || 'suggestion';
+            const itemStatus = (item.status || 'pending').toLowerCase();
+            const itemTarget = (item.target === 'point_graph' || item.target === 'points_graph') ? 'point_graph' : (item.target === 'server_checker' || item.is_server_checker ? 'server_checker' : (item.target === 'general' ? 'general' : 'overlay'));
+
+            if (currentTypeFilter === 'suggestion' && itemType !== 'suggestion') return false;
+            if (currentTypeFilter === 'bug_report' && itemType !== 'bug_report') return false;
+            if (currentTypeFilter === 'my_tickets') {
+                if (!LOGGED_IN_DISCORD_USER || String(item.discord_id) !== String(LOGGED_IN_DISCORD_USER.id)) {
+                    return false;
+                }
+            }
+
+            if (currentStatusFilter !== 'all') {
+                if (currentStatusFilter === 'pending') {
+                    if (!['pending', 'open'].includes(itemStatus)) return false;
+                } else if (currentStatusFilter === 'considering') {
+                    if (!['considering', 'investigating', 'in-progress'].includes(itemStatus)) return false;
+                } else if (currentStatusFilter === 'accepted') {
+                    if (!['accepted', 'resolved', 'completed'].includes(itemStatus)) return false;
+                } else if (currentStatusFilter === 'declined') {
+                    if (!['declined', 'closed', 'rejected'].includes(itemStatus)) return false;
+                }
+            }
+
+            if (currentCategoryFilter !== 'all' && itemTarget !== currentCategoryFilter) {
+                return false;
+            }
+
+            if (searchQuery) {
+                const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
+                const descMatch = (item.suggestion || item.description || '').toLowerCase().includes(searchQuery);
+                const authorMatch = (item.name || item.discord_username || '').toLowerCase().includes(searchQuery);
+                const idMatch = String(item.id).includes(searchQuery);
+
+                let msgMatch = false;
+                if (Array.isArray(item.messages)) {
+                    msgMatch = item.messages.some(m => (m.message || '').toLowerCase().includes(searchQuery) || (m.sender_name || '').toLowerCase().includes(searchQuery));
+                }
+
+                if (!titleMatch && !descMatch && !authorMatch && !idMatch && !msgMatch) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        filtered.sort((a, b) => {
+            if (sortOrder === 'replies') {
+                const countA = (a.messages || []).length;
+                const countB = (b.messages || []).length;
+                return countB - countA;
+            }
+            const tA = new Date(a.timestamp || 0).getTime();
+            const tB = new Date(b.timestamp || 0).getTime();
+            return sortOrder === 'asc' ? tA - tB : tB - tA;
+        });
+
+        if (countDisplay) {
+            countDisplay.innerText = `Showing ${filtered.length} of ${allTickets.length} tickets`;
+        }
+
+        if (filtered.length === 0) {
+            feed.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        feed.innerHTML = filtered.map(item => {
+            const itemType = item.type || 'suggestion';
+            const isDiscord = Boolean(item.discord_id && !item.anonymous);
+            const avatarUrl = item.discord_avatar;
+            const displayName = escapeHtml(item.name || 'Anonymous');
+            const messages = Array.isArray(item.messages) ? item.messages : [];
+            const msgCount = messages.length;
+
+            const isAuthorLoggedIn = Boolean(
+                LOGGED_IN_DISCORD_USER &&
+                item.discord_id &&
+                String(LOGGED_IN_DISCORD_USER.id) === String(item.discord_id) &&
+                !item.anonymous
+            );
+            const canViewConversation = Boolean(IS_ADMIN || isAuthorLoggedIn);
+            const canReply = isAuthorLoggedIn || IS_ADMIN;
+            const hasChat = Boolean(item.discord_id && !item.anonymous);
+
+            const avatarBlock = (avatarUrl && !item.anonymous) ? `
+                <img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="w-8 h-8 rounded-full border border-white/10 shrink-0">
+            ` : `
+                <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono text-gray-300 font-bold shrink-0">
+                    ${displayName.charAt(0).toUpperCase()}
+                </div>
+            `;
+
+            const discordTag = isDiscord ? `
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 rounded text-[9px] font-mono font-semibold" title="Verified Discord Account">
+                    <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028z"/></svg>
+                    Discord
+                </span>
+            ` : (item.anonymous ? `
+                <span class="inline-flex items-center px-1.5 py-0.5 bg-white/5 text-gray-400 border border-white/10 rounded text-[9px] font-mono">
+                    Anonymous
+                </span>
+            ` : '');
+
+            const titleBlock = item.title ? `
+                <h3 class="text-sm font-bold text-white font-display tracking-wide">${escapeHtml(item.title)}</h3>
+            ` : '';
+
+            const legacyAdminResponseBlock = item.admin_comment ? `
+                <div class="bg-blue-500/10 border border-blue-500/20 p-3.5 rounded-xl flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between text-xs font-semibold text-blue-400">
+                        <span class="flex items-center gap-1.5 font-mono">
+                            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.95 2.68 3.22 1.24.22 2.5.34 3.79.34 1.29 0 2.55-.12 3.79-.34 1.56-.27 2.68-1.63 2.68-3.22V8.25A3.75 3.75 0 0012.75 4.5h-1.5a3.75 3.75 0 00-3.75 3.75v5.27h-.001z"></path>
+                            </svg>
+                            Developer Note (${escapeHtml(item.comment_by || 'Admin')})
+                        </span>
+                        <span class="text-[10px] text-gray-400 font-mono">${formatTimestamp(item.comment_timestamp)}</span>
+                    </div>
+                    <p class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap">${escapeHtml(item.admin_comment)}</p>
+                </div>
+            ` : '';
+
+            const messagesListHtml = messages.map(m => {
+                const isAdminMsg = m.sender_type === 'admin';
+                const senderTitle = isAdminMsg ? 'Administrator' : 'Author';
+                const cardBg = isAdminMsg ? 'bg-blue-950/20 border-blue-500/30' : 'bg-emerald-950/20 border-emerald-500/30';
+                const tagColor = isAdminMsg ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                const avatar = m.sender_avatar ? `
+                    <img src="${escapeHtml(m.sender_avatar)}" class="w-5 h-5 rounded-full border border-white/10 shrink-0" alt="">
+                ` : `
+                    <div class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold text-gray-300 font-mono shrink-0">
+                        ${escapeHtml(m.sender_name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                `;
+
+                return `
+                    <div class="flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg}">
+                        <div class="flex items-center justify-between gap-2 text-xs">
+                            <div class="flex items-center gap-2 min-w-0">
+                                ${avatar}
+                                <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(m.timestamp)}</span>
+                        </div>
+                        <p class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(m.message)}</p>
+                    </div>
+                `;
+            }).join('');
+
+            let composerHtml = '';
+            if (canReply) {
+                composerHtml = `
+                    <div class="flex flex-col gap-2 pt-2 border-t border-white/5">
+                        <label class="text-[10px] font-mono uppercase text-gray-400 font-bold flex items-center justify-between">
+                            <span>Post Private Reply</span>
+                            <span class="text-emerald-400">${isAuthorLoggedIn ? 'Signed in as Author' : 'Signed in as Admin'}</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <textarea id="reply-input-${item.id}" rows="2" placeholder="Write a private reply to developers..."
+                                class="premium-input px-3 py-2 rounded-xl text-xs font-mono resize-none w-full outline-none"></textarea>
+                        </div>
+                        <div class="flex justify-end items-center gap-2">
+                            <div id="reply-status-${item.id}" class="text-[10px] font-mono hidden"></div>
+                            <button onclick="submitTicketReply(${item.id})" id="reply-btn-${item.id}"
+                                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium font-mono transition flex items-center gap-1.5 shadow-md shadow-blue-500/10">
+                                <span>Send Reply</span>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let threadContainer = '';
+            if (canViewConversation) {
+                const isAuthor = isAuthorLoggedIn && !IS_ADMIN;
+                const roleBadge = isAuthor ? `
+                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Author View</span>
+                ` : `
+                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Admin View</span>
+                `;
+
+                threadContainer = `
+                    <div id="thread-section-${item.id}" class="flex flex-col gap-3 pt-3 border-t border-white/5">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-bold text-gray-200 flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                                    </svg>
+                                    <span>Private Discussion</span>
+                                    <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/10 text-white font-mono">${msgCount}</span>
+                                </span>
+                                ${roleBadge}
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-mono">Visible only to you and developers</span>
+                        </div>
+                        
+                        <div id="thread-messages-${item.id}" class="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+                            ${messagesListHtml.length > 0 ? messagesListHtml : '<p class="text-xs text-gray-500 font-mono italic py-2">No messages in this private discussion yet. Send a message below to chat with developers.</p>'}
+                        </div>
+
+                        ${composerHtml}
+                    </div>
+                `;
+            } else if (hasChat) {
+                if (!LOGGED_IN_DISCORD_USER) {
+                    threadContainer = `
+                        <div class="pt-3 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
+                            <div class="flex items-center gap-2 text-gray-400 font-mono text-[11px]">
+                                <svg class="w-3.5 h-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                                </svg>
+                                <span>Private developer discussion (Author only)</span>
+                            </div>
+                            <a href="/auth/discord/login?next=/tickets" class="px-2.5 py-1 bg-[#5865F2]/20 hover:bg-[#5865F2]/30 text-[#5865F2] border border-[#5865F2]/30 rounded-lg font-mono text-[10px] font-semibold transition shrink-0">
+                                Sign in as Author &rarr;
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    threadContainer = `
+                        <div class="pt-3 border-t border-white/5 flex items-center gap-2 p-3 rounded-xl bg-white/[0.015] border border-white/5 text-[11px] text-gray-500 font-mono">
+                            <svg class="w-3.5 h-3.5 text-gray-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                            </svg>
+                            <span>Private conversation between author and developers.</span>
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="premium-glass interactive-card p-6 rounded-2xl flex flex-col justify-between gap-4 border border-white/5">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                ${avatarBlock}
+                                <div class="flex flex-col gap-0.5 min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-sm font-semibold text-white tracking-wide truncate">${displayName}</span>
+                                        ${discordTag}
+                                        ${getTypeBadge(itemType)}
+                                        ${getCategoryBadge(item.target, item.is_server_checker)}
+                                    </div>
+                                    <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
+                                </div>
+                            </div>
+                            <div class="shrink-0">
+                                ${getStatusBadge(item.status, itemType)}
+                            </div>
+                        </div>
+
+                        ${titleBlock}
+
+                        <p class="text-sm text-gray-300 font-mono leading-relaxed bg-black/20 p-4 rounded-xl border border-white/5 whitespace-pre-wrap">${escapeHtml(item.suggestion || item.description)}</p>
+
+                        ${legacyAdminResponseBlock}
+
+                        ${threadContainer}
+                    </div>
+
+                    <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
+                        <span>Ticket ID: #${item.id}</span>
+                        <span>Category: ${(item.target || 'overlay').toUpperCase()}</span>
+                        <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+
+        const typeRadio = document.querySelector('input[name="submit-type"]:checked');
+        const selectedType = typeRadio ? typeRadio.value : 'suggestion';
+
+        const anonCheckbox = document.getElementById('submit-anonymous');
+        const targetRadio = document.querySelector('input[name="submit-target"]:checked');
+        const selectedTarget = targetRadio ? targetRadio.value : "overlay";
+        const titleInput = document.getElementById('submit-title');
+        const descInput = document.getElementById('submit-description');
+        const statusDiv = document.getElementById('submit-form-status');
+        const submitBtn = document.getElementById('submit-form-btn');
+
+        const isAnon = anonCheckbox ? anonCheckbox.checked : false;
+
+        const payload = {
+            type: selectedType,
+            title: titleInput ? titleInput.value.trim() : '',
+            description: descInput.value.trim(),
+            suggestion: descInput.value.trim(),
+            anonymous: isAnon,
+            target: selectedTarget,
+            is_server_checker: selectedTarget === "server_checker"
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Submitting...";
+        statusDiv.classList.add('hidden');
+
+        try {
+            const res = await fetch('/tickets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-emerald-950/20 text-emerald-400 border border-emerald-500/20';
+                statusDiv.innerText = "Success: Ticket created successfully!";
+                statusDiv.classList.remove('hidden');
+
+                descInput.value = '';
+                if (titleInput) titleInput.value = '';
+                if (anonCheckbox) anonCheckbox.checked = false;
+
+                const refreshRes = await fetch('/api/tickets');
+                if (refreshRes.ok) {
+                    const freshData = await refreshRes.json();
+                    allTickets = freshData.tickets || [];
+                    updateStats();
+                    renderTickets();
+                }
+            } else {
+                const errorMsg = data.detail || "Server error while processing ticket.";
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-rose-950/20 text-rose-400 border border-rose-500/20';
+                statusDiv.innerText = `Error: ${errorMsg}`;
+                statusDiv.classList.remove('hidden');
+            }
+        } catch (err) {
+            statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-rose-950/20 text-rose-400 border border-rose-500/20';
+            statusDiv.innerText = "Error: Failed to connect to server.";
+            statusDiv.classList.remove('hidden');
+        } finally {
+            submitBtn.disabled = false;
+            updateFormPlaceholders();
+        }
+    }
+
+    async function submitTicketReply(ticketId) {
+        const input = document.getElementById(`reply-input-${ticketId}`);
+        const btn = document.getElementById(`reply-btn-${ticketId}`);
+        const statusEl = document.getElementById(`reply-status-${ticketId}`);
+
+        if (!input || !input.value.trim()) return;
+
+        const msgText = input.value.trim();
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msgText })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                input.value = '';
+
+                const ticket = allTickets.find(t => t.id === ticketId);
+                if (ticket) {
+                    ticket.messages = data.messages || [];
+                }
+                renderTickets();
+            } else {
+                if (statusEl) {
+                    statusEl.className = 'text-[10px] font-mono text-rose-400';
+                    statusEl.innerText = data.detail || 'Failed to post reply.';
+                    statusEl.classList.remove('hidden');
+                } else {
+                    alert(data.detail || 'Failed to post reply.');
+                }
+            }
+        } catch (err) {
+            if (statusEl) {
+                statusEl.className = 'text-[10px] font-mono text-rose-400';
+                statusEl.innerText = 'Network error posting reply.';
+                statusEl.classList.remove('hidden');
+            } else {
+                alert('Network error posting reply.');
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    let ticketSocket = null;
+    let reconnectTimeout = null;
+
+    function initTicketWebSocket() {
+        if (ticketSocket && (ticketSocket.readyState === WebSocket.OPEN || ticketSocket.readyState === WebSocket.CONNECTING)) return;
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/tickets`;
+
+        try {
+            ticketSocket = new WebSocket(wsUrl);
+
+            ticketSocket.onopen = () => {
+                console.log('[Tickets WS] Connected for real-time ticket updates');
+            };
+
+            ticketSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'ticket_message') {
+                        handleIncomingTicketMessage(data.ticket_id, data.new_message, data.messages);
+                    }
+                } catch (e) {
+                    console.error('[Tickets WS] Message parse error:', e);
+                }
+            };
+
+            ticketSocket.onclose = () => {
+                ticketSocket = null;
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = setTimeout(initTicketWebSocket, 3000);
+            };
+
+            ticketSocket.onerror = () => {
+                try { ticketSocket.close(); } catch (e) { }
+            };
+        } catch (err) {
+            console.warn('[Tickets WS] Connection failed, fallback to polling:', err);
+        }
+    }
+
+    function handleIncomingTicketMessage(ticketId, newMsg, fullMessages) {
+        if (!ticketId || !newMsg) return;
+
+        const ticket = allTickets.find(t => t.id === ticketId);
+        if (ticket) {
+            ticket.messages = fullMessages || (ticket.messages ? [...ticket.messages, newMsg] : [newMsg]);
+            ticket.messages_count = ticket.messages.length;
+        }
+
+        const threadMessagesContainer = document.getElementById(`thread-messages-${ticketId}`);
+        if (threadMessagesContainer) {
+            const existingBubble = threadMessagesContainer.querySelector(`[data-msg-id="${newMsg.id}"]`);
+            if (!existingBubble) {
+                const emptyP = threadMessagesContainer.querySelector('p.italic');
+                if (emptyP) emptyP.remove();
+
+                const isAdminMsg = newMsg.sender_type === 'admin';
+                const senderTitle = isAdminMsg ? 'Administrator' : 'Author';
+                const cardBg = isAdminMsg ? 'bg-blue-950/20 border-blue-500/30' : 'bg-emerald-950/20 border-emerald-500/30';
+                const tagColor = isAdminMsg ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                const avatar = newMsg.sender_avatar ? `
+                    <img src="${escapeHtml(newMsg.sender_avatar)}" class="w-5 h-5 rounded-full border border-white/10 shrink-0" alt="">
+                ` : `
+                    <div class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold text-gray-300 font-mono shrink-0">
+                        ${escapeHtml(newMsg.sender_name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                `;
+
+                const msgEl = document.createElement('div');
+                msgEl.setAttribute('data-msg-id', newMsg.id);
+                msgEl.className = `flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg} transition-all duration-300`;
+                msgEl.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-2 min-w-0">
+                            ${avatar}
+                            <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(newMsg.sender_name || 'User')}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                        </div>
+                        <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(newMsg.timestamp)}</span>
+                    </div>
+                    <p class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(newMsg.message)}</p>
+                `;
+
+                threadMessagesContainer.appendChild(msgEl);
+
+                threadMessagesContainer.scrollTo({
+                    top: threadMessagesContainer.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        const threadSection = document.getElementById(`thread-section-${ticketId}`);
+        if (threadSection) {
+            const countBadge = threadSection.querySelector('.font-mono.rounded-full');
+            if (countBadge && ticket) {
+                countBadge.innerText = ticket.messages.length;
+            }
+        }
+    }
+
+    let isWindowFocused = true;
+    try {
+        isWindowFocused = !document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus());
+    } catch (e) {}
+
+    window.addEventListener('focus', () => {
+        isWindowFocused = true;
+        syncTicketsFromServer();
+    });
+
+    window.addEventListener('blur', () => {
+        isWindowFocused = false;
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            isWindowFocused = false;
+        } else {
+            isWindowFocused = (typeof document.hasFocus !== 'function' || document.hasFocus());
+            if (isWindowFocused) {
+                syncTicketsFromServer();
+            }
+        }
+    });
+
+    async function syncTicketsFromServer() {
+        if (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus())) {
+            isWindowFocused = false;
+            return;
+        }
+        try {
+            const res = await fetch('/api/tickets', { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                const freshTickets = data.tickets || [];
+                let hasChanges = false;
+                freshTickets.forEach(fresh => {
+                    const local = allTickets.find(t => t.id === fresh.id);
+                    if (local) {
+                        const localMsgCount = (local.messages || []).length;
+                        const freshMsgCount = (fresh.messages || []).length;
+                        if (localMsgCount !== freshMsgCount || local.status !== fresh.status) {
+                            local.status = fresh.status;
+                            if (local.can_view_conversation && freshMsgCount > localMsgCount) {
+                                const newMessages = (fresh.messages || []).slice(localMsgCount);
+                                local.messages = fresh.messages;
+                                newMessages.forEach(m => handleIncomingTicketMessage(fresh.id, m, fresh.messages));
+                            } else {
+                                local.messages = fresh.messages;
+                            }
+                            hasChanges = true;
+                        }
+                    } else {
+                        allTickets.unshift(fresh);
+                        hasChanges = true;
+                    }
+                });
+                if (hasChanges && !document.activeElement.matches('input, textarea')) {
+                    updateStats();
+                }
+            }
+        } catch (e) { }
+    }
+
+    setInterval(() => {
+        if (isWindowFocused && !document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus())) {
+            syncTicketsFromServer();
+        }
+    }, 4000);
+</script>
+{% endblock %}
