@@ -95,10 +95,10 @@ sock = Sock(app)
 active_connections = set()
 
 def get_dashboard_payload_data(username=None):
-    perms = get_user_permissions(username) if username else {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+    perms = get_user_permissions(username) if username else {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
     
     suggestions = []
-    if perms.get("suggestions", True):
+    if perms.get("suggestions", False):
         sug_data = load_suggestions()
         raw_sugs = sug_data.get("suggestions", [])
         for s in sorted(raw_sugs, key=lambda x: x.get("timestamp", ""), reverse=True):
@@ -127,28 +127,32 @@ def get_dashboard_payload_data(username=None):
             })
 
     banned_ips = {}
-    if perms.get("bans", True):
+    if perms.get("bans", False):
         ban_data = load_banned_ips()
         banned_ips = ban_data.get("banned", {})
 
     crashes = []
-    if perms.get("crashes", True):
+    if perms.get("crashes", False):
         crash_data = load_crashes()
         crashes = sorted(crash_data.get("crashes", []), key=lambda c: c.get("timestamp", ""), reverse=True)
 
     contact_messages = []
-    if perms.get("contact", True):
+    if perms.get("contact", False):
         contact_data = load_contact_messages()
         contact_messages = sorted(contact_data.get("messages", []), key=lambda m: m.get("timestamp", ""), reverse=True)
 
-    persistent_data = load_persistent_servers()
-    servers_data = get_sc_data("servers.json") or {}
-    server_cards = build_server_cards(servers_data)
+    persistent_servers = {}
+    server_cards = []
+    if perms.get("servers", False):
+        persistent_data = load_persistent_servers()
+        persistent_servers = persistent_data.get("persistent", {})
+        servers_data = get_sc_data("servers.json") or {}
+        server_cards = build_server_cards(servers_data)
 
     active_count = len(server_cards)
-    total_count = len(servers_data)
-    persistent_count = len(persistent_data.get("persistent", {}))
-    historical_count = max(0, total_count - active_count)
+    total_count = len(server_cards)
+    persistent_count = len(persistent_servers)
+    historical_count = 0
 
     return {
         "suggestions": suggestions,
@@ -156,7 +160,7 @@ def get_dashboard_payload_data(username=None):
         "crashes": crashes,
         "contact_messages": contact_messages,
         "servers": server_cards,
-        "persistent_servers": persistent_data.get("persistent", {}),
+        "persistent_servers": persistent_servers,
         "server_counts": {
             "total": total_count,
             "active": active_count,
@@ -404,23 +408,31 @@ def save_admins(data):
 def is_root_user(user_identifier: str) -> bool:
     if not user_identifier:
         return False
-    discord_id = str(user_identifier).strip()
+    ident_str = str(user_identifier).strip()
+    
+    root_ids = get_root_discord_ids()
+    if root_ids and ident_str in root_ids:
+        return True
+        
+    root_user, _ = get_admin_credentials()
+    if root_user and secrets.compare_digest(ident_str, root_user):
+        return True
+
     if has_request_context():
         try:
-            if session.get("is_root") and session.get("admin_logged_in"):
-                return True
-            discord_id = session.get("discord_id") or discord_id
+            if session.get("admin_logged_in") and session.get("is_root"):
+                sess_user = str(session.get("username") or "")
+                sess_discord = str(session.get("discord_id") or "")
+                if (sess_user and secrets.compare_digest(sess_user, ident_str)) or (sess_discord and sess_discord == ident_str):
+                    return True
         except Exception:
             pass
-    root_ids = get_root_discord_ids()
-    if root_ids and discord_id in root_ids:
-        return True
-    root_user, _ = get_admin_credentials()
-    return secrets.compare_digest(str(user_identifier), root_user)
+
+    return False
 
 def get_user_permissions(user_identifier: str) -> dict:
     if not user_identifier:
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+        return {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
     if is_root_user(user_identifier):
         return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
     
@@ -434,7 +446,7 @@ def get_user_permissions(user_identifier: str) -> dict:
                 break
                 
     if not admin_info:
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+        return {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
         
     perms = admin_info.get("permissions")
     if perms is None:
@@ -452,7 +464,7 @@ def has_permission(user_identifier: str, section: str) -> bool:
         return False
     if is_root_user(user_identifier):
         return True
-    return get_user_permissions(user_identifier).get(section, True)
+    return bool(get_user_permissions(user_identifier).get(section, False))
 
 def get_admin_notifier_config(user_identifier: str) -> dict:
     admins_data = load_admins()
@@ -1124,8 +1136,14 @@ def page_not_found(e):
 @app.route("/api/contact", methods=["POST"])
 def submit_contact_message():
     ip = request.remote_addr or "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+
+    if is_ip_banned(ip):
+        return jsonify({"detail": "Access restricted. Your IP is banned."}), 403
+
     ip_hash = hashlib.sha256(ip.encode('utf-8')).hexdigest()
-    
     ban_data = load_banned_ips()
     if ip_hash in ban_data.get("banned", {}):
         return jsonify({"detail": "Access restricted."}), 403
