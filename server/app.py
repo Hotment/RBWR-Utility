@@ -91,6 +91,23 @@ werkzeug_logger.setLevel(logging.INFO)
 logger = app.logger.getChild("main")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
 
+SERVER_START_TIME = time.time()
+
+def format_uptime(seconds: float) -> str:
+    secs = int(seconds)
+    days, secs = divmod(secs, 86400)
+    hours, secs = divmod(secs, 3600)
+    mins, secs = divmod(secs, 60)
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0 or days > 0:
+        parts.append(f"{hours}h")
+    if mins > 0 or hours > 0 or days > 0:
+        parts.append(f"{mins}m")
+    parts.append(f"{secs}s")
+    return " ".join(parts)
+
 sock = Sock(app)
 active_connections = set()
 
@@ -1089,6 +1106,29 @@ def favicon():
         "favicon.ico",
         mimetype="image/vnd.microsoft.icon"
     )
+
+@app.route("/api/status", methods=["GET", "HEAD"])
+def status_check():
+    uptime_sec = max(0.0, round(time.time() - SERVER_START_TIME, 2))
+    try:
+        ver_data = load_versions()
+        version = ver_data.get("latest", "unknown")
+    except Exception:
+        version = "unknown"
+
+    payload = {
+        "status": "ok",
+        "service": "RBWR Utility Server",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "uptime_seconds": uptime_sec,
+        "uptime": format_uptime(uptime_sec),
+        "version": version
+    }
+    response = jsonify(payload)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response, 200
 
 @app.route("/calculator", methods=["GET"])
 def calculator_page():
