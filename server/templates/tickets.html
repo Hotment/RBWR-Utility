@@ -164,7 +164,7 @@
                     <option value="all">All Categories</option>
                     <option value="overlay">APRM Overlay</option>
                     <option value="point_graph">Point History Graph</option>
-                    <option value="server_checker">Server Checker</option>
+                    <option value="server_checker">Server Browser</option>
                     <option value="general">General</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400">
@@ -356,7 +356,7 @@
                             <input type="radio" name="submit-target" value="server_checker"
                                 class="premium-checkbox accent-amber-500">
                             <span class="inline-flex items-center text-amber-300 font-medium whitespace-nowrap">
-                                Server Checker
+                                Server Browser
                             </span>
                         </label>
                         <label
@@ -624,7 +624,7 @@
         } else if (target === 'point_graph' || target === 'points_graph') {
             return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Point History</span>`;
         } else if (target === 'server_checker' || isServerChecker) {
-            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">Server Checker</span>`;
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">Server Browser</span>`;
         }
         return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">APRM Overlay</span>`;
     }

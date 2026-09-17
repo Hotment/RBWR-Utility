@@ -76,6 +76,22 @@
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
         }
 
+        input[type="search"]::-webkit-search-decoration,
+        input[type="search"]::-webkit-search-cancel-button,
+        input[type="search"]::-webkit-search-results-button,
+        input[type="search"]::-webkit-search-results-decoration {
+            -webkit-appearance: none;
+            appearance: none;
+            display: none;
+        }
+
+        input::-ms-clear,
+        input::-ms-reveal {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+
         .hover-glow:hover {
             border-color: rgba(59, 130, 246, 0.25);
             box-shadow: 0 0 25px rgba(59, 130, 246, 0.15);
@@ -600,8 +616,8 @@
             <div
                 class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 <div class="relative flex-1 max-w-md">
-                    <input type="search" id="adminServerSearch" oninput="onAdminSearchInput()"
-                        placeholder="Search by Job ID or Server ID..."
+                    <input type="text" autocomplete="off" spellcheck="false" id="adminServerSearch"
+                        oninput="onAdminSearchInput()" placeholder="Search by Job ID or Server ID..."
                         class="premium-input w-full pl-9 pr-8 py-2 text-xs font-mono rounded-lg outline-none" />
                     <svg class="w-4 h-4 absolute left-3 top-2.5 text-slate-500 pointer-events-none" fill="none"
                         stroke="currentColor" viewBox="0 0 24 24">
@@ -1189,18 +1205,25 @@
                 const shortId = (card.getAttribute('data-short-id') || '').toLowerCase();
                 const isHistorical = card.getAttribute('data-is-historical') === 'true';
                 const isPersistent = card.getAttribute('data-is-persistent') === 'true';
+                const isArchived = card.getAttribute('data-is-archived') === 'true';
 
                 let matchesFilter = true;
                 if (adminServerFilter === 'active') {
-                    matchesFilter = !isHistorical;
+                    matchesFilter = !isHistorical && !isArchived;
                 } else if (adminServerFilter === 'historical') {
-                    matchesFilter = isHistorical;
+                    matchesFilter = isHistorical || isArchived;
                 } else if (adminServerFilter === 'persistent') {
                     matchesFilter = isPersistent;
                 }
 
                 let matchesSearch = true;
-                if (searchVal.length > 0) {
+                if (isArchived) {
+                    if (searchVal.length > 0 && isExactJobOrServerIdMatch(searchVal, jobId, shortId)) {
+                        matchesSearch = true;
+                    } else {
+                        matchesSearch = false;
+                    }
+                } else if (searchVal.length > 0) {
                     matchesSearch = jobId.includes(searchVal) || (shortId && shortId.includes(searchVal)) || isExactJobOrServerIdMatch(searchVal, jobId, shortId);
                 }
 
@@ -1619,7 +1642,7 @@
                     targetTag = '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 text-[10px] rounded font-bold uppercase border border-emerald-500/20">Point Graph</span>';
                     targetAttr = 'point_graph';
                 } else if (s.target === 'server_checker' || s.is_server_checker) {
-                    targetTag = '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Checker</span>';
+                    targetTag = '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/20">Server Browser</span>';
                     targetAttr = 'server_checker';
                 }
 
@@ -2163,6 +2186,7 @@
             const isPrivate = Boolean(s.is_private);
             const isPersistent = Boolean(s.is_persistent);
             const isHistorical = Boolean(s.is_historical);
+            const isArchived = Boolean(s.is_archived);
             const pCount = s.player_count !== undefined ? s.player_count : 0;
             const maxP = s.max_players || 12;
 
@@ -2173,13 +2197,16 @@
             const jParts = (s.job_id || '').split('-').filter(Boolean);
             const shortId = s.short_id || (jParts.length >= 3 ? `${jParts[1]}-${jParts[2]}` : '');
 
+            const canJoin = !isPrivate && !isArchived && (!isHistorical || isPersistent);
+
             return `
-                <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60')} flex flex-col justify-between gap-4 transition-all"
+                <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isArchived ? 'border-cyan-500/30 bg-cyan-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60'))} flex flex-col justify-between gap-4 transition-all"
                     data-job-id="${escapeHtml(s.job_id)}"
                     data-short-id="${escapeHtml(shortId)}"
                     data-is-private="${isPrivate}"
                     data-is-historical="${isHistorical}"
                     data-is-persistent="${isPersistent}"
+                    data-is-archived="${isArchived}"
                     data-player-count="${isPrivate ? '' : pCount}"
                     data-snapshot-count="${s.snapshot_count || 0}"
                     data-age-seconds="${s.age_seconds || 0}"
@@ -2192,7 +2219,7 @@
                                 ${shortId ? `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold">ID: ${escapeHtml(shortId)}</span>` : ''}
                                 ${isPrivate ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">Private</span>' : ''}
                                 ${isPersistent ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">Persistent</span>' : ''}
-                                ${isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>'}
+                                ${isArchived ? '<span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">Archived</span>' : (isHistorical ? '<span class="px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 text-[10px] font-mono font-bold">Historical</span>' : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Active</span>')}
                             </div>
                             <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 text-[10px] font-mono font-bold shrink-0">
                                 ${s.snapshot_count || 0} snaps
@@ -2247,6 +2274,7 @@
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                             </a>
 
+                            ${canJoin ? `
                             <a href="roblox://experiences/start?placeId=11765852158&gameInstanceId=${escapeHtml(s.job_id)}"
                                 class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-xs font-semibold transition flex items-center gap-1.5"
                                 title="Launch Roblox and join this server instance">
@@ -2255,7 +2283,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <span>Join</span>
-                            </a>
+                            </a>` : ''}
                         </div>
 
                         <button onclick="toggleAdminServerPersist('${escapeHtml(s.job_id)}', ${!isPersistent})"

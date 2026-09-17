@@ -57,7 +57,12 @@
                     Persistent Server
                 </span>
                 {% endif %}
-                {% if is_historical %}
+                {% if is_archived %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
+                    Archived Server
+                </span>
+                {% elif is_historical %}
                 <span
                     class="px-2.5 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-xs font-mono font-bold">
                     Historical Server
@@ -104,6 +109,7 @@
         </div>
 
         <div class="flex items-center gap-3 shrink-0 flex-wrap">
+            {% if (not is_private) and (not is_archived) and (not is_historical or is_persistent) %}
             <a href="roblox://experiences/start?placeId=11765852158&gameInstanceId={{ job_id }}"
                 class="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md group"
                 title="Launch Roblox and join this server instance">
@@ -117,6 +123,7 @@
                 </svg>
                 <span>Join Server</span>
             </a>
+            {% endif %}
             <button type="button" onclick="refreshPage()" id="refreshBtn"
                 class="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md">
                 <svg id="refreshIcon" class="w-4 h-4 text-amber-400 transition-transform duration-500" fill="none"
@@ -129,8 +136,8 @@
             </button>
             <div id="autoRefreshBadge"
                 class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs font-mono flex items-center gap-2">
-                <span id="autoRefreshLabel">{% if is_historical %}Historical (Archived){% else %}Auto-refresh: 30s{%
-                    endif %}</span>
+                <span id="autoRefreshLabel">{% if is_archived %}Archived (Read-only){% elif is_historical %}Historical
+                    (Inactive){% else %}Auto-refresh: 30s{% endif %}</span>
             </div>
         </div>
     </div>
@@ -171,8 +178,9 @@
                 {% endif %}
             </div>
             <div
-                class="text-[11px] font-mono text-center {% if is_historical %}text-slate-500{% else %}text-emerald-400{% endif %}">
-                {% if is_persistent and is_historical %}Persistent Server (Historical · Saved permanently){% elif
+                class="text-[11px] font-mono text-center {% if is_archived %}text-cyan-400/80{% elif is_historical %}text-slate-500{% else %}text-emerald-400{% endif %}">
+                {% if is_archived %}Archived{% elif is_persistent and is_historical %}Persistent Server (Historical ·
+                Saved permanently){% elif
                 is_persistent %}Persistent Server (Active · Saved permanently){% elif is_historical %}Historical
                 (Retained
                 up to 48 hours){% else %}Live Server Instance{% endif %}
@@ -397,8 +405,10 @@
         const overlay = document.getElementById('tabPausedOverlay');
         if (overlay) overlay.classList.add('hidden');
         const autoRefreshLabel = document.getElementById('autoRefreshLabel');
-        {% if is_historical %}
-        if (autoRefreshLabel) autoRefreshLabel.textContent = 'Historical (Archived)';
+        {% if is_archived %}
+        if (autoRefreshLabel) autoRefreshLabel.textContent = 'Archived (Read-only)';
+        {% elif is_historical %}
+        if (autoRefreshLabel) autoRefreshLabel.textContent = 'Historical (Inactive)';
         {% else %}
         if (autoRefreshLabel) autoRefreshLabel.textContent = 'Auto-refresh: 30s';
         if (pausedWhileHidden) {
@@ -412,7 +422,7 @@
     window.addEventListener('blur', checkTabFocus);
     document.addEventListener('visibilitychange', checkTabFocus);
 
-    {% if not is_historical %}
+    {% if not is_historical and not is_archived %}
     setInterval(function () {
         if (isTabFocused && !document.hidden) {
             window.location.reload();

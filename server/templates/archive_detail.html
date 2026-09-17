@@ -1,0 +1,535 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Archive for {{ date_formatted }}{% endblock %}
+
+{% block content %}
+<main
+    class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="flex flex-col gap-2 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap text-xs font-mono">
+                <a href="/servers"
+                    class="text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
+                        </path>
+                    </svg>
+                    Server Browser
+                </a>
+                <span class="text-gray-600">/</span>
+                <a href="/archives" class="text-cyan-400 hover:text-cyan-300 transition-colors">
+                    Archives
+                </a>
+                <span class="text-gray-600">/</span>
+                <span class="text-gray-300 font-semibold">{{ date }}</span>
+            </div>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1
+                    class="text-2xl sm:text-3xl md:text-4xl font-display font-semibold tracking-tight text-white flex items-center gap-3">
+                    Archive: {{ date_formatted }}
+                </h1>
+                <span
+                    class="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
+                    {{ date }}
+                </span>
+                {% if stats.is_compressed %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-mono font-bold flex items-center gap-1.5"
+                    title="Compressed using Gzip">
+                    <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4">
+                        </path>
+                    </svg>
+                    <span>{{ stats.filename }} ({{ stats.size_str }})</span>
+                </span>
+                {% else %}
+                <span
+                    class="px-2.5 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-xs font-mono">
+                    {{ stats.filename }} ({{ stats.size_str }})
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-gray-400 text-sm max-w-2xl">
+                Displaying all {{ stats.total_servers }} server instances archived on {{ date_formatted }}{% if
+                day_of_week %} ({{ day_of_week }}){% endif %}.
+                Click any server card to inspect graphs.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
+            <a href="/archives"
+                class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 hover:text-white border border-white/10 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                <span>All Archives</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-cyan-400 font-semibold">Archived
+                    Servers</span>
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+                    {{ stats.total_servers }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Instances in this file</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-emerald-400 font-semibold">Total
+                    Snapshots</span>
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-emerald-300 tracking-tight">
+                    {{ "{:,}".format(stats.total_snapshots) }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Historical states</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-amber-400 font-semibold">Archive
+                    Date</span>
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-xl sm:text-2xl font-mono font-bold text-amber-300 tracking-tight truncate"
+                    title="{{ date_formatted }}">
+                    {{ date_formatted }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">{{ day_of_week or 'Archive Session' }}</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-blue-400 font-semibold">Access Mode</span>
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-xl sm:text-2xl font-mono font-bold text-blue-300 tracking-tight">
+                    Read-Only
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Finalized Archive</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+        <div>
+            <h2 class="text-xl sm:text-2xl font-display font-semibold text-white">Archived Instances</h2>
+            <p id="archiveServerCountLabel" class="text-xs text-gray-400 font-mono mt-0.5">
+                Showing {{ servers|length }} archived servers
+            </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div class="relative min-w-[190px]">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                    </svg>
+                </div>
+                <select id="archiveSort" onchange="setArchiveSort(this.value)"
+                    class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-cyan-500/50 appearance-none cursor-pointer">
+                    <option value="snapshots_desc">Sort: Most Snapshots</option>
+                    <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+                    <option value="newest">Sort: Longest Uptime</option>
+                    <option value="oldest">Sort: Shortest Uptime</option>
+                    <option value="public_first">Sort: Public Servers First</option>
+                    <option value="private_first">Sort: Private Servers First</option>
+                    <option value="players_desc">Sort: Most Players</option>
+                    <option value="players_asc">Sort: Fewest Players</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="relative min-w-[280px] sm:min-w-[320px]">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" autocomplete="off" spellcheck="false" id="archiveSearch"
+                    oninput="filterArchiveServers()" placeholder="Search by Job ID or Server ID..."
+                    class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-cyan-500/50" />
+                <button type="button" id="clearArchiveSearchBtn" onclick="clearArchiveSearch()"
+                    class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="archiveServerGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% if servers and servers|length > 0 %}
+        {% for server in servers %}
+        {% include "_server_card.html" %}
+        {% endfor %}
+        {% else %}
+        <div
+            class="col-span-full premium-glass rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/10">
+            <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                </path>
+            </svg>
+            <h3 class="text-lg font-display font-semibold text-white">No servers found in this archive file</h3>
+            <p class="text-xs text-gray-400 max-w-md font-mono">
+                This archive date does not contain any server instances.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="archivePaginationContainer"
+        class="hidden flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5 text-xs font-mono">
+        <div id="archivePaginationInfo" class="text-gray-400">
+            Showing <span id="archivePageStartIdx" class="text-white font-semibold">1</span>–<span
+                id="archivePageEndIdx" class="text-white font-semibold">21</span> of <span id="archivePageTotalCount"
+                class="text-white font-semibold">0</span> archived servers
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap justify-center" id="archivePaginationButtons">
+        </div>
+    </div>
+
+    <div id="noArchiveServerResultsNotice"
+        class="hidden premium-glass rounded-2xl p-8 text-center flex-col items-center justify-center gap-2 border border-white/10">
+        <p class="text-sm font-semibold text-gray-300 font-display">No archived servers found matching your search.</p>
+        <button type="button" onclick="clearArchiveSearch()" class="text-xs font-mono text-cyan-400 hover:underline">
+            Clear search query
+        </button>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function copyText(text, btn) {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            setTimeout(() => { btn.innerHTML = orig; }, 1800);
+        });
+    }
+
+    const ARCHIVE_PAGE_SIZE = 21;
+    let archiveCurrentPage = 1;
+    let archiveCards = [];
+    let archiveMatchingCards = [];
+    let archiveCurrentSort = 'snapshots_desc';
+
+    function setArchiveSort(sortVal) {
+        archiveCurrentSort = sortVal || 'snapshots_desc';
+        filterArchiveServers(true);
+    }
+
+    function getCardPlayerCount(card) {
+        if (card.dataset.playerCount !== undefined && card.dataset.playerCount !== '') {
+            const p = parseInt(card.dataset.playerCount, 10);
+            if (!isNaN(p)) return p;
+        }
+        const m = card.textContent.match(/(\d+)\s*\/\s*\d+\s*Players/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    function getCardSnapshotCount(card) {
+        if (card.dataset.snapshotCount !== undefined && card.dataset.snapshotCount !== '') {
+            const s = parseInt(card.dataset.snapshotCount, 10);
+            if (!isNaN(s)) return s;
+        }
+        const m = card.textContent.match(/(\d+)\s*snapshots/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    function getCardTimestamp(card) {
+        if (card.dataset.rawTimestamp) {
+            const t = Date.parse(card.dataset.rawTimestamp);
+            if (!isNaN(t)) return t;
+        }
+        return 0;
+    }
+
+    function getCardUptime(card) {
+        if (card.dataset.uptimeSeconds !== undefined && card.dataset.uptimeSeconds !== '') {
+            const u = parseFloat(card.dataset.uptimeSeconds);
+            if (!isNaN(u)) return u;
+        }
+        return 0;
+    }
+
+    function filterArchiveServers(resetPage = true) {
+        const searchInput = document.getElementById('archiveSearch');
+        const clearBtn = document.getElementById('clearArchiveSearchBtn');
+        const countLabel = document.getElementById('archiveServerCountLabel');
+        const noResults = document.getElementById('noArchiveServerResultsNotice');
+
+        if (!archiveCards || archiveCards.length === 0) {
+            archiveCards = Array.from(document.querySelectorAll('.server-card'));
+        }
+
+        if (resetPage) {
+            archiveCurrentPage = 1;
+        }
+
+        const raw = (searchInput?.value || '').trim().toLowerCase();
+
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', raw.length === 0);
+        }
+
+        archiveMatchingCards = [];
+
+        archiveCards.forEach(card => {
+            const jobId = (card.dataset.jobId || '').toLowerCase();
+            const shortId = (card.dataset.shortId || '').toLowerCase();
+
+            let matches = true;
+            if (raw.length > 0) {
+                const cleanRaw = raw.replace(/-/g, '');
+                const cleanJobId = jobId.replace(/-/g, '');
+                const cleanShortId = shortId.replace(/-/g, '');
+                matches = jobId.includes(raw) || (shortId && shortId.includes(raw)) ||
+                    (cleanRaw && cleanJobId.includes(cleanRaw)) ||
+                    (cleanShortId && cleanShortId.includes(cleanRaw));
+            }
+
+            if (matches) {
+                archiveMatchingCards.push(card);
+            }
+        });
+
+        archiveMatchingCards.sort((a, b) => {
+            const pA = getCardPlayerCount(a);
+            const pB = getCardPlayerCount(b);
+            const sA = getCardSnapshotCount(a);
+            const sB = getCardSnapshotCount(b);
+            const tA = getCardTimestamp(a);
+            const tB = getCardTimestamp(b);
+            const uA = getCardUptime(a);
+            const uB = getCardUptime(b);
+            const privA = a.dataset.isPrivate === 'true' ? 1 : 0;
+            const privB = b.dataset.isPrivate === 'true' ? 1 : 0;
+
+            if (archiveCurrentSort === 'players_desc') {
+                return (pB - pA) || (sB - sA) || (uB - uA);
+            } else if (archiveCurrentSort === 'players_asc') {
+                return (pA - pB) || (sA - sB) || (uA - uB);
+            } else if (archiveCurrentSort === 'snapshots_desc') {
+                return (sB - sA) || (uB - uA) || (pB - pA);
+            } else if (archiveCurrentSort === 'snapshots_asc') {
+                return (sA - sB) || (uA - uB) || (pA - pB);
+            } else if (archiveCurrentSort === 'oldest') {
+                return (uA - uB) || (pB - pA) || (tA - tB);
+            } else if (archiveCurrentSort === 'newest') {
+                return (uB - uA) || (pB - pA) || (tB - tA);
+            } else if (archiveCurrentSort === 'public_first') {
+                return (privA - privB) || (sB - sA) || (uB - uA);
+            } else if (archiveCurrentSort === 'private_first') {
+                return (privB - privA) || (sB - sA) || (uB - uA);
+            } else {
+                return (sB - sA) || (uB - uA);
+            }
+        });
+
+        applyArchivePaginationDisplay();
+    }
+
+    function applyArchivePaginationDisplay() {
+        const totalItems = archiveMatchingCards.length;
+        const totalPages = Math.ceil(totalItems / ARCHIVE_PAGE_SIZE) || 1;
+        if (archiveCurrentPage > totalPages) archiveCurrentPage = totalPages;
+        if (archiveCurrentPage < 1) archiveCurrentPage = 1;
+
+        const startIdx = (archiveCurrentPage - 1) * ARCHIVE_PAGE_SIZE;
+        const endIdx = startIdx + ARCHIVE_PAGE_SIZE;
+        const pageSlice = archiveMatchingCards.slice(startIdx, endIdx);
+
+        const grid = document.getElementById('archiveServerGrid');
+        const countLabel = document.getElementById('archiveServerCountLabel');
+        const noResults = document.getElementById('noArchiveServerResultsNotice');
+        const container = document.getElementById('archivePaginationContainer');
+
+        if (grid) {
+            pageSlice.forEach(card => {
+                grid.appendChild(card);
+                card.style.display = 'flex';
+            });
+            archiveCards.forEach(card => {
+                if (!pageSlice.includes(card)) {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        const searchInput = document.getElementById('archiveSearch');
+        const raw = (searchInput?.value || '').trim();
+
+        if (countLabel) {
+            if (raw.length > 0) {
+                countLabel.textContent = `Showing ${Math.min(startIdx + 1, totalItems)}–${Math.min(endIdx, totalItems)} of ${totalItems.toLocaleString()} matching archived servers`;
+            } else {
+                countLabel.textContent = `Showing ${Math.min(startIdx + 1, totalItems)}–${Math.min(endIdx, totalItems)} of ${totalItems.toLocaleString()} archived servers`;
+            }
+        }
+
+        if (noResults) {
+            if (totalItems === 0 && archiveCards.length > 0) {
+                noResults.classList.remove('hidden');
+                noResults.classList.add('flex');
+            } else {
+                noResults.classList.add('hidden');
+                noResults.classList.remove('flex');
+            }
+        }
+
+        renderArchivePagination(totalItems, archiveCurrentPage, totalPages);
+    }
+
+    function goToArchivePage(page) {
+        archiveCurrentPage = page;
+        applyArchivePaginationDisplay();
+        const grid = document.getElementById('archiveServerGrid');
+        if (grid) {
+            const rect = grid.getBoundingClientRect();
+            if (rect.top < 0) {
+                grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }
+
+    function renderArchivePagination(totalItems, currentPage, totalPages) {
+        const container = document.getElementById('archivePaginationContainer');
+        const buttonsContainer = document.getElementById('archivePaginationButtons');
+        const pageStartEl = document.getElementById('archivePageStartIdx');
+        const pageEndEl = document.getElementById('archivePageEndIdx');
+        const pageTotalEl = document.getElementById('archivePageTotalCount');
+
+        if (!container || !buttonsContainer) return;
+
+        if (totalItems <= 0) {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        container.classList.add('flex');
+
+        const startIdx = (currentPage - 1) * ARCHIVE_PAGE_SIZE + 1;
+        const endIdx = Math.min(currentPage * ARCHIVE_PAGE_SIZE, totalItems);
+
+        if (pageStartEl) pageStartEl.textContent = startIdx.toLocaleString();
+        if (pageEndEl) pageEndEl.textContent = endIdx.toLocaleString();
+        if (pageTotalEl) pageTotalEl.textContent = totalItems.toLocaleString();
+
+        if (totalPages <= 1) {
+            buttonsContainer.innerHTML = '';
+            return;
+        }
+
+        let buttonsHtml = '';
+
+        const prevDisabled = currentPage === 1;
+        buttonsHtml += `
+            <button type="button" onclick="goToArchivePage(${currentPage - 1})" ${prevDisabled ? 'disabled' : ''}
+                class="px-2.5 py-1 rounded-lg border border-white/10 ${prevDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 cursor-pointer'} transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span>Prev</span>
+            </button>
+        `;
+
+        const getPagesToShow = (cur, total) => {
+            if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+            if (cur <= 4) return [1, 2, 3, 4, 5, '...', total];
+            if (cur >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+            return [1, '...', cur - 1, cur, cur + 1, '...', total];
+        };
+
+        const pages = getPagesToShow(currentPage, totalPages);
+        pages.forEach(p => {
+            if (p === '...') {
+                buttonsHtml += `<span class="px-2 py-1 text-gray-500">...</span>`;
+            } else if (p === currentPage) {
+                buttonsHtml += `
+                    <button type="button" class="px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold cursor-default">
+                        ${p}
+                    </button>
+                `;
+            } else {
+                buttonsHtml += `
+                    <button type="button" onclick="goToArchivePage(${p})"
+                        class="px-3 py-1 rounded-lg border border-white/10 hover:bg-white/10 text-gray-300 transition-all cursor-pointer">
+                        ${p}
+                    </button>
+                `;
+            }
+        });
+
+        const nextDisabled = currentPage === totalPages;
+        buttonsHtml += `
+            <button type="button" onclick="goToArchivePage(${currentPage + 1})" ${nextDisabled ? 'disabled' : ''}
+                class="px-2.5 py-1 rounded-lg border border-white/10 ${nextDisabled ? 'opacity-30 cursor-not-allowed text-gray-500' : 'hover:bg-white/10 text-gray-300 cursor-pointer'} transition-all flex items-center gap-1">
+                <span>Next</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+        `;
+
+        buttonsContainer.innerHTML = buttonsHtml;
+    }
+
+    function clearArchiveSearch() {
+        const searchInput = document.getElementById('archiveSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            filterArchiveServers(true);
+            searchInput.focus();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        archiveCards = Array.from(document.querySelectorAll('.server-card'));
+        filterArchiveServers(true);
+    });
+</script>
+{% endblock %}

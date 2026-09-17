@@ -131,7 +131,8 @@
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
         <div>
-            <h2 class="text-xl sm:text-2xl font-display font-semibold text-white">Active Server Instances</h2>
+            <h2 id="serverSectionHeading" class="text-xl sm:text-2xl font-display font-semibold text-white">Active
+                Server Instances</h2>
             <p id="serverCountLabel" class="text-xs text-gray-400 font-mono mt-0.5">Showing {{ servers |
                 rejectattr('is_private') | list | length }}
                 active servers</p>
@@ -148,9 +149,11 @@
                     class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Historical</button>
                 <button type="button" onclick="setStatusFilter('persistent', this)"
                     class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Persistent</button>
+                <button type="button" onclick="setStatusFilter('archives', this)"
+                    class="status-filter-btn px-2.5 py-1 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer">Archives</button>
             </div>
 
-            <div class="relative min-w-[190px]">
+            <div id="serverSortWrapper" class="relative w-full sm:w-[260px] min-w-[220px] shrink-0">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -182,7 +185,8 @@
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                 </div>
-                <input type="search" id="serverSearch" placeholder="Search by Job ID or Server ID..."
+                <input type="text" autocomplete="off" spellcheck="false" id="serverSearch"
+                    placeholder="Search by Job ID or Server ID..."
                     class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-amber-500/50" />
                 <button type="button" id="clearSearchBtn" onclick="clearSearch()"
                     class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
@@ -230,7 +234,7 @@
 
     <div id="noResultsNotice"
         class="hidden premium-glass rounded-2xl p-8 text-center flex-col items-center justify-center gap-2 border border-white/10">
-        <p class="text-sm font-semibold text-gray-300">No servers found matching your search.</p>
+        <p id="noResultsMessage" class="text-sm font-semibold text-gray-300">No servers found matching your search.</p>
         <button type="button" onclick="clearSearch()" class="text-xs font-mono text-amber-400 hover:underline">Clear
             search query</button>
     </div>
@@ -278,7 +282,7 @@
         if (overlay) overlay.classList.add('hidden');
         if (pausedWhileHidden) {
             pausedWhileHidden = false;
-            if (currentStatusFilter !== 'historical') {
+            if (currentStatusFilter !== 'historical' && currentStatusFilter !== 'archives') {
                 refreshData();
             }
         }
@@ -294,6 +298,7 @@
     let noResultsNotice = null;
     let currentStatusFilter = 'all';
     let currentSort = 'newest';
+    let currentArchiveSort = 'newest';
     let lookupDebounceTimer = null;
     let searchDebounceTimer = null;
     let activeLookupQuery = '';
@@ -302,12 +307,52 @@
     let historicalTotalCount = 0;
     let historicalTotalPages = 1;
     let historicalFetchAbortController = null;
+    let isArchivesLoaded = false;
+    let archiveDaysData = null;
+    let archiveStatsData = null;
+    let archivesFetchAbortController = null;
+
+    const SERVER_SORT_OPTIONS = `
+        <option value="newest">Sort: Newest Servers</option>
+        <option value="oldest">Sort: Oldest Servers</option>
+        <option value="public_first">Sort: Public Servers First</option>
+        <option value="private_first">Sort: Private Servers First</option>
+        <option value="players_desc">Sort: Most Players</option>
+        <option value="players_asc">Sort: Fewest Players</option>
+        <option value="snapshots_desc">Sort: Most Snapshots</option>
+        <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+    `;
+
+    const ARCHIVE_SORT_OPTIONS = `
+        <option value="newest">Sort: Newest Date</option>
+        <option value="oldest">Sort: Oldest Date</option>
+        <option value="servers_desc">Sort: Most Servers</option>
+        <option value="servers_asc">Sort: Fewest Servers</option>
+        <option value="snapshots_desc">Sort: Most Snapshots</option>
+        <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+    `;
+
+    function updateSortDropdown() {
+        const sortSelect = document.getElementById('serverSort');
+        if (!sortSelect) return;
+        if (currentStatusFilter === 'archives') {
+            sortSelect.innerHTML = ARCHIVE_SORT_OPTIONS;
+            sortSelect.value = currentArchiveSort || 'newest';
+        } else {
+            sortSelect.innerHTML = SERVER_SORT_OPTIONS;
+            sortSelect.value = currentSort || 'newest';
+        }
+    }
 
     function setSortOption(sortVal) {
-        currentSort = sortVal || 'newest';
-        if (currentStatusFilter === 'historical') {
+        if (currentStatusFilter === 'archives') {
+            currentArchiveSort = sortVal || 'newest';
+            renderArchiveDaysInGrid();
+        } else if (currentStatusFilter === 'historical') {
+            currentSort = sortVal || 'newest';
             fetchHistoricalPage(1);
         } else {
+            currentSort = sortVal || 'newest';
             filterServers(true);
         }
     }
@@ -408,16 +453,285 @@
             btn.classList.remove('text-gray-400');
         }
 
-        if (currentStatusFilter === 'historical') {
-            fetchHistoricalPage(1);
+        const heading = document.getElementById('serverSectionHeading');
+        const sortWrapper = document.getElementById('serverSortWrapper');
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
+
+        updateSortDropdown();
+        if (sortWrapper) sortWrapper.classList.remove('hidden');
+
+        if (currentStatusFilter === 'archives') {
+            if (heading) heading.textContent = 'Server Archives';
+            if (searchInput) searchInput.placeholder = 'Search archived dates (e.g. 2026-09-10, Sept, Thursday)...';
+            fetchArchivesTab();
         } else {
-            const grid = document.getElementById('serverGrid');
-            if (grid && isHistoricalLoaded) {
-                grid.innerHTML = initialActiveCardsHtml;
-                serverCards = Array.from(document.querySelectorAll('.server-card'));
-                isHistoricalLoaded = false;
+            if (heading) {
+                if (currentStatusFilter === 'historical') heading.textContent = 'Historical Server Instances';
+                else if (currentStatusFilter === 'persistent') heading.textContent = 'Persistent Server Instances';
+                else heading.textContent = 'Active Server Instances';
             }
-            filterServers(true);
+            if (searchInput) searchInput.placeholder = 'Search by Job ID or Server ID...';
+
+            if (currentStatusFilter === 'historical') {
+                fetchHistoricalPage(1);
+            } else {
+                const grid = document.getElementById('serverGrid');
+                if (grid && (isHistoricalLoaded || isArchivesLoaded)) {
+                    grid.innerHTML = initialActiveCardsHtml;
+                    serverCards = Array.from(document.querySelectorAll('.server-card'));
+                    isHistoricalLoaded = false;
+                    isArchivesLoaded = false;
+                }
+                filterServers(true);
+            }
+        }
+
+        try {
+            const url = new URL(window.location);
+            if (status === 'all') {
+                url.searchParams.delete('tab');
+                url.searchParams.delete('status');
+            } else {
+                url.searchParams.set('tab', status);
+                url.searchParams.delete('status');
+            }
+            window.history.replaceState({}, '', url);
+        } catch (e) { }
+    }
+
+    async function fetchArchivesTab() {
+        isArchivesLoaded = true;
+        isHistoricalLoaded = false;
+
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
+        if (!clearSearchBtn) clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (!serverCountLabel) serverCountLabel = document.getElementById('serverCountLabel');
+        if (!noResultsNotice) noResultsNotice = document.getElementById('noResultsNotice');
+        const container = document.getElementById('paginationContainer');
+        const grid = document.getElementById('serverGrid');
+
+        if (container) {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+        }
+        if (noResultsNotice) {
+            noResultsNotice.classList.add('hidden');
+            noResultsNotice.classList.remove('flex');
+        }
+
+        const rawQuery = searchInput ? searchInput.value : '';
+        const query = rawQuery.trim();
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('hidden', query.length === 0);
+        }
+
+        if (archiveDaysData !== null) {
+            renderArchiveDaysInGrid();
+            return;
+        }
+
+        if (archivesFetchAbortController) {
+            archivesFetchAbortController.abort();
+        }
+        archivesFetchAbortController = new AbortController();
+
+        if (grid) {
+            grid.innerHTML = `
+                <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-3">
+                    <div class="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                    <span class="text-xs font-mono text-gray-400">Loading archives...</span>
+                </div>
+            `;
+        }
+
+        try {
+            const resp = await fetch('/api/archives', { signal: archivesFetchAbortController.signal });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            archiveDaysData = data.days || [];
+            archiveStatsData = data.stats || {};
+
+            renderArchiveDaysInGrid();
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('Error loading archives:', err);
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-xs font-mono text-rose-400">
+                        Failed to load archives. Please try again.
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function renderArchiveDaysInGrid() {
+        if (currentStatusFilter !== 'archives') return;
+        if (!searchInput) searchInput = document.getElementById('serverSearch');
+        if (!clearSearchBtn) clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (!serverCountLabel) serverCountLabel = document.getElementById('serverCountLabel');
+        if (!noResultsNotice) noResultsNotice = document.getElementById('noResultsNotice');
+        const container = document.getElementById('paginationContainer');
+        const grid = document.getElementById('serverGrid');
+
+        if (container) {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+        }
+
+        const raw = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('hidden', raw.length === 0);
+        }
+
+        const allDays = archiveDaysData || [];
+        if (allDays.length === 0) {
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="col-span-full premium-glass rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/10">
+                        <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                        </svg>
+                        <h3 class="text-lg font-display font-semibold text-white">No archive files found</h3>
+                        <p class="text-xs text-gray-400 max-w-md font-mono">
+                            Server snapshots older than 48 hours are automatically archived by day into compressed archive files.
+                        </p>
+                    </div>
+                `;
+            }
+            if (serverCountLabel) {
+                serverCountLabel.textContent = 'Showing 0 archived days';
+            }
+            if (noResultsNotice) {
+                noResultsNotice.classList.add('hidden');
+                noResultsNotice.classList.remove('flex');
+            }
+            return;
+        }
+
+        const matchingDays = allDays.filter(day => {
+            if (!raw) return true;
+            const date = (day.date || '').toLowerCase();
+            const formatted = (day.date_formatted || '').toLowerCase();
+            const dow = (day.day_of_week || '').toLowerCase();
+            return date.includes(raw) || formatted.includes(raw) || dow.includes(raw);
+        });
+
+        matchingDays.sort((a, b) => {
+            const dateA = a.date || '';
+            const dateB = b.date || '';
+            const sCountA = a.server_count || 0;
+            const sCountB = b.server_count || 0;
+            const snapCountA = a.snapshot_count || 0;
+            const snapCountB = b.snapshot_count || 0;
+
+            if (currentArchiveSort === 'oldest') {
+                return dateA.localeCompare(dateB);
+            } else if (currentArchiveSort === 'servers_desc') {
+                return (sCountB - sCountA) || (snapCountB - snapCountA) || dateB.localeCompare(dateA);
+            } else if (currentArchiveSort === 'servers_asc') {
+                return (sCountA - sCountB) || (snapCountA - snapCountB) || dateB.localeCompare(dateA);
+            } else if (currentArchiveSort === 'snapshots_desc') {
+                return (snapCountB - snapCountA) || (sCountB - sCountA) || dateB.localeCompare(dateA);
+            } else if (currentArchiveSort === 'snapshots_asc') {
+                return (snapCountA - snapCountB) || (sCountA - sCountB) || dateB.localeCompare(dateA);
+            } else {
+                // newest
+                return dateB.localeCompare(dateA);
+            }
+        });
+
+        if (matchingDays.length === 0) {
+            if (grid) grid.innerHTML = '';
+            if (serverCountLabel) {
+                serverCountLabel.textContent = 'Showing 0 matching archived days';
+            }
+            if (noResultsNotice) {
+                const msgEl = document.getElementById('noResultsMessage') || noResultsNotice.querySelector('p');
+                if (msgEl) msgEl.textContent = 'No archived days found matching your search.';
+                noResultsNotice.classList.remove('hidden');
+                noResultsNotice.classList.add('flex');
+            }
+            return;
+        }
+
+        if (noResultsNotice) {
+            noResultsNotice.classList.add('hidden');
+            noResultsNotice.classList.remove('flex');
+        }
+
+        if (serverCountLabel) {
+            if (raw.length > 0) {
+                serverCountLabel.textContent = `Showing ${matchingDays.length} matching archived day${matchingDays.length !== 1 ? 's' : ''}`;
+            } else {
+                serverCountLabel.textContent = `Showing ${allDays.length} archived day${allDays.length !== 1 ? 's' : ''}`;
+            }
+        }
+
+        if (grid) {
+            grid.innerHTML = matchingDays.map(day => `
+                <div class="archive-day-card premium-glass rounded-2xl p-5 shadow-xl border border-white/10 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-5 interactive-card">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-center justify-between gap-2 border-b border-white/5 pb-3">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
+                                    ${day.date}
+                                </span>
+                                ${day.is_compressed ? `
+                                <span class="px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[10px] font-mono font-bold flex items-center gap-1" title="Gzip Compressed Archive">
+                                    <span>Compressed</span>
+                                </span>` : `
+                                <span class="px-2 py-0.5 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-[10px] font-mono">
+                                    JSON
+                                </span>`}
+                            </div>
+                            <span class="text-xs font-mono text-gray-400" title="File Size">
+                                ${day.size_str || ''}
+                            </span>
+                        </div>
+
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-lg font-display font-semibold text-white hover:text-cyan-300 transition-colors">
+                                    ${day.date_formatted || day.date}
+                                </h3>
+                                ${day.day_of_week ? `<span class="text-xs font-mono text-gray-400">${day.day_of_week}</span>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+                            <div class="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
+                                <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                                    Archived Servers
+                                </span>
+                                <span class="font-mono font-bold text-base text-cyan-300">
+                                    ${(day.server_count || 0).toLocaleString()}
+                                </span>
+                            </div>
+
+                            <div class="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
+                                <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                                    Total Snapshots
+                                </span>
+                                <span class="font-mono font-bold text-base text-emerald-300">
+                                    ${(day.snapshot_count || 0).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-white/5">
+                        <a href="/archives/${day.date}"
+                            class="w-full py-2.5 px-4 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 hover:text-cyan-200 border border-cyan-500/30 rounded-xl text-xs font-semibold font-display transition-all flex items-center justify-center gap-2 group shadow-sm cursor-pointer">
+                            <span>Browse All Servers (${day.server_count || 0})</span>
+                            <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            `).join('');
         }
     }
 
@@ -555,6 +869,10 @@
     }
 
     function filterServers(resetPage = true) {
+        if (currentStatusFilter === 'archives') {
+            renderArchiveDaysInGrid();
+            return;
+        }
         if (!searchInput) searchInput = document.getElementById('serverSearch');
         if (!clearSearchBtn) clearSearchBtn = document.getElementById('clearSearchBtn');
         if (!serverCards || serverCards.length === 0) {
@@ -591,12 +909,13 @@
             const isPrivate = card.dataset.isPrivate === 'true';
             const isHistorical = card.dataset.isHistorical === 'true';
             const isPersistent = card.dataset.isPersistent === 'true';
+            const isArchived = card.dataset.isArchived === 'true';
 
             let matchesStatus = true;
             if (currentStatusFilter === 'active') {
-                matchesStatus = !isHistorical;
+                matchesStatus = !isHistorical && !isArchived;
             } else if (currentStatusFilter === 'historical') {
-                matchesStatus = isHistorical;
+                matchesStatus = isHistorical || isArchived;
             } else if (currentStatusFilter === 'persistent') {
                 matchesStatus = isPersistent;
             }
@@ -604,7 +923,13 @@
             const showPrivate = (query.length > 0) || (currentSort === 'private_first') || (currentSort === 'public_first');
             let isVisible = false;
 
-            if (isHistorical && !isPersistent) {
+            if (isArchived) {
+                if (query.length > 0 && isExactJobOrServerIdMatch(query, jobId, shortId)) {
+                    isVisible = matchesStatus;
+                } else {
+                    isVisible = false;
+                }
+            } else if (isHistorical && !isPersistent) {
                 if (query.length > 0 && isExactJobOrServerIdMatch(query, jobId, shortId)) {
                     isVisible = matchesStatus;
                 } else {
@@ -828,7 +1153,9 @@
         if (!searchInput) searchInput = document.getElementById('serverSearch');
         if (searchInput) {
             searchInput.value = '';
-            if (currentStatusFilter === 'historical') {
+            if (currentStatusFilter === 'archives') {
+                renderArchiveDaysInGrid();
+            } else if (currentStatusFilter === 'historical') {
                 fetchHistoricalPage(1);
             } else {
                 filterServers(true);
@@ -851,7 +1178,9 @@
 
         if (searchInput) {
             searchInput.addEventListener('input', () => {
-                if (currentStatusFilter === 'historical') {
+                if (currentStatusFilter === 'archives') {
+                    renderArchiveDaysInGrid();
+                } else if (currentStatusFilter === 'historical') {
                     clearTimeout(searchDebounceTimer);
                     searchDebounceTimer = setTimeout(() => {
                         fetchHistoricalPage(1);
@@ -870,10 +1199,16 @@
             if (sortSelect) sortSelect.value = sortParam;
         }
 
-        const initialStatus = urlParams.get('status') || urlParams.get('tab');
+        const initialStatus = (urlParams.get('status') || urlParams.get('tab') || '').toLowerCase();
         if (initialStatus === 'historical') {
             const histBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'historical');
             setStatusFilter('historical', histBtn);
+        } else if (initialStatus === 'archives') {
+            const archBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'archives');
+            setStatusFilter('archives', archBtn);
+        } else if (initialStatus === 'persistent') {
+            const persBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'persistent');
+            setStatusFilter('persistent', persBtn);
         } else {
             const q = urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId');
             if (q && searchInput) {
@@ -888,7 +1223,7 @@
 
         setInterval(() => {
             if (isTabFocused && !document.hidden) {
-                if (currentStatusFilter !== 'historical') {
+                if (currentStatusFilter !== 'historical' && currentStatusFilter !== 'archives') {
                     refreshData();
                 }
             }

@@ -2,20 +2,25 @@ from flask import Flask, request, jsonify, send_from_directory, redirect, Respon
 from pydantic import BaseModel, Field, ValidationError
 import os
 import json
+import gzip
+orjson = None
 try:
     import orjson
-    def _json_dumps(obj):
-        return orjson.dumps(obj)
-    def _json_loads(b):
-        return orjson.loads(b)
 except ImportError:
-    orjson = None
-    def _json_dumps(obj):
-        return json.dumps(obj).encode("utf-8")
-    def _json_loads(b):
-        if isinstance(b, (bytes, bytearray)):
-            return json.loads(b.decode("utf-8"))
-        return json.loads(b)
+    pass
+
+def _json_dumps(obj):
+    if orjson: 
+        return orjson.dumps(obj)
+    return json.dumps(obj).encode("utf-8")
+
+def _json_loads(b):
+    if orjson:
+        return orjson.loads(b)
+    if isinstance(b, (bytes, bytearray)):
+        return json.loads(b.decode("utf-8"))
+    return json.loads(b)
+
 from urllib.parse import quote, urlencode
 import secrets
 import requests
@@ -35,6 +40,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR = os.path.join(BASE_DIR, "files")
 DATA_DIR = os.path.join(BASE_DIR, "data")
+ARCHIVES_DIR = os.path.join(DATA_DIR, "archives")
 VERSIONS_FILE = os.path.join(BASE_DIR, "versions.json")
 SUGGESTIONS_FILE = os.path.join(BASE_DIR, "suggestions.json")
 CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
@@ -46,6 +52,7 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(ARCHIVES_DIR, exist_ok=True)
 load_dotenv(ENV_FILE)
 load_dotenv()
 
@@ -575,7 +582,7 @@ def create_discord_ticket_channel(ticket: dict) -> str | None:
     target_labels = {
         "overlay": "APRM Overlay",
         "point_graph": "Point History Graph",
-        "server_checker": "Server Checker",
+        "server_checker": "Server Browser",
         "general": "General"
     }
     target = ticket.get("target") or "overlay"
@@ -587,6 +594,9 @@ def create_discord_ticket_channel(ticket: dict) -> str | None:
         author_display += " *(Submitted anonymously to public)*"
 
     async def _create_async():
+        if not disnake_bot:
+            return None
+            
         guild_id = int(DISCORD_GUILD_ID)
         guild = disnake_bot.get_guild(guild_id)
         if not guild:
@@ -1398,7 +1408,10 @@ def get_sc_data(filename: str, max_retries: int = 6):
     for attempt in range(max_retries):
         try:
             with open(filepath, "rb") as f:
-                data = _json_loads(f.read())
+                raw_bytes = f.read()
+            if filename.endswith(".gz") or filepath.endswith(".gz"):
+                raw_bytes = gzip.decompress(raw_bytes)
+            data = _json_loads(raw_bytes)
             try:
                 mtime_after = os.path.getmtime(filepath)
             except OSError:
@@ -1421,6 +1434,8 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
     
     try:
         raw_bytes = _json_dumps(data)
+        if filename.endswith(".gz") or filepath.endswith(".gz"):
+            raw_bytes = gzip.compress(raw_bytes, compresslevel=9)
         with open(temp_path, "wb") as f:
             f.write(raw_bytes)
             f.flush()
@@ -1470,6 +1485,363 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
             except Exception:
                 pass
     return False
+
+def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
+    """
+    Returns the YYYY-MM-DD date when this server first started.
+    Checks server_meta, then earliest snapshot in snaps, then archives, then today.
+    """
+    if not job_id:
+        return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        
+    meta = _sc_server_meta.get(job_id, {})
+    st_ts = meta.get("start_timestamp")
+    if st_ts and len(st_ts) >= 10 and st_ts[4] == '-' and st_ts[7] == '-':
+        return st_ts[:10]
+        
+    if snaps:
+        earliest_ts = min(snaps.keys())
+        if earliest_ts and len(earliest_ts) >= 10 and earliest_ts[4] == '-' and earliest_ts[7] == '-':
+            if job_id not in _sc_server_meta:
+                _sc_server_meta[job_id] = {}
+            _sc_server_meta[job_id]["start_timestamp"] = earliest_ts
+            return earliest_ts[:10]
+            
+    if os.path.exists(ARCHIVES_DIR):
+        try:
+            for fname in sorted(os.listdir(ARCHIVES_DIR)):
+                if fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz")):
+                    date_str = fname[len("servers_"):len("servers_")+10]
+                    day_data = get_sc_data(os.path.join("archives", fname))
+                    if isinstance(day_data, dict) and job_id in day_data:
+                        if job_id not in _sc_server_meta:
+                            _sc_server_meta[job_id] = {}
+                        first_ts = min(day_data[job_id].keys()) if day_data[job_id] else None
+                        _sc_server_meta[job_id]["start_timestamp"] = first_ts or f"{date_str}T00:00:00Z"
+                        return date_str
+        except Exception:
+            pass
+
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+def archive_expired_server_data(expired_by_date: dict):
+    """
+    Saves/merges expired snapshots into archive files in ARCHIVES_DIR.
+    expired_by_date format:
+    {
+        "YYYY-MM-DD": {
+            "job_id": {
+                "timestamp_iso": { ... state ... },
+                ...
+            },
+            ...
+        }
+    }
+    """
+    if not expired_by_date:
+        return
+
+    os.makedirs(ARCHIVES_DIR, exist_ok=True)
+    
+    for date_str, servers_dict in expired_by_date.items():
+        if not servers_dict:
+            continue
+            
+        base_name = f"servers_{date_str}"
+        json_filename = f"{base_name}.json"
+        gz_filename = f"{base_name}.json.gz"
+        
+        json_rel = os.path.join("archives", json_filename)
+        gz_rel = os.path.join("archives", gz_filename)
+        
+        json_full = os.path.join(ARCHIVES_DIR, json_filename)
+        gz_full = os.path.join(ARCHIVES_DIR, gz_filename)
+        
+        existing_archive = {}
+        target_is_gz = False
+        
+        if os.path.exists(json_full):
+            existing_archive = get_sc_data(json_rel)
+        elif os.path.exists(gz_full):
+            existing_archive = get_sc_data(gz_rel)
+            target_is_gz = True
+            
+        if not isinstance(existing_archive, dict):
+            existing_archive = {}
+        else:
+            existing_archive = dict(existing_archive)
+                
+        for job_id, snaps in servers_dict.items():
+            if job_id not in existing_archive:
+                existing_archive[job_id] = {}
+            else:
+                existing_archive[job_id] = dict(existing_archive[job_id])
+            existing_archive[job_id].update(snaps)
+            
+        target_rel = gz_rel if target_is_gz else json_rel
+        save_sc_data(existing_archive, target_rel)
+        snapshot_count = sum(len(s) for s in servers_dict.values())
+        logger.info(f"Archived {snapshot_count} snapshot(s) for {date_str} to {target_rel}")
+
+def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
+    """
+    Looks up snapshots for a given job_id or short in-game ID across archive files in ARCHIVES_DIR.
+    Returns (matched_job_id, merged_snapshots) or (None, None).
+    """
+    if not query or not os.path.exists(ARCHIVES_DIR):
+        return None, None
+
+    clean_q = query.strip()
+    merged_snapshots = {}
+    matched_job_id = None
+
+    try:
+        archive_files = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
+        for fname in archive_files:
+            if not (fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz"))):
+                continue
+            day_data = get_sc_data(os.path.join("archives", fname))
+            if not isinstance(day_data, dict):
+                continue
+
+            if clean_q in day_data:
+                matched_job_id = clean_q
+                snaps = day_data[clean_q]
+                if isinstance(snaps, dict):
+                    merged_snapshots.update(snaps)
+            else:
+                for j_id, snaps in day_data.items():
+                    if is_exact_job_or_server_id_match(clean_q, j_id):
+                        matched_job_id = j_id
+                        if isinstance(snaps, dict):
+                            merged_snapshots.update(snaps)
+                        break
+
+        if matched_job_id:
+            for fname in archive_files:
+                if not (fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz"))):
+                    continue
+                day_data = get_sc_data(os.path.join("archives", fname))
+                if isinstance(day_data, dict) and matched_job_id in day_data:
+                    snaps = day_data[matched_job_id]
+                    if isinstance(snaps, dict):
+                        merged_snapshots.update(snaps)
+            return matched_job_id, merged_snapshots
+    except Exception as e:
+        logger.error(f"Error querying archived snapshots for {query}: {e}")
+
+    return None, None
+
+def format_file_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+
+def get_all_archive_days_info() -> tuple[list[dict], dict]:
+    """
+    Returns (days_list, summary_stats) for all archived days in ARCHIVES_DIR.
+    """
+    if not os.path.exists(ARCHIVES_DIR):
+        return [], {"total_days": 0, "total_servers": 0, "total_snapshots": 0, "total_size_bytes": 0, "total_size_str": "0 B"}
+
+    archive_map = {}
+    try:
+        filenames = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
+    except Exception:
+        filenames = []
+
+    for fname in filenames:
+        if not fname.startswith("servers_"):
+            continue
+        is_gz = fname.endswith(".json.gz")
+        is_json = fname.endswith(".json") and not is_gz
+        if not (is_gz or is_json):
+            continue
+
+        date_part = fname[len("servers_"):]
+        date_str = date_part[:-len(".json.gz")] if is_gz else date_part[:-len(".json")]
+
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            date_formatted = dt.strftime("%B %d, %Y")
+            day_of_week = dt.strftime("%A")
+        except Exception:
+            date_formatted = date_str
+            day_of_week = ""
+
+        full_path = os.path.join(ARCHIVES_DIR, fname)
+        size_bytes = os.path.getsize(full_path) if os.path.exists(full_path) else 0
+
+        rel_path = os.path.join("archives", fname)
+        day_data = get_sc_data(rel_path)
+        if isinstance(day_data, dict):
+            s_count = len(day_data)
+            snap_count = sum(len(snaps) for snaps in day_data.values() if isinstance(snaps, dict))
+        else:
+            s_count = 0
+            snap_count = 0
+
+        if date_str in archive_map and not is_gz:
+            continue
+
+        archive_map[date_str] = {
+            "date": date_str,
+            "date_formatted": date_formatted,
+            "day_of_week": day_of_week,
+            "filename": fname,
+            "is_compressed": is_gz,
+            "size_bytes": size_bytes,
+            "size_str": format_file_size(size_bytes),
+            "server_count": s_count,
+            "snapshot_count": snap_count,
+            "rel_path": rel_path
+        }
+
+    days_list = sorted(archive_map.values(), key=lambda d: d["date"], reverse=True)
+    total_days = len(days_list)
+    total_servers = sum(d["server_count"] for d in days_list)
+    total_snapshots = sum(d["snapshot_count"] for d in days_list)
+    total_size_bytes = sum(d["size_bytes"] for d in days_list)
+
+    summary_stats = {
+        "total_days": total_days,
+        "total_servers": total_servers,
+        "total_snapshots": total_snapshots,
+        "total_size_bytes": total_size_bytes,
+        "total_size_str": format_file_size(total_size_bytes)
+    }
+
+    return days_list, summary_stats
+
+def compress_finalized_archives(current_data: dict | None = None):
+    """
+    Compresses finalized archive JSON files into .json.gz using max gzip compression (level 9).
+    A day's archive is finalized when:
+    1. The archive date is older than the 48-hour active window.
+    2. No active server currently running in current_data started on that date.
+    """
+    if not os.path.exists(ARCHIVES_DIR):
+        return
+
+    now_utc = datetime.now(timezone.utc)
+    cutoff_date_str = (now_utc - timedelta(hours=48)).strftime('%Y-%m-%d')
+
+    active_start_dates = set()
+    if current_data:
+        for s_id, snaps in current_data.items():
+            if snaps:
+                s_date = get_server_start_date(s_id, snaps)
+                if s_date:
+                    active_start_dates.add(s_date)
+
+    try:
+        for fname in os.listdir(ARCHIVES_DIR):
+            if not fname.startswith("servers_") or not fname.endswith(".json"):
+                continue
+            
+            date_part = fname[len("servers_"):-len(".json")]
+            if len(date_part) != 10 or date_part[4] != '-' or date_part[7] != '-':
+                continue
+
+            if date_part >= cutoff_date_str:
+                continue
+
+            if date_part in active_start_dates:
+                continue
+
+            uncompressed_path = os.path.join(ARCHIVES_DIR, fname)
+            gz_filename = f"{fname}.gz"
+            gz_path = os.path.join(ARCHIVES_DIR, gz_filename)
+
+            try:
+                with open(uncompressed_path, "rb") as f_in:
+                    raw_data = f_in.read()
+
+                compressed_data = gzip.compress(raw_data, compresslevel=9)
+                temp_gz_path = f"{gz_path}.{os.getpid()}_{time.time_ns()}.tmp"
+                with open(temp_gz_path, "wb") as f_out:
+                    f_out.write(compressed_data)
+                    f_out.flush()
+
+                os.replace(temp_gz_path, gz_path)
+                
+                try:
+                    os.remove(uncompressed_path)
+                except Exception:
+                    pass
+
+                with _sc_cache_lock:
+                    _sc_file_cache.pop(os.path.join("archives", fname), None)
+                    
+                ratio = round(len(raw_data) / max(1, len(compressed_data)), 2)
+                logger.info(f"Compressed finalized archive {fname} -> {gz_filename} ({len(raw_data)} -> {len(compressed_data)} bytes, {ratio}x ratio)")
+            except Exception as comp_err:
+                logger.error(f"Failed to compress archive {fname}: {comp_err}")
+    except Exception as e:
+        logger.error(f"Error checking archives for compression: {e}")
+
+def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> bool:
+    """
+    Finds snapshots/servers older than 48 hours in current_data,
+    archives them into files based on the date the server started (data/archives/servers_YYYY-MM-DD.json),
+    and removes them from current_data.
+    Also triggers compression for finalized past archives (.json -> .json.gz).
+    Returns True if current_data was modified (dirty), False otherwise.
+    """
+    now_utc = datetime.now(timezone.utc)
+    cutoff_dt = now_utc - timedelta(hours=48)
+    cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
+
+    servers_dirty = False
+    archived_data_by_date = {}
+
+    def record_expired_snapshot(s_id, ts, s_data, server_start_date):
+        date_str = server_start_date or (ts[:10] if (ts and len(ts) >= 10 and ts[4] == '-' and ts[7] == '-') else now_utc.strftime('%Y-%m-%d'))
+        if date_str not in archived_data_by_date:
+            archived_data_by_date[date_str] = {}
+        if s_id not in archived_data_by_date[date_str]:
+            archived_data_by_date[date_str][s_id] = {}
+        archived_data_by_date[date_str][s_id][ts] = s_data
+
+    for s_id in list(current_data.keys()):
+        if s_id in persistent_ids:
+            continue
+        snaps = current_data.get(s_id, {})
+        if not snaps:
+            del current_data[s_id]
+            servers_dirty = True
+            continue
+
+        server_start_date = get_server_start_date(s_id, snaps)
+        latest_ts = max(snaps.keys())
+        p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else 0
+        
+        if p_count == 0 and latest_ts < cutoff_iso:
+            for ts, s_data in snaps.items():
+                record_expired_snapshot(s_id, ts, s_data, server_start_date)
+            del current_data[s_id]
+            servers_dirty = True
+            logger.info(f"Moved inactive historical server {s_id} (started: {server_start_date}, latest: {latest_ts} < cutoff: {cutoff_iso}) to archive")
+            continue
+
+        earliest_ts = min(snaps.keys())
+        if earliest_ts < cutoff_iso:
+            expired_keys = [ts for ts in snaps.keys() if ts < cutoff_iso]
+            if expired_keys:
+                for ts in expired_keys:
+                    record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+                    del snaps[ts]
+                servers_dirty = True
+
+    if archived_data_by_date:
+        archive_expired_server_data(archived_data_by_date)
+
+    compress_finalized_archives(current_data)
+
+    return servers_dirty
 
 def update_public_roblox_servers():
     base_url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
@@ -1630,36 +2002,17 @@ def pull_server_checker_data():
                     state[unit] = {}
 
             heartbeat = server.get('lastHeartbeat', datetime.now(timezone.utc).isoformat())
+            if job_id not in _sc_server_meta:
+                _sc_server_meta[job_id] = {}
+            if "start_timestamp" not in _sc_server_meta[job_id]:
+                _sc_server_meta[job_id]["start_timestamp"] = heartbeat
+                meta_dirty = True
             current_data[job_id][heartbeat] = state
 
         servers_dirty = bool(servers_list)
-        now_utc = datetime.now(timezone.utc)
-        cutoff_dt = now_utc - timedelta(hours=48)
-        cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
-
-        for s_id in list(current_data.keys()):
-            if s_id in persistent_ids:
-                continue
-            snaps = current_data.get(s_id, {})
-            if not snaps:
-                del current_data[s_id]
-                servers_dirty = True
-                continue
-            latest_ts = max(snaps.keys())
-            p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else 0
-            if p_count == 0 and latest_ts < cutoff_iso:
-                del current_data[s_id]
-                servers_dirty = True
-                logger.info(f"Pruned historical server {s_id} (latest: {latest_ts} < cutoff: {cutoff_iso})")
-                continue
-
-            earliest_ts = min(snaps.keys())
-            if earliest_ts < cutoff_iso:
-                expired_keys = [ts for ts in snaps.keys() if ts < cutoff_iso]
-                if expired_keys:
-                    for ts in expired_keys:
-                        del snaps[ts]
-                    servers_dirty = True
+        pruned_dirty = prune_and_archive_servers_data(current_data, persistent_ids)
+        if pruned_dirty:
+            servers_dirty = True
 
         if servers_dirty:
             save_sc_data(current_data, "servers.json")
@@ -1872,6 +2225,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             "is_private": is_private,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
+            "is_archived": False,
             "player_count": player_count,
             "max_players": max_players,
             "raw_timestamp": latest_timestamp,
@@ -1899,7 +2253,7 @@ def get_active_cards_base(servers_data, persistent_ids):
 
     return cards
 
-def build_server_cards(data, search_query=None):
+def build_server_cards(data, search_query=None, is_archived=False, exact_search_only=True):
     if not data:
         return []
 
@@ -1907,7 +2261,7 @@ def build_server_cards(data, search_query=None):
     persistent_ids = set(persistent_data.get("persistent", {}).keys())
     clean_query = (search_query or "").strip()
 
-    if not clean_query:
+    if not clean_query and not is_archived:
         return list(get_active_cards_base(data, persistent_ids))
 
     cards = []
@@ -1915,7 +2269,10 @@ def build_server_cards(data, search_query=None):
     for job_id, snapshots in sorted(data.items()):
         if not snapshots:
             continue
-        latest_timestamp = max(snapshots.keys())
+        valid_ts_keys = [k for k in snapshots.keys() if not k.startswith('_')]
+        if not valid_ts_keys:
+            continue
+        latest_timestamp = max(valid_ts_keys)
         latest_state = snapshots[latest_timestamp]
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
@@ -1925,7 +2282,8 @@ def build_server_cards(data, search_query=None):
         is_persistent = job_id in persistent_ids
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
 
-        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
+        server_is_archived = is_archived or (isinstance(snapshots, dict) and bool(snapshots.get('_is_archived', False)))
+        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or server_is_archived
         if is_private:
             player_count = None
             max_players = None
@@ -1933,11 +2291,23 @@ def build_server_cards(data, search_query=None):
             player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
             max_players = info.get("maxPlayers", 12) if info else 12
 
-        if is_historical and not is_persistent:
-            if not is_exact_job_or_server_id_match(clean_query, job_id):
-                continue
+        if (is_historical or server_is_archived) and not is_persistent:
+            if exact_search_only:
+                if not is_exact_job_or_server_id_match(clean_query, job_id):
+                    continue
+            elif clean_query:
+                j_parts = [p for p in job_id.split("-") if p]
+                short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+                clean_q_lower = clean_query.lower()
+                matches = (
+                    is_exact_job_or_server_id_match(clean_query, job_id) or
+                    clean_q_lower in job_id.lower() or
+                    (short_id and clean_q_lower in short_id.lower())
+                )
+                if not matches:
+                    continue
 
-        first_timestamp = min(snapshots.keys())
+        first_timestamp = min(valid_ts_keys)
         uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
         uptime_str = format_uptime_duration(uptime_sec)
 
@@ -1950,6 +2320,7 @@ def build_server_cards(data, search_query=None):
             "is_private": is_private,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
+            "is_archived": server_is_archived,
             "player_count": player_count,
             "max_players": max_players,
             "raw_timestamp": latest_timestamp,
@@ -1958,7 +2329,7 @@ def build_server_cards(data, search_query=None):
             "latest_timestamp": f"{age_sec}s ago",
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
-            "snapshot_count": len(snapshots),
+            "snapshot_count": len(valid_ts_keys),
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
@@ -2287,7 +2658,9 @@ def servers_page():
 @app.route("/servers/<job_id>", methods=["GET"])
 def server_detail_page(job_id):
     servers_data = get_sc_data("servers.json")
-    snapshots = servers_data.get(job_id)
+    snapshots = servers_data.get(job_id) if servers_data else None
+    is_archived = False
+
     if snapshots is None:
         if _sc_latest_data:
             for s in _sc_latest_data.get('data', {}).get('servers', []):
@@ -2295,6 +2668,13 @@ def server_detail_page(job_id):
                     snapshots = {s.get('lastHeartbeat', datetime.now(timezone.utc).isoformat()): s.get('state', {})}
                     break
                     
+    if snapshots is None:
+        matched_jid, archived_snaps = get_archived_server_snapshots(job_id)
+        if matched_jid and archived_snaps:
+            job_id = matched_jid
+            snapshots = archived_snaps
+            is_archived = True
+
     if snapshots is None:
         return redirect("/servers")
 
@@ -2305,7 +2685,7 @@ def server_detail_page(job_id):
         return redirect("/servers")
 
     server = None
-    if _sc_latest_data:
+    if _sc_latest_data and not is_archived:
         for s in _sc_latest_data.get('data', {}).get('servers', []):
             if s.get('jobId') == job_id:
                 server = s
@@ -2319,8 +2699,8 @@ def server_detail_page(job_id):
     latest_state = snapshots.get(latest_ts, {}) if latest_ts else {}
     age_sec = convert_ISO_to_secs(latest_ts) if latest_ts else 0
 
-    is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-    is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
+    is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600 and not is_archived))
+    is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or is_archived
     if is_private:
         player_count = None
         max_players = None
@@ -2343,6 +2723,7 @@ def server_detail_page(job_id):
             "is_private": is_private,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
+            "is_archived": is_archived,
             "is_admin": is_admin,
             "player_count": player_count,
             "max_players": max_players,
@@ -2380,6 +2761,7 @@ def server_detail_page(job_id):
         "is_private": is_private,
         "is_persistent": is_persistent,
         "is_historical": is_historical,
+        "is_archived": is_archived,
         "is_admin": is_admin,
         "player_count": player_count,
         "max_players": max_players,
@@ -2409,16 +2791,20 @@ def lookup_server_api():
     if not query:
         return jsonify({"success": True, "found": False, "message": "Query parameter 'q' is required."})
 
-    servers_data = get_sc_data("servers.json")
-    if not servers_data:
-        return jsonify({"success": True, "found": False})
-
+    servers_data = get_sc_data("servers.json") or {}
     matched_cards = build_server_cards(servers_data, search_query=query)
     target_card = None
     for card in matched_cards:
         if is_exact_job_or_server_id_match(query, card.get("job_id", "")):
             target_card = card
             break
+
+    if not target_card:
+        archived_jid, archived_snaps = get_archived_server_snapshots(query)
+        if archived_jid and archived_snaps:
+            archived_cards = build_server_cards({archived_jid: archived_snaps}, search_query=query, is_archived=True)
+            if archived_cards:
+                target_card = archived_cards[0]
 
     if not target_card:
         return jsonify({"success": True, "found": False})
@@ -2478,6 +2864,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "is_private": is_private,
             "is_persistent": is_persistent,
             "is_historical": True,
+            "is_archived": False,
             "player_count": player_count,
             "max_players": max_players,
             "raw_timestamp": latest_timestamp,
@@ -2599,6 +2986,115 @@ def get_historical_servers_api():
 def refresh_servers_api():
     success = pull_server_checker_data()
     return jsonify({"success": success})
+
+@app.route("/archives", methods=["GET"])
+def browse_archives_page():
+    days_list, summary_stats = get_all_archive_days_info()
+    return render_template("archives.html", days=days_list, stats=summary_stats)
+
+@app.route("/archives/<date_str>", methods=["GET"])
+def view_archive_day_page(date_str):
+    date_str = date_str.strip()
+    gz_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json.gz")
+    json_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json")
+
+    target_rel = None
+    is_compressed = False
+    filename = None
+
+    if os.path.exists(gz_path):
+        target_rel = os.path.join("archives", f"servers_{date_str}.json.gz")
+        is_compressed = True
+        filename = f"servers_{date_str}.json.gz"
+    elif os.path.exists(json_path):
+        target_rel = os.path.join("archives", f"servers_{date_str}.json")
+        is_compressed = False
+        filename = f"servers_{date_str}.json"
+    else:
+        return redirect("/archives")
+
+    day_data = get_sc_data(target_rel)
+    if not isinstance(day_data, dict):
+        return redirect("/archives")
+
+    full_path = os.path.join(ARCHIVES_DIR, filename)
+    size_bytes = os.path.getsize(full_path) if os.path.exists(full_path) else 0
+
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        date_formatted = dt.strftime("%B %d, %Y")
+        day_of_week = dt.strftime("%A")
+    except Exception:
+        date_formatted = date_str
+        day_of_week = ""
+
+    server_cards = build_server_cards(day_data, is_archived=True, exact_search_only=False)
+    total_snaps = sum(c.get("snapshot_count", 0) for c in server_cards)
+
+    stats = {
+        "date": date_str,
+        "date_formatted": date_formatted,
+        "day_of_week": day_of_week,
+        "filename": filename,
+        "is_compressed": is_compressed,
+        "size_str": format_file_size(size_bytes),
+        "total_servers": len(server_cards),
+        "total_snapshots": total_snaps
+    }
+
+    return render_template(
+        "archive_detail.html",
+        date=date_str,
+        date_formatted=date_formatted,
+        day_of_week=day_of_week,
+        servers=server_cards,
+        stats=stats
+    )
+
+@app.route("/api/archives", methods=["GET"])
+def get_archives_api():
+    days_list, summary_stats = get_all_archive_days_info()
+    return jsonify({
+        "success": True,
+        "days": days_list,
+        "stats": summary_stats
+    })
+
+@app.route("/api/archives/<date_str>", methods=["GET"])
+def get_archive_day_api(date_str):
+    date_str = date_str.strip()
+    gz_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json.gz")
+    json_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json")
+
+    target_rel = None
+    is_compressed = False
+    filename = None
+    if os.path.exists(gz_path):
+        target_rel = os.path.join("archives", f"servers_{date_str}.json.gz")
+        is_compressed = True
+        filename = f"servers_{date_str}.json.gz"
+    elif os.path.exists(json_path):
+        target_rel = os.path.join("archives", f"servers_{date_str}.json")
+        is_compressed = False
+        filename = f"servers_{date_str}.json"
+    else:
+        return jsonify({"success": False, "message": f"No archive found for date {date_str}."}), 404
+
+    day_data = get_sc_data(target_rel)
+    if not isinstance(day_data, dict):
+        return jsonify({"success": False, "message": "Failed to read archive data."}), 500
+
+    query = (request.args.get("q") or "").strip()
+    server_cards = build_server_cards(day_data, search_query=query, is_archived=True, exact_search_only=False)
+
+    return jsonify({
+        "success": True,
+        "date": date_str,
+        "filename": filename,
+        "is_compressed": is_compressed,
+        "total_servers": len(server_cards),
+        "servers": server_cards
+    })
 
 _servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
 _cache_lock = threading.Lock()
@@ -2856,13 +3352,21 @@ def add_ticket_message_api(ticket_id):
             sender_label = "Administrator" if is_adm else "Ticket Author"
             content = f"**[{sender_label}] {s_name}**:\n{m_text}"
             async def _send_fwd_async():
+                if not disnake_bot:
+                    return None
+                
                 channel = disnake_bot.get_channel(int(ch_id))
                 if not channel:
                     channel = await disnake_bot.fetch_channel(int(ch_id))
+
+                if not channel or not isinstance(channel, disnake.TextChannel):
+                    logger.warning(f"[Disnake Forward] Channel {ch_id} is not a text channel or doesnt exist.")
+                    return None
+                    
                 sent = await channel.send(content=content)
                 return str(sent.id)
             try:
-                fut = asyncio.run_coroutine_threadsafe(_send_fwd_async(), disnake_bot_loop)
+                fut = asyncio.run_coroutine_threadsafe(_send_fwd_async(), disnake_bot_loop)  # pyright: ignore[reportArgumentType]
                 d_id = fut.result(timeout=8)
                 if d_id:
                     d = load_suggestions()

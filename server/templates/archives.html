@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - Server Archives{% endblock %}
+
+{% block content %}
+<main
+    class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+                <a href="/servers"
+                    class="text-xs font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
+                        </path>
+                    </svg>
+                    Live Server Browser
+                </a>
+                <span class="text-gray-600">/</span>
+                <span class="text-xs font-mono text-cyan-400 font-semibold">Archives</span>
+            </div>
+            <h1
+                class="text-3xl sm:text-4xl md:text-5xl font-display font-semibold tracking-tight text-white flex items-center gap-3">
+                Server Archives
+            </h1>
+            <p class="text-gray-400 text-sm max-w-2xl">
+                Browse finalized historical Roblox server archives by day.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-cyan-400 font-semibold">Archived
+                    Days</span>
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+                    {{ stats.total_days }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Historical days stored</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-emerald-400 font-semibold">Stored
+                    Servers</span>
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-emerald-300 tracking-tight">
+                    {{ "{:,}".format(stats.total_servers) }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Total instances archived</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-amber-400 font-semibold">Snapshots</span>
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-amber-300 tracking-tight">
+                    {{ "{:,}".format(stats.total_snapshots) }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Recorded data points</span>
+            </div>
+        </div>
+
+        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-mono text-blue-400 font-semibold">Archive
+                    Storage</span>
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4">
+                    </path>
+                </svg>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-blue-300 tracking-tight">
+                    {{ stats.total_size_str }}
+                </span>
+                <span class="text-[11px] font-mono text-gray-400 mt-0.5">Gzip max compressed</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+        <div>
+            <h2 class="text-xl sm:text-2xl font-display font-semibold text-white">Archived Days</h2>
+            <p id="daysCountLabel" class="text-xs text-gray-400 font-mono mt-0.5">
+                Showing {{ days|length }} archived day{{ 's' if days|length != 1 else '' }}
+            </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div class="relative w-full sm:w-[260px] min-w-[220px] shrink-0">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                    </svg>
+                </div>
+                <select id="archiveSort" onchange="filterArchiveDays()"
+                    class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-cyan-500/50 appearance-none cursor-pointer">
+                    <option value="newest">Sort: Newest Date</option>
+                    <option value="oldest">Sort: Oldest Date</option>
+                    <option value="servers_desc">Sort: Most Servers</option>
+                    <option value="servers_asc">Sort: Fewest Servers</option>
+                    <option value="snapshots_desc">Sort: Most Snapshots</option>
+                    <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="relative min-w-[280px] sm:min-w-[340px]">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" autocomplete="off" spellcheck="false" id="archiveDaySearch"
+                    oninput="filterArchiveDays()" placeholder="Search by date (e.g. 2026-09-10, Sept, Thursday)..."
+                    class="premium-input w-full pl-10 pr-10 py-2.5 text-xs font-mono rounded-xl bg-[#121217] placeholder:text-gray-500 focus:border-cyan-500/50" />
+                <button type="button" id="clearDaySearchBtn" onclick="clearDaySearch()"
+                    class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="archiveDaysGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {% if days and days|length > 0 %}
+        {% for day in days %}
+        <div class="archive-day-card premium-glass rounded-2xl p-5 shadow-xl border border-white/10 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-5 interactive-card"
+            data-date="{{ day.date }}" data-date-formatted="{{ day.date_formatted }}"
+            data-day-of-week="{{ day.day_of_week }}" data-servers="{{ day.server_count }}"
+            data-snapshots="{{ day.snapshot_count }}">
+            <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2 border-b border-white/5 pb-3">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span
+                            class="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
+                            {{ day.date }}
+                        </span>
+                        {% if day.is_compressed %}
+                        <span
+                            class="px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[10px] font-mono font-bold flex items-center gap-1"
+                            title="Gzip Compressed Archive">
+                            <span>Compressed</span>
+                        </span>
+                        {% else %}
+                        <span
+                            class="px-2 py-0.5 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-400 text-[10px] font-mono">
+                            JSON
+                        </span>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs font-mono text-gray-400" title="File Size">
+                        {{ day.size_str }}
+                    </span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-display font-semibold text-white hover:text-cyan-300 transition-colors">
+                            {{ day.date_formatted }}
+                        </h3>
+                        {% if day.day_of_week %}
+                        <span class="text-xs font-mono text-gray-400">{{ day.day_of_week }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+                    <div class="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
+                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                            Archived Servers
+                        </span>
+                        <span class="font-mono font-bold text-base text-cyan-300">
+                            {{ "{:,}".format(day.server_count) }}
+                        </span>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
+                        <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                            Total Snapshots
+                        </span>
+                        <span class="font-mono font-bold text-base text-emerald-300">
+                            {{ "{:,}".format(day.snapshot_count) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-white/5">
+                <a href="/archives/{{ day.date }}"
+                    class="w-full py-2.5 px-4 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 hover:text-cyan-200 border border-cyan-500/30 rounded-xl text-xs font-semibold font-display transition-all flex items-center justify-center gap-2 group shadow-sm">
+                    <span>Browse All Servers ({{ day.server_count }})</span>
+                    <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div
+            class="col-span-full premium-glass rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/10">
+            <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4">
+                </path>
+            </svg>
+            <h3 class="text-lg font-display font-semibold text-white">No archive files found</h3>
+            <p class="text-xs text-gray-400 max-w-md font-mono">
+                Server snapshots older than 48 hours are automatically archived by day into the archives directory.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="noArchiveResultsNotice"
+        class="hidden premium-glass rounded-2xl p-8 text-center flex-col items-center justify-center gap-2 border border-white/10">
+        <p class="text-sm font-semibold text-gray-300 font-display">No archived days found matching your search.</p>
+        <button type="button" onclick="clearDaySearch()" class="text-xs font-mono text-cyan-400 hover:underline">
+            Clear date search query
+        </button>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterArchiveDays() {
+        const searchInput = document.getElementById('archiveDaySearch');
+        const sortSelect = document.getElementById('archiveSort');
+        const clearBtn = document.getElementById('clearDaySearchBtn');
+        const countLabel = document.getElementById('daysCountLabel');
+        const noResults = document.getElementById('noArchiveResultsNotice');
+        const grid = document.getElementById('archiveDaysGrid');
+        const cards = Array.from(document.querySelectorAll('.archive-day-card'));
+
+        const raw = (searchInput?.value || '').trim().toLowerCase();
+        const sortVal = sortSelect?.value || 'newest';
+
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', raw.length === 0);
+        }
+
+        const matchingCards = [];
+        cards.forEach(card => {
+            const date = (card.dataset.date || '').toLowerCase();
+            const formatted = (card.dataset.dateFormatted || '').toLowerCase();
+            const dow = (card.dataset.dayOfWeek || '').toLowerCase();
+
+            const matches = (raw.length === 0) || date.includes(raw) || formatted.includes(raw) || dow.includes(raw);
+
+            if (matches) {
+                matchingCards.push(card);
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        matchingCards.sort((a, b) => {
+            const dateA = a.dataset.date || '';
+            const dateB = b.dataset.date || '';
+            const sCountA = parseInt(a.dataset.servers || '0', 10);
+            const sCountB = parseInt(b.dataset.servers || '0', 10);
+            const snapCountA = parseInt(a.dataset.snapshots || '0', 10);
+            const snapCountB = parseInt(b.dataset.snapshots || '0', 10);
+
+            if (sortVal === 'oldest') {
+                return dateA.localeCompare(dateB);
+            } else if (sortVal === 'servers_desc') {
+                return (sCountB - sCountA) || (snapCountB - snapCountA) || dateB.localeCompare(dateA);
+            } else if (sortVal === 'servers_asc') {
+                return (sCountA - sCountB) || (snapCountA - snapCountB) || dateB.localeCompare(dateA);
+            } else if (sortVal === 'snapshots_desc') {
+                return (snapCountB - snapCountA) || (sCountB - sCountA) || dateB.localeCompare(dateA);
+            } else if (sortVal === 'snapshots_asc') {
+                return (snapCountA - snapCountB) || (sCountA - sCountB) || dateB.localeCompare(dateA);
+            } else {
+                return dateB.localeCompare(dateA);
+            }
+        });
+
+        if (grid) {
+            matchingCards.forEach(card => {
+                grid.appendChild(card);
+                card.style.display = 'flex';
+            });
+        }
+
+        if (countLabel) {
+            if (raw.length > 0) {
+                countLabel.textContent = `Showing ${matchingCards.length} matching day${matchingCards.length !== 1 ? 's' : ''}`;
+            } else {
+                countLabel.textContent = `Showing ${cards.length} archived day${cards.length !== 1 ? 's' : ''}`;
+            }
+        }
+
+        if (noResults) {
+            if (matchingCards.length === 0 && cards.length > 0) {
+                noResults.classList.remove('hidden');
+                noResults.classList.add('flex');
+            } else {
+                noResults.classList.add('hidden');
+                noResults.classList.remove('flex');
+            }
+        }
+    }
+
+    function clearDaySearch() {
+        const searchInput = document.getElementById('archiveDaySearch');
+        if (searchInput) {
+            searchInput.value = '';
+            filterArchiveDays();
+            searchInput.focus();
+        }
+    }
+</script>
+{% endblock %}
