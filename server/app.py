@@ -1322,17 +1322,6 @@ _sc_server_ids = []
 _sc_latest_data = {}
 _sc_server_meta = {}
 
-def load_server_meta():
-    global _sc_server_meta
-    data = get_sc_data("server_meta.json")
-    if isinstance(data, dict):
-        _sc_server_meta.clear()
-        _sc_server_meta.update(data)
-    return _sc_server_meta
-
-def save_server_meta():
-    save_sc_data(_sc_server_meta, "server_meta.json")
-
 def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
     if job_id in _sc_public_server_ids:
         return False
@@ -1486,6 +1475,19 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
                 pass
     return False
 
+def load_server_meta():
+    global _sc_server_meta
+    data = get_sc_data("server_meta.json")
+    if isinstance(data, dict):
+        _sc_server_meta.clear()
+        _sc_server_meta.update(data)
+    return _sc_server_meta
+
+load_server_meta()
+
+def save_server_meta():
+    save_sc_data(_sc_server_meta, "server_meta.json")
+
 def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
     """
     Returns the YYYY-MM-DD date when this server first started.
@@ -1530,7 +1532,9 @@ def get_active_server_start_dates(current_data: dict | None = None) -> set:
     that are still ACTIVE (i.e. not historical).
     """
     active_dates = set()
-    if not current_data:
+    if current_data is None:
+        current_data = get_sc_data("servers.json")
+    if not isinstance(current_data, dict):
         return active_dates
 
     now_utc = datetime.now(timezone.utc)
@@ -1890,6 +1894,24 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
 
         meta = _sc_server_meta.setdefault(s_id, {})
         last_archived_ts = meta.get("last_archived_ts", "")
+        if not last_archived_ts and server_start_date:
+            gz_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json.gz")
+            json_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json")
+            target_rel = None
+            if os.path.exists(gz_path):
+                target_rel = os.path.join("archives", f"servers_{server_start_date}.json.gz")
+            elif os.path.exists(json_path):
+                target_rel = os.path.join("archives", f"servers_{server_start_date}.json")
+            if target_rel:
+                arch_data = get_sc_data(target_rel)
+                if isinstance(arch_data, dict) and s_id in arch_data:
+                    arch_snaps = arch_data[s_id]
+                    if isinstance(arch_snaps, dict) and arch_snaps:
+                        valid_arch_keys = [k for k in arch_snaps.keys() if not k.startswith('_')]
+                        if valid_arch_keys:
+                            last_archived_ts = max(valid_arch_keys)
+                            meta["last_archived_ts"] = last_archived_ts
+                            meta_dirty = True
 
         if is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
             unarchived_keys = [ts for ts in valid_ts_keys if ts > last_archived_ts]
