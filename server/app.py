@@ -1846,6 +1846,7 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
     cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
 
     servers_dirty = False
+    meta_dirty = False
     archived_data_by_date = {}
 
     def record_expired_snapshot(s_id, ts, s_data, server_start_date):
@@ -1887,12 +1888,22 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
         age_sec = convert_ISO_to_secs(latest_ts, now=now_utc)
         server_start_date = get_server_start_date(s_id, snaps)
 
+        meta = _sc_server_meta.setdefault(s_id, {})
+        last_archived_ts = meta.get("last_archived_ts", "")
+
         if is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
-            for ts in valid_ts_keys:
-                record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+            unarchived_keys = [ts for ts in valid_ts_keys if ts > last_archived_ts]
+            if unarchived_keys:
+                for ts in unarchived_keys:
+                    record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+                meta["last_archived_ts"] = max(unarchived_keys)
+                meta_dirty = True
+
             if latest_ts < cutoff_iso:
                 del current_data[s_id]
+                _sc_server_meta.pop(s_id, None)
                 servers_dirty = True
+                meta_dirty = True
                 logger.info(f"Purged expired historical server {s_id} (>48h inactive, started: {server_start_date}) from servers.json")
             continue
 
@@ -1903,10 +1914,15 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
                 for ts in expired_keys:
                     record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
                     del snaps[ts]
+                meta["last_archived_ts"] = max(meta.get("last_archived_ts", ""), max(expired_keys))
                 servers_dirty = True
+                meta_dirty = True
 
     if archived_data_by_date:
         archive_expired_server_data(archived_data_by_date, current_data)
+
+    if meta_dirty:
+        save_server_meta()
 
     compress_finalized_archives(current_data)
 
