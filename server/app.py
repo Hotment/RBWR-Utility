@@ -1526,7 +1526,7 @@ def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
 
 def archive_expired_server_data(expired_by_date: dict):
     """
-    Saves/merges expired snapshots into archive files in ARCHIVES_DIR.
+    Saves/merges expired snapshots directly into .json.gz compressed archive files in ARCHIVES_DIR.
     expired_by_date format:
     {
         "YYYY-MM-DD": {
@@ -1558,13 +1558,11 @@ def archive_expired_server_data(expired_by_date: dict):
         gz_full = os.path.join(ARCHIVES_DIR, gz_filename)
         
         existing_archive = {}
-        target_is_gz = False
         
-        if os.path.exists(json_full):
-            existing_archive = get_sc_data(json_rel)
-        elif os.path.exists(gz_full):
+        if os.path.exists(gz_full):
             existing_archive = get_sc_data(gz_rel)
-            target_is_gz = True
+        elif os.path.exists(json_full):
+            existing_archive = get_sc_data(json_rel)
             
         if not isinstance(existing_archive, dict):
             existing_archive = {}
@@ -1578,10 +1576,18 @@ def archive_expired_server_data(expired_by_date: dict):
                 existing_archive[job_id] = dict(existing_archive[job_id])
             existing_archive[job_id].update(snaps)
             
-        target_rel = gz_rel if target_is_gz else json_rel
-        save_sc_data(existing_archive, target_rel)
+        save_sc_data(existing_archive, gz_rel)
+
+        if os.path.exists(json_full):
+            try:
+                os.remove(json_full)
+                with _sc_cache_lock:
+                    _sc_file_cache.pop(json_rel, None)
+            except Exception:
+                pass
+
         snapshot_count = sum(len(s) for s in servers_dict.values())
-        logger.info(f"Archived {snapshot_count} snapshot(s) for {date_str} to {target_rel}")
+        logger.info(f"Archived {snapshot_count} snapshot(s) for {date_str} to {gz_rel} (compressed)")
 
 def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
     """
@@ -1718,24 +1724,12 @@ def get_all_archive_days_info() -> tuple[list[dict], dict]:
 
 def compress_finalized_archives(current_data: dict | None = None):
     """
-    Compresses finalized archive JSON files into .json.gz using max gzip compression (level 9).
-    A day's archive is finalized when:
-    1. The archive date is older than the 48-hour active window.
-    2. No active server currently running in current_data started on that date.
+    Compresses all uncompressed archive JSON files into .json.gz using max gzip compression (level 9).
+    Scans ARCHIVES_DIR for any uncompressed servers_*.json files, converts/merges them to .json.gz,
+    and removes the uncompressed .json files.
     """
     if not os.path.exists(ARCHIVES_DIR):
         return
-
-    now_utc = datetime.now(timezone.utc)
-    cutoff_date_str = (now_utc - timedelta(hours=48)).strftime('%Y-%m-%d')
-
-    active_start_dates = set()
-    if current_data:
-        for s_id, snaps in current_data.items():
-            if snaps:
-                s_date = get_server_start_date(s_id, snaps)
-                if s_date:
-                    active_start_dates.add(s_date)
 
     try:
         for fname in os.listdir(ARCHIVES_DIR):
@@ -1746,38 +1740,51 @@ def compress_finalized_archives(current_data: dict | None = None):
             if len(date_part) != 10 or date_part[4] != '-' or date_part[7] != '-':
                 continue
 
-            if date_part >= cutoff_date_str:
-                continue
-
-            if date_part in active_start_dates:
-                continue
-
             uncompressed_path = os.path.join(ARCHIVES_DIR, fname)
             gz_filename = f"{fname}.gz"
             gz_path = os.path.join(ARCHIVES_DIR, gz_filename)
+            json_rel = os.path.join("archives", fname)
+            gz_rel = os.path.join("archives", gz_filename)
 
             try:
-                with open(uncompressed_path, "rb") as f_in:
-                    raw_data = f_in.read()
-
-                compressed_data = gzip.compress(raw_data, compresslevel=9)
-                temp_gz_path = f"{gz_path}.{os.getpid()}_{time.time_ns()}.tmp"
-                with open(temp_gz_path, "wb") as f_out:
-                    f_out.write(compressed_data)
-                    f_out.flush()
-
-                os.replace(temp_gz_path, gz_path)
-                
-                try:
-                    os.remove(uncompressed_path)
-                except Exception:
-                    pass
+                if os.path.exists(gz_path):
+                    day_json = get_sc_data(json_rel)
+                    day_gz = get_sc_data(gz_rel)
+                    if isinstance(day_json, dict) and isinstance(day_gz, dict):
+                        for j_id, snaps in day_json.items():
+                            if j_id not in day_gz:
+                                day_gz[j_id] = {}
+                            else:
+                                day_gz[j_id] = dict(day_gz[j_id])
+                            day_gz[j_id].update(snaps)
+                        save_sc_data(day_gz, gz_rel)
+                    try:
+                        os.remove(uncompressed_path)
+                    except Exception:
+                        pass
+                else:
+                    data = get_sc_data(json_rel)
+                    if isinstance(data, dict) and data:
+                        save_sc_data(data, gz_rel)
+                    else:
+                        with open(uncompressed_path, "rb") as f_in:
+                            raw_data = f_in.read()
+                        compressed_data = gzip.compress(raw_data, compresslevel=9)
+                        temp_gz_path = f"{gz_path}.{os.getpid()}_{time.time_ns()}.tmp"
+                        with open(temp_gz_path, "wb") as f_out:
+                            f_out.write(compressed_data)
+                            f_out.flush()
+                        os.replace(temp_gz_path, gz_path)
+                    
+                    try:
+                        os.remove(uncompressed_path)
+                    except Exception:
+                        pass
 
                 with _sc_cache_lock:
-                    _sc_file_cache.pop(os.path.join("archives", fname), None)
+                    _sc_file_cache.pop(json_rel, None)
                     
-                ratio = round(len(raw_data) / max(1, len(compressed_data)), 2)
-                logger.info(f"Compressed finalized archive {fname} -> {gz_filename} ({len(raw_data)} -> {len(compressed_data)} bytes, {ratio}x ratio)")
+                logger.info(f"Compressed archive {fname} -> {gz_filename}")
             except Exception as comp_err:
                 logger.error(f"Failed to compress archive {fname}: {comp_err}")
     except Exception as e:
@@ -2029,6 +2036,10 @@ def pull_server_checker_data():
 
 def server_checker_worker():
     time.sleep(2)
+    try:
+        compress_finalized_archives()
+    except Exception as e:
+        logger.error(f"Error in initial archive compression: {e}")
     while True:
         try:
             pull_server_checker_data()
