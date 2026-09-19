@@ -95,6 +95,157 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function groupBreakdownSources(breakdownData) {
+        const entries = Array.isArray(breakdownData)
+            ? breakdownData
+            : Object.entries(breakdownData || {});
+
+        const regularList = [];
+        const missionList = [];
+        let totalMissionPoints = 0;
+
+        entries.forEach(([cat, val]) => {
+            const numVal = typeof val === "number" ? val : parseFloat(val) || 0;
+            const trimmedCat = (cat || "").trim();
+            if (!trimmedCat && numVal === 0) return;
+
+            if (/^mission\s*completed\s*:/i.test(trimmedCat)) {
+                const cleanSubName = trimmedCat.replace(/^mission\s*completed\s*:\s*/i, "").trim();
+                missionList.push({
+                    fullName: trimmedCat,
+                    displayName: cleanSubName || trimmedCat,
+                    value: numVal
+                });
+                totalMissionPoints += numVal;
+            } else {
+                regularList.push({
+                    isGroup: false,
+                    name: trimmedCat || "Unknown",
+                    value: numVal
+                });
+            }
+        });
+
+        if (missionList.length > 0) {
+            missionList.sort((a, b) => b.value - a.value);
+            regularList.push({
+                isGroup: true,
+                groupKey: "mission_completed",
+                name: "Mission Completed",
+                value: totalMissionPoints,
+                count: missionList.length,
+                subItems: missionList
+            });
+        }
+
+        regularList.sort((a, b) => b.value - a.value);
+        return regularList;
+    }
+
+    function renderBreakdownItems(containerEl, groupedItems, totalBasePoints, isModal = false) {
+        if (!containerEl) return;
+        containerEl.innerHTML = "";
+
+        if (!groupedItems || groupedItems.length === 0) {
+            containerEl.innerHTML = `<p style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0;">No sub-category breakdown recorded for this event.</p>`;
+            return;
+        }
+
+        const denom = totalBasePoints || groupedItems.reduce((sum, item) => sum + item.value, 0) || 1;
+        const prefix = isModal ? "+" : "";
+
+        groupedItems.forEach((item, idx) => {
+            const pct = Math.min(100, Math.max(0, ((item.value / denom) * 100))).toFixed(1);
+            const barPct = isModal ? Math.min(100, Math.max(4, pct)) : pct;
+
+            const itemEl = document.createElement("div");
+
+            if (!item.isGroup) {
+                itemEl.className = "breakdown-item";
+                itemEl.innerHTML = `
+                    <div class="breakdown-item-header">
+                        <span class="breakdown-name">${item.name}</span>
+                        <span class="breakdown-val">${prefix}${item.value.toLocaleString()} pts (${pct}%)</span>
+                    </div>
+                    <div class="breakdown-bar-bg">
+                        <div class="breakdown-bar-fill" style="width: ${barPct}%;"></div>
+                    </div>
+                `;
+            } else {
+                const groupId = `breakdownGroup_${isModal ? 'modal_' : ''}${idx}`;
+                itemEl.className = "breakdown-item breakdown-group";
+                itemEl.id = groupId;
+
+                let subItemsHtml = "";
+                item.subItems.forEach(sub => {
+                    const subPctOfTotal = Math.min(100, Math.max(0, ((sub.value / denom) * 100))).toFixed(1);
+                    const subPctOfGroup = item.value > 0 ? ((sub.value / item.value) * 100).toFixed(1) : "0";
+                    const subBarPct = Math.min(100, Math.max(3, subPctOfGroup));
+
+                    subItemsHtml += `
+                        <div class="breakdown-subitem">
+                            <div class="breakdown-subitem-header">
+                                <span class="breakdown-subitem-name" title="${sub.fullName}">
+                                    <span class="breakdown-subitem-dot"></span>
+                                    <span>${sub.displayName}</span>
+                                </span>
+                                <span class="breakdown-subitem-val">${prefix}${sub.value.toLocaleString()} pts <span class="breakdown-subitem-pct">(${subPctOfTotal}% total · ${subPctOfGroup}% of missions)</span></span>
+                            </div>
+                            <div class="breakdown-subitem-bar-bg">
+                                <div class="breakdown-subitem-bar-fill" style="width: ${subBarPct}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                itemEl.innerHTML = `
+                    <div class="breakdown-item-header breakdown-group-header" role="button" tabindex="0" title="Click to view all ${item.count} individual missions">
+                        <div class="breakdown-group-title-box">
+                            <svg class="breakdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                            <span class="breakdown-name">${item.name}</span>
+                            <span class="breakdown-group-badge">${item.count} Mission${item.count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="breakdown-group-right">
+                            <span class="breakdown-val">${prefix}${item.value.toLocaleString()} pts (${pct}%)</span>
+                            <span class="breakdown-expand-hint">Expand</span>
+                        </div>
+                    </div>
+                    <div class="breakdown-bar-bg">
+                        <div class="breakdown-bar-fill" style="width: ${barPct}%;"></div>
+                    </div>
+                    <div class="breakdown-subitems-list">
+                        <div class="breakdown-subitems-meta">
+                            <span>Individual Mission Breakdown (${item.count} completed)</span>
+                            <span>Points</span>
+                        </div>
+                        ${subItemsHtml}
+                    </div>
+                `;
+
+                const header = itemEl.querySelector(".breakdown-group-header");
+                const hint = itemEl.querySelector(".breakdown-expand-hint");
+                const toggleFn = (e) => {
+                    e.stopPropagation();
+                    const isExpanded = itemEl.classList.toggle("expanded");
+                    if (hint) hint.textContent = isExpanded ? "Collapse" : "Expand";
+                };
+                if (header) {
+                    header.addEventListener("click", toggleFn);
+                    header.addEventListener("keydown", (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleFn(e);
+                        }
+                    });
+                }
+            }
+
+            containerEl.appendChild(itemEl);
+        });
+    }
+
     function showDatapointModal(d) {
         if (!d || !localDatapointModal) return;
         if (localModalDpDate) localModalDpDate.textContent = (d.formatted_date || "") + ", 2026";
@@ -110,26 +261,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (localModalDpTotal) localModalDpTotal.textContent = ((d.u1 || 0) + (d.u2 || 0)).toLocaleString();
 
         if (localModalDpBreakdownList) {
-            localModalDpBreakdownList.innerHTML = "";
             if (d.breakdown && typeof d.breakdown === "object" && Object.keys(d.breakdown).length > 0) {
-                const entries = Object.entries(d.breakdown).sort((a, b) => b[1] - a[1]);
-                const totalChange = d.change || entries.reduce((sum, item) => sum + item[1], 0) || 1;
-
-                entries.forEach(([cat, val]) => {
-                    const pct = Math.min(100, Math.max(5, ((val / totalChange) * 100).toFixed(1)));
-                    const item = document.createElement("div");
-                    item.className = "breakdown-item";
-                    item.innerHTML = `
-                        <div class="breakdown-item-header">
-                            <span class="breakdown-name">${cat}</span>
-                            <span class="breakdown-val">+${val.toLocaleString()} pts (${((val / totalChange) * 100).toFixed(1)}%)</span>
-                        </div>
-                        <div class="breakdown-bar-bg">
-                            <div class="breakdown-bar-fill" style="width: ${pct}%;"></div>
-                        </div>
-                    `;
-                    localModalDpBreakdownList.appendChild(item);
-                });
+                const grouped = groupBreakdownSources(d.breakdown);
+                const totalChange = d.change || grouped.reduce((sum, item) => sum + item.value, 0) || 1;
+                renderBreakdownItems(localModalDpBreakdownList, grouped, totalChange, true);
             } else {
                 localModalDpBreakdownList.innerHTML = `<p style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0;">No sub-category breakdown recorded for this event.</p>`;
             }
@@ -327,27 +462,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (localStatTimelinePoints) localStatTimelinePoints.textContent = `${timeline.length} Events`;
         if (localStatPlayerId) localStatPlayerId.textContent = player.id || player.username || "Local Player";
 
-        const sortedBreakdown = Object.entries(categoryTotals.OVERALL).sort((a, b) => b[1] - a[1]);
-        const overallPoints = sortedBreakdown.reduce((sum, item) => sum + item[1], 0) || 1;
-        if (localBreakdownTotalSources) localBreakdownTotalSources.textContent = `${sortedBreakdown.length} Categories`;
+        const groupedBreakdown = groupBreakdownSources(categoryTotals.OVERALL);
+        const overallPoints = groupedBreakdown.reduce((sum, item) => sum + item.value, 0) || 1;
+        if (localBreakdownTotalSources) localBreakdownTotalSources.textContent = `${groupedBreakdown.length} Categories`;
 
         if (localBreakdownList) {
-            localBreakdownList.innerHTML = "";
-            sortedBreakdown.forEach(([cat, val]) => {
-                const pct = ((val / overallPoints) * 100).toFixed(1);
-                const item = document.createElement("div");
-                item.className = "breakdown-item";
-                item.innerHTML = `
-                    <div class="breakdown-item-header">
-                        <span class="breakdown-name">${cat}</span>
-                        <span class="breakdown-val">${val.toLocaleString()} pts (${pct}%)</span>
-                    </div>
-                    <div class="breakdown-bar-bg">
-                        <div class="breakdown-bar-fill" style="width: ${pct}%"></div>
-                    </div>
-                `;
-                localBreakdownList.appendChild(item);
-            });
+            renderBreakdownItems(localBreakdownList, groupedBreakdown, overallPoints, false);
         }
 
         if (localDropzoneSection) localDropzoneSection.style.display = "none";

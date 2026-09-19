@@ -1117,6 +1117,177 @@ body {
     transition: width 0.4s ease;
 }
 
+.breakdown-group {
+    position: relative;
+    border-color: rgba(96, 165, 250, 0.18);
+}
+
+.breakdown-group:hover {
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.breakdown-group-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.15s ease;
+}
+
+.breakdown-group-header:hover {
+    opacity: 0.92;
+}
+
+.breakdown-group-title-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.breakdown-group-badge {
+    font-size: 0.68rem;
+    font-family: var(--font-mono);
+    padding: 1.5px 8px;
+    border-radius: 9999px;
+    background: rgba(96, 165, 250, 0.12);
+    color: #93c5fd;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.breakdown-group-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.breakdown-expand-hint {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.08);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.breakdown-group-header:hover .breakdown-expand-hint {
+    background: rgba(96, 165, 250, 0.18);
+    color: #bfdbfe;
+}
+
+.breakdown-chevron {
+    color: #60a5fa;
+    transform: rotate(-90deg);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+}
+
+.breakdown-group.expanded .breakdown-chevron {
+    transform: rotate(0deg);
+}
+
+.breakdown-subitems-list {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 10px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.breakdown-group.expanded .breakdown-subitems-list {
+    display: flex;
+}
+
+.breakdown-subitems-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 4px 2px 4px;
+    font-family: var(--font-mono);
+}
+
+.breakdown-subitem {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.breakdown-subitem:hover {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.breakdown-subitem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.breakdown-subitem-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #e5e7eb;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.breakdown-subitem-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #60a5fa;
+    flex-shrink: 0;
+}
+
+.breakdown-subitem-val {
+    font-family: var(--font-mono);
+    color: #d1d5db;
+    font-size: 0.76rem;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.breakdown-subitem-pct {
+    color: #9ca3af;
+    font-size: 0.7rem;
+}
+
+.breakdown-subitem-bar-bg {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.breakdown-subitem-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: #60a5fa;
+    transition: width 0.3s ease;
+}
+
 .files-table-container {
     max-height: 240px;
     overflow-y: auto;
