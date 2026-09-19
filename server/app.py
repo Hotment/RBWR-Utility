@@ -1524,9 +1524,36 @@ def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
 
     return datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
-def archive_expired_server_data(expired_by_date: dict):
+def get_active_server_start_dates(current_data: dict | None = None) -> set:
     """
-    Saves/merges expired snapshots directly into .json.gz compressed archive files in ARCHIVES_DIR.
+    Returns the set of start dates (YYYY-MM-DD) for servers currently in current_data
+    that are still ACTIVE (i.e. not historical).
+    """
+    active_dates = set()
+    if not current_data:
+        return active_dates
+
+    now_utc = datetime.now(timezone.utc)
+    for s_id, snaps in current_data.items():
+        if not snaps:
+            continue
+        valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
+        if not valid_ts_keys:
+            continue
+        latest_ts = max(valid_ts_keys)
+        latest_state = snaps.get(latest_ts, {})
+        age_sec = convert_ISO_to_secs(latest_ts, now=now_utc)
+        if not is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
+            start_date = get_server_start_date(s_id, snaps)
+            if start_date:
+                active_dates.add(start_date)
+    return active_dates
+
+def archive_expired_server_data(expired_by_date: dict, current_data: dict | None = None):
+    """
+    Saves/merges historical server snapshots into archive files in ARCHIVES_DIR.
+    - If a day still has active servers running in current_data, it is saved as uncompressed .json.
+    - If all servers from that day are historical (no active servers left), it is saved directly as .json.gz.
     expired_by_date format:
     {
         "YYYY-MM-DD": {
@@ -1542,6 +1569,7 @@ def archive_expired_server_data(expired_by_date: dict):
         return
 
     os.makedirs(ARCHIVES_DIR, exist_ok=True)
+    active_dates = get_active_server_start_dates(current_data)
     
     for date_str, servers_dict in expired_by_date.items():
         if not servers_dict:
@@ -1576,18 +1604,28 @@ def archive_expired_server_data(expired_by_date: dict):
                 existing_archive[job_id] = dict(existing_archive[job_id])
             existing_archive[job_id].update(snaps)
             
-        save_sc_data(existing_archive, gz_rel)
-
-        if os.path.exists(json_full):
-            try:
-                os.remove(json_full)
-                with _sc_cache_lock:
-                    _sc_file_cache.pop(json_rel, None)
-            except Exception:
-                pass
-
-        snapshot_count = sum(len(s) for s in servers_dict.values())
-        logger.info(f"Archived {snapshot_count} snapshot(s) for {date_str} to {gz_rel} (compressed)")
+        day_has_active_servers = (date_str in active_dates)
+        
+        if day_has_active_servers:
+            save_sc_data(existing_archive, json_rel)
+            if os.path.exists(gz_full):
+                try:
+                    os.remove(gz_full)
+                    with _sc_cache_lock:
+                        _sc_file_cache.pop(gz_rel, None)
+                except Exception:
+                    pass
+            logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {json_rel} (active day, uncompressed)")
+        else:
+            save_sc_data(existing_archive, gz_rel)
+            if os.path.exists(json_full):
+                try:
+                    os.remove(json_full)
+                    with _sc_cache_lock:
+                        _sc_file_cache.pop(json_rel, None)
+                except Exception:
+                    pass
+            logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {gz_rel} (finalized, compressed)")
 
 def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
     """
@@ -1724,12 +1762,15 @@ def get_all_archive_days_info() -> tuple[list[dict], dict]:
 
 def compress_finalized_archives(current_data: dict | None = None):
     """
-    Compresses all uncompressed archive JSON files into .json.gz using max gzip compression (level 9).
-    Scans ARCHIVES_DIR for any uncompressed servers_*.json files, converts/merges them to .json.gz,
-    and removes the uncompressed .json files.
+    Compresses archive JSON files into .json.gz once all servers started that day are historical.
+    Scans ARCHIVES_DIR for servers_YYYY-MM-DD.json files:
+    If no active servers from that date exist in current_data, it compresses the archive to .json.gz
+    and removes the uncompressed .json file.
     """
     if not os.path.exists(ARCHIVES_DIR):
         return
+
+    active_start_dates = get_active_server_start_dates(current_data)
 
     try:
         for fname in os.listdir(ARCHIVES_DIR):
@@ -1738,6 +1779,9 @@ def compress_finalized_archives(current_data: dict | None = None):
             
             date_part = fname[len("servers_"):-len(".json")]
             if len(date_part) != 10 or date_part[4] != '-' or date_part[7] != '-':
+                continue
+
+            if date_part in active_start_dates:
                 continue
 
             uncompressed_path = os.path.join(ARCHIVES_DIR, fname)
@@ -1784,7 +1828,7 @@ def compress_finalized_archives(current_data: dict | None = None):
                 with _sc_cache_lock:
                     _sc_file_cache.pop(json_rel, None)
                     
-                logger.info(f"Compressed archive {fname} -> {gz_filename}")
+                logger.info(f"Compressed finalized archive {fname} -> {gz_filename} (all servers for {date_part} are historical)")
             except Exception as comp_err:
                 logger.error(f"Failed to compress archive {fname}: {comp_err}")
     except Exception as e:
@@ -1792,10 +1836,9 @@ def compress_finalized_archives(current_data: dict | None = None):
 
 def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> bool:
     """
-    Finds snapshots/servers older than 48 hours in current_data,
-    archives them into files based on the date the server started (data/archives/servers_YYYY-MM-DD.json),
-    and removes them from current_data.
-    Also triggers compression for finalized past archives (.json -> .json.gz).
+    Archives servers as soon as they become historical into files based on their start date (data/archives/servers_YYYY-MM-DD.json),
+    and removes non-persistent historical servers from current_data (servers.json).
+    Also compresses a day's archive into .json.gz once all servers that started that day are historical.
     Returns True if current_data was modified (dirty), False otherwise.
     """
     now_utc = datetime.now(timezone.utc)
@@ -1815,28 +1858,47 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
 
     for s_id in list(current_data.keys()):
         if s_id in persistent_ids:
+            snaps = current_data.get(s_id, {})
+            if snaps:
+                server_start_date = get_server_start_date(s_id, snaps)
+                valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
+                expired_keys = [ts for ts in valid_ts_keys if ts < cutoff_iso]
+                if expired_keys:
+                    for ts in expired_keys:
+                        record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+                        del snaps[ts]
+                    servers_dirty = True
             continue
+
         snaps = current_data.get(s_id, {})
         if not snaps:
             del current_data[s_id]
             servers_dirty = True
             continue
 
-        server_start_date = get_server_start_date(s_id, snaps)
-        latest_ts = max(snaps.keys())
-        p_count = _sc_public_servers_info.get(s_id, {}).get("playing", 0) if s_id in _sc_public_servers_info else 0
-        
-        if p_count == 0 and latest_ts < cutoff_iso:
-            for ts, s_data in snaps.items():
-                record_expired_snapshot(s_id, ts, s_data, server_start_date)
+        valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
+        if not valid_ts_keys:
             del current_data[s_id]
             servers_dirty = True
-            logger.info(f"Moved inactive historical server {s_id} (started: {server_start_date}, latest: {latest_ts} < cutoff: {cutoff_iso}) to archive")
             continue
 
-        earliest_ts = min(snaps.keys())
+        latest_ts = max(valid_ts_keys)
+        latest_state = snaps.get(latest_ts, {})
+        age_sec = convert_ISO_to_secs(latest_ts, now=now_utc)
+        server_start_date = get_server_start_date(s_id, snaps)
+
+        if is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
+            for ts in valid_ts_keys:
+                record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+            if latest_ts < cutoff_iso:
+                del current_data[s_id]
+                servers_dirty = True
+                logger.info(f"Purged expired historical server {s_id} (>48h inactive, started: {server_start_date}) from servers.json")
+            continue
+
+        earliest_ts = min(valid_ts_keys)
         if earliest_ts < cutoff_iso:
-            expired_keys = [ts for ts in snaps.keys() if ts < cutoff_iso]
+            expired_keys = [ts for ts in valid_ts_keys if ts < cutoff_iso]
             if expired_keys:
                 for ts in expired_keys:
                     record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
@@ -1844,7 +1906,7 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
                 servers_dirty = True
 
     if archived_data_by_date:
-        archive_expired_server_data(archived_data_by_date)
+        archive_expired_server_data(archived_data_by_date, current_data)
 
     compress_finalized_archives(current_data)
 
