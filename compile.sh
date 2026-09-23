@@ -44,6 +44,7 @@ CORES=$(nproc 2>/dev/null || echo 4)
 python3 -m nuitka \
     --standalone \
     --onefile \
+    --low-memory \
     --enable-plugin=tk-inter \
     --linux-icon=icon.png \
     --output-filename="RBWR_APRM_Calculator_linux_x86_64_v${CURRENT_VERSION}" \

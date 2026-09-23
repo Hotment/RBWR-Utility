@@ -110,7 +110,7 @@ if "%FORMAT%"=="zip" (
     set "NUITKA_PARAMS=--standalone --output-filename=RBWR_APRM_Calculator.exe"
     set "OUTPUT_PARAM="
 ) else (
-    set "NUITKA_PARAMS=--standalone --onefile"
+    set "NUITKA_PARAMS=--standalone --onefile --low-memory"
     set "OUTPUT_PARAM=--output-filename=RBWR_APRM_Calculator_win_x64_v%VERSION%.exe"
 )
 

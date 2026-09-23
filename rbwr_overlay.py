@@ -18,7 +18,15 @@ IS_LINUX = sys.platform.startswith('linux')
 IS_WINDOWS = sys.platform == 'win32' or os.name == 'nt'
 IS_MAC = sys.platform == 'darwin'
 
-__version__ = "2.0.3"
+__version__ = "2.0.5"
+
+if IS_WINDOWS:
+    import ctypes
+    try:
+        myappid = f"Hotment.RBWR.APRMCalculator.{__version__}"
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
 
 # --- Update Server Configuration ---
 BACKEND_SERVER_URL = "https://rbwr.hotment.dev"
@@ -101,22 +109,102 @@ logging.getLogger("PIL").setLevel(logging.WARNING)
 logging.getLogger("onnxruntime").setLevel(logging.WARNING)
 log = logging.getLogger("rbwr")
 
+def get_resource_path(filename):
+    if os.path.exists(filename):
+        return os.path.abspath(filename)
+    if getattr(sys, 'frozen', False) or hasattr(sys, '_MEIPASS'):
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        p = os.path.join(base_dir, filename)
+        if os.path.exists(p):
+            return p
+    try:
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        p = os.path.join(exe_dir, filename)
+        if os.path.exists(p):
+            return p
+    except Exception:
+        pass
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        p = os.path.join(script_dir, filename)
+        if os.path.exists(p):
+            return p
+    except Exception:
+        pass
+    return None
+
+def get_default_icon_image():
+    try:
+        img = Image.new("RGBA", (256, 256), color=(7, 8, 10, 0))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse([20, 20, 236, 236], outline=(0, 240, 255, 255), width=10)
+        draw.ellipse([32, 32, 224, 224], fill=(17, 20, 26, 255))
+        bolt = [(145, 55), (95, 135), (125, 135), (115, 195), (165, 115), (135, 115)]
+        draw.polygon(bolt, fill=(57, 255, 20, 255))
+        return img
+    except Exception:
+        return Image.new("RGBA", (64, 64), color=(0, 240, 255, 255))
+
+def generate_default_icon():
+    try:
+        img = get_default_icon_image()
+        img.save("icon.png")
+        img.save("icon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    except Exception:
+        pass
+
+def ensure_icon_files():
+    ico = get_resource_path("icon.ico")
+    png = get_resource_path("icon.png")
+    if not ico or not png:
+        try:
+            generate_default_icon()
+            ico = get_resource_path("icon.ico")
+            png = get_resource_path("icon.png")
+        except Exception:
+            pass
+    return ico, png
+
+def apply_window_icon(window):
+    try:
+        if not window:
+            return
+        try:
+            if not window.winfo_exists():
+                return
+        except Exception:
+            return
+
+        ico_path, png_path = ensure_icon_files()
+        if IS_WINDOWS and ico_path and os.path.exists(ico_path):
+            try:
+                window.iconbitmap(ico_path)
+            except Exception:
+                pass
+        img = get_default_icon_image()
+        if png_path and os.path.exists(png_path):
+            try:
+                img = Image.open(png_path)
+            except Exception:
+                pass
+        try:
+            tk_icon = ImageTk.PhotoImage(img, master=window)
+            window.tk_icon = tk_icon
+            window.iconphoto(False, tk_icon)
+        except Exception as icon_err:
+            log.debug(f"iconphoto setting ignored: {icon_err}")
+    except Exception as e:
+        log.warning(f"Failed to apply window icon: {e}")
+
 def show_crash_dialog(tb_text):
     try:
-        crash_win = tk.Tk()
-        crash_win.title("Application Crash Detected")
-        
-        if IS_WINDOWS and os.path.exists("icon.ico"):
-            try:
-                crash_win.iconbitmap("icon.ico")
-            except Exception:
-                pass
+        root = getattr(tk, '_default_root', None)
+        if root is not None and root.winfo_exists():
+            crash_win = tk.Toplevel(root)
         else:
-            try:
-                crash_win.tk_icon = ImageTk.PhotoImage(get_default_icon_image())  # pyright: ignore[reportAttributeAccessIssue]
-                crash_win.iconphoto(False, crash_win.tk_icon)  # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
-            except Exception:
-                pass
+            crash_win = tk.Tk()
+        crash_win.title("Application Crash Detected")
+        apply_window_icon(crash_win)
 
         crash_win.geometry("560x380")
         crash_win.configure(bg="#07080a")
@@ -302,26 +390,6 @@ log.info(f"Python: {sys.version}")
 log.info(f"Executable: {sys.executable}")
 log.info(f"Script __file__: {__file__}")
 log.info(f"Log file: {_log_path}")
-
-def get_default_icon_image():
-    try:
-        img = Image.new("RGBA", (256, 256), color=(7, 8, 10, 0))
-        draw = ImageDraw.Draw(img)
-        draw.ellipse([20, 20, 236, 236], outline=(0, 240, 255, 255), width=10)
-        draw.ellipse([32, 32, 224, 224], fill=(17, 20, 26, 255))
-        bolt = [(145, 55), (95, 135), (125, 135), (115, 195), (165, 115), (135, 115)]
-        draw.polygon(bolt, fill=(57, 255, 20, 255))
-        return img
-    except Exception:
-        return Image.new("RGBA", (64, 64), color=(0, 240, 255, 255))
-
-def generate_default_icon():
-    try:
-        img = get_default_icon_image()
-        img.save("icon.png")
-        img.save("icon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    except Exception:
-        pass
 
 def get_macos_active_app():
     if not IS_MAC:
@@ -551,6 +619,7 @@ class OverlayApp:
 
         popup = tk.Toplevel(self.win)
         self.custom_message_window = popup
+        apply_window_icon(popup)
         popup.transient(self.win)
         popup.title(title)
         
@@ -1431,21 +1500,17 @@ class OverlayApp:
         self.var_turbine_health_threshold = tk.StringVar(value=str(int(self.turbine_health_threshold)))
         self.var_turbine_health_threshold.trace_add("write", lambda *args: self.on_turbine_health_threshold_change())
 
-        # Icon and Tray Setup (Loads existing icon if present, otherwise uses in-memory generated icon)
+        # Icon and Tray Setup
         self.icon_image_pil = get_default_icon_image()
-        
-        if IS_WINDOWS and os.path.exists("icon.ico"):
+        ico_path, png_path = ensure_icon_files()
+        if png_path and os.path.exists(png_path):
             try:
-                self.root.iconbitmap("icon.ico")
+                self.icon_image_pil = Image.open(png_path)
             except Exception:
-                log.warning("Failed to load custom icon from icon.ico")
-        else:
-            try:
-                self.tk_icon = ImageTk.PhotoImage(self.icon_image_pil)
-                self.root.iconphoto(False, self.tk_icon)  # pyright: ignore[reportArgumentType]
-            except Exception as e:
-                log.warning(f"Failed to set fallback icon: {e}")
-                
+                pass
+
+        apply_window_icon(self.root)
+        apply_window_icon(self.win)
         self.setup_tray_icon()
         
         self.context_menu = tk.Menu(self.win, tearoff=0, bg=BG_CARD, fg=TEXT_LIGHT, 
@@ -1568,21 +1633,51 @@ class OverlayApp:
                 hwnd_to_use = self.win.winfo_id()
                 parent = ctypes.windll.user32.GetParent(hwnd_to_use)
                 hwnd = parent if parent else hwnd_to_use
+                
+                GWLP_HWNDPARENT = -8
+                ctypes.windll.user32.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, 0)
+                
                 style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-                style = style & ~WS_EX_TOOLWINDOW
-                style = style | WS_EX_APPWINDOW
+                style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
                 ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
 
                 if hasattr(self, 'bg_win') and self.bg_win and self.bg_win.winfo_exists():
                     bg_hwnd_to_use = self.bg_win.winfo_id()
                     bg_parent = ctypes.windll.user32.GetParent(bg_hwnd_to_use)
                     bg_hwnd = bg_parent if bg_parent else bg_hwnd_to_use
+                    ctypes.windll.user32.SetWindowLongPtrW(bg_hwnd, GWLP_HWNDPARENT, 0)
                     bg_style = ctypes.windll.user32.GetWindowLongW(bg_hwnd, GWL_EXSTYLE)
                     bg_style = (bg_style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW
                     ctypes.windll.user32.SetWindowLongW(bg_hwnd, GWL_EXSTYLE, bg_style)
 
-                    GWLP_HWNDPARENT = -8
-                    ctypes.windll.user32.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, bg_hwnd)
+                ico_path, _ = ensure_icon_files()
+                h_icon_big = 0
+                h_icon_small = 0
+                if ico_path and os.path.exists(ico_path):
+                    try:
+                        IMAGE_ICON = 1
+                        LR_LOADFROMFILE = 0x0010
+                        h_icon_big = ctypes.windll.user32.LoadImageW(0, ico_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+                        h_icon_small = ctypes.windll.user32.LoadImageW(0, ico_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+                    except Exception:
+                        pass
+                if not h_icon_big:
+                    try:
+                        h_exe = ctypes.windll.kernel32.GetModuleHandleW(None)
+                        h_icon_big = ctypes.windll.user32.LoadIconW(h_exe, 1)
+                        h_icon_small = ctypes.windll.user32.LoadIconW(h_exe, 1)
+                    except Exception:
+                        pass
+                
+                if h_icon_big or h_icon_small:
+                    try:
+                        WM_SETICON = 0x0080
+                        if h_icon_big:
+                            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 1, h_icon_big)
+                        if h_icon_small:
+                            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 0, h_icon_small)
+                    except Exception as e:
+                        log.warning(f"Win32 WM_SETICON failed: {e}")
             elif IS_LINUX:
                 try:
                     self.win.attributes('-type', 'utility')
@@ -1604,16 +1699,21 @@ class OverlayApp:
         self.win.focus_force()
 
     def create_widgets(self):
-        self.telemetry_frame = None
-        for child in self.win.winfo_children():
-            if child != getattr(self, 'context_menu', None):
-                child.destroy()
-            
-        if self.is_compact:
-            self.build_compact_layout()
-        else:
-            self.build_detailed_layout()
-        self.update_recirc_indicator_ui()
+        prev_updating = self.updating_fields
+        self.updating_fields = True
+        try:
+            self.telemetry_frame = None
+            for child in self.win.winfo_children():
+                if child != getattr(self, 'context_menu', None):
+                    child.destroy()
+                
+            if self.is_compact:
+                self.build_compact_layout()
+            else:
+                self.build_detailed_layout()
+            self.update_recirc_indicator_ui()
+        finally:
+            self.updating_fields = prev_updating
 
     def make_draggable(self, widget):
         widget.bind("<Button-1>", self.start_drag)
@@ -2035,10 +2135,10 @@ class OverlayApp:
     def setup_tray_icon(self):
         try:
             import pystray
-            from PIL import Image
             
-            if os.path.exists("icon.png"):
-                image = Image.open("icon.png")
+            _, png_path = ensure_icon_files()
+            if png_path and os.path.exists(png_path):
+                image = Image.open(png_path)
             else:
                 image = self.icon_image_pil
             
@@ -2174,6 +2274,7 @@ class OverlayApp:
 
         settings_win = tk.Toplevel(self.win)
         self.settings_window = settings_win
+        apply_window_icon(settings_win)
         settings_win.transient(self.win)
 
         settings_win.title("APRM Monitor Settings")
@@ -2662,6 +2763,7 @@ class OverlayApp:
 
         popup = tk.Toplevel(self.win)
         self.update_window = popup
+        apply_window_icon(popup)
         popup.transient(self.win)
 
         popup.title("Update Available")
@@ -2669,11 +2771,21 @@ class OverlayApp:
         popup.overrideredirect(True)
         popup.attributes("-topmost", True)
         
-        # Center relative to active overlay window
+        # Center relative to active overlay window, ensuring on-screen placement
         w = 380
         h = 260
-        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
-        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
+        screen_w = self.win.winfo_screenwidth()
+        screen_h = self.win.winfo_screenheight()
+        win_w = self.win.winfo_width()
+        win_h = self.win.winfo_height()
+        if win_w > 1 and win_h > 1:
+            x = self.win.winfo_x() + (win_w - w) // 2
+            y = self.win.winfo_y() + (win_h - h) // 2
+        else:
+            x = (screen_w - w) // 2
+            y = (screen_h - h) // 2
+        x = max(10, min(screen_w - w - 10, x))
+        y = max(10, min(screen_h - h - 10, y))
         
         popup.geometry(f"{w}x{h}+{x}+{y}")
         
@@ -2765,6 +2877,10 @@ class OverlayApp:
                 self.update_topmost_state()
 
         popup.bind("<Destroy>", on_popup_destroy)
+        popup.deiconify()
+        popup.lift(self.win)
+        popup.attributes("-topmost", True)
+        popup.focus_force()
 
     def open_suggestions_dialog(self):
         if hasattr(self, 'suggestions_window') and self.suggestions_window and self.suggestions_window.winfo_exists():
@@ -2776,6 +2892,7 @@ class OverlayApp:
 
         popup = tk.Toplevel(self.win)
         self.suggestions_window = popup
+        apply_window_icon(popup)
         popup.transient(self.win)
 
         popup.title("Submit Feedback & Suggestions")
@@ -2977,6 +3094,7 @@ class OverlayApp:
 
         loading = tk.Toplevel(self.win)
         self.loading_window = loading
+        apply_window_icon(loading)
         loading.transient(self.win)
 
         loading.title("Downloading Update")
@@ -2984,11 +3102,21 @@ class OverlayApp:
         loading.overrideredirect(True)
         loading.attributes("-topmost", True)
         
-        # Center relative to active overlay window
+        # Center relative to active overlay window, ensuring on-screen placement
         w = 300
         h = 120
-        x = self.win.winfo_x() + (self.win.winfo_width() - w) // 2
-        y = self.win.winfo_y() + (self.win.winfo_height() - h) // 2
+        screen_w = self.win.winfo_screenwidth()
+        screen_h = self.win.winfo_screenheight()
+        win_w = self.win.winfo_width()
+        win_h = self.win.winfo_height()
+        if win_w > 1 and win_h > 1:
+            x = self.win.winfo_x() + (win_w - w) // 2
+            y = self.win.winfo_y() + (win_h - h) // 2
+        else:
+            x = (screen_w - w) // 2
+            y = (screen_h - h) // 2
+        x = max(10, min(screen_w - w - 10, x))
+        y = max(10, min(screen_h - h - 10, y))
         
         loading.geometry(f"{w}x{h}+{x}+{y}")
         
@@ -3045,6 +3173,10 @@ class OverlayApp:
                 self.update_topmost_state()
 
         loading.bind("<Destroy>", on_loading_destroy)
+        loading.deiconify()
+        loading.lift(self.win)
+        loading.attributes("-topmost", True)
+        loading.focus_force()
 
     def on_input_update(self, source):
         if self.updating_fields:
@@ -3058,6 +3190,14 @@ class OverlayApp:
         self.update_calculations(source=source)
 
     def update_calculations(self, source="demand"):
+        if not hasattr(self, 'win') or not self.win:
+            return
+        try:
+            if not self.win.winfo_exists():
+                return
+        except Exception:
+            return
+
         self.updating_fields = True
         try:
             if source == "demand":
@@ -3112,65 +3252,111 @@ class OverlayApp:
                     
                     self.render_outputs(thermal_val, flow, gen_load)
         except Exception as e:
-            self.show_error_state()
+            try:
+                self.show_error_state()
+            except Exception:
+                pass
         finally:
             self.updating_fields = False
 
     def render_outputs(self, thermal, flow, gen_load):
+        if not hasattr(self, 'win') or not self.win:
+            return
+        try:
+            if not self.win.winfo_exists():
+                return
+        except Exception:
+            return
+
         self.update_recirc_indicator_ui()
         limit = 108
         unit_suffix = "APRM" if self.calc.selected_unit == 1 else "RTP"
-        if not self.is_compact:
-            self.lbl_gen_val.config(text=f"{gen_load:.2f} MWe", fg=ACCENT_CYAN)
-            self.lbl_feed_val.config(text=f"{flow:.2f} kg/s", fg=ACCENT_GOLD)
-            self.lbl_neon_rtp.config(text=f"{thermal:.2f}% {unit_suffix}")
-            
-            if thermal > limit:
-                self.neon_frame.config(bg="#2a0c0e", highlightbackground=ACCENT_RED, bd=1)
-                self.lbl_neon_rtp.config(bg="#2a0c0e", fg=ACCENT_RED)
-                self.lbl_neon_sub.config(text=f"OVERPOWER SCRAM RISK (>{limit}%)", bg="#2a0c0e", fg=ACCENT_RED)
+        try:
+            if not self.is_compact:
+                if hasattr(self, 'lbl_gen_val') and self.lbl_gen_val and self.lbl_gen_val.winfo_exists():
+                    self.lbl_gen_val.config(text=f"{gen_load:.2f} MWe", fg=ACCENT_CYAN)
+                if hasattr(self, 'lbl_feed_val') and self.lbl_feed_val and self.lbl_feed_val.winfo_exists():
+                    self.lbl_feed_val.config(text=f"{flow:.2f} kg/s", fg=ACCENT_GOLD)
+                if hasattr(self, 'lbl_neon_rtp') and self.lbl_neon_rtp and self.lbl_neon_rtp.winfo_exists():
+                    self.lbl_neon_rtp.config(text=f"{thermal:.2f}% {unit_suffix}")
+                
+                if hasattr(self, 'neon_frame') and self.neon_frame and self.neon_frame.winfo_exists():
+                    if thermal > limit:
+                        self.neon_frame.config(bg="#2a0c0e", highlightbackground=ACCENT_RED, bd=1)
+                        if hasattr(self, 'lbl_neon_rtp') and self.lbl_neon_rtp and self.lbl_neon_rtp.winfo_exists():
+                            self.lbl_neon_rtp.config(bg="#2a0c0e", fg=ACCENT_RED)
+                        if hasattr(self, 'lbl_neon_sub') and self.lbl_neon_sub and self.lbl_neon_sub.winfo_exists():
+                            self.lbl_neon_sub.config(text=f"OVERPOWER SCRAM RISK (>{limit}%)", bg="#2a0c0e", fg=ACCENT_RED)
+                    else:
+                        self.neon_frame.config(bg=WIN_BG, highlightbackground=WIN_BG, bd=0)
+                        if hasattr(self, 'lbl_neon_rtp') and self.lbl_neon_rtp and self.lbl_neon_rtp.winfo_exists():
+                            self.lbl_neon_rtp.config(bg=WIN_BG, fg=ACCENT_CYAN)
+                        if hasattr(self, 'lbl_neon_sub') and self.lbl_neon_sub and self.lbl_neon_sub.winfo_exists():
+                            self.lbl_neon_sub.config(text="APRM REACTOR POWER STATUS", bg=WIN_BG, fg=TEXT_MUTED)
             else:
-                self.neon_frame.config(bg=WIN_BG, highlightbackground=WIN_BG, bd=0)
-                self.lbl_neon_rtp.config(bg=WIN_BG, fg=ACCENT_CYAN)
-                self.lbl_neon_sub.config(text="APRM REACTOR POWER STATUS", bg=WIN_BG, fg=TEXT_MUTED)
-        else:
-            if thermal > limit:
-                self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_RED)
-            else:
-                self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_CYAN)
-            self.lbl_compact_flow.config(text=f"[{int(flow)} kg/s]", fg=TEXT_MUTED)
+                if hasattr(self, 'lbl_compact_rtp') and self.lbl_compact_rtp and self.lbl_compact_rtp.winfo_exists():
+                    if thermal > limit:
+                        self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_RED)
+                    else:
+                        self.lbl_compact_rtp.config(text=f"{thermal:.1f}% {unit_suffix}", fg=ACCENT_CYAN)
+                if hasattr(self, 'lbl_compact_flow') and self.lbl_compact_flow and self.lbl_compact_flow.winfo_exists():
+                    self.lbl_compact_flow.config(text=f"[{int(flow)} kg/s]", fg=TEXT_MUTED)
+        except Exception:
+            pass
 
     def show_error_state(self):
+        if not hasattr(self, 'win') or not self.win:
+            return
+        try:
+            if not self.win.winfo_exists():
+                return
+        except Exception:
+            return
+
         self.update_recirc_indicator_ui()
-        if not self.is_compact:
-            self.lbl_gen_val.config(text="ERROR", fg=ACCENT_RED)
-            self.lbl_feed_val.config(text="ERROR", fg=ACCENT_RED)
-            self.lbl_neon_rtp.config(text="ERR", fg=ACCENT_RED)
-            self.neon_frame.config(bg=WIN_BG, bd=0)
-            self.lbl_neon_rtp.config(bg=WIN_BG)
-            self.lbl_neon_sub.config(text="VALUE OUT OF RANGE", bg=WIN_BG, fg=ACCENT_RED)
-        else:
-            self.lbl_compact_rtp.config(text="ERR", fg=ACCENT_RED)
-            self.lbl_compact_flow.config(text="[---]", fg=TEXT_MUTED)
+        try:
+            if not self.is_compact:
+                if hasattr(self, 'lbl_gen_val') and self.lbl_gen_val and self.lbl_gen_val.winfo_exists():
+                    self.lbl_gen_val.config(text="ERROR", fg=ACCENT_RED)
+                if hasattr(self, 'lbl_feed_val') and self.lbl_feed_val and self.lbl_feed_val.winfo_exists():
+                    self.lbl_feed_val.config(text="ERROR", fg=ACCENT_RED)
+                if hasattr(self, 'lbl_neon_rtp') and self.lbl_neon_rtp and self.lbl_neon_rtp.winfo_exists():
+                    self.lbl_neon_rtp.config(text="ERR", fg=ACCENT_RED)
+                if hasattr(self, 'neon_frame') and self.neon_frame and self.neon_frame.winfo_exists():
+                    self.neon_frame.config(bg=WIN_BG, bd=0)
+                if hasattr(self, 'lbl_neon_rtp') and self.lbl_neon_rtp and self.lbl_neon_rtp.winfo_exists():
+                    self.lbl_neon_rtp.config(bg=WIN_BG)
+                if hasattr(self, 'lbl_neon_sub') and self.lbl_neon_sub and self.lbl_neon_sub.winfo_exists():
+                    self.lbl_neon_sub.config(text="VALUE OUT OF RANGE", bg=WIN_BG, fg=ACCENT_RED)
+            else:
+                if hasattr(self, 'lbl_compact_rtp') and self.lbl_compact_rtp and self.lbl_compact_rtp.winfo_exists():
+                    self.lbl_compact_rtp.config(text="ERR", fg=ACCENT_RED)
+                if hasattr(self, 'lbl_compact_flow') and self.lbl_compact_flow and self.lbl_compact_flow.winfo_exists():
+                    self.lbl_compact_flow.config(text="[---]", fg=TEXT_MUTED)
+        except Exception:
+            pass
 
     def update_recirc_indicator_ui(self):
-        override_active = self.calc.recirc_override is not None
-        
-        if hasattr(self, 'lbl_recirc_indicator') and self.lbl_recirc_indicator and self.lbl_recirc_indicator.winfo_exists():
-            if override_active:
-                val = self.calc.recirc_override
-                self.lbl_recirc_indicator.config(text=f"OVR: {val:.0f}%")
-                self.lbl_recirc_indicator.pack(side="right", padx=5, pady=(2, 4))
-            else:
-                self.lbl_recirc_indicator.pack_forget()
-                
-        if hasattr(self, 'lbl_arrow_ref') and self.lbl_arrow_ref and self.lbl_arrow_ref.winfo_exists():
-            if override_active:
-                self.lbl_arrow_ref.config(text="🔄", fg=ACCENT_GOLD, cursor="hand2")
-                self.lbl_arrow_ref.bind("<Button-1>", lambda e: self.reset_recirc_override())
-            else:
-                self.lbl_arrow_ref.config(text="➔", fg=ACCENT_CYAN, cursor="")
-                self.lbl_arrow_ref.bind("<Button-1>", self.start_drag)
+        try:
+            override_active = self.calc.recirc_override is not None
+            
+            if hasattr(self, 'lbl_recirc_indicator') and self.lbl_recirc_indicator and self.lbl_recirc_indicator.winfo_exists():
+                if override_active:
+                    val = self.calc.recirc_override
+                    self.lbl_recirc_indicator.config(text=f"OVR: {val:.0f}%")
+                    self.lbl_recirc_indicator.pack(side="right", padx=5, pady=(2, 4))
+                else:
+                    self.lbl_recirc_indicator.pack_forget()
+                    
+            if hasattr(self, 'lbl_arrow_ref') and self.lbl_arrow_ref and self.lbl_arrow_ref.winfo_exists():
+                if override_active:
+                    self.lbl_arrow_ref.config(text="🔄", fg=ACCENT_GOLD, cursor="hand2")
+                    self.lbl_arrow_ref.bind("<Button-1>", lambda e: self.reset_recirc_override())
+                else:
+                    self.lbl_arrow_ref.config(text="➔", fg=ACCENT_CYAN, cursor="")
+                    self.lbl_arrow_ref.bind("<Button-1>", self.start_drag)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
