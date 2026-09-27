@@ -83,6 +83,7 @@ app = Flask(
     __name__,
     template_folder="templates"
 )
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.logger.handlers = [stream_handler, file_handler]
 app.logger.propagate = False
 app.logger.setLevel(logging.INFO)
@@ -2462,62 +2463,106 @@ def parse_label_seconds(label, fallback_idx=0):
     except Exception:
         return float(fallback_idx)
 
-def compress_points_raw(points, precision=2):
+def lttb_indices(points, threshold=600):
     """
-    Compress collinear points where points is a list of (x, y) tuples.
-    Returns list of retained (x, y) tuples.
+    Selects up to `threshold` point indices using Largest Triangle Three Buckets (LTTB) algorithm.
+    Guarantees first and last points are included.
+    Preserves visually significant peaks, valleys, and inflections.
     """
-    if len(points) <= 2:
+    n = len(points)
+    if n <= threshold or threshold <= 2:
+        return set(range(n))
+
+    sampled = {0, n - 1}
+    bucket_size = (n - 2) / (threshold - 2)
+    a = 0
+
+    for i in range(threshold - 2):
+        c_start = int((i + 1) * bucket_size) + 1
+        c_end = min(int((i + 2) * bucket_size) + 1, n)
+        if c_end <= c_start:
+            c_x, c_y = points[min(c_start, n - 1)]
+        else:
+            c_x = sum(points[k][0] for k in range(c_start, c_end)) / (c_end - c_start)
+            c_y = sum(points[k][1] for k in range(c_start, c_end)) / (c_end - c_start)
+
+        b_start = int(i * bucket_size) + 1
+        b_end = min(int((i + 1) * bucket_size) + 1, n)
+        ax, ay = points[a]
+
+        max_area = -1.0
+        max_idx = b_start
+        for j in range(b_start, b_end):
+            bx, by = points[j]
+            area = abs((ax - c_x) * (by - ay) - (ax - bx) * (c_y - ay))
+            if area > max_area:
+                max_area = area
+                max_idx = j
+
+        sampled.add(max_idx)
+        a = max_idx
+
+    return sampled
+
+def compress_flat_stretches(points, precision=2):
+    """
+    Compresses flat stretches where y remains constant.
+    Keeps the beginning and end of each flat stretch and inflection points.
+    """
+    n = len(points)
+    if n <= 2:
         return list(points)
+    result = [points[0]]
+    for i in range(1, n - 1):
+        y_prev = round(points[i - 1][1], precision) if precision is not None else points[i - 1][1]
+        y_curr = round(points[i][1], precision) if precision is not None else points[i][1]
+        y_next = round(points[i + 1][1], precision) if precision is not None else points[i + 1][1]
+        if y_prev == y_curr == y_next:
+            continue
+        result.append(points[i])
+    result.append(points[-1])
+    return result
 
-    compressed = [points[0]]
-    for i in range(1, len(points) - 1):
-        x1, y1 = points[i - 1]
-        x2, y2 = points[i]
-        x3, y3 = points[i + 1]
+MAX_CHART_POINTS = 600
 
-        try:
-            ry1 = round(y1, precision) if precision is not None else y1
-            ry2 = round(y2, precision) if precision is not None else y2
-            ry3 = round(y3, precision) if precision is not None else y3
-            cross_product = (x2 - x1) * (ry3 - ry2) - (ry2 - ry1) * (x3 - x2)
-        except Exception:
-            cross_product = 1.0
-
-        if abs(cross_product) > 1e-5:
-            compressed.append(points[i])
-
-    compressed.append(points[-1])
-    return compressed
-
-def compress_points(points, precision=2):
+def compress_points(points, precision=2, max_points=MAX_CHART_POINTS):
     """
-    Compress collinear points where points is a list of (x, y) tuples.
+    Compress collinear/flat points and apply LTTB downsampling when point count exceeds max_points.
     x is seconds_ago (float), y is metric value (float).
-    precision controls the number of decimal places for y (default 2, None for unrounded).
     """
-    raw = compress_points_raw(points, precision=precision)
-    return [{"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)} for x, y in raw]
+    if not points:
+        return []
+    cleaned = compress_flat_stretches(points, precision=precision)
+    if len(cleaned) > max_points:
+        indices = lttb_indices(cleaned, threshold=max_points)
+        cleaned = [cleaned[i] for i in sorted(indices)]
+    return [
+        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
+        for x, y in cleaned
+    ]
 
-def compress_paired_points(u1_points, u2_points, precision=2):
+def compress_paired_points(u1_points, u2_points, precision=2, max_points=MAX_CHART_POINTS):
     """
-    Compresses u1_points and u2_points (lists of (x, y) tuples).
-    If a point in one unit is kept, but the other unit had its point at that timestamp removed
-    due to compression, the other unit keeps and shows that point anyway.
-    Points that are collinear in both units are compressed away.
-    Returns (c_u1, c_u2) where each is a list of {"x": ..., "y": ...} dicts.
+    Compresses u1_points and u2_points (lists of (x, y) tuples) using synchronized timestamps.
+    Applies flat stretch elimination and paired LTTB decimation to bound point counts
+    while ensuring both units retain inflection points at shared timestamps.
     """
     if not u1_points and not u2_points:
         return [], []
     if not u1_points:
-        return [], compress_points(u2_points, precision=precision)
+        return [], compress_points(u2_points, precision=precision, max_points=max_points)
     if not u2_points:
-        return compress_points(u1_points, precision=precision), []
+        return compress_points(u1_points, precision=precision, max_points=max_points), []
 
-    raw1 = compress_points_raw(u1_points, precision=precision)
-    raw2 = compress_points_raw(u2_points, precision=precision)
+    c_u1 = compress_flat_stretches(u1_points, precision=precision)
+    c_u2 = compress_flat_stretches(u2_points, precision=precision)
 
-    kept_x = {round(x, 1) for x, _ in raw1} | {round(x, 1) for x, _ in raw2}
+    if len(c_u1) > max_points or len(c_u2) > max_points:
+        idx1 = lttb_indices(c_u1, threshold=max_points)
+        idx2 = lttb_indices(c_u2, threshold=max_points)
+        kept_x = {round(c_u1[i][0], 1) for i in idx1} | {round(c_u2[i][0], 1) for i in idx2}
+    else:
+        kept_x = {round(x, 1) for x, _ in c_u1} | {round(x, 1) for x, _ in c_u2}
 
     res_u1 = [
         {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
@@ -2529,7 +2574,6 @@ def compress_paired_points(u1_points, u2_points, precision=2):
         for x, y in u2_points
         if round(x, 1) in kept_x
     ]
-
     return res_u1, res_u2
 
 def build_chart_payload(job_id, snapshots):
@@ -2596,7 +2640,8 @@ def build_chart_payload(job_id, snapshots):
                     "data": c_players,
                     "borderColor": "#10b981",
                     "backgroundColor": "rgba(16, 185, 129, 0.08)",
-                }]
+                }],
+                "total_points": len(player_points),
             })
 
     for metric_key, metric_cfg in metrics.items():
@@ -2674,6 +2719,7 @@ def build_chart_payload(job_id, snapshots):
         chart_payload.append({
             "metric": metric_title,
             "datasets": datasets,
+            "total_points": max(len(u1_points), len(u2_points)) if (u1_points or u2_points) else 0,
         })
 
     last_heartbeat_age = ordered_snapshots[-1]["seconds_ago"] if ordered_snapshots else 0

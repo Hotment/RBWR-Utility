@@ -783,19 +783,49 @@
         }
     };
 
-    function updateAllHeaderBadges(xVal) {
-        chartInstances.forEach((chart, index) => {
-            const pointsBadge = document.getElementById(`chart-points-${index}`);
-            if (!pointsBadge) return;
+    function isChartInViewport(chart) {
+        if (!chart || !chart.canvas) return false;
+        const rect = chart.canvas.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < (window.innerHeight || document.documentElement.clientHeight);
+    }
+
+    let hoverRafId = null;
+    let pendingHoverX = null;
+
+    function scheduleSyncHover(xVal) {
+        pendingHoverX = xVal;
+        if (hoverRafId !== null) return;
+        hoverRafId = requestAnimationFrame(() => {
+            hoverRafId = null;
+            currentHoveredX = pendingHoverX;
+            updateHeaderBadges(currentHoveredX);
+            for (let i = 0; i < chartInstances.length; i++) {
+                const inst = chartInstances[i];
+                if (isChartInViewport(inst)) {
+                    inst.draw();
+                }
+            }
+        });
+    }
+
+    function updateHeaderBadges(xVal) {
+        for (let i = 0; i < chartInstances.length; i++) {
+            const chart = chartInstances[i];
+            const pointsBadge = chart._badgeEl;
+            if (!pointsBadge) continue;
 
             if (xVal === null || xVal === undefined) {
                 pointsBadge.textContent = `${chart._totalPoints || 0} points`;
-                return;
+                continue;
             }
 
+            if (!isChartInViewport(chart)) continue;
+
             const readoutItems = [];
-            (chart.data.datasets || []).forEach(ds => {
-                if (!ds.data || ds.data.length === 0) return;
+            const datasets = chart.data.datasets || [];
+            for (let d = 0; d < datasets.length; d++) {
+                const ds = datasets[d];
+                if (!ds.data || ds.data.length === 0) continue;
                 const yVal = getYForX(ds.data, xVal);
                 if (yVal !== null && yVal !== undefined && !isNaN(yVal)) {
                     readoutItems.push({
@@ -804,7 +834,7 @@
                         value: formatMetricValue(yVal, chart._metricUnit, chart._isPlayerCount, chart._metricName)
                     });
                 }
-            });
+            }
 
             if (readoutItems.length > 0) {
                 const headerSummary = readoutItems.map(it => {
@@ -815,7 +845,7 @@
             } else {
                 pointsBadge.textContent = `${chart._totalPoints || 0} points`;
             }
-        });
+        }
     }
 
     function saveZoomState(min, max, windowSeconds, isCustom) {
@@ -832,31 +862,62 @@
         } catch (e) { }
     }
 
+    let zoomRafId = null;
+    let pendingZoomChart = null;
+
     function syncZoomFromChart(sourceChart) {
         if (isSyncingZoom) return;
         if (!sourceChart || !sourceChart.scales || !sourceChart.scales.x) return;
 
-        isSyncingZoom = true;
-        try {
-            const xMin = sourceChart.scales.x.min;
-            const xMax = sourceChart.scales.x.max;
+        pendingZoomChart = sourceChart;
+        if (zoomRafId !== null) return;
 
-            currentWindowSeconds = null;
-            document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+        zoomRafId = requestAnimationFrame(() => {
+            zoomRafId = null;
+            if (!pendingZoomChart) return;
+            const src = pendingZoomChart;
+            pendingZoomChart = null;
 
-            chartInstances.forEach(targetChart => {
-                if (targetChart !== sourceChart && targetChart.options && targetChart.options.scales && targetChart.options.scales.x) {
-                    targetChart.options.scales.x.min = xMin;
-                    targetChart.options.scales.x.max = xMax;
-                    targetChart.update('none');
+            isSyncingZoom = true;
+            try {
+                const xMin = src.scales.x.min;
+                const xMax = src.scales.x.max;
+
+                currentWindowSeconds = null;
+                document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+
+                for (let i = 0; i < chartInstances.length; i++) {
+                    const targetChart = chartInstances[i];
+                    if (targetChart !== src && targetChart.options?.scales?.x) {
+                        targetChart.options.scales.x.min = xMin;
+                        targetChart.options.scales.x.max = xMax;
+                        if (isChartInViewport(targetChart)) {
+                            targetChart.update('none');
+                        } else {
+                            targetChart._needsScaleUpdate = true;
+                        }
+                    }
                 }
-            });
 
-            saveZoomState(xMin, xMax, null, true);
-        } finally {
-            isSyncingZoom = false;
-        }
+                saveZoomState(xMin, xMax, null, true);
+            } finally {
+                isSyncingZoom = false;
+            }
+        });
     }
+
+    window.addEventListener('scroll', function () {
+        for (let i = 0; i < chartInstances.length; i++) {
+            const c = chartInstances[i];
+            if (c._needsScaleUpdate && isChartInViewport(c)) {
+                c._needsScaleUpdate = false;
+                c.update('none');
+            }
+        }
+        if (currentHoveredX !== null) {
+            scheduleSyncHover(currentHoveredX);
+        }
+    }, { passive: true });
 
     chartsData.forEach((chart, index) => {
         const ctx = document.getElementById(`chart-${index}`);
@@ -894,20 +955,19 @@
                 borderColor: color,
                 backgroundColor: bgColor,
                 fill: false,
-                tension: 0.15,
+                tension: 0,
+                normalized: true,
                 spanGaps: true,
                 pointRadius: 0,
-                pointHoverRadius: 6,
-                pointHoverBackgroundColor: color,
-                pointHoverBorderColor: '#ffffff',
-                pointHoverBorderWidth: 2,
+                pointHoverRadius: 0,
                 borderWidth: 2,
             };
         });
 
+        const serverReportedPoints = chart.total_points || totalPoints;
         const pointsLabel = document.getElementById(`chart-points-${index}`);
         if (pointsLabel) {
-            pointsLabel.textContent = `${totalPoints} points`;
+            pointsLabel.textContent = `${serverReportedPoints} points`;
         }
 
         const serverMinX = (typeof lastHeartbeatAge === 'number' && !isNaN(lastHeartbeatAge)) ? lastHeartbeatAge : null;
@@ -925,6 +985,9 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
+                normalized: true,
+                parsing: false,
+                events: ['wheel', 'mousedown', 'touchstart', 'touchmove', 'touchend'],
                 interaction: {
                     intersect: false,
                     mode: 'nearest',
@@ -1018,33 +1081,28 @@
                 y >= chartInstance.chartArea.top && y <= chartInstance.chartArea.bottom) {
                 const xVal = chartInstance.scales.x.getValueForPixel(x);
                 if (xVal !== undefined && !isNaN(xVal)) {
-                    currentHoveredX = xVal;
-                    updateAllHeaderBadges(xVal);
-                    chartInstances.forEach(inst => inst.draw());
+                    scheduleSyncHover(xVal);
                 }
             } else {
                 if (currentHoveredX !== null) {
-                    currentHoveredX = null;
-                    updateAllHeaderBadges(null);
-                    chartInstances.forEach(inst => inst.draw());
+                    scheduleSyncHover(null);
                 }
             }
         });
 
         ctx.addEventListener('pointerleave', function () {
             if (currentHoveredX !== null) {
-                currentHoveredX = null;
-                updateAllHeaderBadges(null);
-                chartInstances.forEach(inst => inst.draw());
+                scheduleSyncHover(null);
             }
         });
 
         chartInstance._minAvailableX = effectiveMinX;
         chartInstance._maxAvailableX = effectiveMaxX;
-        chartInstance._totalPoints = totalPoints;
+        chartInstance._totalPoints = serverReportedPoints;
         chartInstance._isPlayerCount = isPlayerCount;
         chartInstance._metricUnit = metricUnit;
         chartInstance._metricName = metricName;
+        chartInstance._badgeEl = pointsLabel;
         chartInstances.push(chartInstance);
     });
 
