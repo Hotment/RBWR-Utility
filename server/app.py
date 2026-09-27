@@ -2766,6 +2766,60 @@ def servers_page():
         charts=global_payload.get("charts", [])
     )
 
+def format_demand_value(val):
+    if val is None:
+        return "N/A"
+    try:
+        v = float(val)
+    except (ValueError, TypeError):
+        return str(val)
+
+    if v == -4:
+        return "Evac"
+    elif v == -3:
+        return "RST"
+    elif v == -2:
+        return "LOOP"
+    elif v == -1:
+        return "Maint"
+    else:
+        if v.is_integer():
+            return f"{int(v)} MW"
+        return f"{v:.2f} MW"
+
+def format_total_demand(u1, u2):
+    try:
+        v1 = float(u1) if u1 is not None else 0.0
+    except (ValueError, TypeError):
+        v1 = 0.0
+    try:
+        v2 = float(u2) if u2 is not None else 0.0
+    except (ValueError, TypeError):
+        v2 = 0.0
+
+    is_u1_special = v1 < 0
+    is_u2_special = v2 < 0
+
+    if is_u1_special and is_u2_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        if lbl1 == lbl2:
+            return lbl1
+        return f"{lbl1} / {lbl2}"
+    elif is_u1_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        return f"{lbl1} (U1) | {lbl2} (U2)"
+    elif is_u2_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        return f"{lbl1} (U1) | {lbl2} (U2)"
+    else:
+        tot = v1 + v2
+        if tot.is_integer():
+            return f"{int(tot)} MW"
+        return f"{tot:.2f} MW"
+
 @app.route("/servers/<job_id>", methods=["GET"])
 def server_detail_page(job_id):
     servers_data = get_sc_data("servers.json")
@@ -2830,6 +2884,9 @@ def server_detail_page(job_id):
         unit1_st = latest_st.get("Unit1", {})
         unit2_st = latest_st.get("Unit2", {})
 
+        u1_dem = unit1_st.get("NextDemandU1", 0)
+        u2_dem = unit2_st.get("NextDemandU2", 0)
+
         summary = {
             "is_private": is_private,
             "is_persistent": is_persistent,
@@ -2844,9 +2901,12 @@ def server_detail_page(job_id):
             "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
             "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
-            "next_demand": round(float(unit1_st.get("NextDemandU1", 0)) + float(unit2_st.get("NextDemandU2", 0)), 2),
-            "dmandU1": unit1_st.get("NextDemandU1", 0),
-            "dmandU2": unit2_st.get("NextDemandU2", 0),
+            "next_demand": round(float(u1_dem or 0) + float(u2_dem or 0), 2),
+            "next_demand_formatted": format_total_demand(u1_dem, u2_dem),
+            "dmandU1": u1_dem,
+            "dmandU2": u2_dem,
+            "dmandU1_formatted": format_demand_value(u1_dem),
+            "dmandU2_formatted": format_demand_value(u2_dem),
         }
         return render_template("server_detail.html", **payload, **summary)
 
@@ -2883,8 +2943,11 @@ def server_detail_page(job_id):
         "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
         "next_demand": next_demand,
+        "next_demand_formatted": format_total_demand(dmand_next1, dmand_next2),
         "dmandU1": dmand_next1,
         "dmandU2": dmand_next2,
+        "dmandU1_formatted": format_demand_value(dmand_next1),
+        "dmandU2_formatted": format_demand_value(dmand_next2),
     }
 
     return render_template("server_detail.html", **payload, **summary)

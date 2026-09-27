@@ -1243,8 +1243,24 @@
     {% if charts and charts | length > 0 %}
     var globalChartInstance = null;
     var currentGlobalWindowSeconds = null;
+    var currentGlobalHoveredX = null;
+    const GLOBAL_ZOOM_STORAGE_KEY = 'rbwr_global_zoom';
 
-    function setGlobalTimeWindow(seconds, btnElement) {
+    function saveGlobalZoomState(min, max, windowSeconds, isCustom) {
+        const state = {
+            min: min,
+            max: max,
+            windowSeconds: windowSeconds !== undefined ? windowSeconds : currentGlobalWindowSeconds,
+            isCustom: !!isCustom,
+            timestamp: Date.now()
+        };
+        try {
+            sessionStorage.setItem(GLOBAL_ZOOM_STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(GLOBAL_ZOOM_STORAGE_KEY, JSON.stringify(state));
+        } catch (e) { }
+    }
+
+    function setGlobalTimeWindow(seconds, btnElement, shouldSave = true) {
         currentGlobalWindowSeconds = seconds;
 
         document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
@@ -1262,23 +1278,32 @@
                 globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
             }
             globalChartInstance.update('none');
-        }
 
-        try {
-            localStorage.setItem('rbwr_global_time_window', seconds !== null ? String(seconds) : 'all');
-        } catch (e) { }
+            if (shouldSave) {
+                saveGlobalZoomState(globalChartInstance.options.scales.x.min, globalChartInstance.options.scales.x.max, seconds, false);
+                try {
+                    localStorage.setItem('rbwr_global_time_window', seconds !== null ? String(seconds) : 'all');
+                } catch (e) { }
+            }
+        }
     }
 
     function resetGlobalZoom() {
+        try {
+            sessionStorage.removeItem(GLOBAL_ZOOM_STORAGE_KEY);
+            localStorage.removeItem(GLOBAL_ZOOM_STORAGE_KEY);
+            localStorage.removeItem('rbwr_global_time_window');
+        } catch (e) { }
+        currentGlobalWindowSeconds = null;
+        document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+        const allBtn = document.getElementById('btnGlobalRangeAll');
+        if (allBtn) allBtn.classList.add('active');
+
         if (!globalChartInstance) return;
         if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
         globalChartInstance.options.scales.x.min = 0;
         const limitMax = globalChartInstance._maxAvailableX || 0;
-        if (currentGlobalWindowSeconds === null) {
-            globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
-        } else {
-            globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(currentGlobalWindowSeconds, limitMax) : currentGlobalWindowSeconds;
-        }
+        globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
         globalChartInstance.update('none');
     }
 
@@ -1365,6 +1390,242 @@
         return label;
     }
 
+    function getYForX(points, targetX) {
+        if (!points || points.length === 0) return null;
+        const len = points.length;
+        if (len === 1) return points[0].y;
+
+        const firstX = points[0].x;
+        const lastX = points[len - 1].x;
+        const minX = Math.min(firstX, lastX);
+        const maxX = Math.max(firstX, lastX);
+
+        if (targetX < minX || targetX > maxX) {
+            return Math.abs(targetX - firstX) < Math.abs(targetX - lastX) ? points[0].y : points[len - 1].y;
+        }
+
+        const isAscending = lastX >= firstX;
+        let low = 0;
+        let high = len - 1;
+
+        if (isAscending) {
+            while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (points[mid].x <= targetX) {
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            const i1 = Math.max(0, Math.min(len - 2, high));
+            const p1 = points[i1];
+            const p2 = points[i1 + 1];
+            if (!p1 || !p2 || p2.x === p1.x) return p1 ? p1.y : null;
+            const ratio = (targetX - p1.x) / (p2.x - p1.x);
+            return p1.y + ratio * (p2.y - p1.y);
+        } else {
+            while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (points[mid].x >= targetX) {
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            const i1 = Math.max(0, Math.min(len - 2, high));
+            const p1 = points[i1];
+            const p2 = points[i1 + 1];
+            if (!p1 || !p2 || p2.x === p1.x) return p1 ? p1.y : null;
+            const ratio = (targetX - p1.x) / (p2.x - p1.x);
+            return p1.y + ratio * (p2.y - p1.y);
+        }
+    }
+
+    function drawGlobalTooltipBox(ctx, chart, xPixel, timeStr, items) {
+        if (!items || items.length === 0) return;
+
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.font = '10px JetBrains Mono, monospace';
+
+        let maxWidth = ctx.measureText(timeStr).width;
+        items.forEach(item => {
+            const text = `${item.label}: ${item.value}`;
+            const w = ctx.measureText(text).width + 16;
+            if (w > maxWidth) maxWidth = w;
+        });
+
+        const boxWidth = Math.max(110, Math.ceil(maxWidth + 18));
+        const headerHeight = 15;
+        const rowHeight = 14;
+        const boxHeight = headerHeight + (items.length * rowHeight) + 8;
+
+        let boxX = xPixel + 10;
+        if (boxX + boxWidth > chart.chartArea.right) {
+            boxX = xPixel - boxWidth - 10;
+        }
+        if (boxX < chart.chartArea.left) {
+            boxX = chart.chartArea.left + 4;
+        }
+
+        const boxY = chart.chartArea.top + 6;
+        const radius = 5;
+
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+        } else {
+            ctx.rect(boxX, boxY, boxWidth, boxHeight);
+        }
+        ctx.fillStyle = 'rgba(18, 18, 23, 0.94)';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.fillText(timeStr, boxX + 8, boxY + 12);
+
+        ctx.beginPath();
+        ctx.moveTo(boxX + 6, boxY + 16);
+        ctx.lineTo(boxX + boxWidth - 6, boxY + 16);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        let curY = boxY + 28;
+        items.forEach(item => {
+            ctx.beginPath();
+            ctx.arc(boxX + 11, curY - 3, 3, 0, Math.PI * 2);
+            ctx.fillStyle = item.color || '#3b82f6';
+            ctx.fill();
+
+            ctx.fillStyle = '#d1d5db';
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText(item.label + ':', boxX + 18, curY);
+
+            const labelWidth = ctx.measureText(item.label + ':').width;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px JetBrains Mono, monospace';
+            ctx.fillText(item.value, boxX + 18 + labelWidth + 4, curY);
+
+            curY += rowHeight;
+        });
+
+        ctx.restore();
+    }
+
+    const globalCrosshairPlugin = {
+        id: 'globalCrosshairPlugin',
+        afterDraw: (chart) => {
+            if (currentGlobalHoveredX === null || currentGlobalHoveredX === undefined) return;
+            if (!chart.scales || !chart.scales.x || !chart.scales.y || !chart.chartArea) return;
+
+            const xMin = chart.scales.x.min;
+            const xMax = chart.scales.x.max;
+            const lower = Math.min(xMin, xMax);
+            const upper = Math.max(xMin, xMax);
+
+            if (currentGlobalHoveredX < lower || currentGlobalHoveredX > upper) return;
+
+            const xPixel = chart.scales.x.getPixelForValue(currentGlobalHoveredX);
+            if (isNaN(xPixel) || xPixel < chart.chartArea.left || xPixel > chart.chartArea.right) return;
+
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(chart.chartArea.left, chart.chartArea.top, chart.chartArea.width, chart.chartArea.height);
+            ctx.clip();
+
+            ctx.beginPath();
+            ctx.moveTo(xPixel, chart.chartArea.top);
+            ctx.lineTo(xPixel, chart.chartArea.bottom);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.setLineDash([4, 3]);
+            ctx.stroke();
+
+            const readoutItems = [];
+            (chart.data.datasets || []).forEach(ds => {
+                if (!ds.data || ds.data.length === 0) return;
+                const yVal = getYForX(ds.data, currentGlobalHoveredX);
+                if (yVal === null || yVal === undefined || isNaN(yVal)) return;
+
+                const formattedVal = Math.abs(yVal) >= 100 ? yVal.toFixed(1) : yVal.toFixed(2);
+                readoutItems.push({
+                    label: ds.label,
+                    color: ds.borderColor || '#3b82f6',
+                    value: `${formattedVal} MW`
+                });
+
+                const yPixel = chart.scales.y.getPixelForValue(yVal);
+                if (isNaN(yPixel) || yPixel < chart.chartArea.top || yPixel > chart.chartArea.bottom) return;
+
+                ctx.setLineDash([]);
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                ctx.arc(xPixel, yPixel, 5.5, 0, Math.PI * 2);
+                ctx.fillStyle = ds.borderColor || '#3b82f6';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            if (readoutItems.length > 0) {
+                const timeStr = formatTimeAgo(currentGlobalHoveredX);
+                drawGlobalTooltipBox(ctx, chart, xPixel, timeStr, readoutItems);
+            }
+
+            ctx.restore();
+        }
+    };
+
+    function updateGlobalHeaderBadge(xVal) {
+        const pointsLabel = document.getElementById('globalPointsLabel');
+        if (!pointsLabel) return;
+
+        if (xVal === null || xVal === undefined) {
+            pointsLabel.textContent = `${totalGlobalPoints} points`;
+            return;
+        }
+
+        const readoutItems = [];
+        (globalChartInstance.data.datasets || []).forEach(ds => {
+            if (!ds.data || ds.data.length === 0) return;
+            const yVal = getYForX(ds.data, xVal);
+            if (yVal !== null && yVal !== undefined && !isNaN(yVal)) {
+                const formattedVal = Math.abs(yVal) >= 100 ? yVal.toFixed(1) : yVal.toFixed(2);
+                readoutItems.push({
+                    label: ds.label,
+                    color: ds.borderColor || '#3b82f6',
+                    value: `${formattedVal} MW`
+                });
+            }
+        });
+
+        if (readoutItems.length > 0) {
+            const headerSummary = readoutItems.map(it => {
+                const shortLabel = it.label.includes('1') ? 'U1' : (it.label.includes('2') ? 'U2' : it.label);
+                return `<span style="color: ${it.color}; font-weight: 600;">${shortLabel}: ${it.value}</span>`;
+            }).join(' <span class="text-gray-600">|</span> ');
+            pointsLabel.innerHTML = headerSummary;
+        } else {
+            pointsLabel.textContent = `${totalGlobalPoints} points`;
+        }
+    }
+
     let totalGlobalPoints = 0;
     let maxGlobalX = 0;
 
@@ -1414,6 +1675,7 @@
         data: {
             datasets: datasets
         },
+        plugins: [globalCrosshairPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1426,33 +1688,34 @@
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#121217',
-                    titleColor: '#f3f4f6',
-                    bodyColor: '#e5e7eb',
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    borderWidth: 1,
-                    padding: 10,
-                    bodyFont: { family: 'JetBrains Mono', size: 12 },
-                    callbacks: {
-                        title: function (context) {
-                            if (!context || !context.length) return '';
-                            return formatTimeAgo(context[0].parsed.x);
-                        },
-                        label: function (context) {
-                            return ` ${context.dataset.label}: ${context.parsed.y} MW`;
-                        }
-                    }
+                    enabled: false
                 },
                 zoom: {
                     pan: {
                         enabled: true,
                         mode: 'x',
-                        modifierKey: null
+                        modifierKey: null,
+                        onPan: function ({ chart }) {
+                            currentGlobalWindowSeconds = null;
+                            document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+                            saveGlobalZoomState(chart.scales.x.min, chart.scales.x.max, null, true);
+                        },
+                        onPanComplete: function ({ chart }) {
+                            saveGlobalZoomState(chart.scales.x.min, chart.scales.x.max, null, true);
+                        }
                     },
                     zoom: {
                         wheel: { enabled: true, speed: 0.1 },
                         pinch: { enabled: true },
-                        mode: 'x'
+                        mode: 'x',
+                        onZoom: function ({ chart }) {
+                            currentGlobalWindowSeconds = null;
+                            document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+                            saveGlobalZoomState(chart.scales.x.min, chart.scales.x.max, null, true);
+                        },
+                        onZoomComplete: function ({ chart }) {
+                            saveGlobalZoomState(chart.scales.x.min, chart.scales.x.max, null, true);
+                        }
                     },
                     limits: {
                         x: { min: 0, max: maxGlobalX > 0 ? maxGlobalX : undefined }
@@ -1488,20 +1751,99 @@
         }
     });
 
+    ctx.addEventListener('pointermove', function (e) {
+        const rect = ctx.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (globalChartInstance.chartArea &&
+            x >= globalChartInstance.chartArea.left && x <= globalChartInstance.chartArea.right &&
+            y >= globalChartInstance.chartArea.top && y <= globalChartInstance.chartArea.bottom) {
+            const xVal = globalChartInstance.scales.x.getValueForPixel(x);
+            if (xVal !== undefined && !isNaN(xVal)) {
+                currentGlobalHoveredX = xVal;
+                updateGlobalHeaderBadge(xVal);
+                globalChartInstance.draw();
+            }
+        } else {
+            if (currentGlobalHoveredX !== null) {
+                currentGlobalHoveredX = null;
+                updateGlobalHeaderBadge(null);
+                globalChartInstance.draw();
+            }
+        }
+    });
+
+    ctx.addEventListener('pointerleave', function () {
+        if (currentGlobalHoveredX !== null) {
+            currentGlobalHoveredX = null;
+            updateGlobalHeaderBadge(null);
+            globalChartInstance.draw();
+        }
+    });
+
     globalChartInstance._maxAvailableX = maxGlobalX;
 
-    try {
-        const saved = localStorage.getItem('rbwr_global_time_window');
-        if (saved && saved !== 'all') {
-            const sec = parseInt(saved, 10);
-            if (!isNaN(sec)) {
-                const targetBtn = Array.from(document.querySelectorAll('.time-range-btn')).find(b => b.textContent.trim().toLowerCase() === (sec === 600 ? '10m' : sec === 1800 ? '30m' : sec === 3600 ? '1h' : sec === 21600 ? '6h' : sec === 86400 ? '24h' : ''));
+    function restoreGlobalSavedZoom() {
+        let saved = null;
+        try {
+            const raw = sessionStorage.getItem(GLOBAL_ZOOM_STORAGE_KEY) || localStorage.getItem(GLOBAL_ZOOM_STORAGE_KEY);
+            if (raw) saved = JSON.parse(raw);
+        } catch (e) { }
+
+        if (saved) {
+            if (saved.isCustom && typeof saved.min === 'number' && typeof saved.max === 'number' && saved.max > saved.min) {
+                currentGlobalWindowSeconds = null;
+                document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
+                const limitMax = globalChartInstance._maxAvailableX || 0;
+                globalChartInstance.options.scales.x.min = Math.max(0, saved.min);
+                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(limitMax, saved.max) : saved.max;
+                globalChartInstance.update('none');
+                return;
+            } else if (saved.windowSeconds !== undefined) {
+                const sec = saved.windowSeconds;
+                const targetBtn = Array.from(document.querySelectorAll('.time-range-btn')).find(b => {
+                    const text = b.textContent.trim().toLowerCase();
+                    if (sec === null) return text === 'all';
+                    if (sec === 600) return text === '10m';
+                    if (sec === 1800) return text === '30m';
+                    if (sec === 3600) return text === '1h';
+                    if (sec === 21600) return text === '6h';
+                    if (sec === 86400) return text === '24h';
+                    if (sec === 604800) return text === '7d';
+                    return false;
+                });
                 if (targetBtn) {
-                    setGlobalTimeWindow(sec, targetBtn);
+                    setGlobalTimeWindow(sec, targetBtn, false);
+                    return;
                 }
             }
         }
-    } catch (e) { }
+
+        try {
+            const fallback = localStorage.getItem('rbwr_global_time_window');
+            if (fallback && fallback !== 'all') {
+                const sec = parseInt(fallback, 10);
+                if (!isNaN(sec)) {
+                    const targetBtn = Array.from(document.querySelectorAll('.time-range-btn')).find(b => {
+                        const text = b.textContent.trim().toLowerCase();
+                        if (sec === 600) return text === '10m';
+                        if (sec === 1800) return text === '30m';
+                        if (sec === 3600) return text === '1h';
+                        if (sec === 21600) return text === '6h';
+                        if (sec === 86400) return text === '24h';
+                        if (sec === 604800) return text === '7d';
+                        return false;
+                    });
+                    if (targetBtn) {
+                        setGlobalTimeWindow(sec, targetBtn, false);
+                    }
+                }
+            }
+        } catch (e) { }
+    }
+
+    restoreGlobalSavedZoom();
     }) ();
     {% endif %}
 </script>
