@@ -557,17 +557,20 @@
         return null;
     }
 
-    function formatMetricValue(val, unit, isPlayerCount, metricName) {
+    function formatMetricValue(val, unit, isPlayerCount, metricName, rawVal) {
         if (val === null || val === undefined || isNaN(val)) return 'N/A';
         if (isPlayerCount) return `${Math.round(val)} players`;
 
-        const isDemand = (unit === 'MW' || unit === 'MWe') || (metricName && metricName.toLowerCase().includes('demand'));
-        if (isDemand || val < 0) {
-            const roundedVal = Math.round(val);
-            if (Math.abs(val - roundedVal) < 0.001) {
+        const isDemand = Boolean(metricName && metricName.toLowerCase().includes('demand'));
+        const checkVal = (rawVal !== undefined && rawVal !== null && !isNaN(rawVal)) ? rawVal : val;
+
+        if (isDemand && checkVal < 0) {
+            const roundedVal = Math.round(checkVal);
+            if (Math.abs(checkVal - roundedVal) < 0.001) {
                 const code = formatDemandCode(roundedVal);
                 if (code) return code;
             }
+            return unit ? `0 ${unit}` : '0';
         }
 
         let formatted;
@@ -585,7 +588,11 @@
     function getYForX(points, targetX) {
         if (!points || points.length === 0) return null;
         const len = points.length;
-        if (len === 1) return points[0].y;
+        if (len === 1) {
+            const p = points[0];
+            const pRaw = (p.rawY !== undefined && p.rawY !== null) ? p.rawY : p.y;
+            return { y: p.y, rawY: pRaw };
+        }
 
         const firstX = points[0].x;
         const lastX = points[len - 1].x;
@@ -593,7 +600,9 @@
         const maxX = Math.max(firstX, lastX);
 
         if (targetX < minX || targetX > maxX) {
-            return Math.abs(targetX - firstX) < Math.abs(targetX - lastX) ? points[0].y : points[len - 1].y;
+            const edge = Math.abs(targetX - firstX) < Math.abs(targetX - lastX) ? points[0] : points[len - 1];
+            const edgeRaw = (edge.rawY !== undefined && edge.rawY !== null) ? edge.rawY : edge.y;
+            return { y: edge.y, rawY: edgeRaw };
         }
 
         const isAscending = lastX >= firstX;
@@ -612,9 +621,24 @@
             const i1 = Math.max(0, Math.min(len - 2, high));
             const p1 = points[i1];
             const p2 = points[i1 + 1];
-            if (!p1 || !p2 || p2.x === p1.x) return p1 ? p1.y : null;
+            if (!p1 || !p2 || p2.x === p1.x) {
+                const p = p1 || p2;
+                return p ? { y: p.y, rawY: (p.rawY !== undefined && p.rawY !== null) ? p.rawY : p.y } : null;
+            }
             const ratio = (targetX - p1.x) / (p2.x - p1.x);
-            return p1.y + ratio * (p2.y - p1.y);
+            const interpY = p1.y + ratio * (p2.y - p1.y);
+            const nearest = Math.abs(targetX - p1.x) <= Math.abs(targetX - p2.x) ? p1 : p2;
+            const nearestRaw = (nearest.rawY !== undefined && nearest.rawY !== null) ? nearest.rawY : nearest.y;
+            const p1Raw = (p1.rawY !== undefined && p1.rawY !== null) ? p1.rawY : p1.y;
+            const p2Raw = (p2.rawY !== undefined && p2.rawY !== null) ? p2.rawY : p2.y;
+            const isDemand = p1.isDemand || p2.isDemand || (p1Raw < 0 && p1.y === 0) || (p2Raw < 0 && p2.y === 0);
+            let rawY;
+            if (isDemand && (p1Raw < 0 || p2Raw < 0)) {
+                rawY = nearestRaw;
+            } else {
+                rawY = interpY;
+            }
+            return { y: interpY, rawY: rawY };
         } else {
             while (low <= high) {
                 const mid = (low + high) >> 1;
@@ -627,9 +651,24 @@
             const i1 = Math.max(0, Math.min(len - 2, high));
             const p1 = points[i1];
             const p2 = points[i1 + 1];
-            if (!p1 || !p2 || p2.x === p1.x) return p1 ? p1.y : null;
+            if (!p1 || !p2 || p2.x === p1.x) {
+                const p = p1 || p2;
+                return p ? { y: p.y, rawY: (p.rawY !== undefined && p.rawY !== null) ? p.rawY : p.y } : null;
+            }
             const ratio = (targetX - p1.x) / (p2.x - p1.x);
-            return p1.y + ratio * (p2.y - p1.y);
+            const interpY = p1.y + ratio * (p2.y - p1.y);
+            const nearest = Math.abs(targetX - p1.x) <= Math.abs(targetX - p2.x) ? p1 : p2;
+            const nearestRaw = (nearest.rawY !== undefined && nearest.rawY !== null) ? nearest.rawY : nearest.y;
+            const p1Raw = (p1.rawY !== undefined && p1.rawY !== null) ? p1.rawY : p1.y;
+            const p2Raw = (p2.rawY !== undefined && p2.rawY !== null) ? p2.rawY : p2.y;
+            const isDemand = p1.isDemand || p2.isDemand || (p1Raw < 0 && p1.y === 0) || (p2Raw < 0 && p2.y === 0);
+            let rawY;
+            if (isDemand && (p1Raw < 0 || p2Raw < 0)) {
+                rawY = nearestRaw;
+            } else {
+                rawY = interpY;
+            }
+            return { y: interpY, rawY: rawY };
         }
     }
 
@@ -749,16 +788,16 @@
             const readoutItems = [];
             (chart.data.datasets || []).forEach(ds => {
                 if (!ds.data || ds.data.length === 0) return;
-                const yVal = getYForX(ds.data, currentHoveredX);
-                if (yVal === null || yVal === undefined || isNaN(yVal)) return;
+                const pt = getYForX(ds.data, currentHoveredX);
+                if (!pt || pt.y === null || pt.y === undefined || isNaN(pt.y)) return;
 
                 readoutItems.push({
                     label: ds.label,
                     color: ds.borderColor || '#3b82f6',
-                    value: formatMetricValue(yVal, chart._metricUnit, chart._isPlayerCount, chart._metricName)
+                    value: formatMetricValue(pt.y, chart._metricUnit, chart._isPlayerCount, chart._metricName, pt.rawY)
                 });
 
-                const yPixel = chart.scales.y.getPixelForValue(yVal);
+                const yPixel = chart.scales.y.getPixelForValue(pt.y);
                 if (isNaN(yPixel) || yPixel < chart.chartArea.top || yPixel > chart.chartArea.bottom) return;
 
                 ctx.setLineDash([]);
@@ -826,12 +865,12 @@
             for (let d = 0; d < datasets.length; d++) {
                 const ds = datasets[d];
                 if (!ds.data || ds.data.length === 0) continue;
-                const yVal = getYForX(ds.data, xVal);
-                if (yVal !== null && yVal !== undefined && !isNaN(yVal)) {
+                const pt = getYForX(ds.data, xVal);
+                if (pt && pt.y !== null && pt.y !== undefined && !isNaN(pt.y)) {
                     readoutItems.push({
                         label: ds.label,
                         color: ds.borderColor || '#3b82f6',
-                        value: formatMetricValue(yVal, chart._metricUnit, chart._isPlayerCount, chart._metricName)
+                        value: formatMetricValue(pt.y, chart._metricUnit, chart._isPlayerCount, chart._metricName, pt.rawY)
                     });
                 }
             }
@@ -929,6 +968,7 @@
 
         const metricName = chart.metric || '';
         const isPlayerCount = metricName.toLowerCase().includes('player');
+        const isDemandMetric = metricName.toLowerCase().includes('demand');
         const metricUnit = getMetricUnit(metricName);
 
         const datasets = (chart.datasets || []).map(ds => {
@@ -938,7 +978,10 @@
 
             const points = (ds.data || []).map(item => {
                 if (typeof item === 'object' && item !== null && 'x' in item && 'y' in item) {
-                    return { x: parseFloat(item.x), y: parseFloat(item.y) };
+                    const rawX = parseFloat(item.x);
+                    const rawY = parseFloat(item.y);
+                    const renderedY = (isDemandMetric && rawY < 0) ? 0 : rawY;
+                    return { x: rawX, y: renderedY, rawY: rawY, isDemand: isDemandMetric };
                 }
                 return null;
             }).filter(p => p !== null && !isNaN(p.x) && !isNaN(p.y));
@@ -1048,16 +1091,17 @@
                         grid: { color: 'rgba(255, 255, 255, 0.04)' }
                     },
                     y: {
-                        beginAtZero: isPlayerCount,
+                        beginAtZero: isPlayerCount || isDemandMetric,
+                        min: isDemandMetric ? 0 : undefined,
                         ticks: {
                             color: '#9ca3af',
                             font: { family: 'JetBrains Mono', size: 10 },
                             precision: isPlayerCount ? 0 : 2,
                             callback: function (val) {
                                 if (isPlayerCount) return Math.round(val) + ' players';
-                                if (metricName && metricName.toLowerCase().includes('demand')) {
-                                    const code = formatDemandCode(val);
-                                    if (code) return code;
+                                if (isDemandMetric) {
+                                    if (val < 0) return 0;
+                                    return val;
                                 }
                                 return val;
                             }
@@ -1099,6 +1143,7 @@
         chartInstance._isPlayerCount = isPlayerCount;
         chartInstance._metricUnit = metricUnit;
         chartInstance._metricName = metricName;
+        chartInstance._isDemandMetric = isDemandMetric;
         chartInstance._badgeEl = pointsLabel;
         chartInstances.push(chartInstance);
     });
