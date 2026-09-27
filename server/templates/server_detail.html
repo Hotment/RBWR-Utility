@@ -866,8 +866,9 @@
         let chartMaxX = 0;
         let chartMinX = null;
 
-        const isPlayerCount = chart.metric && chart.metric.toLowerCase().includes('player');
-        const metricUnit = getMetricUnit(chart.metric);
+        const metricName = chart.metric || '';
+        const isPlayerCount = metricName.toLowerCase().includes('player');
+        const metricUnit = getMetricUnit(metricName);
 
         const datasets = (chart.datasets || []).map(ds => {
             const isUnit1 = ds.label && ds.label.includes('1');
