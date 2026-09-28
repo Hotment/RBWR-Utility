@@ -210,20 +210,27 @@
 
     <div id="archiveServerGrid" class="is-loading grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 min-h-[320px]">
         <div id="archiveLoadingState"
-            class="col-span-full py-20 text-center flex flex-col items-center justify-center gap-4">
-            <div class="flex items-center gap-3">
-                <span class="text-sm font-display font-semibold text-white tracking-wide">Loading Archived
-                    Servers...</span>
+            class="col-span-full py-20 text-center flex flex-col items-center justify-center gap-5">
+            <div class="relative flex items-center justify-center">
+                <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                    <svg class="w-7 h-7 text-cyan-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
             </div>
-            <div
-                class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-3 overflow-hidden p-0.5 relative shadow-inner">
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-base font-display font-semibold text-white tracking-wide">Decompressing & Loading Archive...</span>
+                <span class="text-xs font-mono text-cyan-300/80">{{ stats.filename }} ({{ stats.size_str }})</span>
+            </div>
+            <div class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-2.5 overflow-hidden p-0.5 relative shadow-inner">
                 <div id="archiveProgressBar"
-                    class="h-full bg-cyan-400 rounded-full transition-all duration-300 relative" style="width: 25%;">
+                    class="h-full bg-cyan-500 rounded-full transition-all duration-150 relative shadow-sm shadow-cyan-500/50" style="width: 0%;">
                 </div>
             </div>
             <div class="flex items-center justify-between w-full max-w-md text-[11px] font-mono text-gray-400 px-1">
                 <span id="archiveLoadingStatus">Reading records...</span>
-                <span id="archiveLoadingPercent" class="text-cyan-400 font-bold">25%</span>
+                <span id="archiveLoadingPercent" class="text-cyan-400 font-bold">0%</span>
             </div>
         </div>
 
@@ -586,15 +593,40 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        updateArchiveLoadingProgress(35, 'Parsing archive dataset...');
-        requestAnimationFrame(() => {
-            archiveCards = Array.from(document.querySelectorAll('.server-card'));
-            updateArchiveLoadingProgress(70, 'Sorting servers and calculating pagination...');
-            setTimeout(() => {
+        const cards = Array.from(document.querySelectorAll('.server-card'));
+        const total = cards.length;
+        if (total === 0) {
+            updateArchiveLoadingProgress(100, 'Loaded successfully');
+            finishArchiveLoading();
+            return;
+        }
+
+        archiveCards = cards;
+        let processed = 0;
+        const batchSize = Math.max(10, Math.ceil(total / 12));
+
+        function processBatch() {
+            const limit = Math.min(processed + batchSize, total);
+            for (let i = processed; i < limit; i++) {
+                getCardPlayerCount(cards[i]);
+                getCardSnapshotCount(cards[i]);
+                getCardUptime(cards[i]);
+            }
+            processed = limit;
+            const pct = Math.min(95, Math.round((processed / total) * 90) + 5);
+            updateArchiveLoadingProgress(pct, `Processed ${processed} of ${total} archived servers (${pct}%)...`);
+
+            if (processed < total) {
+                requestAnimationFrame(processBatch);
+            } else {
+                updateArchiveLoadingProgress(98, 'Applying filters & pagination...');
                 filterArchiveServers(true);
                 finishArchiveLoading();
-            }, 60);
-        });
+            }
+        }
+
+        updateArchiveLoadingProgress(5, `Preparing ${total} archived servers...`);
+        requestAnimationFrame(processBatch);
     });
 </script>
 {% endblock %}

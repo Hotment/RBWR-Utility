@@ -386,8 +386,13 @@
             const sec = parseFloat(card.dataset.ageSeconds);
             if (!isNaN(sec)) return Date.now() - (sec * 1000);
         }
-        const m = card.textContent.match(/(\d+)s\s*ago/i);
-        if (m) return Date.now() - (parseInt(m[1], 10) * 1000);
+        const m = card.textContent.match(/(\d+)\s*(s|m|h|d|w|mo)\s*ago/i);
+        if (m) {
+            const val = parseInt(m[1], 10);
+            const unit = m[2].toLowerCase();
+            const mult = unit === 'mo' ? 2592000 : (unit === 'w' ? 604800 : (unit === 'd' ? 86400 : (unit === 'h' ? 3600 : (unit === 'm' ? 60 : 1))));
+            return Date.now() - (val * mult * 1000);
+        }
         return 0;
     }
 
@@ -537,34 +542,104 @@
 
         if (grid) {
             grid.innerHTML = `
-                <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-display font-semibold text-white tracking-wide">Loading Archives...</span>
+                <div class="col-span-full py-20 text-center flex flex-col items-center justify-center gap-5">
+                    <div class="relative flex items-center justify-center">
+                        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                            <svg class="w-7 h-7 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                            </svg>
+                        </div>
+                        <div class="absolute -inset-1 rounded-2xl border border-cyan-500/20 animate-ping pointer-events-none"></div>
                     </div>
-                    <div class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-3 overflow-hidden p-0.5 relative shadow-inner">
-                        <div class="h-full bg-cyan-400 rounded-full transition-all duration-300" style="width: 75%;"></div>
+                    <div class="flex flex-col items-center gap-1.5">
+                        <span class="text-base font-display font-semibold text-white tracking-wide">Loading Server Archives...</span>
+                        <span id="archivesFetchStatus" class="text-xs font-mono text-gray-400">Connecting to archive repository...</span>
                     </div>
-                    <span class="text-xs font-mono text-gray-400">Fetching archived records...</span>
+                    <div class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-2.5 overflow-hidden p-0.5 relative shadow-inner">
+                        <div id="archivesFetchProgressBar" class="h-full bg-cyan-500 rounded-full transition-all duration-200 ease-out shadow-sm shadow-cyan-500/50" style="width: 0%;"></div>
+                    </div>
+                    <span id="archivesFetchPct" class="text-[11px] font-mono text-cyan-400/80 font-bold">0%</span>
                 </div>
             `;
         }
 
         try {
-            const resp = await fetch('/api/archives', { signal: archivesFetchAbortController.signal });
+            const resp = await fetch('/api/archives?stream=1', { signal: archivesFetchAbortController.signal });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const data = await resp.json();
 
-            archiveDaysData = data.days || [];
-            archiveStatsData = data.stats || {};
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let completed = false;
 
-            renderArchiveDaysInGrid();
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || !trimmed.startsWith('data: ')) continue;
+                    try {
+                        const ev = JSON.parse(trimmed.slice(6));
+                        const bar = document.getElementById('archivesFetchProgressBar');
+                        const status = document.getElementById('archivesFetchStatus');
+                        const pct = document.getElementById('archivesFetchPct');
+
+                        if (ev.type === 'progress') {
+                            const p = Math.min(99, Math.max(1, ev.percent));
+                            if (bar) bar.style.width = `${p}%`;
+                            if (pct) pct.textContent = `${p}%`;
+                            if (status) status.textContent = `Scanning ${ev.filename} (${ev.current} of ${ev.total} archives)...`;
+                        } else if (ev.type === 'complete') {
+                            completed = true;
+                            if (bar) bar.style.width = '100%';
+                            if (pct) pct.textContent = '100%';
+                            if (status) status.textContent = 'Archives indexed successfully!';
+
+                            archiveDaysData = ev.days || [];
+                            archiveStatsData = ev.stats || {};
+
+                            setTimeout(() => {
+                                renderArchiveDaysInGrid();
+                            }, 60);
+                        } else if (ev.type === 'error') {
+                            throw new Error(ev.message || 'Error scanning archives');
+                        }
+                    } catch (pe) {
+                        console.warn('Error parsing SSE archive chunk:', pe);
+                    }
+                }
+            }
+
+            if (!completed && archiveDaysData === null) {
+                const fallbackResp = await fetch('/api/archives', { signal: archivesFetchAbortController.signal });
+                const data = await fallbackResp.json();
+                archiveDaysData = data.days || [];
+                archiveStatsData = data.stats || {};
+                renderArchiveDaysInGrid();
+            }
         } catch (err) {
+            clearTimeout(progressTimer1);
+            clearTimeout(progressTimer2);
             if (err.name === 'AbortError') return;
             console.error('Error loading archives:', err);
             if (grid) {
                 grid.innerHTML = `
-                    <div class="col-span-full py-12 text-center text-xs font-mono text-rose-400">
-                        Failed to load archives. Please try again.
+                    <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <div class="flex flex-col items-center gap-1">
+                            <span class="text-sm font-display font-semibold text-white">Failed to Load Archives</span>
+                            <span class="text-xs font-mono text-rose-400 max-w-md">${err.message || 'Network error fetching archive catalog'}</span>
+                        </div>
+                        <button type="button" onclick="fetchArchivesTab()" class="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            <span>Retry Loading Archives</span>
+                        </button>
                     </div>
                 `;
             }
@@ -728,6 +803,7 @@
 
                     <div class="pt-2 border-t border-white/5">
                         <a href="/archives/${day.date}"
+                            onclick="handleArchiveNavigation(event, this, '${day.date}')"
                             class="w-full py-2.5 px-4 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 hover:text-cyan-200 border border-cyan-500/30 rounded-xl text-xs font-semibold font-display transition-all flex items-center justify-center gap-2 group shadow-sm cursor-pointer">
                             <span>Browse All Servers (${day.server_count || 0})</span>
                             <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -738,6 +814,31 @@
                 </div>
             `).join('');
         }
+    }
+
+    function showArchiveTopProgressBar() {
+        let bar = document.getElementById('globalArchiveTopBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'globalArchiveTopBar';
+            bar.className = 'fixed top-0 left-0 right-0 h-1 z-[9999] pointer-events-none overflow-hidden';
+            bar.innerHTML = '<div class="h-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse" style="width: 85%; transition: width 0.3s ease;"></div>';
+            document.body.appendChild(bar);
+        }
+    }
+
+    function handleArchiveNavigation(e, btn, date) {
+        if (btn.dataset.loading === 'true') return;
+        btn.dataset.loading = 'true';
+        btn.classList.add('opacity-90', 'cursor-wait');
+        btn.innerHTML = `
+            <svg class="w-4 h-4 animate-spin text-cyan-300 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="font-mono text-[11px]">Decompressing & Opening Archive...</span>
+        `;
+        showArchiveTopProgressBar();
     }
 
     async function fetchHistoricalPage(page = 1) {
@@ -1319,7 +1420,9 @@
         if (s < 60) return `${s}s ago`;
         if (s < 3600) return `${Math.floor(s / 60)}m ago`;
         if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-        return `${Math.floor(s / 86400)}d ago`;
+        if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+        if (s < 2592000) return `${Math.floor(s / 604800)}w ago`;
+        return `${Math.floor(s / 2592000)}mo ago`;
     }
 
     function formatSingleTick(sec, step) {

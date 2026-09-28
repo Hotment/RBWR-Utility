@@ -458,9 +458,20 @@
             const m = Math.floor((s % 3600) / 60);
             return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
         }
-        const d = Math.floor(s / 86400);
-        const h = Math.floor((s % 86400) / 3600);
-        return h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
+        if (s < 604800) {
+            const d = Math.floor(s / 86400);
+            const h = Math.floor((s % 86400) / 3600);
+            return h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
+        }
+        if (s < 2592000) {
+            const w = Math.floor(s / 604800);
+            const d = Math.floor((s % 604800) / 86400);
+            return d > 0 ? `${w}w ${d}d ago` : `${w}w ago`;
+        }
+        const mo = Math.floor(s / 2592000);
+        const remD = Math.floor((s % 2592000) / 86400);
+        const remW = Math.floor(remD / 7);
+        return remW > 0 ? `${mo}mo ${remW}w ago` : (remD > 0 ? `${mo}mo ${remD}d ago` : `${mo}mo ago`);
     }
 
     function formatSingleTick(sec, step) {

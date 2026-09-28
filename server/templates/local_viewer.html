@@ -4,7 +4,7 @@
 
 {% block extra_head %}
 <meta name="description" content="100% Client-Side Private RBWR Point History Graph">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/points_style.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/points_style.css') }}?v=8">
 {% endblock %}
 
 {% block content %}
@@ -29,6 +29,13 @@
                 <span class="detail-badge" id="localFileSizeBadge">0 MB</span>
             </div>
 
+            <button class="btn btn-secondary" id="btnSwitchFile" style="display: none;" title="Open another SAR JSON or archive file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Switch File</span>
+            </button>
+
             <button class="btn btn-secondary" id="btnOpenLocalPasteModal" title="Paste raw JSON directly">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
@@ -45,7 +52,7 @@
                 </svg>
                 <span>Open Local File</span>
             </button>
-            <input type="file" id="localFileInput" accept=".json" style="display: none;">
+            <input type="file" id="localFileInput" accept=".json,.zip,.gz" style="display: none;">
 
             <a href="https://points-rbwr.hotment.dev/login" target="_blank" rel="noopener" class="btn btn-ghost"
                 title="Live sync via Points RBWR">
@@ -56,13 +63,28 @@
 
     <section id="localDropzoneSection" class="local-dropzone-card">
         <div class="upload-dropzone" id="localDropzone">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            <h2 style="font-family: var(--font-heading); color: #ffffff; margin-top: 8px;">Select or Drop your SAR JSON
-                File</h2>
-            <p class="dropzone-text">Click anywhere here or drag and drop <code>sar_data.json</code></p>
-            <span class="privacy-note">File processing happens strictly on your CPU using HTML5 FileReader.</span>
+            <div id="dropzoneContent">
+                <h2 style="font-family: var(--font-heading); color: #ffffff; margin-top: 8px;">Select or Drop your SAR JSON or Archive</h2>
+                <p class="dropzone-text">Click anywhere here or drag and drop <code>sar_data.json</code>, <code>.zip</code>, or <code>.gz</code></p>
+                <span class="privacy-note">File processing and in-memory decompression strictly execute locally on your device.</span>
+            </div>
+
+            <div class="dropzone-loading-overlay" id="localDropzoneLoadingOverlay" style="display: none;">
+                <div class="loading-spinner-box">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" class="animate-spin">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.2"></circle>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                    </svg>
+                </div>
+                <h3 class="loading-title" id="localLoadingTitle">Reading File & Archive Data...</h3>
+                <div class="loading-progress-bar-bg">
+                    <div class="loading-progress-bar-fill" id="localLoadingProgressBar" style="width: 15%;"></div>
+                </div>
+                <div class="loading-status-row">
+                    <span class="loading-status-text" id="localLoadingStatusText">Opening file bytes...</span>
+                    <span class="loading-percent-text" id="localLoadingPercentText">15%</span>
+                </div>
+            </div>
         </div>
 
         <div class="form-group" style="margin-top: 18px;">
@@ -140,13 +162,25 @@
 
             <div class="kpi-card card-total">
                 <div class="kpi-header">
-                    <span class="kpi-label">Combined Points</span>
+                    <span class="kpi-label">Points You Have (Balance)</span>
                     <span class="kpi-tag tag-total" id="localTotalGain24h">+0 total</span>
                 </div>
                 <div class="kpi-value" id="localValTotalPoints">---</div>
                 <div class="kpi-footer">
                     <span class="kpi-subtext" id="localValPointEvents">0 point updates</span>
                     <span class="kpi-meta" id="localValTotalLogs">0 total logs</span>
+                </div>
+            </div>
+
+            <div class="kpi-card card-audit" id="kpiCardAudit">
+                <div class="kpi-header">
+                    <span class="kpi-label">Total Points You Got</span>
+                    <span class="kpi-tag tag-audit" id="localGainedStatusTag">Audit</span>
+                </div>
+                <div class="kpi-value text-cyan-300" id="localValTotalGainedPoints">---</div>
+                <div class="kpi-footer">
+                    <span class="kpi-subtext" id="localAuditIgnoredGains">+0 from Roblox imports</span>
+                    <span class="kpi-meta" id="localAuditDiffText">Comparing vs Balance...</span>
                 </div>
             </div>
         </section>
@@ -294,15 +328,177 @@
         <section class="detail-card">
             <div class="detail-card-header">
                 <div class="detail-card-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
                         <path d="M22 12A10 10 0 0 0 12 2v10z" />
                     </svg>
                     <span>Points Source Breakdown</span>
                 </div>
-                <span class="detail-badge" id="localBreakdownTotalSources">0 Categories</span>
+
+                <div class="breakdown-nav-tabs" id="breakdownNavTabs">
+                    <button type="button" class="b-tab-btn active" data-tab="all" id="tabBtnAll">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        <span>All Categories</span>
+                        <span class="b-tab-badge" id="localBreakdownTotalSources">0</span>
+                    </button>
+                    <button type="button" class="b-tab-btn" data-tab="missions" id="tabBtnMissions">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="6"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>
+                        <span>Missions</span>
+                        <span class="b-tab-badge b-tab-badge-accent" id="localMissionsTabBadge">0</span>
+                    </button>
+                    <button type="button" class="b-tab-btn" data-tab="unit1" id="tabBtnUnit1">
+                        <span class="b-tab-dot dot-u1"></span>
+                        <span>Unit 1</span>
+                    </button>
+                    <button type="button" class="b-tab-btn" data-tab="unit2" id="tabBtnUnit2">
+                        <span class="b-tab-dot dot-u2"></span>
+                        <span>Unit 2</span>
+                    </button>
+                </div>
             </div>
-            <div class="breakdown-bars-container" id="localBreakdownList">
+
+            <div class="b-tab-pane active" id="tabPaneAll">
+                <div class="breakdown-bars-container" id="localBreakdownList">
+                </div>
+            </div>
+
+            <div class="b-tab-pane" id="tabPaneMissions" style="display: none;">
+                <div class="missions-dashboard-container">
+                    <div class="mission-stats-grid">
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Total Mission Points</span>
+                            <span class="m-stat-val text-white" id="mStatTotalPoints">0 pts</span>
+                            <span class="m-stat-sub" id="mStatTotalCount">0 missions total</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Mission Completed</span>
+                            <span class="m-stat-val text-blue-400" id="mStatCompletedPoints">0 pts</span>
+                            <span class="m-stat-sub" id="mStatCompletedCount">0 completed</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Mission Auto-Claimed</span>
+                            <span class="m-stat-val text-cyan-400" id="mStatAutoClaimedPoints">0 pts</span>
+                            <span class="m-stat-sub" id="mStatAutoClaimedCount">0 auto-claimed</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Auto-Claim Ratio</span>
+                            <span class="m-stat-val text-amber-300" id="mStatAutoClaimPct">0%</span>
+                            <span class="m-stat-sub">of all mission points</span>
+                        </div>
+                    </div>
+
+                    <div class="missions-toolbar">
+                        <div class="missions-filter-pills" id="missionsFilterGroup">
+                            <button type="button" class="m-pill active" data-filter="all">All (<span id="mCountAll">0</span>)</button>
+                            <button type="button" class="m-pill" data-filter="completed">Completed (<span id="mCountCompleted">0</span>)</button>
+                            <button type="button" class="m-pill" data-filter="auto_claimed">Auto-Claimed (<span id="mCountAutoClaimed">0</span>)</button>
+                        </div>
+
+                        <div class="missions-search-box">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="inputMissionSearch" placeholder="Search missions (e.g. Turbine, Coolant, Rod)..." class="missions-search-input">
+                        </div>
+                    </div>
+
+                    <div class="missions-cards-container" id="localMissionsList">
+                        <p style="color: var(--text-muted); font-size: 0.82rem; padding: 20px 0; text-align: center;">No missions recorded in this activity log.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="b-tab-pane" id="tabPaneUnit1" style="display: none;">
+                <div class="breakdown-bars-container" id="localBreakdownUnit1List">
+                </div>
+            </div>
+
+            <div class="b-tab-pane" id="tabPaneUnit2" style="display: none;">
+                <div class="breakdown-bars-container" id="localBreakdownUnit2List">
+                </div>
+            </div>
+        </section>
+
+        <section class="points-reconciliation-card" id="localReconciliationSection">
+            <div class="reconciliation-header">
+                <div class="reconciliation-title-group">
+                    <div class="reconciliation-icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <path d="m9 12 2 2 4-4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="reconciliation-title">Points Audit & Balance Reconciliation</h3>
+                        <p class="reconciliation-subtitle">Sum of all points earned across all activity logs (including Roblox DataStore imports) compared with your current held profile balance.</p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnOpenAuditModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span>View Audit Breakdown</span>
+                </button>
+            </div>
+
+            <div class="reconciliation-metrics-grid">
+                <div class="reconcile-metric">
+                    <span class="reconcile-metric-label">Points You Have (Balance)</span>
+                    <div class="reconcile-metric-val" id="reconcileValHave">0 pts</div>
+                    <span class="reconcile-metric-sub" id="reconcileSubHave">U1: 0 · U2: 0</span>
+                </div>
+
+                <div class="reconcile-metric-divider">vs</div>
+
+                <div class="reconcile-metric">
+                    <span class="reconcile-metric-label">Total Points You Got (Earned)</span>
+                    <div class="reconcile-metric-val text-cyan-300" id="reconcileValGot">0 pts</div>
+                    <span class="reconcile-metric-sub" id="reconcileSubGot">0 standard + 0 Roblox imports</span>
+                </div>
+
+                <div class="reconcile-metric-divider">=</div>
+
+                <div class="reconcile-metric">
+                    <span class="reconcile-metric-label">Reconciliation Result</span>
+                    <div class="reconcile-metric-val" id="reconcileValDiff">0 pts</div>
+                    <span class="reconcile-status-badge badge-match" id="reconcileStatusBadge">Exact Match</span>
+                </div>
+            </div>
+
+            <div class="reconciliation-bar-section">
+                <div class="reconcile-bar-header">
+                    <span class="reconcile-bar-title">Reconciliation Accounting Ratio</span>
+                    <span class="reconcile-bar-pct" id="reconcileBarPct">100.0% accounted for</span>
+                </div>
+                <div class="reconcile-bar-bg">
+                    <div class="reconcile-bar-fill" id="reconcileBarFill" style="width: 100%;"></div>
+                </div>
+                <div class="reconcile-chips">
+                    <span class="reconcile-chip" id="chipStandardLogs">
+                        <span class="chip-dot dot-blue"></span>
+                        <span>Logged Events: <strong id="reconcileChipStandardVal">0 pts</strong></span>
+                    </span>
+                    <span class="reconcile-chip" id="chipIgnoredLogs">
+                        <span class="chip-dot dot-amber"></span>
+                        <span>Roblox Imports (IGNORED_LOG_MESSAGES): <strong id="reconcileChipIgnoredVal">0 pts</strong></span>
+                    </span>
+                    <span class="reconcile-chip" id="chipBalanceAccount">
+                        <span class="chip-dot dot-emerald"></span>
+                        <span>Profile Balance: <strong id="reconcileChipBalanceVal">0 pts</strong></span>
+                    </span>
+                </div>
             </div>
         </section>
     </div>
@@ -392,10 +588,79 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="localAuditModal" style="display: none;">
+    <div class="modal-card modal-lg">
+        <div class="modal-header">
+            <div class="modal-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <path d="m9 12 2 2 4-4"></path>
+                </svg>
+                <span>Points Reconciliation & Audit Report</span>
+            </div>
+            <button class="btn-close" id="btnCloseAuditModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-intro-text">
+                Detailed comparison between your recorded player point balance and historical activity logs, including legacy Roblox DataStore imports.
+            </p>
+
+            <div class="audit-summary-cards">
+                <div class="audit-sum-card">
+                    <span class="audit-card-label">Profile Points Balance</span>
+                    <span class="audit-card-val text-white" id="modalAuditHeldVal">0</span>
+                    <span class="audit-card-sub" id="modalAuditHeldSub">Unit 1 + Unit 2</span>
+                </div>
+                <div class="audit-sum-card">
+                    <span class="audit-card-label">Total Points Gained</span>
+                    <span class="audit-card-val text-cyan-300" id="modalAuditGainedVal">0</span>
+                    <span class="audit-card-sub" id="modalAuditGainedSub">Standard + Ignored Logs</span>
+                </div>
+                <div class="audit-sum-card">
+                    <span class="audit-card-label">Reconciliation Delta</span>
+                    <span class="audit-card-val" id="modalAuditDiffVal">0</span>
+                    <span class="audit-card-sub" id="modalAuditDiffStatus">Balanced</span>
+                </div>
+            </div>
+
+            <div class="audit-details-section">
+                <div class="audit-section-heading">
+                    <span>Legacy & Roblox Imports (<code>IGNORED_LOG_MESSAGES</code>)</span>
+                    <span class="audit-badge" id="modalAuditIgnoredCount">0 Events</span>
+                </div>
+                <p class="audit-section-desc">
+                    These log entries were excluded from the progression chart to prevent chronological timeline anomalies, but their points are fully included in this reconciliation calculation:
+                </p>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Date / Time</th>
+                                <th>Log Message / Pattern</th>
+                                <th>Unit</th>
+                                <th style="text-align: right;">Points Gained</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalAuditIgnoredTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: var(--text-muted);">No ignored logs found.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" id="btnCloseAuditModalBtn">Done</button>
+        </div>
+    </div>
+</div>
+
 <div id="toastContainer" class="toast-container"></div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/chart.js') }}?v=7"></script>
-<script src="{{ url_for('static', filename='js/local-viewer.js') }}?v=7"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="{{ url_for('static', filename='js/chart.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/local-viewer.js') }}?v=8"></script>
 {% endblock %}

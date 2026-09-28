@@ -1063,8 +1063,13 @@
                 const sec = parseFloat(card.dataset.ageSeconds);
                 if (!isNaN(sec)) return Date.now() - (sec * 1000);
             }
-            const m = card.textContent.match(/(\d+)s\s*ago/i);
-            if (m) return Date.now() - (parseInt(m[1], 10) * 1000);
+            const m = card.textContent.match(/(\d+)\s*(s|m|h|d|w|mo)\s*ago/i);
+            if (m) {
+                const val = parseInt(m[1], 10);
+                const unit = m[2].toLowerCase();
+                const mult = unit === 'mo' ? 2592000 : (unit === 'w' ? 604800 : (unit === 'd' ? 86400 : (unit === 'h' ? 3600 : (unit === 'm' ? 60 : 1))));
+                return Date.now() - (val * mult * 1000);
+            }
             return 0;
         }
 

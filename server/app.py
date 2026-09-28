@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context
+from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 import os
 import json
 import gzip
+import queue
 orjson = None
 try:
     import orjson
@@ -10,16 +11,41 @@ except ImportError:
     pass
 
 def _json_dumps(obj):
-    if orjson: 
-        return orjson.dumps(obj)
+    if orjson:
+        try:
+            return orjson.dumps(obj)
+        except Exception:
+            pass
     return json.dumps(obj).encode("utf-8")
 
 def _json_loads(b):
-    if orjson:
-        return orjson.loads(b)
+    if not b:
+        return {}
     if isinstance(b, (bytes, bytearray)):
-        return json.loads(b.decode("utf-8"))
-    return json.loads(b)
+        if not b.strip():
+            return {}
+        if orjson:
+            try:
+                return orjson.loads(b)
+            except Exception:
+                pass
+        try:
+            return json.loads(b.decode("utf-8"))
+        except Exception:
+            return {}
+    if isinstance(b, str):
+        if not b.strip():
+            return {}
+        if orjson:
+            try:
+                return orjson.loads(b)
+            except Exception:
+                pass
+        try:
+            return json.loads(b)
+        except Exception:
+            return {}
+    return {}
 
 from urllib.parse import quote, urlencode
 import secrets
@@ -1360,6 +1386,7 @@ def get_server_player_count(job_id, snapshots=None, latest_state=None, is_privat
 
 _sc_file_cache = {}
 _sc_cache_lock = threading.Lock()
+_sc_file_io_lock = threading.RLock()
 
 _sc_historical_cards_base = None
 _sc_historical_cards_key = None
@@ -1379,7 +1406,7 @@ def invalidate_historical_cards_cache():
         _sc_active_cards_base = None
         _sc_active_cards_key = None
 
-def get_sc_data(filename: str, max_retries: int = 6):
+def get_sc_data(filename: str, max_retries: int = 8):
     filepath = os.path.join(DATA_DIR, filename)
     if not os.path.exists(filepath):
         return {}
@@ -1397,23 +1424,55 @@ def get_sc_data(filename: str, max_retries: int = 6):
 
     for attempt in range(max_retries):
         try:
-            with open(filepath, "rb") as f:
-                raw_bytes = f.read()
+            with _sc_file_io_lock:
+                if not os.path.exists(filepath):
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                with open(filepath, "rb") as f:
+                    raw_bytes = f.read()
+
+            if not raw_bytes or not raw_bytes.strip():
+                if attempt < max_retries - 1:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                with _sc_cache_lock:
+                    if filename in _sc_file_cache:
+                        return _sc_file_cache[filename][1]
+                return {}
+
             if filename.endswith(".gz") or filepath.endswith(".gz"):
-                raw_bytes = gzip.decompress(raw_bytes)
+                try:
+                    raw_bytes = gzip.decompress(raw_bytes)
+                except Exception:
+                    if attempt < max_retries - 1:
+                        time.sleep(0.05 * (attempt + 1))
+                        continue
+                    raise
+
             data = _json_loads(raw_bytes)
+            if not isinstance(data, dict):
+                data = {}
+
             try:
                 mtime_after = os.path.getmtime(filepath)
             except OSError:
                 mtime_after = current_mtime
+
             with _sc_cache_lock:
                 _sc_file_cache[filename] = (mtime_after, data)
             return data
         except (PermissionError, Exception) as e:
             if attempt < max_retries - 1:
-                time.sleep(0.04 * (attempt + 1))
+                time.sleep(0.05 * (attempt + 1))
             else:
+                with _sc_cache_lock:
+                    if filename in _sc_file_cache:
+                        return _sc_file_cache[filename][1]
                 logger.error(f"Error loading sc data from {filename}: {e}")
+
+    with _sc_cache_lock:
+        if filename in _sc_file_cache:
+            return _sc_file_cache[filename][1]
     return {}
 
 def save_sc_data(data, filename: str, max_retries: int = 10):
@@ -1432,7 +1491,8 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
             
         for attempt in range(max_retries):
             try:
-                os.replace(temp_path, filepath)
+                with _sc_file_io_lock:
+                    os.replace(temp_path, filepath)
                 try:
                     new_mtime = os.path.getmtime(filepath)
                 except OSError:
@@ -1444,11 +1504,12 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
                 return True
             except PermissionError:
                 if attempt < max_retries - 1:
-                    time.sleep(0.04 * (attempt + 1))
+                    time.sleep(0.05 * (attempt + 1))
                 else:
                     try:
-                        with open(filepath, "wb") as f:
-                            f.write(raw_bytes)
+                        with _sc_file_io_lock:
+                            with open(filepath, "wb") as f:
+                                f.write(raw_bytes)
                         try:
                             new_mtime = os.path.getmtime(filepath)
                         except OSError:
@@ -1462,7 +1523,7 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
                         logger.error(f"Error in direct save fallback for {filename}: {fallback_err}")
             except Exception as e:
                 if attempt < max_retries - 1:
-                    time.sleep(0.04 * (attempt + 1))
+                    time.sleep(0.05 * (attempt + 1))
                 else:
                     logger.error(f"Error replacing {temp_path} to {filepath}: {e}")
     except Exception as e:
@@ -1689,27 +1750,35 @@ def format_file_size(size_bytes: int) -> str:
     else:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
-def get_all_archive_days_info() -> tuple[list[dict], dict]:
+_sc_archives_meta_cache = {}
+
+def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]:
     """
     Returns (days_list, summary_stats) for all archived days in ARCHIVES_DIR.
+    Accepts optional progress_callback(current_idx, total_count, filename, percent).
     """
     if not os.path.exists(ARCHIVES_DIR):
         return [], {"total_days": 0, "total_servers": 0, "total_snapshots": 0, "total_size_bytes": 0, "total_size_str": "0 B"}
 
     archive_map = {}
     try:
-        filenames = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
+        raw_filenames = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
     except Exception:
-        filenames = []
+        raw_filenames = []
 
-    for fname in filenames:
+    valid_filenames = []
+    for fname in raw_filenames:
         if not fname.startswith("servers_"):
             continue
         is_gz = fname.endswith(".json.gz")
         is_json = fname.endswith(".json") and not is_gz
         if not (is_gz or is_json):
             continue
+        valid_filenames.append(fname)
 
+    total_files = len(valid_filenames)
+    for idx, fname in enumerate(valid_filenames, 1):
+        is_gz = fname.endswith(".json.gz")
         date_part = fname[len("servers_"):]
         date_str = date_part[:-len(".json.gz")] if is_gz else date_part[:-len(".json")]
 
@@ -1723,15 +1792,31 @@ def get_all_archive_days_info() -> tuple[list[dict], dict]:
 
         full_path = os.path.join(ARCHIVES_DIR, fname)
         size_bytes = os.path.getsize(full_path) if os.path.exists(full_path) else 0
+        try:
+            mtime = os.path.getmtime(full_path)
+        except OSError:
+            mtime = 0
 
-        rel_path = os.path.join("archives", fname)
-        day_data = get_sc_data(rel_path)
-        if isinstance(day_data, dict):
-            s_count = len(day_data)
-            snap_count = sum(len(snaps) for snaps in day_data.values() if isinstance(snaps, dict))
+        cached = _sc_archives_meta_cache.get(fname)
+        if cached and cached[0] == mtime and cached[1] == size_bytes:
+            s_count, snap_count = cached[2], cached[3]
         else:
-            s_count = 0
-            snap_count = 0
+            rel_path = os.path.join("archives", fname)
+            day_data = get_sc_data(rel_path)
+            if isinstance(day_data, dict):
+                s_count = len(day_data)
+                snap_count = sum(len(snaps) for snaps in day_data.values() if isinstance(snaps, dict))
+            else:
+                s_count = 0
+                snap_count = 0
+            _sc_archives_meta_cache[fname] = (mtime, size_bytes, s_count, snap_count)
+
+        if progress_callback:
+            pct = int((idx / total_files) * 100) if total_files > 0 else 100
+            try:
+                progress_callback(idx, total_files, fname, pct)
+            except Exception:
+                pass
 
         if date_str in archive_map and not is_gz:
             continue
@@ -1746,7 +1831,7 @@ def get_all_archive_days_info() -> tuple[list[dict], dict]:
             "size_str": format_file_size(size_bytes),
             "server_count": s_count,
             "snapshot_count": snap_count,
-            "rel_path": rel_path
+            "rel_path": os.path.join("archives", fname)
         }
 
     days_list = sorted(archive_map.values(), key=lambda d: d["date"], reverse=True)
@@ -1846,6 +1931,9 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
     Also compresses a day's archive into .json.gz once all servers that started that day are historical.
     Returns True if current_data was modified (dirty), False otherwise.
     """
+    if not current_data or not isinstance(current_data, dict):
+        return False
+
     now_utc = datetime.now(timezone.utc)
     cutoff_dt = now_utc - timedelta(hours=48)
     cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
@@ -2203,6 +2291,45 @@ def format_uptime_duration(seconds: float) -> str:
     rem_h = (s % 86400) // 3600
     return f"{d}d {rem_h}h" if rem_h > 0 else f"{d}d"
 
+def format_heartbeat_age(seconds: float) -> str:
+    """
+    Formats a heartbeat age (in seconds) into human-readable intervals:
+    seconds, minutes, hours, days, weeks, months (and years if >= 365d).
+    """
+    if seconds is None:
+        return "N/A"
+    try:
+        s = max(0, int(round(float(seconds))))
+    except (ValueError, TypeError):
+        return "N/A"
+
+    if s < 60:
+        return f"{s}s ago"
+    if s < 3600:
+        m = s // 60
+        rem_s = s % 60
+        return f"{m}m {rem_s}s ago" if rem_s > 0 else f"{m}m ago"
+    if s < 86400:
+        h = s // 3600
+        rem_m = (s % 3600) // 60
+        return f"{h}h {rem_m}m ago" if rem_m > 0 else f"{h}h ago"
+    if s < 604800:  # 7 days
+        d = s // 86400
+        rem_h = (s % 86400) // 3600
+        return f"{d}d {rem_h}h ago" if rem_h > 0 else f"{d}d ago"
+    if s < 2592000:  # 30 days
+        w = s // 604800
+        rem_d = (s % 604800) // 86400
+        return f"{w}w {rem_d}d ago" if rem_d > 0 else f"{w}w ago"
+    if s < 31536000:  # 365 days
+        mo = s // 2592000
+        rem_d = (s % 2592000) // 86400
+        rem_w = rem_d // 7
+        return f"{mo}mo {rem_w}w ago" if rem_w > 0 else (f"{mo}mo {rem_d}d ago" if rem_d > 0 else f"{mo}mo ago")
+    y = s // 31536000
+    rem_mo = (s % 31536000) // 2592000
+    return f"{y}y {rem_mo}mo ago" if rem_mo > 0 else f"{y}y ago"
+
 def get_server_uptime_seconds(snapshots, is_historical, age_sec=None):
     if not snapshots:
         return 0
@@ -2343,7 +2470,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             "raw_timestamp": latest_timestamp,
             "first_timestamp": first_timestamp,
             "age_seconds": age_sec,
-            "latest_timestamp": f"{age_sec}s ago",
+            "latest_timestamp": format_heartbeat_age(age_sec),
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
@@ -2438,7 +2565,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
             "raw_timestamp": latest_timestamp,
             "first_timestamp": first_timestamp,
             "age_seconds": age_sec,
-            "latest_timestamp": f"{age_sec}s ago",
+            "latest_timestamp": format_heartbeat_age(age_sec),
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(valid_ts_keys),
@@ -3090,7 +3217,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "raw_timestamp": latest_timestamp,
             "first_timestamp": first_timestamp,
             "age_seconds": age_sec,
-            "latest_timestamp": f"{age_sec}s ago",
+            "latest_timestamp": format_heartbeat_age(age_sec),
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
@@ -3273,12 +3400,47 @@ def view_archive_day_page(date_str):
 
 @app.route("/api/archives", methods=["GET"])
 def get_archives_api():
-    days_list, summary_stats = get_all_archive_days_info()
-    return jsonify({
-        "success": True,
-        "days": days_list,
-        "stats": summary_stats
-    })
+    stream_requested = request.args.get("stream") == "1"
+    if stream_requested:
+        def generate():
+            q = queue.Queue()
+            done = object()
+
+            def worker():
+                try:
+                    def on_progress(cur, total, fname, pct):
+                        q.put({
+                            "type": "progress",
+                            "current": cur,
+                            "total": total,
+                            "filename": fname,
+                            "percent": pct,
+                            "status": f"Scanning archive {cur} of {total} ({fname})..."
+                        })
+                    days, stats = get_all_archive_days_info(progress_callback=on_progress)
+                    q.put({"type": "complete", "days": days, "stats": stats})
+                except Exception as e:
+                    q.put({"type": "error", "message": str(e)})
+                finally:
+                    q.put(done)
+
+            t = threading.Thread(target=worker, daemon=True)
+            t.start()
+
+            while True:
+                item = q.get()
+                if item is done:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+
+        return Response(stream_with_context(generate()), mimetype="text/event-stream")
+    else:
+        days_list, summary_stats = get_all_archive_days_info()
+        return jsonify({
+            "success": True,
+            "days": days_list,
+            "stats": summary_stats
+        })
 
 @app.route("/api/archives/<date_str>", methods=["GET"])
 def get_archive_day_api(date_str):
