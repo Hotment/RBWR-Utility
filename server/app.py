@@ -2283,13 +2283,9 @@ def format_uptime_duration(seconds: float) -> str:
         m = s // 60
         rem_s = s % 60
         return f"{m}m {rem_s}s" if rem_s > 0 else f"{m}m"
-    if s < 86400:
-        h = s // 3600
-        rem_m = (s % 3600) // 60
-        return f"{h}h {rem_m}m" if rem_m > 0 else f"{h}h"
-    d = s // 86400
-    rem_h = (s % 86400) // 3600
-    return f"{d}d {rem_h}h" if rem_h > 0 else f"{d}d"
+    h = s // 3600
+    rem_m = (s % 3600) // 60
+    return f"{h}h {rem_m}m" if rem_m > 0 else f"{h}h"
 
 def format_heartbeat_age(seconds: float) -> str:
     """
