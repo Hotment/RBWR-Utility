@@ -415,10 +415,36 @@
     let searchQuery = '';
     let sortOrder = 'desc';
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
+    function getCombinedUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        if (window.location.hash) {
+            const hash = window.location.hash;
+            const qIndex = hash.indexOf('?');
+            if (qIndex !== -1) {
+                const hashParams = new URLSearchParams(hash.substring(qIndex + 1));
+                for (const [key, val] of hashParams.entries()) {
+                    if (!params.has(key)) {
+                        params.set(key, val);
+                    }
+                }
+            } else if (hash.includes('&') || hash.includes('=')) {
+                const cleanHash = hash.replace(/^#/, '');
+                const parts = cleanHash.split('&');
+                parts.forEach(part => {
+                    const [k, v] = part.split('=');
+                    if (k && v !== undefined && !params.has(k)) {
+                        params.set(k, decodeURIComponent(v));
+                    }
+                });
+            }
+        }
+        return params;
+    }
 
-        const tabParam = urlParams.get('tab') || urlParams.get('type');
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = getCombinedUrlParams();
+
+        const tabParam = urlParams.get('tab');
         if (tabParam) {
             if (['bugs', 'bug', 'bug_report', 'bug_reports'].includes(tabParam.toLowerCase())) {
                 currentTypeFilter = 'bug_report';
@@ -428,6 +454,82 @@
                 currentTypeFilter = 'my_tickets';
             } else {
                 currentTypeFilter = 'suggestion';
+            }
+        } else if (urlParams.get('type')) {
+            const typeParam = urlParams.get('type').toLowerCase();
+            if (['bugs', 'bug', 'bug_report', 'bug_reports', 'defect', 'issue'].includes(typeParam)) {
+                currentTypeFilter = 'bug_report';
+            } else if (['all', 'all_tickets'].includes(typeParam)) {
+                currentTypeFilter = 'all';
+            } else if (['my', 'my_tickets'].includes(typeParam) && LOGGED_IN_DISCORD_USER) {
+                currentTypeFilter = 'my_tickets';
+            } else if (['suggestion', 'suggestions', 'feature', 'features', 'idea'].includes(typeParam)) {
+                currentTypeFilter = 'suggestion';
+            }
+        }
+
+        const presetTypeParam = urlParams.get('submit_type') || urlParams.get('submitType') || urlParams.get('new_type') || urlParams.get('preset_type') || urlParams.get('ticket_type') || urlParams.get('form_type') || urlParams.get('type');
+        if (presetTypeParam) {
+            const norm = presetTypeParam.toLowerCase().trim();
+            let matchedType = null;
+            if (['bug', 'bugs', 'bug_report', 'bug-report', 'bugreport', 'issue', 'defect', 'problem', 'error'].includes(norm)) {
+                matchedType = 'bug_report';
+            } else if (['suggestion', 'suggestions', 'feature', 'features', 'feature_suggestion', 'feature-suggestion', 'idea', 'enhancement', 'request', 'proposal'].includes(norm)) {
+                matchedType = 'suggestion';
+            }
+
+            if (matchedType) {
+                const typeRadio = document.querySelector(`input[name="submit-type"][value="${matchedType}"]`);
+                if (typeRadio) {
+                    typeRadio.checked = true;
+                    updateFormPlaceholders();
+                }
+            }
+        }
+
+        const targetParam = urlParams.get('target') || urlParams.get('category') || urlParams.get('project') || urlParams.get('submit_target');
+        if (targetParam) {
+            const normTarget = targetParam.toLowerCase().trim();
+            let matchedTarget = null;
+            if (['overlay', 'aprm', 'aprm_overlay'].includes(normTarget)) {
+                matchedTarget = 'overlay';
+            } else if (['point_graph', 'point', 'points', 'graph', 'history'].includes(normTarget)) {
+                matchedTarget = 'point_graph';
+            } else if (['server_checker', 'server', 'servers', 'checker', 'browser'].includes(normTarget)) {
+                matchedTarget = 'server_checker';
+            } else if (['general', 'other', 'misc'].includes(normTarget)) {
+                matchedTarget = 'general';
+            }
+
+            if (matchedTarget) {
+                const targetRadio = document.querySelector(`input[name="submit-target"][value="${matchedTarget}"]`);
+                if (targetRadio) {
+                    targetRadio.checked = true;
+                }
+            }
+        }
+
+        const titleParam = urlParams.get('title') || urlParams.get('summary');
+        if (titleParam) {
+            const titleInput = document.getElementById('submit-title');
+            if (titleInput) {
+                titleInput.value = titleParam;
+            }
+        }
+
+        const descParam = urlParams.get('desc') || urlParams.get('description') || urlParams.get('body') || urlParams.get('details');
+        if (descParam) {
+            const descInput = document.getElementById('submit-description');
+            if (descInput) {
+                descInput.value = descParam;
+            }
+        }
+
+        const anonParam = urlParams.get('anon') || urlParams.get('anonymous');
+        if (anonParam && ['1', 'true', 'yes'].includes(anonParam.toLowerCase().trim())) {
+            const anonCheckbox = document.getElementById('submit-anonymous');
+            if (anonCheckbox) {
+                anonCheckbox.checked = true;
             }
         }
 
@@ -446,6 +548,15 @@
             if (errorBanner) {
                 errorBanner.innerText = `Discord Notice: ${errorParam}`;
                 errorBanner.classList.remove('hidden');
+            }
+        }
+
+        if (window.location.hash.includes('submit-section') || urlParams.get('submit') === 'true' || urlParams.get('action') === 'new' || urlParams.get('action') === 'create') {
+            const submitSection = document.getElementById('submit-section');
+            if (submitSection) {
+                setTimeout(() => {
+                    submitSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
             }
         }
 
