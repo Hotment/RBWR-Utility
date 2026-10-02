@@ -69,15 +69,26 @@ _current_dir = os.path.abspath(os.path.dirname(__file__))
 if _current_dir not in sys.path:
     sys.path.insert(0, _current_dir)
 
-from bot.bot import (
-    create_discord_ticket_channel,
-    forward_ticket_reply_to_discord,
-    start_bot_thread,
-    is_user_in_guild,
-    notify_ticket_author_dm,
-    update_discussion_thread_status,
-    notify_ticket_deleted,
-)
+try:
+    from bot.bot import (
+        create_discord_ticket_channel,
+        forward_ticket_reply_to_discord,
+        start_bot_thread,
+        is_user_in_guild,
+        notify_ticket_author_dm,
+        update_discussion_thread_status,
+        notify_ticket_deleted,
+    )
+except Exception:
+    from bot import (
+        create_discord_ticket_channel,  # pyright: ignore[reportAttributeAccessIssue]
+        forward_ticket_reply_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        start_bot_thread,  # pyright: ignore[reportAttributeAccessIssue]
+        is_user_in_guild,  # pyright: ignore[reportAttributeAccessIssue]
+        notify_ticket_author_dm,  # pyright: ignore[reportAttributeAccessIssue]
+        update_discussion_thread_status,  # pyright: ignore[reportAttributeAccessIssue]
+        notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
+    )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR = os.path.join(BASE_DIR, "files")
