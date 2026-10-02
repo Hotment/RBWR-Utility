@@ -468,23 +468,20 @@
                     </div>
 
                     <div
-                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        class="cyber-panel p-1.5 rounded-xl flex items-center border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 overflow-x-auto max-w-full w-fit">
                         <button onclick="filterStatus('all')" id="tab-all"
                             class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
                             Status</button>
                         <button onclick="filterStatus('pending')" id="tab-pending"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending
-                            / Open</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
                         <button onclick="filterStatus('considering')" id="tab-considering"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
                         <button onclick="filterStatus('planned')" id="tab-planned"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
                         <button onclick="filterStatus('accepted')" id="tab-accepted"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted
-                            / Resolved</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted</button>
                         <button onclick="filterStatus('declined')" id="tab-declined"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined
-                            / Closed</button>
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
                     </div>
                 </div>
 
@@ -837,6 +834,7 @@
                 });
             }
 
+            updateAdminStatusTabLabels();
             connectWebSocket();
         });
 
@@ -933,7 +931,33 @@
                         : "px-4 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase";
                 }
             });
+            updateAdminStatusTabLabels();
             applyFilter();
+        }
+
+        function updateAdminStatusTabLabels() {
+            const btnAll = document.getElementById('tab-all');
+            const btnPending = document.getElementById('tab-pending');
+            const btnConsidering = document.getElementById('tab-considering');
+            const btnPlanned = document.getElementById('tab-planned');
+            const btnAccepted = document.getElementById('tab-accepted');
+            const btnDeclined = document.getElementById('tab-declined');
+
+            if (currentTicketTypeFilter === 'bug_report') {
+                if (btnAll) btnAll.innerText = 'All Status';
+                if (btnPending) btnPending.innerText = 'Open';
+                if (btnConsidering) btnConsidering.innerText = 'Investigating';
+                if (btnPlanned) btnPlanned.innerText = 'Planned';
+                if (btnAccepted) btnAccepted.innerText = 'Resolved';
+                if (btnDeclined) btnDeclined.innerText = 'Closed';
+            } else {
+                if (btnAll) btnAll.innerText = 'All Status';
+                if (btnPending) btnPending.innerText = 'Pending';
+                if (btnConsidering) btnConsidering.innerText = 'Considering';
+                if (btnPlanned) btnPlanned.innerText = 'Planned';
+                if (btnAccepted) btnAccepted.innerText = 'Accepted';
+                if (btnDeclined) btnDeclined.innerText = 'Declined';
+            }
         }
 
         function filterTarget(target) {

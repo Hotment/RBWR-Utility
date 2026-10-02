@@ -150,23 +150,19 @@
 
     <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2">
-            <div class="premium-glass p-1 rounded-xl flex flex-wrap gap-1 text-xs font-medium border border-white/5">
+            <div class="premium-glass p-1 rounded-xl flex items-center gap-1 overflow-x-auto max-w-full text-xs font-medium border border-white/5 shrink-0">
                 <button onclick="filterStatus('all')" id="tab-status-all"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All
-                    Status</button>
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All Status</button>
                 <button onclick="filterStatus('pending')" id="tab-status-pending"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending
-                    / Open</button>
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending</button>
                 <button onclick="filterStatus('considering')" id="tab-status-considering"
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
                 <button onclick="filterStatus('planned')" id="tab-status-planned"
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Planned</button>
                 <button onclick="filterStatus('accepted')" id="tab-status-accepted"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted
-                    / Resolved</button>
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted</button>
                 <button onclick="filterStatus('declined')" id="tab-status-declined"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined
-                    / Closed</button>
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined</button>
             </div>
 
             <div class="relative shrink-0 min-w-[150px]">
@@ -572,6 +568,7 @@
         }
 
         updateTypeTabsUI();
+        updateStatusTabLabels();
         updateStats();
         renderTickets();
         initTicketWebSocket();
@@ -606,7 +603,33 @@
     function switchTypeTab(type) {
         currentTypeFilter = type;
         updateTypeTabsUI();
+        updateStatusTabLabels();
         renderTickets();
+    }
+
+    function updateStatusTabLabels() {
+        const btnAll = document.getElementById('tab-status-all');
+        const btnPending = document.getElementById('tab-status-pending');
+        const btnConsidering = document.getElementById('tab-status-considering');
+        const btnPlanned = document.getElementById('tab-status-planned');
+        const btnAccepted = document.getElementById('tab-status-accepted');
+        const btnDeclined = document.getElementById('tab-status-declined');
+
+        if (currentTypeFilter === 'bug_report') {
+            if (btnAll) btnAll.innerText = 'All Status';
+            if (btnPending) btnPending.innerText = 'Open';
+            if (btnConsidering) btnConsidering.innerText = 'Investigating';
+            if (btnPlanned) btnPlanned.innerText = 'Planned';
+            if (btnAccepted) btnAccepted.innerText = 'Resolved';
+            if (btnDeclined) btnDeclined.innerText = 'Closed';
+        } else {
+            if (btnAll) btnAll.innerText = 'All Status';
+            if (btnPending) btnPending.innerText = 'Pending';
+            if (btnConsidering) btnConsidering.innerText = 'Considering';
+            if (btnPlanned) btnPlanned.innerText = 'Planned';
+            if (btnAccepted) btnAccepted.innerText = 'Accepted';
+            if (btnDeclined) btnDeclined.innerText = 'Declined';
+        }
     }
 
     function updateTypeTabsUI() {
