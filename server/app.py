@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 import os
+import sys
 import json
 import gzip
 import queue
@@ -58,10 +59,20 @@ import threading
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import asyncio
-import disnake
-from disnake.ext import commands
 from flask_sock import Sock
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+_workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _workspace_root not in sys.path:
+    sys.path.insert(0, _workspace_root)
+
+from bot.bot import (
+    create_discord_ticket_channel,
+    forward_ticket_reply_to_discord,
+    start_bot_thread,
+    is_user_in_guild,
+    notify_ticket_author_dm,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR = os.path.join(BASE_DIR, "files")
@@ -605,235 +616,6 @@ def save_admin_notifier_config(user_identifier: str, notifier_config: dict):
     
     save_admins(admins_data)
 
-disnake_bot: commands.Bot | None = None
-disnake_bot_loop: asyncio.AbstractEventLoop | None = None
-
-DISCORD_TICKETS_CATEGORY_ID = os.environ.get("DISCORD_TICKETS_CATEGORY_ID", "1547529007334162432").strip()
-DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1547514559097733141").strip()
-
-def create_discord_ticket_channel(ticket: dict) -> str | None:
-    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
-        logger.warning("[Disnake Channel] Disnake bot is not ready; cannot create ticket channel.")
-        return None
-
-    ticket_id = ticket.get("id")
-    ticket_type = ticket.get("type", "suggestion")
-    raw_title = ticket.get("title") or ticket.get("suggestion") or ticket.get("description") or f"ticket-{ticket_id}"
-    
-    slug = "".join(c if c.isalnum() else "-" for c in raw_title.lower()).strip("-")
-    slug = "-".join(part for part in slug.split("-") if part)[:25]
-    prefix = "bug" if ticket_type == "bug_report" else "ticket"
-    channel_name = f"{prefix}-{ticket_id}"
-    if slug:
-        channel_name += f"-{slug}"
-    channel_name = channel_name[:95]
-
-    author_name = ticket.get("name", "Anonymous")
-    discord_id = ticket.get("discord_id")
-    discord_username = ticket.get("discord_username")
-    is_anon = bool(ticket.get("anonymous"))
-
-    target_labels = {
-        "overlay": "APRM Overlay",
-        "point_graph": "Point History Graph",
-        "server_checker": "Server Browser",
-        "general": "General"
-    }
-    target = ticket.get("target") or "overlay"
-
-    is_bug = (ticket_type == "bug_report")
-    embed_color = disnake.Color.red() if is_bug else disnake.Color.blurple()
-    author_display = f"{discord_username} (ID: `{discord_id}`)" if discord_id and not is_anon else author_name
-    if is_anon and discord_id:
-        author_display += " *(Submitted anonymously to public)*"
-
-    async def _create_async():
-        if not disnake_bot:
-            return None
-            
-        guild_id = int(DISCORD_GUILD_ID)
-        guild = disnake_bot.get_guild(guild_id)
-        if not guild:
-            guild = await disnake_bot.fetch_guild(guild_id)
-        
-        cat_id = int(DISCORD_TICKETS_CATEGORY_ID)
-        category = disnake_bot.get_channel(cat_id)
-        if not category:
-            try:
-                category = await disnake_bot.fetch_channel(cat_id)
-            except Exception:
-                category = None
-        
-        cat_obj = category if isinstance(category, disnake.CategoryChannel) else None
-        ch = await guild.create_text_channel(
-            name=channel_name,
-            category=cat_obj,
-            topic=f"Ticket #{ticket_id} ({ticket_type.upper()}) | Author: {discord_username or author_name}"
-        )
-        
-        embed = disnake.Embed(
-            title=f"{'Bug Report' if is_bug else 'Feature Suggestion'} #{ticket_id}: {ticket.get('title') or (ticket.get('suggestion') or '')[:50]}",
-            description=(ticket.get('suggestion') or ticket.get('description') or '')[:3500],
-            color=embed_color,
-            timestamp=datetime.now(timezone.utc)
-        )
-        embed.add_field(name="Type", value="Bug Report" if is_bug else "Suggestion", inline=True)
-        embed.add_field(name="Category", value=target_labels.get(target, target), inline=True)
-        embed.add_field(name="Status", value=(ticket.get("status") or ("open" if is_bug else "pending")).upper(), inline=True)
-        embed.add_field(name="Author", value=author_display, inline=True)
-        embed.add_field(name="Admin Replies", value="Type any message in this channel to send a reply directly to the ticket author. When the author replies on the website, their message will appear here in real time.", inline=False)
-        embed.set_footer(text=f"RBWR Utility Ticket #{ticket_id}")
-
-        await ch.send(embed=embed)
-        return str(ch.id)
-
-    try:
-        future = asyncio.run_coroutine_threadsafe(_create_async(), disnake_bot_loop)
-        channel_id = future.result(timeout=10)
-        logger.info(f"[Disnake Channel] Created Discord channel #{channel_name} ({channel_id}) for ticket #{ticket_id}")
-        return channel_id
-    except Exception as ex:
-        logger.error(f"[Disnake Channel] Error creating channel: {ex}", exc_info=True)
-        return None
-
-def run_disnake_bot():
-    """
-    Runs the Disnake Discord Bot inside an asyncio event loop in a dedicated background daemon thread.
-    Handles real-time gateway events (on_message) for sub-second admin reply ingestion from ticket channels.
-    """
-    global disnake_bot, disnake_bot_loop
-    bot_token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
-    if not bot_token:
-        logger.warning("[Disnake Bot] DISCORD_BOT_TOKEN is not configured; Disnake bot is disabled.")
-        return
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    disnake_bot_loop = loop
-
-    intents = disnake.Intents.default()
-    intents.message_content = True
-    intents.guilds = True
-
-    bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
-    disnake_bot = bot
-
-    @bot.event
-    async def on_ready():
-        logger.info(f"[Disnake Bot] Connected and active as {bot.user} (ID: {bot.user.id})")
-
-    @bot.event
-    async def on_message(message: disnake.Message):
-        if not message.guild or message.author.bot:
-            return
-        if bot.user and message.author.id == bot.user.id:
-            return
-
-        cat_id = str(getattr(message.channel, "category_id", "") or "")
-        target_cat_id = str(DISCORD_TICKETS_CATEGORY_ID).strip()
-        ch_id = str(message.channel.id)
-
-        data = load_suggestions()
-        suggestions = data.get("suggestions", [])
-        
-        target_ticket = None
-        for s in suggestions:
-            if str(s.get("discord_channel_id", "")) == ch_id:
-                target_ticket = s
-                break
-
-        if not target_ticket and cat_id != target_cat_id:
-            return
-
-        if not target_ticket and cat_id == target_cat_id:
-            ch_name = getattr(message.channel, "name", "")
-            for s in suggestions:
-                if f"ticket-{s.get('id')}" in ch_name or f"bug-{s.get('id')}" in ch_name:
-                    target_ticket = s
-                    target_ticket["discord_channel_id"] = ch_id
-                    break
-
-        if not target_ticket:
-            return
-
-        sender_discord_id = str(message.author.id)
-
-        if not is_website_admin_discord_id(sender_discord_id):
-            logger.info(
-                f"[Disnake Bot] Ignored message from non-website-admin {message.author} "
-                f"(ID: {sender_discord_id}) in #{getattr(message.channel, 'name', ch_id)}: "
-                f"author is not an administrator on the website."
-            )
-            return
-
-        d_msg_id = str(message.id)
-        messages = target_ticket.setdefault("messages", [])
-        for m in messages:
-            if str(m.get("discord_message_id", "")) == d_msg_id:
-                return
-
-        msg_content = (message.clean_content or message.content or "").strip()
-        if not msg_content and message.attachments:
-            msg_content = "\n".join(a.url for a in message.attachments)
-        if not msg_content:
-            return
-
-        admins_data = load_admins()
-        admin_entry = admins_data.get("admins", {}).get(sender_discord_id)
-        if not admin_entry:
-            for k, v in admins_data.get("admins", {}).items():
-                if isinstance(v, dict) and str(v.get("discord_id", "")).strip() == sender_discord_id:
-                    admin_entry = v
-                    break
-        configured_admin_name = admin_entry.get("username") if admin_entry else None
-        sender_name = configured_admin_name or message.author.display_name or getattr(message.author, "global_name", None) or message.author.name or "Administrator"
-        sender_avatar = str(message.author.display_avatar.url) if message.author.display_avatar else ""
-
-        new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
-        new_msg_obj = {
-            "id": new_msg_id,
-            "sender_type": "admin",
-            "sender_name": sender_name,
-            "sender_discord_id": sender_discord_id,
-            "sender_avatar": sender_avatar,
-            "message": msg_content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "discord_message_id": d_msg_id
-        }
-        messages.append(new_msg_obj)
-        save_suggestions(data)
-        broadcast_update("dashboard")
-
-        logger.info(f"[Disnake Bot] Ingested admin reply from #{getattr(message.channel, 'name', ch_id)} (Author: {sender_name}) for ticket #{target_ticket.get('id')}")
-
-        try:
-            await message.add_reaction("📨")
-        except Exception:
-            pass
-
-        broadcast_ticket_update(
-            target_ticket.get("id"),
-            new_msg_obj,
-            messages,
-            target_ticket.get("discord_id"),
-            target_ticket.get("anonymous")
-        )
-
-    try:
-        loop.run_until_complete(bot.start(bot_token))
-    except disnake.errors.PrivilegedIntentsRequired:
-        logger.warning("[Disnake Bot] Privileged Message Content Intent is disabled in Discord Developer Portal. Retrying with basic intents...")
-        try:
-            intents.message_content = False
-            bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
-            disnake_bot = bot
-            loop.run_until_complete(bot.start(bot_token))
-        except Exception as retry_err:
-            logger.error(f"[Disnake Bot] Fallback start failed: {retry_err}")
-    except Exception as e:
-        logger.error(f"[Disnake Bot] Bot encountered error: {e}", exc_info=True)
-
-threading.Thread(target=run_disnake_bot, daemon=True, name="DisnakeBotThread").start()
 
 def get_authenticated_user():
     if has_request_context():
@@ -961,6 +743,19 @@ def load_suggestions():
 def save_suggestions(data):
     with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+
+try:
+    start_bot_thread(
+        load_suggestions=load_suggestions,
+        save_suggestions=save_suggestions,
+        load_admins=load_admins,
+        is_website_admin=is_website_admin_discord_id,
+        broadcast_dashboard=lambda: broadcast_update("dashboard"),
+        broadcast_ticket_update=broadcast_ticket_update,
+        get_servers_data=lambda public_only=True: get_public_servers_payload(public_only=public_only),
+    )
+except Exception as e:
+    logger.warning(f"[Discord Bot] Failed to initialize bot from bot.py: {e}")
 
 def load_contact_messages():
     if not os.path.exists(CONTACT_MESSAGES_FILE):
@@ -2222,7 +2017,16 @@ def pull_server_checker_data():
             if "Misc" in state:
                 del state["Misc"]
 
-            if _sc_public_server_ids:
+            owner_id = server.get("privateServerOwnerId")
+            if owner_id not in (None, "", 0, "None", "null"):
+                is_priv = True
+                state["IsPrivate"] = is_priv
+                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
+                    if job_id not in _sc_server_meta:
+                        _sc_server_meta[job_id] = {}
+                    _sc_server_meta[job_id]["is_private"] = is_priv
+                    meta_dirty = True
+            elif _sc_public_server_ids:
                 is_priv = job_id not in _sc_public_server_ids
                 state["IsPrivate"] = is_priv
                 if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
@@ -3545,19 +3349,58 @@ def get_archive_day_api(date_str):
 _servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
 _cache_lock = threading.Lock()
 
-@app.route("/api/public-servers", methods=["GET"])
-@app.route("/public-servers", methods=["GET"])
-def proxy_public_servers():
+def get_public_servers_payload(public_only=False):
+    def _enrich_and_filter(raw_list):
+        enriched = []
+        for s in raw_list:
+            if not isinstance(s, dict):
+                continue
+            jid = s.get("jobId")
+            if not jid:
+                continue
+            is_priv = get_server_visibility(jid, is_active=True)
+            owner_id = s.get("privateServerOwnerId")
+            if not is_priv and owner_id not in (None, "", 0, "None", "null"):
+                is_priv = True
+            s_copy = dict(s)
+            s_copy["is_private"] = is_priv
+            if not is_priv:
+                p_count = get_server_player_count(jid, is_private=False)
+                if p_count is not None:
+                    s_copy["playerCount"] = p_count
+            if public_only and is_priv:
+                continue
+            enriched.append(s_copy)
+        return enriched
+
     if _sc_latest_data:
         res_json = dict(_sc_latest_data)
         if "success" not in res_json:
             res_json["success"] = True
-        return jsonify(res_json)
+        raw_servers = res_json.get("data", {}).get("servers", [])
+        res_json["data"] = dict(res_json.get("data", {}), servers=_enrich_and_filter(raw_servers))
+        return res_json
 
-    now = time.time()
     with _cache_lock:
-        if _servers_cache["data"] is not None and (now - _servers_cache["timestamp"]) < 60:
-            return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
+        if _servers_cache["data"] is not None:
+            try:
+                cached_json = _json_loads(_servers_cache["data"])
+                if isinstance(cached_json, dict) and "data" in cached_json:
+                    cached_json["data"] = dict(cached_json.get("data", {}), servers=_enrich_and_filter(cached_json.get("data", {}).get("servers", [])))
+                    return cached_json
+            except Exception:
+                pass
+
+    return {"success": True, "data": {"servers": []}}
+
+@app.route("/api/public-servers", methods=["GET"])
+@app.route("/public-servers", methods=["GET"])
+def proxy_public_servers():
+    public_only = request.args.get("public_only", "").lower() in ("1", "true", "yes") or request.args.get("only_public", "").lower() in ("1", "true", "yes")
+
+    payload = get_public_servers_payload(public_only=public_only)
+    if payload.get("data", {}).get("servers"):
+        return jsonify(payload)
 
     primary_url = "https://hydrogen.realisticbwr.org/api/public/servers"
     fallback_url = "https://realisticbwr.org/api/public/servers"
@@ -3583,7 +3426,9 @@ def proxy_public_servers():
                     _servers_cache["timestamp"] = time.time()
                     _servers_cache["content_type"] = "application/json"
                     _servers_cache["status_code"] = 200
-                return Response(content, status=200, content_type="application/json")
+
+                payload = get_public_servers_payload(public_only=public_only)
+                return jsonify(payload)
         except Exception as e:
             logger.warning(f"Error fetching from {url}: {e}")
 
@@ -3792,28 +3637,29 @@ def add_ticket_message_api(ticket_id):
         target_ticket.get("anonymous")
     )
 
-    discord_channel_id = target_ticket.get("discord_channel_id")
-    if discord_channel_id and disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
-        def _fwd_to_discord(ch_id, m_text, s_name, is_adm, current_msg_id):
-            sender_label = "Administrator" if is_adm else "Ticket Author"
-            content = f"**[{sender_label}] {s_name}**:\n{m_text}"
-            async def _send_fwd_async():
-                if not disnake_bot:
-                    return None
-                
-                channel = disnake_bot.get_channel(int(ch_id))
-                if not channel:
-                    channel = await disnake_bot.fetch_channel(int(ch_id))
+    if is_admin:
+        try:
+            notify_ticket_author_dm(
+                target_ticket,
+                "message",
+                {
+                    "sender_name": msg_obj.get("sender_name", "Administrator"),
+                    "message": msg_text,
+                }
+            )
+        except Exception as dm_err:
+            logger.warning(f"[Ticket Message] Failed to notify author via DM: {dm_err}")
 
-                if not channel or not isinstance(channel, disnake.TextChannel):
-                    logger.warning(f"[Disnake Forward] Channel {ch_id} is not a text channel or doesnt exist.")
-                    return None
-                    
-                sent = await channel.send(content=content)
-                return str(sent.id)
+    discord_channel_id = target_ticket.get("discord_channel_id")
+    if discord_channel_id:
+        def _fwd_to_discord(ch_id, m_text, s_name, is_adm, current_msg_id):
             try:
-                fut = asyncio.run_coroutine_threadsafe(_send_fwd_async(), disnake_bot_loop)  # pyright: ignore[reportArgumentType]
-                d_id = fut.result(timeout=8)
+                d_id = forward_ticket_reply_to_discord(
+                    channel_id=str(ch_id),
+                    message_text=m_text,
+                    sender_name=s_name,
+                    is_admin=is_adm,
+                )
                 if d_id:
                     d = load_suggestions()
                     for s in d.get("suggestions", []):
@@ -3952,10 +3798,21 @@ def submit_ticket():
 
     threading.Thread(target=_create_channel_task, args=(dict(new_sug),), daemon=True).start()
 
+    in_guild = False
+    is_logged_in_discord = bool(discord_id)
+    if is_logged_in_discord:
+        try:
+            in_guild = is_user_in_guild(discord_id)
+        except Exception as ex:
+            logger.warning(f"Error checking guild membership for user {discord_id}: {ex}")
+            in_guild = False
+
     return jsonify({
         "message": f"{'Bug report' if ticket_type == 'bug_report' else 'Suggestion'} submitted successfully.",
         "id": new_id,
-        "type": ticket_type
+        "type": ticket_type,
+        "logged_in_discord": is_logged_in_discord,
+        "in_guild": in_guild
     })
 
 @app.route("/crashes", methods=["POST"])
@@ -4067,6 +3924,14 @@ def update_suggestion_status(username):
             s["status"] = payload.status
             save_suggestions(data)
             broadcast_update("dashboard")
+            try:
+                notify_ticket_author_dm(
+                    s,
+                    "status",
+                    {"changed_by": username, "status": payload.status}
+                )
+            except Exception as dm_err:
+                logger.warning(f"Failed to notify author of status change via DM: {dm_err}")
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
@@ -4091,6 +3956,14 @@ def update_suggestion_comment(username):
             s["comment_timestamp"] = datetime.now(timezone.utc).isoformat()
             save_suggestions(data)
             broadcast_update("dashboard")
+            try:
+                notify_ticket_author_dm(
+                    s,
+                    "note",
+                    {"comment_by": username, "comment": payload.comment.strip()}
+                )
+            except Exception as dm_err:
+                logger.warning(f"Failed to notify author of note change via DM: {dm_err}")
             return jsonify({"message": "Admin comment saved successfully.", "id": payload.id, "comment": payload.comment.strip(), "comment_by": username})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
