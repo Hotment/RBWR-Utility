@@ -6,6 +6,7 @@ settings.json
 *test.py
 tests/
 .env
+.prettierignore
 
 server/files
 server/data
@@ -15,6 +16,7 @@ server/contact_messages.json
 server/banned_ips.json
 server/admins.json
 server/gunicorn.conf.py
+server/logs
 
 venv
 *build
