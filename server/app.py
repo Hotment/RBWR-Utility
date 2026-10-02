@@ -1997,15 +1997,39 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
     for s_id in list(current_data.keys()):
         if s_id in persistent_ids:
             snaps = current_data.get(s_id, {})
-            if snaps:
+            if snaps and isinstance(snaps, dict):
                 server_start_date = get_server_start_date(s_id, snaps)
                 valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
-                expired_keys = [ts for ts in valid_ts_keys if ts < cutoff_iso]
-                if expired_keys:
-                    for ts in expired_keys:
-                        record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
-                        del snaps[ts]
-                    servers_dirty = True
+                if valid_ts_keys:
+                    meta = _sc_server_meta.setdefault(s_id, {})
+                    last_archived_ts = meta.get("last_archived_ts", "")
+                    if not last_archived_ts and server_start_date:
+                        gz_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json.gz")
+                        json_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json")
+                        target_rel = None
+                        if os.path.exists(gz_path):
+                            target_rel = os.path.join("archives", f"servers_{server_start_date}.json.gz")
+                        elif os.path.exists(json_path):
+                            target_rel = os.path.join("archives", f"servers_{server_start_date}.json")
+                        if target_rel:
+                            arch_data = get_sc_data(target_rel)
+                            if isinstance(arch_data, dict) and s_id in arch_data:
+                                arch_snaps = arch_data[s_id]
+                                if isinstance(arch_snaps, dict) and arch_snaps:
+                                    valid_arch_keys = [k for k in arch_snaps.keys() if not k.startswith('_')]
+                                    if valid_arch_keys:
+                                        last_archived_ts = max(valid_arch_keys)
+                                        meta["last_archived_ts"] = last_archived_ts
+                                        meta_dirty = True
+
+                    unarchived_keys = [ts for ts in valid_ts_keys if ts > last_archived_ts]
+                    if unarchived_keys:
+                        for ts in unarchived_keys:
+                            record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
+                        meta["last_archived_ts"] = max(unarchived_keys)
+                        meta_dirty = True
+            
+            # Persistent servers are never deleted from servers.json
             continue
 
         snaps = current_data.get(s_id, {})
