@@ -65,6 +65,9 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 _workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _workspace_root not in sys.path:
     sys.path.insert(0, _workspace_root)
+_current_dir = os.path.abspath(os.path.dirname(__file__))
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
 
 from bot.bot import (
     create_discord_ticket_channel,
@@ -73,6 +76,7 @@ from bot.bot import (
     is_user_in_guild,
     notify_ticket_author_dm,
     update_discussion_thread_status,
+    notify_ticket_deleted,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -744,6 +748,32 @@ def load_suggestions():
 def save_suggestions(data):
     with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+
+def get_next_ticket_id(data: dict) -> int:
+    """
+    Computes the next unique ticket ID ensuring IDs never overlap,
+    even if tickets have been deleted.
+    """
+    used_ids = set()
+    for s in data.get("suggestions", []):
+        if isinstance(s.get("id"), int):
+            used_ids.add(s["id"])
+
+    for d in data.get("deleted_tickets", []):
+        if isinstance(d, dict) and isinstance(d.get("id"), int):
+            used_ids.add(d["id"])
+        elif isinstance(d, int):
+            used_ids.add(d)
+
+    for d_id in data.get("deleted_ticket_ids", []):
+        if isinstance(d_id, int):
+            used_ids.add(d_id)
+
+    last_id = data.get("last_ticket_id", 0)
+    highest = max(used_ids) if used_ids else 0
+    new_id = max(highest, last_id) + 1
+    data["last_ticket_id"] = new_id
+    return new_id
 
 try:
     start_bot_thread(
@@ -3728,9 +3758,7 @@ def submit_ticket():
                 except (ValueError, TypeError):
                     continue
     
-    new_id = 1
-    if suggestions:
-        new_id = max(s.get("id", 0) for s in suggestions) + 1
+    new_id = get_next_ticket_id(data)
         
     discord_user = session.get("discord_user") or {}
     discord_id = discord_user.get("id") or None
@@ -4008,15 +4036,46 @@ def delete_suggestion(username):
 
     data = load_suggestions()
     suggestions = data.get("suggestions", [])
-    initial_len = len(suggestions)
-    data["suggestions"] = [s for s in suggestions if s.get("id") != payload.id]
+    target_ticket = None
+    remaining_suggestions = []
+    for s in suggestions:
+        if s.get("id") == payload.id:
+            target_ticket = s
+        else:
+            remaining_suggestions.append(s)
 
-    if len(data["suggestions"]) < initial_len:
-        save_suggestions(data)
-        broadcast_update("dashboard")
-        return jsonify({"message": f"Ticket #{payload.id} deleted successfully.", "id": payload.id})
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
-    return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
+    data["suggestions"] = remaining_suggestions
+
+    deleted_tickets = data.setdefault("deleted_tickets", [])
+    deleted_record = {
+        "id": payload.id,
+        "title": target_ticket.get("title", ""),
+        "type": target_ticket.get("type", "suggestion"),
+        "name": target_ticket.get("name", "Anonymous"),
+        "status": target_ticket.get("status", "pending"),
+        "discord_id": target_ticket.get("discord_id"),
+        "discord_channel_id": target_ticket.get("discord_channel_id"),
+        "discussion_thread_id": target_ticket.get("discussion_thread_id"),
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+        "deleted_by": username,
+        "content": target_ticket.get("suggestion") or target_ticket.get("description") or "",
+    }
+    deleted_tickets.append(deleted_record)
+    data.setdefault("deleted_ticket_ids", []).append(payload.id)
+    data["last_ticket_id"] = max(data.get("last_ticket_id", 0), payload.id)  # pyright: ignore[reportArgumentType]
+
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    try:
+        notify_ticket_deleted(target_ticket, deleted_by=username)
+    except Exception as del_err:
+        logger.warning(f"Failed to send ticket deletion notice to Discord: {del_err}")
+
+    return jsonify({"message": f"Ticket #{payload.id} deleted successfully.", "id": payload.id})
 
 @app.route("/admin/tickets/ban", methods=["POST"])
 @app.route("/admin/suggestions/ban", methods=["POST"])
@@ -4733,18 +4792,23 @@ def start_console_handler():
             try:
                 if os.path.exists(".git"):
                     safe_print("Git repository found, pulling changes...")
-                    subprocess.run("git config core.sparseCheckout true", shell=True, check=True)
+                    subprocess.run("git config core.sparseCheckout true", shell=True, check=False)
                     sparse_file = os.path.join(".git", "info", "sparse-checkout")
                     os.makedirs(os.path.dirname(sparse_file), exist_ok=True)
-                    with open(sparse_file, "w") as f:
+                    with open(sparse_file, "w", encoding="utf-8") as f:
                         f.write("server/*\nbot/*\n")
-                    subprocess.run("git pull origin main", shell=True, check=True)
+                    
+                    subprocess.run("git fetch origin main", shell=True, check=False)
+                    subprocess.run("git checkout origin/main -- server bot", shell=True, check=False)
+                    subprocess.run("git pull origin main", shell=True, check=False)
                 
                 if os.path.exists("server"):
                     safe_print("Copying server files...")
-                    subprocess.run("cp -a server/. . && rm -rf server", shell=True, check=True)
+                    subprocess.run("cp -a server/. . && rm -rf server", shell=True, check=False)
                 if os.path.exists("bot"):
                     safe_print("Bot directory ready.")
+                    if os.path.exists(os.path.join("bot", "bot.py")):
+                        subprocess.run("cp -a bot/bot.py .", shell=True, check=False)
             except Exception as e:
                 safe_print(f"Error during git pull/copy: {e}")
                 

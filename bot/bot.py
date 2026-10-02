@@ -522,6 +522,94 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
     except Exception as ex:
         log.warning(f"[Discussion Status Update] Failed to dispatch update task: {ex}")
 
+def notify_ticket_deleted(ticket: dict[str, Any], deleted_by: str = "Administrator") -> None:
+    """
+    Sends a message in the ticket's Discord admin channel (and discussion thread if active)
+    indicating that the ticket has been deleted.
+    """
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return
+
+    ticket_id = ticket.get("id")
+    channel_id_val = ticket.get("discord_channel_id")
+    discussion_thread_id_val = ticket.get("discussion_thread_id")
+
+    bot_ref = disnake_bot
+
+    async def _notify_async():
+        ch = None
+        if channel_id_val:
+            try:
+                ch = bot_ref.get_channel(int(channel_id_val))
+                if not ch:
+                    ch = await bot_ref.fetch_channel(int(channel_id_val))
+            except Exception as ex:
+                log.warning(f"[Ticket Deletion Notification] Could not fetch channel {channel_id_val}: {ex}")
+
+        if not ch and ticket_id:
+            try:
+                cat_id = int(TICKETS_CATEGORY_ID) if TICKETS_CATEGORY_ID.isdigit() else None
+                for g in bot_ref.guilds:
+                    for c in g.text_channels:
+                        if cat_id and c.category_id != cat_id:
+                            continue
+                        name_lower = c.name.lower()
+                        if (
+                            name_lower == f"ticket-{ticket_id}"
+                            or name_lower.startswith(f"ticket-{ticket_id}-")
+                            or name_lower == f"suggestion-{ticket_id}"
+                            or name_lower.startswith(f"suggestion-{ticket_id}-")
+                            or name_lower == f"bug-{ticket_id}"
+                            or name_lower.startswith(f"bug-{ticket_id}-")
+                        ):
+                            ch = c
+                            break
+                    if ch:
+                        break
+            except Exception as ex:
+                log.warning(f"[Ticket Deletion Notification] Fallback channel lookup failed: {ex}")
+
+        if ch and hasattr(ch, "send") and isinstance(ch, disnake.TextChannel):
+            try:
+                title_txt = ticket.get("title") or (ticket.get("suggestion") or ticket.get("description") or "")[:80] or "No Title"
+                t_type = str(ticket.get("type", "suggestion")).replace("_", " ").title()
+
+                embed = disnake.Embed(
+                    title=f"Ticket #{ticket_id} Deleted",
+                    description=f"This ticket has been permanently deleted from the website by **{deleted_by}**.",
+                    color=disnake.Color.red(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Title", value=title_txt[:250], inline=False)
+                embed.add_field(name="Type", value=t_type, inline=True)
+                embed.add_field(name="Author", value=ticket.get("name") or "Anonymous", inline=True)
+                embed.add_field(name="Deleted By", value=deleted_by, inline=True)
+                embed.set_footer(text=f"RBWR Utility • Ticket #{ticket_id} Deleted")
+
+                await ch.send(content=f"**Ticket #{ticket_id} was deleted by {deleted_by}.**", embed=embed)
+                log.info(f"[Ticket Deletion Notification] Successfully notified #{getattr(ch, 'name', ch.id)} of deletion of Ticket #{ticket_id}")
+            except Exception as e:
+                log.warning(f"[Ticket Deletion Notification] Failed to post deletion in ticket channel: {e}")
+
+        if discussion_thread_id_val:
+            try:
+                dt_id = int(discussion_thread_id_val)
+                dt_ch = bot_ref.get_channel(dt_id)
+                if not dt_ch:
+                    dt_ch = await bot_ref.fetch_channel(dt_id)
+                if dt_ch and hasattr(dt_ch, "send") and isinstance(dt_ch, disnake.Thread):
+                    await dt_ch.send(
+                        content=f"**Notice:** The ticket for this discussion (#{ticket_id}) was deleted from the website by **{deleted_by}**."
+                    )
+            except Exception as e:
+                log.warning(f"[Ticket Deletion Notification] Failed to notify discussion thread: {e}")
+
+    try:
+        asyncio.run_coroutine_threadsafe(_notify_async(), disnake_bot_loop)
+    except Exception as ex:
+        log.warning(f"[Ticket Deletion Notification] Failed to dispatch task: {ex}")
+
 async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_id: int):
     if _check_and_mark_interaction(inter.id) or inter.response.is_done():
         return
