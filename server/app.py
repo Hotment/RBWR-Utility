@@ -481,6 +481,33 @@ def is_root_user(user_identifier: str) -> bool:
 
     return False
 
+def is_website_admin_discord_id(discord_id: str | int) -> bool:
+    """
+    Verifies whether a Discord ID belongs to an administrator registered on the website.
+    Checks against ROOT_DISCORD_ID and entries in admins.json (ignoring Discord server roles).
+    """
+    if not discord_id:
+        return False
+    d_id = str(discord_id).strip()
+    if not d_id:
+        return False
+
+    root_ids = get_root_discord_ids()
+    if root_ids and d_id in root_ids:
+        return True
+    if is_root_user(d_id):
+        return True
+
+    admins_data = load_admins()
+    admins_dict = admins_data.get("admins", {})
+    if d_id in admins_dict:
+        return True
+    for k, v in admins_dict.items():
+        if isinstance(v, dict) and str(v.get("discord_id", "")).strip() == d_id:
+            return True
+
+    return False
+
 def get_user_permissions(user_identifier: str) -> dict:
     if not user_identifier:
         return {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
@@ -729,6 +756,16 @@ def run_disnake_bot():
         if not target_ticket:
             return
 
+        sender_discord_id = str(message.author.id)
+
+        if not is_website_admin_discord_id(sender_discord_id):
+            logger.info(
+                f"[Disnake Bot] Ignored message from non-website-admin {message.author} "
+                f"(ID: {sender_discord_id}) in #{getattr(message.channel, 'name', ch_id)}: "
+                f"author is not an administrator on the website."
+            )
+            return
+
         d_msg_id = str(message.id)
         messages = target_ticket.setdefault("messages", [])
         for m in messages:
@@ -741,8 +778,15 @@ def run_disnake_bot():
         if not msg_content:
             return
 
-        sender_name = message.author.display_name or getattr(message.author, "global_name", None) or message.author.name or "Administrator"
-        sender_discord_id = str(message.author.id)
+        admins_data = load_admins()
+        admin_entry = admins_data.get("admins", {}).get(sender_discord_id)
+        if not admin_entry:
+            for k, v in admins_data.get("admins", {}).items():
+                if isinstance(v, dict) and str(v.get("discord_id", "")).strip() == sender_discord_id:
+                    admin_entry = v
+                    break
+        configured_admin_name = admin_entry.get("username") if admin_entry else None
+        sender_name = configured_admin_name or message.author.display_name or getattr(message.author, "global_name", None) or message.author.name or "Administrator"
         sender_avatar = str(message.author.display_avatar.url) if message.author.display_avatar else ""
 
         new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
