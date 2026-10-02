@@ -392,7 +392,6 @@ class TicketPanelView(disnake.ui.View):
             max_values=1,
             options=options,
         )
-        self.select_menu.callback = self._select_callback
         self.add_item(self.select_menu)
 
         self.discuss_button = disnake.ui.Button(
@@ -401,14 +400,20 @@ class TicketPanelView(disnake.ui.View):
             custom_id=f"ticket_open_discussions:{ticket_id}",
             emoji="💬",
         )
-        self.discuss_button.callback = self._discuss_callback
         self.add_item(self.discuss_button)
 
-    async def _select_callback(self, inter: disnake.MessageInteraction):
-        await handle_ticket_status_select(inter, self.ticket_id)
+_handled_interaction_ids: set[int] = set()
 
-    async def _discuss_callback(self, inter: disnake.MessageInteraction):
-        await handle_ticket_open_discussions(inter, self.ticket_id)
+def _check_and_mark_interaction(inter_id: int) -> bool:
+    """Returns True if this interaction has already been processed, preventing duplicate executions."""
+    if inter_id in _handled_interaction_ids:
+        return True
+    _handled_interaction_ids.add(inter_id)
+    if len(_handled_interaction_ids) > 1000:
+        excess = len(_handled_interaction_ids) - 500
+        for _ in range(excess):
+            _handled_interaction_ids.pop()
+    return False
 
 def build_ticket_panel(ticket_id: int, ticket_type: str, current_status: str) -> tuple[disnake.Embed, disnake.ui.View]:
     is_bug = (ticket_type == "bug_report")
@@ -431,8 +436,94 @@ def build_ticket_panel(ticket_id: int, ticket_type: str, current_status: str) ->
     view = TicketPanelView(ticket_id=ticket_id, ticket_type=ticket_type, current_status=status_clean)
     return panel_embed, view
 
+def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> None:
+    """
+    Updates the embed in the discussion thread to reflect the new ticket status.
+    Can be safely called from both the bot event loop and web server threads.
+    """
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return
+
+    thread_id_val = ticket.get("discussion_thread_id")
+    if not thread_id_val:
+        return
+
+    bot_ref = disnake_bot
+
+    async def _update_async():
+        try:
+            tid = int(thread_id_val)
+            ch = bot_ref.get_channel(tid)
+            if not ch or not isinstance(ch, disnake.Thread):
+                try:
+                    ch = await bot_ref.fetch_channel(tid)
+                except Exception as ex:
+                    log.warning(f"[Discussion Status Update] Could not fetch thread {tid}: {ex}")
+                    return
+
+            if not ch or not isinstance(ch, disnake.Thread):
+                return
+
+            msg = None
+            msg_id_val = ticket.get("discussion_message_id")
+            if msg_id_val:
+                try:
+                    msg = await ch.fetch_message(int(msg_id_val))
+                except Exception:
+                    msg = None
+
+            if not msg:
+                try:
+                    msg = await ch.fetch_message(tid)
+                except Exception:
+                    msg = None
+
+            if not msg and hasattr(ch, "history"):
+                try:
+                    async for m in ch.history(oldest_first=True, limit=5):
+                        if bot_ref.user and m.author.id == bot_ref.user.id and m.embeds:
+                            msg = m
+                            break
+                except Exception:
+                    msg = None
+
+            if not msg or not msg.embeds:
+                return
+
+            old_embed = msg.embeds[0]
+            new_embed = disnake.Embed.from_dict(old_embed.to_dict())
+
+            status_upper = str(new_status).upper()
+            found_field = False
+            for idx, field in enumerate(new_embed.fields):
+                if field.name and field.name.strip().lower() == "status":
+                    new_embed.set_field_at(idx, name="Status", value=f"`{status_upper}`", inline=True)
+                    found_field = True
+                    break
+
+            if not found_field:
+                new_embed.add_field(name="Status", value=f"`{status_upper}`", inline=True)
+
+            if status_upper in ("FIXED", "RESOLVED", "IMPLEMENTED", "ACCEPTED"):
+                new_embed.color = disnake.Color.green()
+            elif status_upper == "PLANNED":
+                new_embed.color = disnake.Color.teal()
+            elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
+                new_embed.color = disnake.Color.red()
+
+            await msg.edit(embed=new_embed)
+            log.info(f"[Discussion Status Update] Updated discussion embed for ticket #{ticket.get('id')} to {status_upper}")
+        except Exception as e:
+            log.warning(f"[Discussion Status Update] Failed to update discussion thread message: {e}")
+
+    try:
+        asyncio.run_coroutine_threadsafe(_update_async(), disnake_bot_loop)
+    except Exception as ex:
+        log.warning(f"[Discussion Status Update] Failed to dispatch update task: {ex}")
+
 async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_id: int):
-    if inter.response.is_done():
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
         return
 
     sender_discord_id = str(inter.author.id)
@@ -483,12 +574,17 @@ async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_
         }
     )
 
+    update_discussion_thread_status(
+        ticket=target,
+        new_status=new_status
+    )
+
     await inter.response.send_message(
         f"Ticket #{ticket_id} status updated from `{prev_status}` to **`{new_status.upper()}`** by {inter.author.mention}."
     )
 
 async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, ticket_id: int):
-    if inter.response.is_done():
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
         return
 
     sender_discord_id = str(inter.author.id)
@@ -556,6 +652,7 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
     init_msg = f"{author_ping} — Discussion thread opened for Ticket #{ticket_id}!"
 
     created_thread = None
+    starter_msg = None
     try:
         if isinstance(dest_ch, disnake.ForumChannel):
             forum_post = await dest_ch.create_thread(
@@ -565,18 +662,19 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
                 allowed_mentions=disnake.AllowedMentions(users=True)
             )
             created_thread = forum_post.thread
+            starter_msg = getattr(forum_post, "message", None)
         elif isinstance(dest_ch, disnake.TextChannel):
             created_thread = await dest_ch.create_thread(
                 name=thread_name,
                 type=disnake.ChannelType.public_thread
             )
-            await created_thread.send(
+            starter_msg = await created_thread.send(
                 content=init_msg,
                 embed=embed,
                 allowed_mentions=disnake.AllowedMentions(users=True)
             )
         elif isinstance(dest_ch, disnake.Thread):
-            await dest_ch.send(
+            starter_msg = await dest_ch.send(
                 content=init_msg,
                 embed=embed,
                 allowed_mentions=disnake.AllowedMentions(users=True)
@@ -584,7 +682,7 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
             created_thread = dest_ch
         elif hasattr(dest_ch, "create_thread"):
             created_thread = await dest_ch.create_thread(name=thread_name)
-            await created_thread.send(
+            starter_msg = await created_thread.send(
                 content=init_msg,
                 embed=embed,
                 allowed_mentions=disnake.AllowedMentions(users=True)
@@ -597,6 +695,8 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
     if created_thread:
         target["discussion_thread_id"] = str(created_thread.id)
         target["discussion_channel_id"] = str(target_channel_id)
+        if starter_msg:
+            target["discussion_message_id"] = str(starter_msg.id)
         if ticket_bridge.save_suggestions:
             ticket_bridge.save_suggestions(data)
         if ticket_bridge.broadcast_dashboard:
@@ -780,13 +880,9 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             except Exception as ex:
                 log.error(f"[Component Handler] Open discussions error: {ex}", exc_info=True)
 
-    @b.slash_command(
-        name="ticket_panel",
-        description="Display or refresh the Ticket Admin Panel in this channel",
-    )
-    async def ticket_panel_command(
+    async def _show_panel_interactive(
         inter: disnake.ApplicationCommandInteraction,
-        id: int | None = commands.Param(default=None, description="Optional ticket ID (defaults to current channel's ticket)"),
+        id: int | None = None
     ):
         await inter.response.defer(ephemeral=True)
         sender_discord_id = str(inter.author.id)
@@ -827,6 +923,26 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         panel_embed, panel_view = build_ticket_panel(ticket_id=t_id, ticket_type=t_type, current_status=st)
         await inter.channel.send(embed=panel_embed, view=panel_view)
         await inter.followup.send(f"Spawned Ticket Admin Panel for Ticket #{t_id}!", ephemeral=True)
+
+    @b.slash_command(
+        name="panel",
+        description="Show the ticket admin panel here without needing to scroll up",
+    )
+    async def panel_command(
+        inter: disnake.ApplicationCommandInteraction,
+        id: int | None = commands.Param(default=None, description="Optional ticket ID (defaults to current channel's ticket)"),
+    ):
+        await _show_panel_interactive(inter, id)
+
+    @b.slash_command(
+        name="ticket_panel",
+        description="Display or refresh the Ticket Admin Panel in this channel",
+    )
+    async def ticket_panel_command(
+        inter: disnake.ApplicationCommandInteraction,
+        id: int | None = commands.Param(default=None, description="Optional ticket ID (defaults to current channel's ticket)"),
+    ):
+        await _show_panel_interactive(inter, id)
 
     @b.event
     async def on_message(message: disnake.Message):

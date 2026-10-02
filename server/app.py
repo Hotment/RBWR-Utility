@@ -72,6 +72,7 @@ from bot.bot import (
     start_bot_thread,
     is_user_in_guild,
     notify_ticket_author_dm,
+    update_discussion_thread_status,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -3932,6 +3933,10 @@ def update_suggestion_status(username):
                 )
             except Exception as dm_err:
                 logger.warning(f"Failed to notify author of status change via DM: {dm_err}")
+            try:
+                update_discussion_thread_status(s, payload.status)
+            except Exception as dt_err:
+                logger.warning(f"Failed to update discussion thread status: {dt_err}")
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
@@ -4732,12 +4737,14 @@ def start_console_handler():
                     sparse_file = os.path.join(".git", "info", "sparse-checkout")
                     os.makedirs(os.path.dirname(sparse_file), exist_ok=True)
                     with open(sparse_file, "w") as f:
-                        f.write("server/*\n")
+                        f.write("server/*\nbot/*\n")
                     subprocess.run("git pull origin main", shell=True, check=True)
                 
                 if os.path.exists("server"):
                     safe_print("Copying server files...")
                     subprocess.run("cp -a server/. . && rm -rf server", shell=True, check=True)
+                if os.path.exists("bot"):
+                    safe_print("Bot directory ready.")
             except Exception as e:
                 safe_print(f"Error during git pull/copy: {e}")
                 

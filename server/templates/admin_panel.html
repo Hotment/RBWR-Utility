@@ -477,6 +477,8 @@
                             / Open</button>
                         <button onclick="filterStatus('considering')" id="tab-considering"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
+                        <button onclick="filterStatus('planned')" id="tab-planned"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
                         <button onclick="filterStatus('accepted')" id="tab-accepted"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted
                             / Resolved</button>
@@ -949,7 +951,7 @@
 
         function filterStatus(status) {
             currentFilter = status;
-            ['all', 'pending', 'considering', 'accepted', 'declined'].forEach(s => {
+            ['all', 'pending', 'considering', 'planned', 'accepted', 'declined'].forEach(s => {
                 const tab = document.getElementById('tab-' + s);
                 if (tab) {
                     tab.className = (s === status)
@@ -973,7 +975,8 @@
                 if (!statusMatch) {
                     if (currentFilter === 'pending') statusMatch = ['pending', 'open'].includes(cardStatus);
                     else if (currentFilter === 'considering') statusMatch = ['considering', 'investigating', 'in-progress'].includes(cardStatus);
-                    else if (currentFilter === 'accepted') statusMatch = ['accepted', 'resolved', 'completed'].includes(cardStatus);
+                    else if (currentFilter === 'planned') statusMatch = (cardStatus === 'planned');
+                    else if (currentFilter === 'accepted') statusMatch = ['accepted', 'resolved', 'completed', 'implemented'].includes(cardStatus);
                     else if (currentFilter === 'declined') statusMatch = ['declined', 'closed', 'rejected'].includes(cardStatus);
                     else statusMatch = (cardStatus === currentFilter);
                 }
@@ -1634,7 +1637,8 @@
                 const st = (s.status || 'pending').toLowerCase();
                 if (['pending', 'open'].includes(st)) badgeClass = 'bg-amber-950/40 text-amber-400 border border-amber-500/20';
                 else if (['considering', 'investigating', 'in-progress'].includes(st)) badgeClass = 'bg-blue-950/40 text-blue-400 border border-blue-500/20';
-                else if (['accepted', 'resolved', 'completed'].includes(st)) badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
+                else if (st === 'planned') badgeClass = 'bg-cyan-950/40 text-cyan-400 border border-cyan-500/20';
+                else if (['accepted', 'resolved', 'completed', 'implemented'].includes(st)) badgeClass = 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
                 else if (['declined', 'closed', 'rejected'].includes(st)) badgeClass = 'bg-rose-950/40 text-rose-400 border border-rose-500/20';
 
                 let targetTag = '<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded font-bold uppercase border border-blue-500/20">Overlay</span>';
@@ -1765,6 +1769,10 @@
                     ? `<button onclick="updateStatus(${s.id}, 'resolved')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Resolve</button>`
                     : `<button onclick="updateStatus(${s.id}, 'accepted')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Accept</button>`;
 
+                const btnPlan = !isBug
+                    ? `<button onclick="updateStatus(${s.id}, 'planned')" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition">Plan</button>`
+                    : '';
+
                 const btnConsider = isBug
                     ? `<button onclick="updateStatus(${s.id}, 'investigating')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Investigate</button>`
                     : `<button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Consider</button>`;
@@ -1815,6 +1823,7 @@
                         <div class="flex flex-wrap justify-between items-center gap-4 mt-1 border-t border-white/5 pt-3 font-mono">
                             <div class="flex flex-wrap gap-2">
                                 ${btnAccept}
+                                ${btnPlan}
                                 ${btnConsider}
                                 ${btnDecline}
                                 ${btnPending}

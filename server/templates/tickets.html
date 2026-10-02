@@ -159,6 +159,8 @@
                     / Open</button>
                 <button onclick="filterStatus('considering')" id="tab-status-considering"
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
+                <button onclick="filterStatus('planned')" id="tab-status-planned"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Planned</button>
                 <button onclick="filterStatus('accepted')" id="tab-status-accepted"
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted
                     / Resolved</button>
@@ -632,7 +634,7 @@
         const bugs = allTickets.filter(t => (t.type || '') === 'bug_report');
         const pending = allTickets.filter(t => ['pending', 'open'].includes((t.status || 'pending').toLowerCase()));
         const considering = allTickets.filter(t => ['considering', 'investigating', 'in-progress'].includes((t.status || '').toLowerCase()));
-        const accepted = allTickets.filter(t => ['accepted', 'resolved', 'completed'].includes((t.status || '').toLowerCase()));
+        const accepted = allTickets.filter(t => ['accepted', 'resolved', 'completed', 'planned', 'implemented'].includes((t.status || '').toLowerCase()));
 
         document.getElementById('stat-total').innerText = total;
         document.getElementById('stat-suggestions').innerText = suggestions.length;
@@ -659,7 +661,7 @@
 
     function filterStatus(status) {
         currentStatusFilter = status;
-        const statuses = ['all', 'pending', 'considering', 'accepted', 'declined'];
+        const statuses = ['all', 'pending', 'considering', 'planned', 'accepted', 'declined'];
         statuses.forEach(s => {
             const btn = document.getElementById(`tab-status-${s}`);
             if (!btn) return;
@@ -715,6 +717,12 @@
         const s = (status || 'pending').toLowerCase();
         const isBug = type === 'bug_report';
 
+        if (s === 'planned') {
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Planned</span>`;
+        }
+        if (s === 'implemented') {
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Implemented</span>`;
+        }
         if (['accepted', 'resolved', 'completed'].includes(s)) {
             const label = isBug ? 'Resolved' : 'Accepted';
             return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${label}</span>`;
@@ -772,8 +780,10 @@
                     if (!['pending', 'open'].includes(itemStatus)) return false;
                 } else if (currentStatusFilter === 'considering') {
                     if (!['considering', 'investigating', 'in-progress'].includes(itemStatus)) return false;
+                } else if (currentStatusFilter === 'planned') {
+                    if (itemStatus !== 'planned') return false;
                 } else if (currentStatusFilter === 'accepted') {
-                    if (!['accepted', 'resolved', 'completed'].includes(itemStatus)) return false;
+                    if (!['accepted', 'resolved', 'completed', 'implemented'].includes(itemStatus)) return false;
                 } else if (currentStatusFilter === 'declined') {
                     if (!['declined', 'closed', 'rejected'].includes(itemStatus)) return false;
                 }
