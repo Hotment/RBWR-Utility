@@ -73,6 +73,45 @@ def is_server_public(server: dict[str, Any]) -> bool:
 
     return True
 
+def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
+    """
+    Returns True ONLY if query is an exact match for:
+    1. The full Job ID (with or without hyphens).
+    2. The shortened Server ID (e.g. '77f6-4b2f' or '77f64b2f'), which is parts[1]-parts[2] of the UUID.
+    3. The first 8-character block of the UUID (e.g. '00109df1').
+    Partial queries (e.g. '77f6', 'b', '001') return False.
+    """
+    if not query or not job_id:
+        return False
+    q = query.strip().lower()
+    jid = job_id.strip().lower()
+    if not q or not jid:
+        return False
+
+    if q == jid:
+        return True
+
+    clean_jid = jid.replace("-", "")
+    clean_q = q.replace("-", "")
+    if clean_q == clean_jid and len(clean_q) >= 8:
+        return True
+
+    j_parts = [p for p in jid.split("-") if p]
+    if len(j_parts) >= 3:
+        short_id = f"{j_parts[1]}-{j_parts[2]}"
+        short_id_compact = f"{j_parts[1]}{j_parts[2]}"
+        if q == short_id or q == short_id_compact:
+            return True
+
+        q_parts = [p for p in q.split("-") if p]
+        if len(q_parts) == 2 and q_parts[0] == j_parts[1] and q_parts[1] == j_parts[2]:
+            return True
+
+    if len(j_parts) >= 1 and len(q) == 8 and q == j_parts[0]:
+        return True
+
+    return False
+
 class RBWRClient:
     def __init__(
         self,
@@ -152,20 +191,40 @@ class RBWRClient:
         parts = [p for p in job_id.split("-") if p]
         return f"{parts[1]}-{parts[2]}" if len(parts) >= 3 else job_id
 
-    async def find_server(self, server_id: str, public_only: bool = True) -> dict[str, Any] | None:
-        payload = await self.fetch(public_only=public_only)
+    async def find_server(
+        self,
+        server_id: str,
+        public_only: bool = True,
+        allow_exact_private: bool = False,
+    ) -> dict[str, Any] | None:
+        can_check_private = allow_exact_private or not public_only
+        payload = await self.fetch(public_only=not can_check_private)
         servers = payload.get("data", {}).get("servers", [])
         wanted = self.norm(server_id)
 
         for server in servers:
-            if public_only and not is_server_public(server):
+            if not is_server_public(server):
                 continue
             job_id = str(server.get("jobId", ""))
-            if job_id and (
+            if not job_id:
+                continue
+            if (
                 self.norm(job_id) == wanted or
-                self.norm(self.short_id(job_id)) == wanted
+                self.norm(self.short_id(job_id)) == wanted or
+                is_exact_job_or_server_id_match(server_id, job_id)
             ):
                 return server
+
+        if can_check_private:
+            for server in servers:
+                if is_server_public(server):
+                    continue
+                job_id = str(server.get("jobId", ""))
+                if not job_id:
+                    continue
+                if is_exact_job_or_server_id_match(server_id, job_id):
+                    return server
+
         return None
 
 disnake_bot: commands.InteractionBot | None = None
@@ -368,21 +427,21 @@ class TicketPanelView(disnake.ui.View):
         is_bug = (ticket_type == "bug_report")
         if is_bug:
             options = [
-                disnake.SelectOption(label="Open", value="open", description="Newly reported bug", emoji="🐛", default=(self.current_status == "open")),
-                disnake.SelectOption(label="Investigating", value="investigating", description="Investigating root cause", emoji="🔍", default=(self.current_status == "investigating")),
-                disnake.SelectOption(label="Confirmed", value="confirmed", description="Bug reproduced and confirmed", emoji="⚠️", default=(self.current_status == "confirmed")),
-                disnake.SelectOption(label="Fixed / Resolved", value="fixed", description="Bug resolved and deployed", emoji="✅", default=(self.current_status in ("fixed", "resolved"))),
-                disnake.SelectOption(label="Closed", value="closed", description="Issue closed", emoji="📁", default=(self.current_status == "closed")),
-                disnake.SelectOption(label="Invalid", value="invalid", description="Not a bug or cannot reproduce", emoji="🚫", default=(self.current_status == "invalid")),
+                disnake.SelectOption(label="Open", value="open", description="Newly reported bug", default=(self.current_status == "open")),
+                disnake.SelectOption(label="Investigating", value="investigating", description="Investigating root cause", default=(self.current_status == "investigating")),
+                disnake.SelectOption(label="Confirmed", value="confirmed", description="Bug reproduced and confirmed", default=(self.current_status == "confirmed")),
+                disnake.SelectOption(label="Fixed / Resolved", value="fixed", description="Bug resolved and deployed", default=(self.current_status in ("fixed", "resolved"))),
+                disnake.SelectOption(label="Closed", value="closed", description="Issue closed", default=(self.current_status == "closed")),
+                disnake.SelectOption(label="Invalid", value="invalid", description="Not a bug or cannot reproduce", default=(self.current_status == "invalid")),
             ]
         else:
             options = [
-                disnake.SelectOption(label="Pending", value="pending", description="Awaiting developer review", emoji="⏳", default=(self.current_status == "pending")),
-                disnake.SelectOption(label="Considering", value="considering", description="Under active consideration", emoji="🤔", default=(self.current_status == "considering")),
-                disnake.SelectOption(label="Accepted", value="accepted", description="Suggestion has been approved", emoji="✅", default=(self.current_status == "accepted")),
-                disnake.SelectOption(label="Planned", value="planned", description="Scheduled for implementation", emoji="📌", default=(self.current_status == "planned")),
-                disnake.SelectOption(label="Implemented", value="implemented", description="Feature is now live", emoji="🚀", default=(self.current_status == "implemented")),
-                disnake.SelectOption(label="Declined", value="declined", description="Will not be implemented", emoji="❌", default=(self.current_status == "declined")),
+                disnake.SelectOption(label="Pending", value="pending", description="Awaiting developer review", default=(self.current_status == "pending")),
+                disnake.SelectOption(label="Considering", value="considering", description="Under active consideration", default=(self.current_status == "considering")),
+                disnake.SelectOption(label="Accepted", value="accepted", description="Suggestion has been approved", default=(self.current_status == "accepted")),
+                disnake.SelectOption(label="Planned", value="planned", description="Scheduled for implementation", default=(self.current_status == "planned")),
+                disnake.SelectOption(label="Implemented", value="implemented", description="Feature is now live", default=(self.current_status == "implemented")),
+                disnake.SelectOption(label="Declined", value="declined", description="Will not be implemented", default=(self.current_status == "declined")),
             ]
 
         self.select_menu = disnake.ui.StringSelect(
@@ -1040,8 +1099,10 @@ class ServerBrowserView(disnake.ui.View):
         u2 = get_unit_state(server, 2)
         pts = get_server_points_rate(server)
         pts_str = f"{pts:.4f}".rstrip("0").rstrip(".") + " pts/s" if pts is not None else "N/A"
+        is_pub = is_server_public(server)
+        vis_label = "Public" if is_pub else "Private"
         players = get_player_count(server)
-        p_display = f"{players}/12" if players != "?" else "?"
+        p_display = f"{players}/12" if (is_pub and players != "?") else ("Private" if not is_pub else "?")
 
         u1_running = is_unit_running(u1)
         u2_running = is_unit_running(u2)
@@ -1058,7 +1119,7 @@ class ServerBrowserView(disnake.ui.View):
                 f"**Job ID:** `{jid}`\n"
                 f"**Points Generation:** `{pts_str}`\n"
                 f"**Active Players:** `{p_display}`\n"
-                f"**Visibility:** `Public`"
+                f"**Visibility:** `{vis_label}`"
             ),
             color=color,
             timestamp=datetime.now(timezone.utc),
@@ -1093,7 +1154,8 @@ class ServerBrowserView(disnake.ui.View):
             if misc_lines:
                 embed.add_field(name="Environmental / Facility", value="\n".join(misc_lines), inline=False)
 
-        embed.set_footer(text=f"RBWR Utility • Server ID: {short}")
+        footer_vis = f" • {vis_label}" if not is_pub else ""
+        embed.set_footer(text=f"RBWR Utility • Server ID: {short}{footer_vis}")
         return embed
 
     def rebuild_components(self):
@@ -1170,7 +1232,6 @@ class ServerBrowserView(disnake.ui.View):
                     label=label[:100],
                     value=jid,
                     description=desc[:100],
-                    emoji="🔍"
                 ))
             inspect_select = disnake.ui.StringSelect(
                 custom_id="browser_inspect_select",
@@ -1185,7 +1246,7 @@ class ServerBrowserView(disnake.ui.View):
         total_pages = max(1, (total_matched + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
 
         prev_btn = disnake.ui.Button(
-            label="◀ Prev",
+            label="[<] Prev",
             style=disnake.ButtonStyle.primary,
             disabled=(self.page <= 0),
             row=3,
@@ -1202,7 +1263,7 @@ class ServerBrowserView(disnake.ui.View):
         self.add_item(page_indicator)
 
         next_btn = disnake.ui.Button(
-            label="Next ▶",
+            label="Next [>]",
             style=disnake.ButtonStyle.primary,
             disabled=(self.page >= total_pages - 1),
             row=3,
@@ -1213,7 +1274,6 @@ class ServerBrowserView(disnake.ui.View):
         refresh_btn = disnake.ui.Button(
             label="Refresh",
             style=disnake.ButtonStyle.success,
-            emoji="🔄",
             row=3,
         )
         refresh_btn.callback = self.on_refresh
@@ -1363,13 +1423,13 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.slash_command(
         name="server",
-        description="View real-time telemetry and stats for a public RBWR server",
+        description="View real-time telemetry and stats for an RBWR server",
         install_types=disnake.ApplicationInstallTypes.all(),
         contexts=disnake.InteractionContextTypes.all(),
     )
     async def server_command(
         inter: disnake.ApplicationCommandInteraction,
-        id: str = commands.Param(description="Job ID or short ID (e.g. 191f-49d5)"),
+        id: str = commands.Param(description="Job ID or Server ID (e.g. 191f-49d5)"),
         info: str = commands.Param(
             default="all",
             description="Specific metric or ALL for complete inspection",
@@ -1380,19 +1440,20 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
         try:
-            server = await client.find_server(id, public_only=True)
+            server = await client.find_server(id, allow_exact_private=True)
         except Exception as e:
             log.exception("RBWR API error")
             await inter.followup.send(f"Error fetching server data: `{e}`")
             return
 
-        if not server or not is_server_public(server):
-            await inter.followup.send(f"Server `{id}` not found or is private / offline.")
+        if not server:
+            await inter.followup.send(f"Server `{id}` not found or is offline.")
             return
 
         job_id = str(server.get("jobId", id))
         short = client.short_id(job_id)
         info_val = getattr(info, "value", info)
+        is_pub = is_server_public(server)
 
         view = disnake.ui.View(timeout=180)
         view.add_item(disnake.ui.Button(
@@ -1414,13 +1475,15 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             await inter.followup.send(embed=embed, view=view)
         else:
             players = get_player_count(server)
+            vis_label = "Public" if is_pub else "Private"
             embed = disnake.Embed(
                 title=f"RBWR Server — {short}",
-                description=f"**Server ID:** `{short}`\n**Job ID:** `{job_id}`",
+                description=f"**Server ID:** `{short}`\n**Job ID:** `{job_id}`\n**Visibility:** `{vis_label}`",
                 color=disnake.Color.teal(),
                 timestamp=datetime.now(timezone.utc),
             )
-            embed.set_footer(text=f"Players: {players} • RBWR Telemetry")
+            footer_text = f"Players: {players} • RBWR Telemetry" if is_pub else "Private Server • RBWR Telemetry"
+            embed.set_footer(text=footer_text)
             add_info(embed, server, 1, info_val)
             add_info(embed, server, 2, info_val)
             await inter.followup.send(embed=embed, view=view)
