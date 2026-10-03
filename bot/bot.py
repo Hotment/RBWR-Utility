@@ -1104,19 +1104,16 @@ class ServerBrowserView(disnake.ui.View):
             self.add_item(disnake.ui.Button(
                 label="Join in Roblox",
                 url=make_roblox_join_url(jid),
-                emoji="🎮",
                 row=0,
             ))
             self.add_item(disnake.ui.Button(
                 label="Open Web View",
                 url=make_web_server_url(jid),
-                emoji="🌐",
                 row=0,
             ))
             back_btn = disnake.ui.Button(
                 label="Back to Server List",
                 style=disnake.ButtonStyle.secondary,
-                emoji="◀",
                 row=0,
             )
             back_btn.callback = self.on_back_to_list
@@ -1124,11 +1121,11 @@ class ServerBrowserView(disnake.ui.View):
             return
 
         filter_options = [
-            disnake.SelectOption(label="All Public Servers", value="all", emoji="🌐", description="Show all online public servers", default=(self.filter_status == "all")),
-            disnake.SelectOption(label="Running Reactors", value="running", emoji="🔥", description="At least 1 unit running (>5% APRM)", default=(self.filter_status == "running")),
-            disnake.SelectOption(label="Dual Running Reactors", value="both", emoji="⚡", description="Both units actively running", default=(self.filter_status == "both")),
-            disnake.SelectOption(label="Earning Points", value="points", emoji="💰", description="Points rate > 0 pts/sec", default=(self.filter_status == "points")),
-            disnake.SelectOption(label="Scrammed Reactors", value="scrammed", emoji="🚨", description="Servers with an active reactor SCRAM", default=(self.filter_status == "scrammed")),
+            disnake.SelectOption(label="All Public Servers", value="all", description="Show all online public servers", default=(self.filter_status == "all")),
+            disnake.SelectOption(label="Running Reactors", value="running", description="At least 1 unit running (>5% APRM)", default=(self.filter_status == "running")),
+            disnake.SelectOption(label="Dual Running Reactors", value="both", description="Both units actively running", default=(self.filter_status == "both")),
+            disnake.SelectOption(label="Earning Points", value="points", description="Points rate > 0 pts/sec", default=(self.filter_status == "points")),
+            disnake.SelectOption(label="Scrammed Reactors", value="scrammed", description="Servers with an active reactor SCRAM", default=(self.filter_status == "scrammed")),
         ]
         filter_select = disnake.ui.StringSelect(
             custom_id="browser_filter_select",
@@ -1140,12 +1137,12 @@ class ServerBrowserView(disnake.ui.View):
         self.add_item(filter_select)
 
         sort_options = [
-            disnake.SelectOption(label="Highest Points / sec", value="points", emoji="⚡", description="Sort by highest points generation rate", default=(self.sort_by == "points")),
-            disnake.SelectOption(label="Most Running Reactors", value="active_reactors", emoji="⚛️", description="Dual running > single running > offline", default=(self.sort_by == "active_reactors")),
-            disnake.SelectOption(label="Highest Unit 1 APRM", value="aprm_u1", emoji="📈", description="Sort by Unit 1 core power", default=(self.sort_by == "aprm_u1")),
-            disnake.SelectOption(label="Highest Unit 2 APRM", value="aprm_u2", emoji="📈", description="Sort by Unit 2 core power", default=(self.sort_by == "aprm_u2")),
-            disnake.SelectOption(label="Most Players", value="players", emoji="👥", description="Sort by player population", default=(self.sort_by == "players")),
-            disnake.SelectOption(label="Server ID (A-Z)", value="id", emoji="🔤", description="Alphabetical sort by short ID", default=(self.sort_by == "id")),
+            disnake.SelectOption(label="Highest Points / sec", value="points", description="Sort by highest points generation rate", default=(self.sort_by == "points")),
+            disnake.SelectOption(label="Most Running Reactors", value="active_reactors", description="Dual running > single running > offline", default=(self.sort_by == "active_reactors")),
+            disnake.SelectOption(label="Highest Unit 1 APRM", value="aprm_u1", description="Sort by Unit 1 core power", default=(self.sort_by == "aprm_u1")),
+            disnake.SelectOption(label="Highest Unit 2 APRM", value="aprm_u2", description="Sort by Unit 2 core power", default=(self.sort_by == "aprm_u2")),
+            disnake.SelectOption(label="Most Players", value="players", description="Sort by player population", default=(self.sort_by == "players")),
+            disnake.SelectOption(label="Server ID (A-Z)", value="id", description="Alphabetical sort by short ID", default=(self.sort_by == "id")),
         ]
         sort_select = disnake.ui.StringSelect(
             custom_id="browser_sort_select",
@@ -1401,12 +1398,10 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         view.add_item(disnake.ui.Button(
             label="Join in Roblox",
             url=make_roblox_join_url(job_id),
-            emoji="🎮",
         ))
         view.add_item(disnake.ui.Button(
             label="Open Web View",
             url=make_web_server_url(job_id),
-            emoji="🌐",
         ))
 
         if info_val == "all":
