@@ -1568,11 +1568,15 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         await inter.followup.send(f"Spawned Ticket Admin Panel for Ticket #{t_id}!", ephemeral=True)
 
     admin_guild_ids = [int(GUILD_ID)] if GUILD_ID.isdigit() else None
+    guild_only_install = disnake.ApplicationInstallTypes(guild=True, user=False)
+    guild_only_contexts = disnake.InteractionContextTypes(guild=True, bot_dm=False, private_channel=False)
 
     @b.slash_command(
         name="panel",
         description="Show the ticket admin panel here without needing to scroll up",
         guild_ids=admin_guild_ids,
+        install_types=guild_only_install,
+        contexts=guild_only_contexts,
     )
     async def panel_command(
         inter: disnake.ApplicationCommandInteraction,
@@ -1584,6 +1588,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         name="ticket_panel",
         description="Display or refresh the Ticket Admin Panel in this channel",
         guild_ids=admin_guild_ids,
+        install_types=guild_only_install,
+        contexts=guild_only_contexts,
     )
     async def ticket_panel_command(
         inter: disnake.ApplicationCommandInteraction,
