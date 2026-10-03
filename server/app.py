@@ -2056,6 +2056,11 @@ def pull_server_checker_data():
                 continue
 
             state = raw_state.copy()
+            misc_data = state.get("Misc")
+            if isinstance(misc_data, dict):
+                tot_pps = misc_data.get("Total points/second")
+                if tot_pps is not None:
+                    state["Total points/second"] = tot_pps
             if "Misc" in state:
                 del state["Misc"]
 
@@ -2328,6 +2333,123 @@ def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=N
 
     return (age_sec > 600) or (latest_state.get("PlayerCount", 0) == 0)
 
+def get_sc_latest_pps_map() -> dict[str, float]:
+    """
+    Extracts {jobId: float(Total points/second)} from the in-memory _sc_latest_data.
+    """
+    pps_map = {}
+    if _sc_latest_data and isinstance(_sc_latest_data, dict):
+        try:
+            for s in _sc_latest_data.get('data', {}).get('servers', []):
+                jid = s.get('jobId')
+                if jid:
+                    st = s.get('state') or {}
+                    misc = st.get('Misc') or {}
+                    pps = misc.get('Total points/second')
+                    if pps is not None:
+                        try:
+                            pps_map[jid] = float(pps)
+                        except (ValueError, TypeError):
+                            pass
+        except Exception:
+            pass
+    return pps_map
+
+def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, latest_state=None, pps_map=None):
+    """
+    Calculates whether Unit 1 / Unit 2 are running (APRM > 5%)
+    and the points rate (pts/s) made by the server.
+
+    If available in _sc_latest_data (or passed via total_pps / latest_state / pps_map),
+    the exact 'Total points/second' reported by the game's server state is used.
+    Otherwise, falls back to calculating based on RBWR points rules.
+    """
+    if not isinstance(unit1, dict):
+        unit1 = {}
+    if not isinstance(unit2, dict):
+        unit2 = {}
+
+    try:
+        u1_aprm = float(unit1.get("APRM", 0) or 0)
+    except (ValueError, TypeError):
+        u1_aprm = 0.0
+
+    try:
+        u2_aprm = float(unit2.get("APRM", 0) or 0)
+    except (ValueError, TypeError):
+        u2_aprm = 0.0
+
+    u1_running = u1_aprm > 5.0
+    u2_running = u2_aprm > 5.0
+
+    resolved_total_pps = None
+    if total_pps is not None:
+        try:
+            resolved_total_pps = float(total_pps)
+        except (ValueError, TypeError):
+            pass
+
+    if resolved_total_pps is None and pps_map and job_id and job_id in pps_map:
+        resolved_total_pps = pps_map[job_id]
+
+    if resolved_total_pps is None and job_id and _sc_latest_data and isinstance(_sc_latest_data, dict):
+        try:
+            for s in _sc_latest_data.get('data', {}).get('servers', []):
+                if s.get('jobId') == job_id:
+                    st = s.get('state') or {}
+                    misc = st.get('Misc') or {}
+                    pps_val = misc.get('Total points/second')
+                    if pps_val is not None:
+                        resolved_total_pps = float(pps_val)
+                    break
+        except Exception:
+            pass
+
+    if resolved_total_pps is None and isinstance(latest_state, dict):
+        pps_val = latest_state.get("Total points/second")
+        if pps_val is None and isinstance(latest_state.get("Misc"), dict):
+            pps_val = latest_state["Misc"].get("Total points/second")
+        if pps_val is not None:
+            try:
+                resolved_total_pps = float(pps_val)
+            except (ValueError, TypeError):
+                pass
+
+    u1_rate = 0.0
+    u2_rate = 0.0
+    if unit1.get("PointsPerSecond") is not None:
+        try:
+            u1_rate = float(unit1.get("PointsPerSecond") or 0)
+        except (ValueError, TypeError):
+            u1_rate = 0.0
+    if unit2.get("PointsPerSecond") is not None:
+        try:
+            u2_rate = float(unit2.get("PointsPerSecond") or 0)
+        except (ValueError, TypeError):
+            u2_rate = 0.0
+
+    if resolved_total_pps is not None:
+        total_rate = max(0.0, resolved_total_pps)
+        demand_rate = max(0.0, total_rate - (u1_rate + u2_rate))
+        points_rate = round(total_rate, 2)
+        points_rate_str = f"{total_rate:.2f} pts/s"
+    else:
+        demand_rate = None
+        points_rate = None
+        points_rate_str = "N/A"
+
+    return {
+        "u1_running": u1_running,
+        "u2_running": u2_running,
+        "u1_aprm": u1_aprm,
+        "u2_aprm": u2_aprm,
+        "u1_rate": u1_rate,
+        "u2_rate": u2_rate,
+        "demand_rate": demand_rate,
+        "points_rate": points_rate,
+        "points_rate_str": points_rate_str,
+    }
+
 def get_active_cards_base(servers_data, persistent_ids):
     global _sc_active_cards_base, _sc_active_cards_key
     cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
@@ -2336,6 +2458,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             return _sc_active_cards_base
 
     now_utc = datetime.now(timezone.utc)
+    pps_map = get_sc_latest_pps_map()
     cards = []
     for job_id, snapshots in sorted(servers_data.items()):
         if not snapshots:
@@ -2367,6 +2490,7 @@ def get_active_cards_base(servers_data, persistent_ids):
 
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
+        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
 
         cards.append({
             "job_id": job_id,
@@ -2384,15 +2508,23 @@ def get_active_cards_base(servers_data, persistent_ids):
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
+            "points_rate": pts_info["points_rate"],
+            "points_rate_str": pts_info["points_rate_str"],
+            "u1_running": pts_info["u1_running"],
+            "u2_running": pts_info["u2_running"],
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "is_running": pts_info["u1_running"],
+                "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "is_running": pts_info["u2_running"],
+                "points_rate": pts_info["u2_rate"],
             },
         })
 
@@ -2415,6 +2547,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
 
     cards = []
     now_utc = datetime.now(timezone.utc)
+    pps_map = get_sc_latest_pps_map()
     for job_id, snapshots in sorted(data.items()):
         if not snapshots:
             continue
@@ -2462,6 +2595,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
 
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
 
         cards.append({
             "job_id": job_id,
@@ -2479,15 +2613,23 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(valid_ts_keys),
+            "points_rate": pts_info["points_rate"],
+            "points_rate_str": pts_info["points_rate_str"],
+            "u1_running": pts_info["u1_running"],
+            "u2_running": pts_info["u2_running"],
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "is_running": pts_info["u1_running"],
+                "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "is_running": pts_info["u2_running"],
+                "points_rate": pts_info["u2_rate"],
             },
         })
     return cards
@@ -2969,6 +3111,7 @@ def server_detail_page(job_id):
 
         u1_dem = unit1_st.get("NextDemandU1", 0)
         u2_dem = unit2_st.get("NextDemandU2", 0)
+        pts_info = calculate_server_points_rate(unit1_st, unit2_st, job_id=job_id, latest_state=latest_st)
 
         summary = {
             "is_private": is_private,
@@ -2990,11 +3133,23 @@ def server_detail_page(job_id):
             "dmandU2": u2_dem,
             "dmandU1_formatted": format_demand_value(u1_dem),
             "dmandU2_formatted": format_demand_value(u2_dem),
+            "u1_running": pts_info["u1_running"],
+            "u2_running": pts_info["u2_running"],
+            "u1_aprm": pts_info["u1_aprm"],
+            "u2_aprm": pts_info["u2_aprm"],
+            "points_rate": pts_info["points_rate"],
+            "points_rate_str": pts_info["points_rate_str"],
+            "u1_rate": pts_info["u1_rate"],
+            "u2_rate": pts_info["u2_rate"],
+            "demand_rate": pts_info["demand_rate"],
         }
         return render_template("server_detail.html", **payload, **summary)
 
     unit1_state = server.get('state', {}).get('Unit1', {})
     unit2_state = server.get('state', {}).get('Unit2', {})
+    server_misc = (server.get('state', {}).get('Misc') or {}) if isinstance(server.get('state'), dict) else {}
+    server_tot_pps = server_misc.get('Total points/second')
+    pts_info = calculate_server_points_rate(unit1_state, unit2_state, job_id=job_id, total_pps=server_tot_pps, latest_state=server.get('state', {}))
 
     scram_reasonU1 = unit1_state.get('SCRAMreason', 'N/A')
     scram_reasonU2 = unit2_state.get('SCRAMreason', 'N/A')
@@ -3031,6 +3186,15 @@ def server_detail_page(job_id):
         "dmandU2": dmand_next2,
         "dmandU1_formatted": format_demand_value(dmand_next1),
         "dmandU2_formatted": format_demand_value(dmand_next2),
+        "u1_running": pts_info["u1_running"],
+        "u2_running": pts_info["u2_running"],
+        "u1_aprm": pts_info["u1_aprm"],
+        "u2_aprm": pts_info["u2_aprm"],
+        "points_rate": pts_info["points_rate"],
+        "points_rate_str": pts_info["points_rate_str"],
+        "u1_rate": pts_info["u1_rate"],
+        "u2_rate": pts_info["u2_rate"],
+        "demand_rate": pts_info["demand_rate"],
     }
 
     return render_template("server_detail.html", **payload, **summary)
@@ -3082,6 +3246,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
             return _sc_historical_cards_base
 
     now_utc = datetime.now(timezone.utc)
+    pps_map = get_sc_latest_pps_map()
     base_cards = []
     for job_id, snapshots in servers_data.items():
         if not snapshots:
@@ -3114,6 +3279,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
 
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
+        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
 
         base_cards.append({
             "job_id": job_id,
@@ -3131,15 +3297,23 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "snapshot_count": len(snapshots),
+            "points_rate": pts_info["points_rate"],
+            "points_rate_str": pts_info["points_rate_str"],
+            "u1_running": pts_info["u1_running"],
+            "u2_running": pts_info["u2_running"],
             "unit1": {
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "is_running": pts_info["u1_running"],
+                "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "is_running": pts_info["u2_running"],
+                "points_rate": pts_info["u2_rate"],
             },
         })
 

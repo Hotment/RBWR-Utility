@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Server Browser{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Browse active, persistent, and historical RBWR servers in real-time. View player counts, reactor status, demand timers, and live performance charts.">
+<meta name="theme-color" content="#f59e0b">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Server Browser & Live Inventory">
+<meta property="og:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, SCRAM warnings, demand schedules, and telemetry graphs.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Server Browser & Live Inventory">
+<meta name="twitter:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, SCRAM warnings, demand schedules, and telemetry graphs.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -164,6 +180,8 @@
                     class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-amber-500/50 appearance-none cursor-pointer">
                     <option value="newest">Sort: Newest Servers</option>
                     <option value="oldest">Sort: Oldest Servers</option>
+                    <option value="points_desc">Sort: Highest Points Rate</option>
+                    <option value="running_first">Sort: Running Reactors First</option>
                     <option value="public_first">Sort: Public Servers First</option>
                     <option value="private_first">Sort: Private Servers First</option>
                     <option value="players_desc">Sort: Most Players</option>
@@ -315,6 +333,8 @@
     const SERVER_SORT_OPTIONS = `
         <option value="newest">Sort: Newest Servers</option>
         <option value="oldest">Sort: Oldest Servers</option>
+        <option value="points_desc">Sort: Highest Points Rate</option>
+        <option value="running_first">Sort: Running Reactors First</option>
         <option value="public_first">Sort: Public Servers First</option>
         <option value="private_first">Sort: Private Servers First</option>
         <option value="players_desc">Sort: Most Players</option>
@@ -1075,8 +1095,16 @@
             const uB = getCardUptime(b);
             const privA = a.dataset.isPrivate === 'true' ? 1 : 0;
             const privB = b.dataset.isPrivate === 'true' ? 1 : 0;
+            const ptsA = parseFloat(a.dataset.pointsRate || '0') || 0;
+            const ptsB = parseFloat(b.dataset.pointsRate || '0') || 0;
+            const runA = (a.dataset.u1Running === 'true' || a.dataset.u2Running === 'true') ? 1 : 0;
+            const runB = (b.dataset.u1Running === 'true' || b.dataset.u2Running === 'true') ? 1 : 0;
 
-            if (currentSort === 'players_desc') {
+            if (currentSort === 'points_desc') {
+                return (ptsB - ptsA) || (uB - uA) || (pB - pA);
+            } else if (currentSort === 'running_first') {
+                return (runB - runA) || (ptsB - ptsA) || (uB - uA) || (pB - pA);
+            } else if (currentSort === 'players_desc') {
                 return (pB - pA) || (sB - sA) || (uB - uA);
             } else if (currentSort === 'players_asc') {
                 return (pA - pB) || (sA - sB) || (uA - uB);

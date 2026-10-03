@@ -2,6 +2,33 @@
 
 {% block title %}RBWR Utility - Server Info - {{ job_id }}{% endblock %}
 
+{% block meta_tags %}
+{% set embed_title = "RBWR Server: " ~ job_id %}
+{% set embed_theme = "#a855f7" if is_private else ("#06b6d4" if is_archived else ("#64748b" if is_historical else "#10b981")) %}
+{% set server_status_text = "Private Server" if is_private else ("Archived Server" if is_archived else ("Historical Server" if is_historical else "Active Live Server")) %}
+{% set players_text = "Private Server" if is_private else ((player_count | default(0) | string) ~ "/" ~ (max_players | default(12) | string) ~ " Players") %}
+{% set demand_text = next_demand_formatted | default(next_demand ~ ' MW') if next_demand else 'N/A' %}
+{% set u1_status = "Unit 1: Running" if u1_running else "Unit 1: Offline" %}
+{% set u2_status = "Unit 2: Running" if u2_running else "Unit 2: Offline" %}
+{% set units_text = u1_status ~ " | " ~ u2_status %}
+{% set points_text = "Points: " ~ (points_rate_str | default('N/A')) %}
+{% set embed_desc = server_status_text ~ " | " ~ players_text ~ " | " ~ units_text ~ " | " ~ points_text ~ " | Uptime: " ~ uptime_str ~ " | Total Demand: " ~ demand_text %}
+
+<meta name="description" content="{{ embed_desc }}">
+<meta name="theme-color" content="{{ embed_theme }}">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility Server Browser">
+<meta property="og:title" content="{{ embed_title }}">
+<meta property="og:description" content="{{ embed_desc }}">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ embed_title }}">
+<meta name="twitter:description" content="{{ embed_desc }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>

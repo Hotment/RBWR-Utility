@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility{% endblock %}
+{% block title %}RBWR Utility - APRM & Thermal Solver{% endblock %}
+
+{% block meta_tags %}
+<meta name="description" content="RBWR Utility - A lightweight desktop overlay, APRM calculator, real-time reactor thermal simulator, and live server browser for Roblox RBWR.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - APRM & Thermal Solver">
+<meta property="og:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with telemetry graphs, and points calculator for Roblox RBWR.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - APRM & Thermal Solver">
+<meta name="twitter:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with telemetry graphs, and points calculator for Roblox RBWR.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
 
 
 

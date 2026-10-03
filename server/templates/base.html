@@ -4,8 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta property="og:site_name" content="RBWR Utility" />
     <title>{% block title %}RBWR Utility{% endblock %}</title>
+
+    {% block meta_tags %}
+    <meta name="description" content="RBWR Utility - Real-time APRM calculations, thermal simulator, live reactor server browser, and operator metrics for Roblox RBWR.">
+    <meta name="theme-color" content="#3b82f6">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="RBWR Utility">
+    <meta property="og:title" content="RBWR Utility - APRM & Thermal Solver">
+    <meta property="og:description" content="Lightweight APRM calculations, real-time reactor thermal simulator, server browser with live graphs, and points calculator for Roblox RBWR.">
+    <meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="RBWR Utility - APRM & Thermal Solver">
+    <meta name="twitter:description" content="Lightweight APRM calculations, real-time reactor thermal simulator, server browser with live graphs, and points calculator for Roblox RBWR.">
+    <meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+    {% endblock %}
+
     <script type="application/ld+json">
         {
             "@context": "https://schema.org",

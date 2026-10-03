@@ -2,9 +2,20 @@
 
 {% block title %}RBWR Utility - Credits & Acknowledgements{% endblock %}
 
-{% block extra_head %}
-<meta name="description"
-    content="Credits and acknowledgements for RBWR Utility and the RBWR APRM Calculator desktop application.">
+{% block meta_tags %}
+<meta name="description" content="Credits and acknowledgements for RBWR Utility and the RBWR APRM Calculator desktop application.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - Credits & Acknowledgements">
+<meta property="og:description" content="Recognizing the creators, collaborators, and open-source foundations behind the RBWR Utility ecosystem.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - Credits & Acknowledgements">
+<meta name="twitter:description" content="Recognizing the creators, collaborators, and open-source foundations behind the RBWR Utility ecosystem.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
 {% endblock %}
 
 {% block content %}

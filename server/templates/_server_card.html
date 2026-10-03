@@ -12,7 +12,10 @@
     data-age-seconds="{{ server.age_seconds }}"
     data-uptime-seconds="{{ server.uptime_seconds }}"
     data-first-timestamp="{{ server.first_timestamp }}"
-    data-raw-timestamp="{{ server.raw_timestamp }}">
+    data-raw-timestamp="{{ server.raw_timestamp }}"
+    data-u1-running="{{ 'true' if server.u1_running else 'false' }}"
+    data-u2-running="{{ 'true' if server.u2_running else 'false' }}"
+    data-points-rate="{{ server.points_rate | default(0) }}">
     <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between gap-2.5">
             <div class="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -45,6 +48,10 @@
                     Active
                 </span>
                 {% endif %}
+                <span class="px-2 py-0.5 rounded-full {% if server.points_rate and server.points_rate > 0 %}bg-amber-500/15 border-amber-500/30 text-amber-300{% else %}bg-white/5 border-white/10 text-gray-400{% endif %} border text-[10px] font-mono font-bold whitespace-nowrap"
+                    title="Points Generation Rate">
+                    ★ {{ server.points_rate_str | default('N/A') }}
+                </span>
             </div>
             <span class="px-2.5 py-1 rounded-full {% if server.is_archived %}bg-cyan-500/15 border-cyan-500/30 text-cyan-300{% else %}bg-emerald-500/15 border-emerald-500/30 text-emerald-300{% endif %} border text-[10px] font-mono font-bold whitespace-nowrap shrink-0">
                 {{ server.snapshot_count }} snapshots
@@ -79,6 +86,23 @@
                     Unit 2 APRM
                 </span>
                 <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm) }}%</span>
+            </div>
+
+            <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex items-center justify-between col-span-2">
+                <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                    </svg>
+                    <span>Points Generation</span>
+                </span>
+                <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-xs {% if server.points_rate and server.points_rate > 0 %}text-amber-400{% else %}text-slate-400{% endif %}">
+                        {{ server.points_rate_str | default('N/A') }}
+                    </span>
+                    {% if server.points_rate and server.points_rate >= 2.9 %}
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">MAX</span>
+                    {% endif %}
+                </div>
             </div>
 
             {% if not server.is_private %}

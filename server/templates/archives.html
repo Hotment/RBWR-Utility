@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Server Archives{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Browse archived RBWR server history and snapshots. Review past reactor runs, uptime records, and thermal metrics.">
+<meta name="theme-color" content="#06b6d4">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Server Archives & Historical Runs">
+<meta property="og:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, telemetry logs, and historical run data.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Server Archives & Historical Runs">
+<meta name="twitter:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, telemetry logs, and historical run data.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block content %}
 <main
     class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">

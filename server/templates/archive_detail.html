@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Archive for {{ date_formatted }}{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="View archived RBWR server instances and reactor metrics recorded on {{ date_formatted }}.">
+<meta name="theme-color" content="#06b6d4">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Server Archive: {{ date_formatted }}">
+<meta property="og:description" content="Archived RBWR reactor snapshots, uptime data, and server logs for {{ date_formatted }}.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Server Archive: {{ date_formatted }}">
+<meta name="twitter:description" content="Archived RBWR reactor snapshots, uptime data, and server logs for {{ date_formatted }}.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block content %}
 <main
     class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">

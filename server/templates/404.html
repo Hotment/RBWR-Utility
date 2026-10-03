@@ -2,8 +2,20 @@
 
 {% block title %}RBWR Utility - 404 Not Found{% endblock %}
 
-{% block extra_head %}
+{% block meta_tags %}
 <meta name="description" content="404 - Page not found on RBWR Utility.">
+<meta name="theme-color" content="#ef4444">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - 404 Not Found">
+<meta property="og:description" content="The requested page could not be found on RBWR Utility.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - 404 Not Found">
+<meta name="twitter:description" content="The requested page could not be found on RBWR Utility.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
 {% endblock %}
 
 {% block content %}

@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Thermal Calculator{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Calculate RBWR reactor thermal power (MWth), steam flow, feedwater requirements, and APRM percentage accurately in real-time.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Reactor Thermal Power & APRM Calculator">
+<meta property="og:description" content="Real-time thermal solver for RBWR Unit 1 and Unit 2. Computes core thermal output, MWth targets, steam flow rates, and control rod APRM targets.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Reactor Thermal Power & APRM Calculator">
+<meta name="twitter:description" content="Real-time thermal solver for RBWR Unit 1 and Unit 2. Computes core thermal output, MWth targets, steam flow rates, and control rod APRM targets.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 
 
 {% block content %}

@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Tickets & Feedback{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Submit suggestions and report bugs for RBWR Utility and the APRM Overlay. Track resolution progress, chat with admins, and follow developer status.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Community Tickets & Feedback">
+<meta property="og:description" content="Submit suggestions and report bugs for RBWR Utility. Track feature progress, discuss proposals, and view resolution statuses.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Community Tickets & Feedback">
+<meta name="twitter:description" content="Submit suggestions and report bugs for RBWR Utility. Track feature progress, discuss proposals, and view resolution statuses.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block content %}
 <main class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-6 w-full flex flex-col gap-6 overflow-x-hidden">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">

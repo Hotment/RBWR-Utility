@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Points & Rank Calculator{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Calculate and simulate your Roblox RBWR point generation rate, evaluate active modifiers and penalties, and estimate your rank progression time.">
+<meta name="theme-color" content="#10b981">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Points & Rank Progression Calculator">
+<meta property="og:description" content="Simulate active reactor point generation rates, evaluate operational penalties, and calculate the exact time to achieve your next rank in RBWR.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Points & Rank Progression Calculator">
+<meta name="twitter:description" content="Simulate active reactor point generation rates, evaluate operational penalties, and calculate the exact time to achieve your next rank in RBWR.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 
 
 {% block content %}

@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Web Tablet{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="In-browser RBWR Operator Tablet emulator. View real-time reactor diagnostics, alarms, core thermal telemetry, and systems control.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Web Operator Tablet Emulator">
+<meta property="og:description" content="Virtual RBWR Operator Tablet interface. Real-time reactor telemetry, alarm annunciators, rod positions, and plant monitoring from any browser.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Web Operator Tablet Emulator">
+<meta name="twitter:description" content="Virtual RBWR Operator Tablet interface. Real-time reactor telemetry, alarm annunciators, rod positions, and plant monitoring from any browser.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block extra_head %}
 <style>
     .tablet-bezel {

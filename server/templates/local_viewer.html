@@ -2,8 +2,23 @@
 
 {% block title %}RBWR Utility - Point History Graph & Local Viewer{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json data strictly in browser memory.">
+<meta name="theme-color" content="#10b981">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Point History Graph & Local Viewer">
+<meta property="og:description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json points history with interactive charts in browser memory.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Point History Graph & Local Viewer">
+<meta name="twitter:description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json points history with interactive charts in browser memory.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block extra_head %}
-<meta name="description" content="100% Client-Side Private RBWR Point History Graph">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/points_style.css') }}?v=8">
 {% endblock %}
 

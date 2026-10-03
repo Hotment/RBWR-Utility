@@ -2,6 +2,22 @@
 
 {% block title %}RBWR Utility - Contact Admin{% endblock %}
 
+{% block meta_tags %}
+<meta name="description" content="Send a private, confidential message directly to the administrator of RBWR Utility.">
+<meta name="theme-color" content="#8b5cf6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="Contact RBWR Utility Administrators">
+<meta property="og:description" content="Send a confidential private message directly to the RBWR Utility administrator and development team.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Contact RBWR Utility Administrators">
+<meta name="twitter:description" content="Send a confidential private message directly to the RBWR Utility administrator and development team.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
 {% block extra_head %}
 <meta name="description" content="Send a private, confidential message directly to the administrator of RBWR Utility.">
 <style>

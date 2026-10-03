@@ -2,9 +2,20 @@
 
 {% block title %}RBWR Utility - Privacy Policy{% endblock %}
 
-{% block extra_head %}
-<meta name="description"
-    content="Privacy Policy for RBWR Utility. Details on data handling, user suggestions, and crash reports.">
+{% block meta_tags %}
+<meta name="description" content="Privacy Policy for RBWR Utility. Details on data handling, client-side privacy, user feedback, and crash diagnostics.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - Privacy Policy">
+<meta property="og:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and telemetry diagnostics.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - Privacy Policy">
+<meta name="twitter:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and telemetry diagnostics.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
 {% endblock %}
 
 {% block content %}
