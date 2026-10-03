@@ -1083,7 +1083,7 @@ class ServerBrowserView(disnake.ui.View):
                     f"**[`{short}`]({web_url})** • [`Join Game`]({join_url})\n"
                     f"`Job ID:` `{jid}`\n"
                     f"• **U1:** {u1_badge} | **U2:** {u2_badge}\n"
-                    f"• **Points:** `{pts_str}` | **Players:** 👥 `{p_display}`\n"
+                    f"• **Points:** `{pts_str}` | **Players:** `{p_display}`\n"
                 )
 
         embed.description = "\n".join(desc_lines)
@@ -1163,11 +1163,14 @@ class ServerBrowserView(disnake.ui.View):
 
         if self.selected_server_job_id:
             jid = self.selected_server_job_id
-            self.add_item(disnake.ui.Button(
-                label="Join in Roblox",
-                url=make_roblox_join_url(jid),
-                row=0,
-            ))
+            selected_server = next((s for s in self.raw_servers if str(s.get("jobId", "")) == jid), None)
+            is_pub = is_server_public(selected_server) if selected_server else True
+            if is_pub:
+                self.add_item(disnake.ui.Button(
+                    label="Join in Roblox",
+                    url=make_roblox_join_url(jid),
+                    row=0,
+                ))
             self.add_item(disnake.ui.Button(
                 label="Open Web View",
                 url=make_web_server_url(jid),
@@ -1456,10 +1459,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         is_pub = is_server_public(server)
 
         view = disnake.ui.View(timeout=180)
-        view.add_item(disnake.ui.Button(
-            label="Join in Roblox",
-            url=make_roblox_join_url(job_id),
-        ))
+        if is_pub:
+            view.add_item(disnake.ui.Button(
+                label="Join in Roblox",
+                url=make_roblox_join_url(job_id),
+            ))
         view.add_item(disnake.ui.Button(
             label="Open Web View",
             url=make_web_server_url(job_id),
