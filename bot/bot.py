@@ -1066,7 +1066,7 @@ class ServerBrowserView(disnake.ui.View):
 
         def unit_field(u_num: int, u_data: dict[str, Any]) -> str:
             scram = u_data.get("SCRAMreason")
-            scram_text = f"**SCRAM:** {scram}\n" if (scram and str(scram).strip() not in ("None", "", "null")) else ""
+            scram_text = f"**Last SCRAM:** {scram}\n" if (scram and str(scram).strip() not in ("None", "", "null")) else ""
             demand_left = u_data.get("Demand Time Left")
             demand_text = f"**Demand Timer:** `{demand_left}s`\n" if demand_left is not None else ""
             return (
