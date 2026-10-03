@@ -1176,8 +1176,6 @@ SERVER_CHECKER_PURGE_KEYS = [
     "Fuel Burn (default 0.54)",
     "NextDemandU1",
     "NextDemandU2",
-    "Offsite Power",
-    "PointsPerSecond",
     "RPS Trip State B",
     "RPS Trip State A",
     "Reactor Scram State",
