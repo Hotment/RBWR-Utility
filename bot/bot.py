@@ -799,15 +799,498 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
             ephemeral=True
         )
 
+ROBLOX_PLACE_ID = "11765852158"
+
+def get_server_points_rate(server: dict[str, Any]) -> float | None:
+    misc = server.get("state", {}).get("Misc", {})
+    if isinstance(misc, dict) and "Total points/second" in misc:
+        val = misc.get("Total points/second")
+        if val is not None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                pass
+    return None
+
+def get_unit_state(server: dict[str, Any], unit: int) -> dict[str, Any]:
+    st = server.get("state", {})
+    if isinstance(st, dict):
+        u = st.get(f"Unit{unit}", {})
+        if isinstance(u, dict):
+            return u
+    return {}
+
+def get_unit_aprm(u_state: dict[str, Any]) -> float:
+    aprm = u_state.get("APRM")
+    if aprm is not None:
+        try:
+            return float(aprm)
+        except (ValueError, TypeError):
+            pass
+    return 0.0
+
+def is_unit_running(u_state: dict[str, Any]) -> bool:
+    return get_unit_aprm(u_state) > 5.0
+
+def get_unit_status_badge(u_state: dict[str, Any]) -> str:
+    aprm = get_unit_aprm(u_state)
+    scram = u_state.get("SCRAMreason")
+    if scram and str(scram).strip() not in ("None", "", "null"):
+        return f"SCRAM: {str(scram).strip()} ({aprm:.1f}%)"
+    if aprm > 5.0:
+        return f"Running ({aprm:.1f}% APRM)"
+    return f"Offline ({aprm:.1f}% APRM)"
+
+def make_roblox_join_url(job_id: str) -> str:
+    return f"https://www.roblox.com/games/start?placeId={ROBLOX_PLACE_ID}&gameInstanceId={job_id}"
+
+def make_web_server_url(job_id: str) -> str:
+    return f"{DEFAULT_SERVER_BASE_URL}/servers/{job_id}"
+
+class ServerBrowserView(disnake.ui.View):
+    PAGE_SIZE = 5
+
+    def __init__(
+        self,
+        client: RBWRClient,
+        author_id: int,
+        all_servers: list[dict[str, Any]],
+        query: str = "",
+        sort_by: str = "points",
+        filter_status: str = "all",
+    ):
+        super().__init__(timeout=300)
+        self.client = client
+        self.author_id = author_id
+        self.raw_servers = all_servers
+        self.query = (query or "").strip().lower()
+        self.sort_by = sort_by
+        self.filter_status = filter_status
+        self.page = 0
+        self.selected_server_job_id: str | None = None
+
+        self.filtered_servers: list[dict[str, Any]] = []
+        self._apply_filtering_and_sorting()
+        self.rebuild_components()
+
+    def _apply_filtering_and_sorting(self):
+        matched = []
+        for s in self.raw_servers:
+            if not is_server_public(s):
+                continue
+
+            jid = str(s.get("jobId", ""))
+            short = self.client.short_id(jid).lower()
+            u1 = get_unit_state(s, 1)
+            u2 = get_unit_state(s, 2)
+            u1_running = is_unit_running(u1)
+            u2_running = is_unit_running(u2)
+            pts = get_server_points_rate(s)
+            u1_scram = str(u1.get("SCRAMreason", "None")).strip()
+            u2_scram = str(u2.get("SCRAMreason", "None")).strip()
+            has_scram = (u1_scram not in ("None", "", "null")) or (u2_scram not in ("None", "", "null"))
+
+            if self.query:
+                q = self.query.replace("-", "")
+                norm_jid = jid.lower().replace("-", "")
+                norm_short = short.replace("-", "")
+                if (q not in norm_jid) and (q not in norm_short) and (q not in u1_scram.lower()) and (q not in u2_scram.lower()):
+                    continue
+
+            if self.filter_status == "running":
+                if not (u1_running or u2_running):
+                    continue
+            elif self.filter_status == "both":
+                if not (u1_running and u2_running):
+                    continue
+            elif self.filter_status == "points":
+                if pts is None or pts <= 0:
+                    continue
+            elif self.filter_status == "scrammed":
+                if not has_scram:
+                    continue
+
+            matched.append(s)
+
+        def sort_key_fn(s: dict[str, Any]):
+            u1 = get_unit_state(s, 1)
+            u2 = get_unit_state(s, 2)
+            pts = get_server_points_rate(s)
+            pts_val = pts if pts is not None else -1.0
+            u1_aprm = get_unit_aprm(u1)
+            u2_aprm = get_unit_aprm(u2)
+            run_count = int(is_unit_running(u1)) + int(is_unit_running(u2))
+
+            if self.sort_by == "points":
+                return (pts_val, run_count, u1_aprm + u2_aprm)
+            elif self.sort_by == "active_reactors":
+                return (run_count, u1_aprm + u2_aprm, pts_val)
+            elif self.sort_by == "aprm_u1":
+                return (u1_aprm, u2_aprm)
+            elif self.sort_by == "aprm_u2":
+                return (u2_aprm, u1_aprm)
+            elif self.sort_by == "players":
+                p_str = get_player_count(s)
+                try:
+                    p_num = int(p_str)
+                except ValueError:
+                    p_num = -1
+                return (p_num, pts_val)
+            elif self.sort_by == "id":
+                return self.client.short_id(str(s.get("jobId", "")))
+            return pts_val
+
+        reverse = (self.sort_by != "id")
+        matched.sort(key=sort_key_fn, reverse=reverse)
+        self.filtered_servers = matched
+
+        max_page = max(0, (len(self.filtered_servers) - 1) // self.PAGE_SIZE)
+        if self.page > max_page:
+            self.page = max_page
+
+    def build_embed(self) -> disnake.Embed:
+        if self.selected_server_job_id:
+            selected = next((s for s in self.filtered_servers if str(s.get("jobId")) == self.selected_server_job_id), None)
+            if not selected:
+                selected = next((s for s in self.raw_servers if str(s.get("jobId")) == self.selected_server_job_id), None)
+            if selected:
+                return self._build_detail_embed(selected)
+
+        total_matched = len(self.filtered_servers)
+        total_pages = max(1, (total_matched + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+        start_idx = self.page * self.PAGE_SIZE
+        page_servers = self.filtered_servers[start_idx : start_idx + self.PAGE_SIZE]
+
+        active_reactors = sum(
+            int(is_unit_running(get_unit_state(s, 1))) + int(is_unit_running(get_unit_state(s, 2)))
+            for s in self.filtered_servers
+        )
+        total_gen = sum(
+            (get_server_points_rate(s) or 0.0)
+            for s in self.filtered_servers
+        )
+
+        embed = disnake.Embed(
+            title="⚡ RBWR Live Server Browser",
+            color=disnake.Color.teal() if total_matched > 0 else disnake.Color.dark_grey(),
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        filter_names = {
+            "all": "All Public",
+            "running": "Running (≥ 1 Unit)",
+            "both": "Dual Running",
+            "points": "Points (> 0/s)",
+            "scrammed": "Scrammed",
+        }
+        sort_names = {
+            "points": "Points / sec",
+            "active_reactors": "Active Units",
+            "aprm_u1": "U1 APRM",
+            "aprm_u2": "U2 APRM",
+            "players": "Players",
+            "id": "Server ID",
+        }
+
+        desc_lines = [
+            f"**Filter:** `{filter_names.get(self.filter_status, self.filter_status)}` • **Sort:** `{sort_names.get(self.sort_by, self.sort_by)}`"
+        ]
+        if self.query:
+            desc_lines.append(f"🔍 **Search Query:** `{self.query}`")
+
+        desc_lines.append(
+            f"**Matching:** `{total_matched}` • **Active Units:** `{active_reactors}` • ⚡ **Total Gen:** `{total_gen:.2f} pts/s`\n"
+        )
+
+        if not page_servers:
+            desc_lines.append("*No public servers matched your search / filter criteria.*")
+            desc_lines.append("Try adjusting your filter or search query above.")
+        else:
+            for s in page_servers:
+                jid = str(s.get("jobId", "unknown"))
+                short = self.client.short_id(jid)
+                u1 = get_unit_state(s, 1)
+                u2 = get_unit_state(s, 2)
+                u1_badge = get_unit_status_badge(u1)
+                u2_badge = get_unit_status_badge(u2)
+                pts = get_server_points_rate(s)
+                pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
+                players = get_player_count(s)
+                p_display = f"{players}/12" if players != "?" else "?"
+                web_url = make_web_server_url(jid)
+                join_url = make_roblox_join_url(jid)
+
+                desc_lines.append(
+                    f"**[`{short}`]({web_url})** • [`Join Game`]({join_url})\n"
+                    f"`Job ID:` `{jid}`\n"
+                    f"• **U1:** {u1_badge} | **U2:** {u2_badge}\n"
+                    f"• **Points:** `{pts_str}` | **Players:** 👥 `{p_display}`\n"
+                )
+
+        embed.description = "\n".join(desc_lines)
+        embed.set_footer(
+            text=f"Page {self.page + 1}/{total_pages} • Total Public: {len(self.raw_servers)} • User App Ready"
+        )
+        return embed
+
+    def _build_detail_embed(self, server: dict[str, Any]) -> disnake.Embed:
+        jid = str(server.get("jobId", "unknown"))
+        short = self.client.short_id(jid)
+        u1 = get_unit_state(server, 1)
+        u2 = get_unit_state(server, 2)
+        pts = get_server_points_rate(server)
+        pts_str = f"{pts:.4f}".rstrip("0").rstrip(".") + " pts/s" if pts is not None else "N/A"
+        players = get_player_count(server)
+        p_display = f"{players}/12" if players != "?" else "?"
+
+        u1_running = is_unit_running(u1)
+        u2_running = is_unit_running(u2)
+        if u1_running and u2_running:
+            color = disnake.Color.green()
+        elif u1_running or u2_running:
+            color = disnake.Color.gold()
+        else:
+            color = disnake.Color.dark_theme() if hasattr(disnake.Color, "dark_theme") else disnake.Color.greyple()
+
+        embed = disnake.Embed(
+            title=f"RBWR Server Telemetry — {short}",
+            description=(
+                f"**Job ID:** `{jid}`\n"
+                f"**Points Generation:** `{pts_str}`\n"
+                f"**Active Players:** `{p_display}`\n"
+                f"**Visibility:** `Public`"
+            ),
+            color=color,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        def unit_field(u_num: int, u_data: dict[str, Any]) -> str:
+            scram = u_data.get("SCRAMreason")
+            scram_text = f"**SCRAM:** {scram}\n" if (scram and str(scram).strip() not in ("None", "", "null")) else ""
+            demand_left = u_data.get("Demand Time Left")
+            demand_text = f"**Demand Timer:** `{demand_left}s`\n" if demand_left is not None else ""
+            return (
+                f"{scram_text}"
+                f"**APRM:** `{fmt(u_data.get('APRM'))}%`\n"
+                f"**RTP:** `{fmt(u_data.get('RTP'))}%`\n"
+                f"**Reactor Temp:** `{fmt(u_data.get('Reactor Temp'))} °C`\n"
+                f"**Output:** `{fmt(u_data.get('Output (MW)'))} MW`\n"
+                f"**Turbine RPM:** `{fmt(u_data.get('Turbine RPM'))}`\n"
+                f"**Points / sec:** `{fmt(u_data.get('PointsPerSecond'))}`\n"
+                f"**Xenon:** `{fmt(u_data.get('Xenon'))}`\n"
+                f"{demand_text}"
+            )
+
+        embed.add_field(name=f"Unit 1 ({get_unit_status_badge(u1)})", value=unit_field(1, u1), inline=True)
+        embed.add_field(name=f"Unit 2 ({get_unit_status_badge(u2)})", value=unit_field(2, u2), inline=True)
+
+        misc = server.get("state", {}).get("Misc", {})
+        if isinstance(misc, dict) and misc:
+            misc_lines = []
+            for k in ("Outside Temperature", "EDG Diesel Storage", "FSS Smoke Detected", "Evacuation Cooldown"):
+                if k in misc:
+                    misc_lines.append(f"**{k}:** `{misc[k]}`")
+            if misc_lines:
+                embed.add_field(name="Environmental / Facility", value="\n".join(misc_lines), inline=False)
+
+        embed.set_footer(text=f"RBWR Utility • Server ID: {short}")
+        return embed
+
+    def rebuild_components(self):
+        self.clear_items()
+
+        if self.selected_server_job_id:
+            jid = self.selected_server_job_id
+            self.add_item(disnake.ui.Button(
+                label="Join in Roblox",
+                url=make_roblox_join_url(jid),
+                emoji="🎮",
+                row=0,
+            ))
+            self.add_item(disnake.ui.Button(
+                label="Open Web View",
+                url=make_web_server_url(jid),
+                emoji="🌐",
+                row=0,
+            ))
+            back_btn = disnake.ui.Button(
+                label="Back to Server List",
+                style=disnake.ButtonStyle.secondary,
+                emoji="◀",
+                row=0,
+            )
+            back_btn.callback = self.on_back_to_list
+            self.add_item(back_btn)
+            return
+
+        filter_options = [
+            disnake.SelectOption(label="All Public Servers", value="all", emoji="🌐", description="Show all online public servers", default=(self.filter_status == "all")),
+            disnake.SelectOption(label="Running Reactors", value="running", emoji="🔥", description="At least 1 unit running (>5% APRM)", default=(self.filter_status == "running")),
+            disnake.SelectOption(label="Dual Running Reactors", value="both", emoji="⚡", description="Both units actively running", default=(self.filter_status == "both")),
+            disnake.SelectOption(label="Earning Points", value="points", emoji="💰", description="Points rate > 0 pts/sec", default=(self.filter_status == "points")),
+            disnake.SelectOption(label="Scrammed Reactors", value="scrammed", emoji="🚨", description="Servers with an active reactor SCRAM", default=(self.filter_status == "scrammed")),
+        ]
+        filter_select = disnake.ui.StringSelect(
+            custom_id="browser_filter_select",
+            placeholder="Filter servers...",
+            options=filter_options,
+            row=0,
+        )
+        filter_select.callback = self.on_filter_change
+        self.add_item(filter_select)
+
+        sort_options = [
+            disnake.SelectOption(label="Highest Points / sec", value="points", emoji="⚡", description="Sort by highest points generation rate", default=(self.sort_by == "points")),
+            disnake.SelectOption(label="Most Running Reactors", value="active_reactors", emoji="⚛️", description="Dual running > single running > offline", default=(self.sort_by == "active_reactors")),
+            disnake.SelectOption(label="Highest Unit 1 APRM", value="aprm_u1", emoji="📈", description="Sort by Unit 1 core power", default=(self.sort_by == "aprm_u1")),
+            disnake.SelectOption(label="Highest Unit 2 APRM", value="aprm_u2", emoji="📈", description="Sort by Unit 2 core power", default=(self.sort_by == "aprm_u2")),
+            disnake.SelectOption(label="Most Players", value="players", emoji="👥", description="Sort by player population", default=(self.sort_by == "players")),
+            disnake.SelectOption(label="Server ID (A-Z)", value="id", emoji="🔤", description="Alphabetical sort by short ID", default=(self.sort_by == "id")),
+        ]
+        sort_select = disnake.ui.StringSelect(
+            custom_id="browser_sort_select",
+            placeholder="Sort by...",
+            options=sort_options,
+            row=1,
+        )
+        sort_select.callback = self.on_sort_change
+        self.add_item(sort_select)
+
+        start_idx = self.page * self.PAGE_SIZE
+        page_servers = self.filtered_servers[start_idx : start_idx + self.PAGE_SIZE]
+        if page_servers:
+            inspect_options = []
+            for s in page_servers:
+                jid = str(s.get("jobId", ""))
+                short = self.client.short_id(jid)
+                u1 = get_unit_state(s, 1)
+                u2 = get_unit_state(s, 2)
+                pts = get_server_points_rate(s)
+                pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
+                label = f"{short} • {pts_str}"
+                desc = f"U1: {get_unit_aprm(u1):.0f}% | U2: {get_unit_aprm(u2):.0f}%"
+                inspect_options.append(disnake.SelectOption(
+                    label=label[:100],
+                    value=jid,
+                    description=desc[:100],
+                    emoji="🔍"
+                ))
+            inspect_select = disnake.ui.StringSelect(
+                custom_id="browser_inspect_select",
+                placeholder="Select a server to inspect full telemetry...",
+                options=inspect_options,
+                row=2,
+            )
+            inspect_select.callback = self.on_inspect_select
+            self.add_item(inspect_select)
+
+        total_matched = len(self.filtered_servers)
+        total_pages = max(1, (total_matched + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+
+        prev_btn = disnake.ui.Button(
+            label="◀ Prev",
+            style=disnake.ButtonStyle.primary,
+            disabled=(self.page <= 0),
+            row=3,
+        )
+        prev_btn.callback = self.on_prev
+        self.add_item(prev_btn)
+
+        page_indicator = disnake.ui.Button(
+            label=f"Page {self.page + 1} / {total_pages}",
+            style=disnake.ButtonStyle.secondary,
+            disabled=True,
+            row=3,
+        )
+        self.add_item(page_indicator)
+
+        next_btn = disnake.ui.Button(
+            label="Next ▶",
+            style=disnake.ButtonStyle.primary,
+            disabled=(self.page >= total_pages - 1),
+            row=3,
+        )
+        next_btn.callback = self.on_next
+        self.add_item(next_btn)
+
+        refresh_btn = disnake.ui.Button(
+            label="Refresh",
+            style=disnake.ButtonStyle.success,
+            emoji="🔄",
+            row=3,
+        )
+        refresh_btn.callback = self.on_refresh
+        self.add_item(refresh_btn)
+
+    async def interaction_check(self, interaction: disnake.MessageInteraction) -> bool:
+        if self.author_id and interaction.author.id != self.author_id:
+            await interaction.response.send_message(
+                "This server browser belongs to another session. Use `/servers` to open your own interactive browser!",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_prev(self, inter: disnake.MessageInteraction):
+        if self.page > 0:
+            self.page -= 1
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_next(self, inter: disnake.MessageInteraction):
+        total_pages = max(1, (len(self.filtered_servers) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+        if self.page < total_pages - 1:
+            self.page += 1
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_filter_change(self, inter: disnake.MessageInteraction):
+        self.filter_status = inter.values[0]  # pyright: ignore[reportOptionalSubscript]
+        self.page = 0
+        self.selected_server_job_id = None
+        self._apply_filtering_and_sorting()
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_sort_change(self, inter: disnake.MessageInteraction):
+        self.sort_by = inter.values[0]  # pyright: ignore[reportOptionalSubscript]
+        self.page = 0
+        self.selected_server_job_id = None
+        self._apply_filtering_and_sorting()
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_inspect_select(self, inter: disnake.MessageInteraction):
+        self.selected_server_job_id = inter.values[0]  # pyright: ignore[reportOptionalSubscript]
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_back_to_list(self, inter: disnake.MessageInteraction):
+        self.selected_server_job_id = None
+        self.rebuild_components()
+        await inter.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def on_refresh(self, inter: disnake.MessageInteraction):
+        await inter.response.defer()
+        try:
+            payload = await self.client.fetch(public_only=True)
+            self.raw_servers = payload.get("data", {}).get("servers", [])
+        except Exception:
+            pass
+        self._apply_filtering_and_sorting()
+        self.rebuild_components()
+        await inter.edit_original_response(embed=self.build_embed(), view=self)
+
 def create_bot_instance(data_supplier: Callable[[bool], dict[str, Any]] | None = None) -> commands.InteractionBot:
-    test_guilds = [int(GUILD_ID)] if GUILD_ID.isdigit() else None
     intents = disnake.Intents.default()
     intents.message_content = True
     intents.guilds = True
 
     new_bot = commands.InteractionBot(
         intents=intents,
-        test_guilds=test_guilds,
+        test_guilds=None,
+        default_install_types=disnake.ApplicationInstallTypes.all(),
+        default_contexts=disnake.InteractionContextTypes.all(),
     )
     new_bot.rbwr = RBWRClient(data_supplier=data_supplier)  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -859,6 +1342,23 @@ def add_info(embed: disnake.Embed, server: dict[str, Any], unit: int, info: str)
 
     embed.add_field(name=f"U{unit} — {label}", value=fmt(value), inline=True)
 
+SORT_CHOICES = [
+    disnake.OptionChoice(name="Highest Points / sec", value="points"),
+    disnake.OptionChoice(name="Most Running Reactors", value="active_reactors"),
+    disnake.OptionChoice(name="Highest Unit 1 APRM", value="aprm_u1"),
+    disnake.OptionChoice(name="Highest Unit 2 APRM", value="aprm_u2"),
+    disnake.OptionChoice(name="Most Players", value="players"),
+    disnake.OptionChoice(name="Server ID (A-Z)", value="id"),
+]
+
+FILTER_CHOICES = [
+    disnake.OptionChoice(name="All Public Servers", value="all"),
+    disnake.OptionChoice(name="Running Reactors (≥ 1 Unit)", value="running"),
+    disnake.OptionChoice(name="Dual Running Reactors (Both Units)", value="both"),
+    disnake.OptionChoice(name="Earning Points (> 0 pts/s)", value="points"),
+    disnake.OptionChoice(name="Scrammed Reactors", value="scrammed"),
+]
+
 def register_bot_events_and_commands(b: commands.InteractionBot):
     @b.event
     async def on_ready():
@@ -866,13 +1366,16 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.slash_command(
         name="server",
-        description="Downloading information about a public RBWR server",
+        description="View real-time telemetry and stats for a public RBWR server",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
     )
     async def server_command(
         inter: disnake.ApplicationCommandInteraction,
-        id: str = commands.Param(description="Full Job ID or shortened ID, e.g., 77f6-4b2f"),
+        id: str = commands.Param(description="Job ID or short ID (e.g. 191f-49d5)"),
         info: str = commands.Param(
-            description="Information you want to retrieve",
+            default="all",
+            description="Specific metric or ALL for complete inspection",
             choices=INFO_CHOICES,
         ),
     ):
@@ -883,72 +1386,129 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             server = await client.find_server(id, public_only=True)
         except Exception as e:
             log.exception("RBWR API error")
-            await inter.followup.send(f"Fault: `{e}`")
+            await inter.followup.send(f"Error fetching server data: `{e}`")
             return
 
         if not server or not is_server_public(server):
-            await inter.followup.send(f"Server `{id}` not found or is private.")
+            await inter.followup.send(f"Server `{id}` not found or is private / offline.")
             return
 
         job_id = str(server.get("jobId", id))
         short = client.short_id(job_id)
-        players = get_player_count(server)
-
-        embed = disnake.Embed(
-            title="RBWR Public Server",
-            description=f"**Server ID:** `{short}`\n**Job ID:** `{job_id}`",
-            color=disnake.Color.green(),
-        )
-        embed.set_footer(text=f"Players: {players}")
-
         info_val = getattr(info, "value", info)
-        add_info(embed, server, 1, info_val)
-        add_info(embed, server, 2, info_val)
 
-        await inter.followup.send(embed=embed)
+        view = disnake.ui.View(timeout=180)
+        view.add_item(disnake.ui.Button(
+            label="Join in Roblox",
+            url=make_roblox_join_url(job_id),
+            emoji="🎮",
+        ))
+        view.add_item(disnake.ui.Button(
+            label="Open Web View",
+            url=make_web_server_url(job_id),
+            emoji="🌐",
+        ))
+
+        if info_val == "all":
+            browser_view = ServerBrowserView(
+                client=client,
+                author_id=inter.author.id,
+                all_servers=[server],
+            )
+            embed = browser_view._build_detail_embed(server)
+            await inter.followup.send(embed=embed, view=view)
+        else:
+            players = get_player_count(server)
+            embed = disnake.Embed(
+                title=f"RBWR Server — {short}",
+                description=f"**Server ID:** `{short}`\n**Job ID:** `{job_id}`",
+                color=disnake.Color.teal(),
+                timestamp=datetime.now(timezone.utc),
+            )
+            embed.set_footer(text=f"Players: {players} • RBWR Telemetry")
+            add_info(embed, server, 1, info_val)
+            add_info(embed, server, 2, info_val)
+            await inter.followup.send(embed=embed, view=view)
+
+    @server_command.autocomplete("id")
+    async def server_id_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
+        client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
+        try:
+            payload = await client.fetch(public_only=True)
+            servers = payload.get("data", {}).get("servers", [])
+        except Exception:
+            return []
+
+        clean_input = (user_input or "").strip().lower().replace("-", "")
+        choices = []
+
+        for s in servers:
+            if not is_server_public(s):
+                continue
+            jid = str(s.get("jobId", ""))
+            short = client.short_id(jid)
+            u1 = get_unit_state(s, 1)
+            u2 = get_unit_state(s, 2)
+            pts = get_server_points_rate(s)
+            pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
+            u1_aprm = get_unit_aprm(u1)
+            u2_aprm = get_unit_aprm(u2)
+
+            norm_jid = jid.lower().replace("-", "")
+            norm_short = short.lower().replace("-", "")
+
+            if not clean_input or clean_input in norm_jid or clean_input in norm_short:
+                label = f"{short} • U1: {u1_aprm:.0f}% | U2: {u2_aprm:.0f}% | {pts_str}"
+                choices.append(disnake.OptionChoice(name=label[:100], value=short))
+                if len(choices) >= 25:
+                    break
+
+        return choices
 
     @b.slash_command(
-        name="serverlist",
-        description="Show list of active public RBWR servers",
+        name="servers",
+        description="Interactive browser & search for active RBWR servers",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
     )
-    async def serverlist_command(inter: disnake.ApplicationCommandInteraction):
+    async def servers_command(
+        inter: disnake.ApplicationCommandInteraction,
+        query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
+        sort_by: str = commands.Param(default="points", description="Sorting criteria", choices=SORT_CHOICES),
+        filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
+    ):
         await inter.response.defer()
         client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
         try:
             payload = await client.fetch(public_only=True)
             servers = payload.get("data", {}).get("servers", [])
-            public_servers = [s for s in servers if is_server_public(s)]
-
-            if public_servers:
-                server_lines = []
-                for s in public_servers:
-                    jid = str(s.get("jobId", ""))
-                    short = client.short_id(jid)
-                    players = get_player_count(s)
-                    p_info = f" ({players} players)" if players != "?" else ""
-                    server_lines.append(f"• `{short}`{p_info}")
-
-                header = f"**Active Public Servers ({len(public_servers)}):**\n\n"
-                body = "\n".join(server_lines)
-                full_text = header + body
-                if len(full_text) > 4000:
-                    body = "\n".join(server_lines[:100])
-                    full_text = header + body + f"\n... and {len(public_servers) - 100} more"
-                description_text = full_text
-            else:
-                description_text = "No active public servers found."
-
-            embed = disnake.Embed(
-                title="Active RBWR Public Servers",
-                description=description_text,
-                color=disnake.Color.green(),
-            )
-            embed.set_footer(text=f"Total Public Servers: {len(public_servers)}")
-
-            await inter.followup.send(embed=embed)
-
         except Exception as e:
-            await inter.followup.send(f"Fault: `{e}`")
+            await inter.followup.send(f"Error fetching servers: `{e}`")
+            return
+
+        browser_view = ServerBrowserView(
+            client=client,
+            author_id=inter.author.id,
+            all_servers=servers,
+            query=query,
+            sort_by=sort_by,
+            filter_status=filter,
+        )
+        await inter.followup.send(embed=browser_view.build_embed(), view=browser_view)
+
+    @b.slash_command(
+        name="serverlist",
+        description="Interactive browser & search for active RBWR servers",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def serverlist_command(
+        inter: disnake.ApplicationCommandInteraction,
+        query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
+        sort_by: str = commands.Param(default="points", description="Sorting criteria", choices=SORT_CHOICES),
+        filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
+    ):
+        await servers_command(inter, query=query, sort_by=sort_by, filter=filter)
 
     @b.listen("on_interaction")
     async def global_ticket_interaction_listener(inter: disnake.Interaction):
@@ -1012,9 +1572,12 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         await inter.channel.send(embed=panel_embed, view=panel_view)
         await inter.followup.send(f"Spawned Ticket Admin Panel for Ticket #{t_id}!", ephemeral=True)
 
+    admin_guild_ids = [int(GUILD_ID)] if GUILD_ID.isdigit() else None
+
     @b.slash_command(
         name="panel",
         description="Show the ticket admin panel here without needing to scroll up",
+        guild_ids=admin_guild_ids,
     )
     async def panel_command(
         inter: disnake.ApplicationCommandInteraction,
@@ -1025,6 +1588,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     @b.slash_command(
         name="ticket_panel",
         description="Display or refresh the Ticket Admin Panel in this channel",
+        guild_ids=admin_guild_ids,
     )
     async def ticket_panel_command(
         inter: disnake.ApplicationCommandInteraction,
@@ -1324,10 +1888,11 @@ def start_bot_thread(
                 intents = disnake.Intents.default()
                 intents.message_content = False
                 intents.guilds = True
-                test_guilds = [int(GUILD_ID)] if GUILD_ID.isdigit() else None
                 bot = commands.InteractionBot(
                     intents=intents,
-                    test_guilds=test_guilds,
+                    test_guilds=None,
+                    default_install_types=disnake.ApplicationInstallTypes.all(),
+                    default_contexts=disnake.InteractionContextTypes.all(),
                 )
                 bot.rbwr = RBWRClient(data_supplier=get_servers_data)  # pyright: ignore[reportAttributeAccessIssue]
                 register_bot_events_and_commands(bot)
