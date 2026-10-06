@@ -42,7 +42,10 @@
 
 {% block content %}
 <main
-    class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden">
+    class="flex-grow max-w-[1500px] mx-auto px-4 sm:px-6 py-6 md:py-8 w-full flex flex-col gap-6 md:gap-8 overflow-x-hidden relative">
+    <div id="serversTopProgressBar" class="fixed top-0 left-0 right-0 h-1 z-[9999] pointer-events-none overflow-hidden opacity-0 transition-opacity duration-300">
+        <div id="serversTopProgressBarFill" class="h-full bg-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.9)] transition-all duration-300 ease-out" style="width: 0%;"></div>
+    </div>
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div class="flex flex-col gap-2">
             <h1
@@ -76,8 +79,11 @@
             class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 rounded-2xl cursor-pointer transition-all"
             onclick="resumePageSync()">
             <div
-                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-2xl mb-3 animate-pulse shadow-lg shadow-amber-500/10">
-                ⏸</div>
+                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mb-3 animate-pulse shadow-lg shadow-amber-500/10">
+                <svg class="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                </svg>
+            </div>
             <h3 class="text-white font-bold text-lg sm:text-xl mb-1 whitespace-nowrap font-display">Sync Paused (Tab
                 Inactive)</h3>
             <p class="text-gray-300 text-xs sm:text-sm max-w-sm font-mono">Click anywhere or switch back to this tab to
@@ -178,6 +184,7 @@
                 </div>
                 <select id="serverSort" onchange="setSortOption(this.value)"
                     class="premium-input w-full pl-8 pr-8 py-2.5 text-xs font-mono rounded-xl bg-[#121217] text-gray-200 border border-white/10 focus:border-amber-500/50 appearance-none cursor-pointer">
+                    <option value="top_servers" selected>Sort: Top Servers</option>
                     <option value="newest">Sort: Newest Servers</option>
                     <option value="oldest">Sort: Oldest Servers</option>
                     <option value="points_desc">Sort: Highest Points Rate</option>
@@ -214,6 +221,26 @@
                     </svg>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <div id="serversLoadingIndicator" class="hidden flex-col gap-2.5 p-4 rounded-2xl bg-[#121217]/90 border border-amber-500/25 backdrop-blur-md shadow-lg shadow-amber-500/5 transition-all duration-300">
+        <div class="flex items-center justify-between gap-3 text-xs font-mono">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="relative flex items-center justify-center w-5 h-5 shrink-0">
+                    <div class="absolute w-5 h-5 rounded-full bg-amber-400/20 animate-ping"></div>
+                    <div class="w-2 h-2 rounded-full bg-amber-400 shadow-sm shadow-amber-400"></div>
+                </div>
+                <span id="serversLoadingTitle" class="font-display font-semibold text-white tracking-wide shrink-0">Syncing Server Data</span>
+                <span class="text-gray-600 hidden sm:inline">|</span>
+                <span id="serversLoadingDetail" class="text-gray-400 text-[11px] truncate max-w-[280px] sm:max-w-none">Updating reactor metrics and heartbeat snapshots...</span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span id="serversLoadingPct" class="font-bold text-amber-400 text-xs">0%</span>
+            </div>
+        </div>
+        <div class="w-full bg-white/5 border border-white/10 rounded-full h-2 overflow-hidden p-0.5 relative shadow-inner">
+            <div id="serversLoadingProgressFill" class="h-full bg-amber-400 rounded-full transition-all duration-300 ease-out shadow-sm shadow-amber-500/50" style="width: 0%;"></div>
         </div>
     </div>
 
@@ -256,6 +283,8 @@
         <button type="button" onclick="clearSearch()" class="text-xs font-mono text-amber-400 hover:underline">Clear
             search query</button>
     </div>
+
+    {% include "_score_inspect_modal.html" %}
 </main>
 {% endblock %}
 
@@ -270,12 +299,167 @@
         });
     }
 
-    function refreshData() {
+    let serversProgressTimer = null;
+    let currentServersProgress = 0;
+    let isRefreshingActiveData = false;
+
+    function startServersLoadingBar(title = 'Syncing Server Data', detail = 'Updating reactor metrics and heartbeat snapshots...') {
+        const topBar = document.getElementById('serversTopProgressBar');
+        const topFill = document.getElementById('serversTopProgressBarFill');
+        const indicator = document.getElementById('serversLoadingIndicator');
+        const titleEl = document.getElementById('serversLoadingTitle');
+        const detailEl = document.getElementById('serversLoadingDetail');
+        const pctEl = document.getElementById('serversLoadingPct');
+        const fillEl = document.getElementById('serversLoadingProgressFill');
+        const grid = document.getElementById('serverGrid');
+
+        if (serversProgressTimer) {
+            clearInterval(serversProgressTimer);
+            serversProgressTimer = null;
+        }
+
+        currentServersProgress = 12;
+        if (titleEl) titleEl.textContent = title;
+        if (detailEl) detailEl.textContent = detail;
+        if (pctEl) pctEl.textContent = '12%';
+        if (fillEl) fillEl.style.width = '12%';
+        if (topFill) topFill.style.width = '12%';
+
+        if (topBar) {
+            topBar.classList.remove('opacity-0');
+            topBar.classList.add('opacity-100');
+        }
+        if (indicator) {
+            indicator.classList.remove('hidden');
+            indicator.classList.add('flex');
+        }
+
+        if (grid) {
+            grid.classList.add('opacity-50', 'pointer-events-none', 'transition-opacity', 'duration-300');
+        }
+
+        serversProgressTimer = setInterval(() => {
+            if (currentServersProgress < 85) {
+                const increment = Math.max(1, Math.round((85 - currentServersProgress) / 7));
+                currentServersProgress += increment;
+                if (pctEl) pctEl.textContent = `${currentServersProgress}%`;
+                if (fillEl) fillEl.style.width = `${currentServersProgress}%`;
+                if (topFill) topFill.style.width = `${currentServersProgress}%`;
+
+                if (currentServersProgress >= 50 && detailEl && detail.includes('heartbeat snapshots')) {
+                    detailEl.textContent = 'Processing APRM, SCRAM and demand states...';
+                }
+            }
+        }, 160);
+    }
+
+    function finishServersLoadingBar(success = true) {
+        if (serversProgressTimer) {
+            clearInterval(serversProgressTimer);
+            serversProgressTimer = null;
+        }
+        currentServersProgress = 100;
+
+        const topBar = document.getElementById('serversTopProgressBar');
+        const topFill = document.getElementById('serversTopProgressBarFill');
+        const indicator = document.getElementById('serversLoadingIndicator');
+        const detailEl = document.getElementById('serversLoadingDetail');
+        const pctEl = document.getElementById('serversLoadingPct');
+        const fillEl = document.getElementById('serversLoadingProgressFill');
+        const grid = document.getElementById('serverGrid');
+
+        if (pctEl) pctEl.textContent = '100%';
+        if (fillEl) fillEl.style.width = '100%';
+        if (topFill) topFill.style.width = '100%';
+        if (detailEl) detailEl.textContent = success ? 'Data synchronized successfully' : 'Sync completed';
+
+        setTimeout(() => {
+            if (topBar) {
+                topBar.classList.remove('opacity-100');
+                topBar.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (topFill) topFill.style.width = '0%';
+                }, 300);
+            }
+            if (indicator) {
+                indicator.classList.add('hidden');
+                indicator.classList.remove('flex');
+                if (fillEl) fillEl.style.width = '0%';
+            }
+            if (grid) {
+                grid.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }, 220);
+    }
+
+    async function refreshData() {
+        if (isRefreshingActiveData) return;
+
+        if (currentStatusFilter === 'historical') {
+            fetchHistoricalPage(currentPage || 1);
+            return;
+        }
+        if (currentStatusFilter === 'archives') {
+            archiveDaysData = null;
+            archiveStatsData = null;
+            fetchArchivesTab();
+            return;
+        }
+
+        isRefreshingActiveData = true;
         const icon = document.getElementById('refreshIcon');
         if (icon) icon.classList.add('animate-spin');
-        setTimeout(() => {
-            window.location.reload();
-        }, 300);
+
+        startServersLoadingBar('Refreshing Server Data', 'Fetching latest server heartbeats...');
+
+        try {
+            if (!searchInput) searchInput = document.getElementById('serverSearch');
+            const query = (searchInput ? searchInput.value : '').trim();
+            const url = `/api/servers/active?q=${encodeURIComponent(query)}`;
+
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            if (data.success) {
+                const grid = document.getElementById('serverGrid');
+                if (grid) {
+                    if (data.cards_html && data.cards_html.trim().length > 0) {
+                        grid.innerHTML = data.cards_html;
+                    } else {
+                        grid.innerHTML = `
+                            <div class="col-span-full premium-glass rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/10">
+                                <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                                <h3 class="text-lg font-display font-semibold text-white">No active server data available</h3>
+                                <p class="text-xs text-gray-400 max-w-md">No active server heartbeats are currently stored. Server snapshots are updated automatically every 60 seconds.</p>
+                            </div>
+                        `;
+                    }
+                    initialActiveCardsHtml = grid.innerHTML;
+                    serverCards = Array.from(document.querySelectorAll('.server-card'));
+                }
+
+                if (window.updateGlobalChartData && data.charts && data.charts.length > 0) {
+                    window.updateGlobalChartData(data.charts[0]);
+                }
+
+                filterServers(false);
+                updateUrlParams();
+                finishServersLoadingBar(true);
+            } else {
+                finishServersLoadingBar(false);
+            }
+        } catch (err) {
+            console.error('Error refreshing server data:', err);
+            finishServersLoadingBar(false);
+        } finally {
+            setTimeout(() => {
+                if (icon) icon.classList.remove('animate-spin');
+                isRefreshingActiveData = false;
+            }, 300);
+        }
     }
 
     let isTabFocused = true;
@@ -315,7 +499,7 @@
     let serverCountLabel = null;
     let noResultsNotice = null;
     let currentStatusFilter = 'all';
-    let currentSort = 'newest';
+    let currentSort = 'top_servers';
     let currentArchiveSort = 'newest';
     let lookupDebounceTimer = null;
     let searchDebounceTimer = null;
@@ -331,6 +515,7 @@
     let archivesFetchAbortController = null;
 
     const SERVER_SORT_OPTIONS = `
+        <option value="top_servers">Sort: Top Servers</option>
         <option value="newest">Sort: Newest Servers</option>
         <option value="oldest">Sort: Oldest Servers</option>
         <option value="points_desc">Sort: Highest Points Rate</option>
@@ -352,27 +537,91 @@
         <option value="snapshots_asc">Sort: Fewest Snapshots</option>
     `;
 
+    let urlUpdateDebounceTimer = null;
+    function debounceUpdateUrlParams(delay = 200) {
+        clearTimeout(urlUpdateDebounceTimer);
+        urlUpdateDebounceTimer = setTimeout(() => {
+            updateUrlParams();
+        }, delay);
+    }
+
+    function updateUrlParams() {
+        try {
+            clearTimeout(urlUpdateDebounceTimer);
+            const url = new URL(window.location);
+
+            if (currentStatusFilter && currentStatusFilter !== 'all') {
+                url.searchParams.set('tab', currentStatusFilter);
+                url.searchParams.delete('status');
+            } else {
+                url.searchParams.delete('tab');
+                url.searchParams.delete('status');
+            }
+
+            const activeSort = (currentStatusFilter === 'archives') ? currentArchiveSort : currentSort;
+            const defaultSort = (currentStatusFilter === 'archives') ? 'newest' : 'top_servers';
+            if (activeSort && activeSort !== defaultSort) {
+                url.searchParams.set('sort', activeSort);
+            } else {
+                url.searchParams.delete('sort');
+            }
+
+            const rawQ = searchInput ? searchInput.value.trim() : '';
+            if (rawQ) {
+                url.searchParams.set('q', rawQ);
+                url.searchParams.delete('search');
+                url.searchParams.delete('jobId');
+            } else {
+                url.searchParams.delete('q');
+                url.searchParams.delete('search');
+                url.searchParams.delete('jobId');
+            }
+
+            if (currentStatusFilter !== 'archives' && currentPage > 1) {
+                url.searchParams.set('page', currentPage);
+            } else {
+                url.searchParams.delete('page');
+            }
+
+            window.history.replaceState({}, '', url);
+        } catch (e) {
+            console.warn('Failed to update URL parameters:', e);
+        }
+    }
+
     function updateSortDropdown() {
         const sortSelect = document.getElementById('serverSort');
         if (!sortSelect) return;
         if (currentStatusFilter === 'archives') {
             sortSelect.innerHTML = ARCHIVE_SORT_OPTIONS;
             sortSelect.value = currentArchiveSort || 'newest';
+            if (!sortSelect.value) {
+                sortSelect.value = 'newest';
+                currentArchiveSort = 'newest';
+            }
         } else {
             sortSelect.innerHTML = SERVER_SORT_OPTIONS;
-            sortSelect.value = currentSort || 'newest';
+            sortSelect.value = currentSort || 'top_servers';
+            if (!sortSelect.value) {
+                sortSelect.value = 'top_servers';
+                currentSort = 'top_servers';
+            }
         }
     }
 
     function setSortOption(sortVal) {
+        currentPage = 1;
         if (currentStatusFilter === 'archives') {
             currentArchiveSort = sortVal || 'newest';
+            updateUrlParams();
             renderArchiveDaysInGrid();
         } else if (currentStatusFilter === 'historical') {
-            currentSort = sortVal || 'newest';
+            currentSort = sortVal || 'top_servers';
+            updateUrlParams();
             fetchHistoricalPage(1);
         } else {
-            currentSort = sortVal || 'newest';
+            currentSort = sortVal || 'top_servers';
+            updateUrlParams();
             filterServers(true);
         }
     }
@@ -467,8 +716,11 @@
         return false;
     }
 
-    function setStatusFilter(status, btn) {
+    function setStatusFilter(status, btn, resetPage = true) {
         currentStatusFilter = status;
+        if (resetPage) {
+            currentPage = 1;
+        }
         document.querySelectorAll('.status-filter-btn').forEach(b => {
             b.classList.remove('active', 'bg-white/10', 'text-white', 'font-semibold');
             b.classList.add('text-gray-400');
@@ -493,35 +745,34 @@
             if (heading) {
                 if (currentStatusFilter === 'historical') heading.textContent = 'Historical Server Instances';
                 else if (currentStatusFilter === 'persistent') heading.textContent = 'Persistent Server Instances';
+                else if (currentStatusFilter === 'active') heading.textContent = 'Active Server Instances';
                 else heading.textContent = 'Active Server Instances';
             }
             if (searchInput) searchInput.placeholder = 'Search by Job ID or Server ID...';
 
             if (currentStatusFilter === 'historical') {
-                fetchHistoricalPage(1);
+                fetchHistoricalPage(currentPage || 1);
             } else {
                 const grid = document.getElementById('serverGrid');
                 if (grid && (isHistoricalLoaded || isArchivesLoaded)) {
-                    grid.innerHTML = initialActiveCardsHtml;
-                    serverCards = Array.from(document.querySelectorAll('.server-card'));
-                    isHistoricalLoaded = false;
-                    isArchivesLoaded = false;
+                    if (initialActiveCardsHtml && initialActiveCardsHtml.trim().length > 0) {
+                        grid.innerHTML = initialActiveCardsHtml;
+                        serverCards = Array.from(document.querySelectorAll('.server-card'));
+                        isHistoricalLoaded = false;
+                        isArchivesLoaded = false;
+                        filterServers(false);
+                    } else {
+                        isHistoricalLoaded = false;
+                        isArchivesLoaded = false;
+                        refreshData();
+                    }
+                } else {
+                    filterServers(false);
                 }
-                filterServers(true);
             }
         }
 
-        try {
-            const url = new URL(window.location);
-            if (status === 'all') {
-                url.searchParams.delete('tab');
-                url.searchParams.delete('status');
-            } else {
-                url.searchParams.set('tab', status);
-                url.searchParams.delete('status');
-            }
-            window.history.replaceState({}, '', url);
-        } catch (e) { }
+        updateUrlParams();
     }
 
     async function fetchArchivesTab() {
@@ -884,18 +1135,23 @@
         }
         historicalFetchAbortController = new AbortController();
 
+        startServersLoadingBar('Loading Historical Servers', 'Fetching server records from database...');
+
         if (grid) {
-            grid.innerHTML = `
-                <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-display font-semibold text-white tracking-wide">Loading Historical Servers...</span>
+            const hasExistingCards = grid.querySelectorAll('.server-card').length > 0;
+            if (!hasExistingCards) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-display font-semibold text-white tracking-wide">Loading Historical Servers...</span>
+                        </div>
+                        <div class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-2.5 overflow-hidden p-0.5 relative shadow-inner">
+                            <div class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width: 75%;"></div>
+                        </div>
+                        <span class="text-xs font-mono text-gray-400">Fetching server records from database...</span>
                     </div>
-                    <div class="w-full max-w-md bg-white/5 border border-white/10 rounded-full h-3 overflow-hidden p-0.5 relative shadow-inner">
-                        <div class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width: 75%;"></div>
-                    </div>
-                    <span class="text-xs font-mono text-gray-400">Fetching server records from database...</span>
-                </div>
-            `;
+                `;
+            }
         }
         if (noResultsNotice) {
             noResultsNotice.classList.add('hidden');
@@ -925,6 +1181,7 @@
                     container.classList.add('hidden');
                     container.classList.remove('flex');
                 }
+                finishServersLoadingBar(true);
                 return;
             }
 
@@ -950,10 +1207,12 @@
             }
 
             renderPagination(historicalTotalCount, currentPage, historicalTotalPages);
+            finishServersLoadingBar(true);
 
         } catch (err) {
             if (err.name === 'AbortError') return;
             console.error('Error loading historical servers:', err);
+            finishServersLoadingBar(false);
             if (grid) {
                 grid.innerHTML = `
                     <div class="col-span-full py-12 text-center text-xs font-mono text-rose-400">
@@ -1099,8 +1358,12 @@
             const ptsB = parseFloat(b.dataset.pointsRate || '0') || 0;
             const runA = (a.dataset.u1Running === 'true' || a.dataset.u2Running === 'true') ? 1 : 0;
             const runB = (b.dataset.u1Running === 'true' || b.dataset.u2Running === 'true') ? 1 : 0;
+            const scoreA = parseFloat(a.dataset.topScore || '0') || 0;
+            const scoreB = parseFloat(b.dataset.topScore || '0') || 0;
 
-            if (currentSort === 'points_desc') {
+            if (currentSort === 'top_servers') {
+                return (scoreB - scoreA) || (ptsB - ptsA) || (uB - uA) || (pB - pA);
+            } else if (currentSort === 'points_desc') {
                 return (ptsB - ptsA) || (uB - uA) || (pB - pA);
             } else if (currentSort === 'running_first') {
                 return (runB - runA) || (ptsB - ptsA) || (uB - uA) || (pB - pA);
@@ -1273,10 +1536,11 @@
     }
 
     function goToPage(page) {
+        currentPage = page;
+        updateUrlParams();
         if (currentStatusFilter === 'historical') {
             fetchHistoricalPage(page);
         } else {
-            currentPage = page;
             applyPaginationDisplay();
         }
         const grid = document.getElementById('serverGrid');
@@ -1292,6 +1556,9 @@
         if (!searchInput) searchInput = document.getElementById('serverSearch');
         if (searchInput) {
             searchInput.value = '';
+            if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
+            currentPage = 1;
+            updateUrlParams();
             if (currentStatusFilter === 'archives') {
                 renderArchiveDaysInGrid();
             } else if (currentStatusFilter === 'historical') {
@@ -1301,6 +1568,33 @@
             }
             searchInput.focus();
         }
+    }
+
+    function syncStateFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        const q = (urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId') || '').trim();
+        if (searchInput) {
+            searchInput.value = q;
+            if (clearSearchBtn) clearSearchBtn.classList.toggle('hidden', q.length === 0);
+        }
+
+        const sortParam = urlParams.get('sort');
+        currentSort = sortParam || 'top_servers';
+        currentArchiveSort = sortParam || 'newest';
+
+        const pageParam = parseInt(urlParams.get('page'), 10);
+        currentPage = (!isNaN(pageParam) && pageParam > 0) ? pageParam : 1;
+
+        const tabParam = (urlParams.get('tab') || urlParams.get('status') || 'all').toLowerCase();
+        const validStatuses = ['all', 'active', 'historical', 'persistent', 'archives'];
+        const effectiveStatus = validStatuses.includes(tabParam) ? tabParam : 'all';
+
+        const matchingBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => {
+            return b.textContent.trim().toLowerCase() === effectiveStatus;
+        });
+
+        setStatusFilter(effectiveStatus, matchingBtn, false);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1315,8 +1609,31 @@
             initialActiveCardsHtml = grid.innerHTML;
         }
 
+        const urlParams = new URLSearchParams(window.location.search);
+
+        const initialQuery = (urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId') || '').trim();
+        if (initialQuery && searchInput) {
+            searchInput.value = initialQuery;
+            if (clearSearchBtn) clearSearchBtn.classList.remove('hidden');
+        }
+
+        const sortParam = urlParams.get('sort');
+        if (sortParam) {
+            currentSort = sortParam;
+            currentArchiveSort = sortParam;
+        } else {
+            currentSort = 'top_servers';
+            currentArchiveSort = 'newest';
+        }
+
+        const pageParam = parseInt(urlParams.get('page'), 10);
+        if (!isNaN(pageParam) && pageParam > 0) {
+            currentPage = pageParam;
+        }
+
         if (searchInput) {
             searchInput.addEventListener('input', () => {
+                debounceUpdateUrlParams(200);
                 if (currentStatusFilter === 'archives') {
                     renderArchiveDaysInGrid();
                 } else if (currentStatusFilter === 'historical') {
@@ -1330,31 +1647,20 @@
             });
         }
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const sortParam = urlParams.get('sort');
-        if (sortParam) {
-            currentSort = sortParam;
-            const sortSelect = document.getElementById('serverSort');
-            if (sortSelect) sortSelect.value = sortParam;
-        }
+        const initialStatus = (urlParams.get('tab') || urlParams.get('status') || 'all').toLowerCase();
+        const validStatuses = ['all', 'active', 'historical', 'persistent', 'archives'];
+        const effectiveStatus = validStatuses.includes(initialStatus) ? initialStatus : 'all';
 
-        const initialStatus = (urlParams.get('status') || urlParams.get('tab') || '').toLowerCase();
-        if (initialStatus === 'historical') {
-            const histBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'historical');
-            setStatusFilter('historical', histBtn);
-        } else if (initialStatus === 'archives') {
-            const archBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'archives');
-            setStatusFilter('archives', archBtn);
-        } else if (initialStatus === 'persistent') {
-            const persBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => b.textContent.trim().toLowerCase() === 'persistent');
-            setStatusFilter('persistent', persBtn);
-        } else {
-            const q = urlParams.get('q') || urlParams.get('search') || urlParams.get('jobId');
-            if (q && searchInput) {
-                searchInput.value = q.trim();
-            }
-            filterServers(true);
-        }
+        const matchingBtn = Array.from(document.querySelectorAll('.status-filter-btn')).find(b => {
+            return b.textContent.trim().toLowerCase() === effectiveStatus;
+        });
+
+        setStatusFilter(effectiveStatus, matchingBtn, false);
+        updateUrlParams();
+
+        window.addEventListener('popstate', () => {
+            syncStateFromUrl();
+        });
 
         window.addEventListener('focus', checkTabFocus);
         window.addEventListener('blur', checkTabFocus);
@@ -1921,6 +2227,67 @@
     });
 
     globalChartInstance._maxAvailableX = maxGlobalX;
+
+    window.updateGlobalChartData = function(newChartData) {
+        if (!globalChartInstance || !newChartData || !newChartData.datasets) return;
+
+        let newTotalGlobalPoints = 0;
+        let newMaxGlobalX = 0;
+
+        const updatedDatasets = (newChartData.datasets || []).map((ds) => {
+            const isUnit1 = ds.label && ds.label.includes('1');
+            const color = isUnit1 ? '#3b82f6' : '#f59e0b';
+            const bgGrad = isUnit1 ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+
+            const points = (ds.data || []).map(item => {
+                if (typeof item === 'object' && item !== null && 'x' in item && 'y' in item) {
+                    return { x: parseFloat(item.x), y: parseFloat(item.y) };
+                }
+                return null;
+            }).filter(p => p !== null && !isNaN(p.x) && !isNaN(p.y));
+
+            newTotalGlobalPoints += points.length;
+            points.forEach(p => {
+                if (p.x > newMaxGlobalX) newMaxGlobalX = p.x;
+            });
+
+            return {
+                label: ds.label,
+                data: points,
+                borderColor: color,
+                backgroundColor: bgGrad,
+                fill: true,
+                tension: 0,
+                spanGaps: true,
+                pointRadius: 0,
+                pointHitRadius: 0,
+                pointHoverRadius: 0,
+                borderWidth: 2,
+            };
+        });
+
+        totalGlobalPoints = newTotalGlobalPoints;
+        maxGlobalX = newMaxGlobalX;
+
+        const pointsLabel = document.getElementById('globalPointsLabel');
+        if (pointsLabel) {
+            pointsLabel.textContent = `${totalGlobalPoints} points`;
+        }
+
+        globalChartInstance.data.datasets = updatedDatasets;
+        globalChartInstance._maxAvailableX = maxGlobalX;
+        if (globalChartInstance.options.plugins && globalChartInstance.options.plugins.zoom && globalChartInstance.options.plugins.zoom.limits) {
+            globalChartInstance.options.plugins.zoom.limits.x = { min: 0, max: maxGlobalX > 0 ? maxGlobalX : undefined };
+        }
+
+        if (currentGlobalWindowSeconds === null) {
+            globalChartInstance.options.scales.x.max = maxGlobalX > 0 ? maxGlobalX : undefined;
+        } else {
+            globalChartInstance.options.scales.x.max = maxGlobalX > 0 ? Math.min(currentGlobalWindowSeconds, maxGlobalX) : currentGlobalWindowSeconds;
+        }
+
+        globalChartInstance.update('none');
+    };
 
     function restoreGlobalSavedZoom() {
         let saved = null;

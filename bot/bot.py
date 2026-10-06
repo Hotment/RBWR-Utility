@@ -112,6 +112,25 @@ def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
 
     return False
 
+def normalize_server_power(server: dict[str, Any]) -> dict[str, Any]:
+    """
+    Ensures 'Output (MW)' is automatically populated on Unit 2 (and Unit 1)
+    using 'PradDoSieci' or fallback keys so it is uniform and easy to consume.
+    """
+    if not isinstance(server, dict):
+        return server
+    state = server.get("state")
+    if isinstance(state, dict):
+        for u_name in ("Unit1", "Unit2"):
+            u = state.get(u_name)
+            if isinstance(u, dict) and u.get("Output (MW)") is None:
+                p_val = u.get("PradDoSieci")
+                if p_val is None:
+                    p_val = u.get("Output") or u.get("Power") or u.get("megawatts")
+                if p_val is not None:
+                    u["Output (MW)"] = p_val
+    return server
+
 class RBWRClient:
     def __init__(
         self,
@@ -141,8 +160,11 @@ class RBWRClient:
                 res = self.data_supplier(public_only)
                 if isinstance(res, dict):
                     servers = res.get("data", {}).get("servers", [])
-                    if public_only and isinstance(servers, list):
-                        res = dict(res, data=dict(res.get("data", {}), servers=[s for s in servers if is_server_public(s)]))
+                    if isinstance(servers, list):
+                        for s in servers:
+                            normalize_server_power(s)
+                        if public_only:
+                            res = dict(res, data=dict(res.get("data", {}), servers=[s for s in servers if is_server_public(s)]))
                     self.cache = res
                     return res
             except Exception as ex:
@@ -163,9 +185,12 @@ class RBWRClient:
                     data = await r.json(content_type=None)
                     if isinstance(data, dict):
                         servers = data.get("data", {}).get("servers", [])
-                        if public_only and isinstance(servers, list):
-                            filtered = [s for s in servers if is_server_public(s)]
-                            data["data"] = dict(data.get("data", {}), servers=filtered)
+                        if isinstance(servers, list):
+                            for s in servers:
+                                normalize_server_power(s)
+                            if public_only:
+                                filtered = [s for s in servers if is_server_public(s)]
+                                data["data"] = dict(data.get("data", {}), servers=filtered)
                         self.cache = data
                         return data
                 last_error = f"HTTP {r.status}"
@@ -1373,7 +1398,14 @@ def get_player_count(server: dict[str, Any]) -> str:
     return "?"
 
 def state_for(server: dict[str, Any], unit: int) -> dict[str, Any]:
-    return server.get("state", {}).get(f"Unit{unit}", {}) or {}
+    st = server.get("state", {}).get(f"Unit{unit}", {}) or {}
+    if isinstance(st, dict) and st.get("Output (MW)") is None:
+        p_val = st.get("PradDoSieci")
+        if p_val is None:
+            p_val = st.get("Output") or st.get("Power") or st.get("megawatts")
+        if p_val is not None:
+            st["Output (MW)"] = p_val
+    return st
 
 def add_info(embed: disnake.Embed, server: dict[str, Any], unit: int, info: str):
     st = state_for(server, unit)

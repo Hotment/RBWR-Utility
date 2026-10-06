@@ -115,12 +115,21 @@
                     </svg>
                     <span>Uptime: {{ uptime_str }}</span>
                 </span>
+                <button type="button"
+                    onclick="openScoreInspectModal('{{ job_id }}', event)"
+                    class="px-2.5 py-1 rounded-full {% if top_score and top_score >= 80 %}bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25{% elif top_score and top_score >= 50 %}bg-blue-500/15 border-blue-500/30 text-blue-300 hover:bg-blue-500/25{% else %}bg-white/5 border-white/10 text-gray-400 hover:bg-white/10{% endif %} border text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors group/score"
+                    title="Click to inspect score breakdown &amp; debugging factors">
+                    <span>Score: {{ top_score | default(0) }}</span>
+                    <svg class="w-3 h-3 opacity-60 group-hover/score:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </button>
                 {% if is_admin %}
                 <button type="button"
                     onclick="toggleServerPersist('{{ job_id }}', {{ 'false' if is_persistent else 'true' }})"
                     id="btnPersistToggle"
                     class="px-3 py-1 rounded-xl {% if is_persistent %}bg-amber-500/20 text-amber-300 border-amber-500/40{% else %}bg-white/5 text-gray-300 border-white/10 hover:bg-white/10{% endif %} border text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer">
-                    <span>{{ '★ Marked Persistent' if is_persistent else '☆ Mark Persistent' }}</span>
+                    <span>{{ 'Marked Persistent' if is_persistent else 'Mark Persistent' }}</span>
                 </button>
                 {% endif %}
                 <button type="button" onclick="copyText('{{ job_id }}', this)"
@@ -388,6 +397,7 @@
             {% endfor %}
         </div>
     </div>
+    {% include "_score_inspect_modal.html" %}
 </main>
 {% endblock %}
 

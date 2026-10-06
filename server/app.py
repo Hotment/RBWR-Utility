@@ -91,10 +91,8 @@ except Exception:
     )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FILES_DIR = os.path.join(BASE_DIR, "files")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ARCHIVES_DIR = os.path.join(DATA_DIR, "archives")
-VERSIONS_FILE = os.path.join(BASE_DIR, "versions.json")
 SUGGESTIONS_FILE = os.path.join(BASE_DIR, "suggestions.json")
 CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
 BANNED_FILE = os.path.join(BASE_DIR, "banned_ips.json")
@@ -103,7 +101,6 @@ ADMINS_FILE = os.path.join(BASE_DIR, "admins.json")
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
-os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(ARCHIVES_DIR, exist_ok=True)
 load_dotenv(ENV_FILE)
@@ -727,25 +724,84 @@ def admin_required(f):
         return f(username, *args, **kwargs)
     return decorated
 
-def load_versions():
-    if not os.path.exists(VERSIONS_FILE):
-        default_data = {
-            "latest": "1.4.1",
-            "versions": {
-                "1.4.1": {
-                    "version": "1.4.1",
-                    "filename": "rbwr_overlay_v1.4.1.exe",
-                    "release_date": "2026-06-04",
-                    "notes": "Dynamic facility usage integration and UI enhancements."
+_github_version_cache = {
+    "data": None,
+    "timestamp": 0.0
+}
+_github_version_lock = threading.Lock()
+GITHUB_RELEASE_CACHE_TTL = 300  # 5 minutes cache to respect GitHub API rate limits
+
+def get_github_latest_release(force_refresh: bool = False) -> dict:
+    """
+    Fetches the latest release from the GitHub repository API with in-memory caching.
+    """
+    now = time.time()
+    with _github_version_lock:
+        if not force_refresh and _github_version_cache["data"] and (now - _github_version_cache["timestamp"] < GITHUB_RELEASE_CACHE_TTL):
+            return _github_version_cache["data"]
+
+    headers = {"User-Agent": "RBWR-Utility-Server/2.0"}
+    try:
+        r = requests.get(
+            "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest",
+            headers=headers,
+            timeout=5
+        )
+        if r.status_code == 200:
+            rel = r.json()
+            tag_name = rel.get("tag_name", "")
+            version = tag_name.lstrip("vV") if tag_name else "unknown"
+            published_at = rel.get("published_at", "")
+            release_date = published_at.split("T")[0] if published_at else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            body_content = rel.get("body", "") or "No release notes available."
+            body_content = body_content.replace("\r\n", "\n")
+            html_url = rel.get("html_url", "https://github.com/Hotment/RBWR-Utility/releases/latest")
+
+            assets = []
+            download_url = html_url
+            for a in rel.get("assets", []):
+                asset_info = {
+                    "name": a.get("name"),
+                    "size": a.get("size"),
+                    "download_url": a.get("browser_download_url")
                 }
+                assets.append(asset_info)
+                if a.get("name", "").endswith((".exe", ".zip")) and download_url == html_url:
+                    download_url = a.get("browser_download_url")
+
+            result = {
+                "version": version,
+                "tag_name": tag_name,
+                "name": rel.get("name", f"Release {version}"),
+                "release_date": release_date,
+                "published_at": published_at,
+                "notes": body_content,
+                "html_url": html_url,
+                "download_url": download_url,
+                "assets": assets
             }
-        }
-        with open(VERSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_data, f, indent=4)
-        return default_data
-    
-    with open(VERSIONS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+            with _github_version_lock:
+                _github_version_cache["data"] = result
+                _github_version_cache["timestamp"] = now
+            return result
+    except Exception as e:
+        logger.warning(f"Error fetching latest release from GitHub: {e}")
+
+    with _github_version_lock:
+        if _github_version_cache["data"]:
+            return _github_version_cache["data"]
+
+    return {
+        "version": "2.0.5",
+        "tag_name": "v2.0.5",
+        "name": "Version 2.0.5",
+        "release_date": "2026-09-23",
+        "published_at": "2026-09-23T23:15:33Z",
+        "notes": "No release notes available.",
+        "html_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
+        "download_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
+        "assets": []
+    }
 
 def load_suggestions():
     if not os.path.exists(SUGGESTIONS_FILE):
@@ -983,38 +1039,12 @@ class ServerPersistPayload(BaseModel):
 
 @app.route("/", methods=["GET"])
 def root():
-    data = load_versions()
-    latest_ver = data.get("latest", "1.5.5")
-    latest_meta = data.get("versions", {}).get(latest_ver, {})
-    release_date = latest_meta.get("release_date", "2026-06-12")
-    release_notes = latest_meta.get("notes", "No release notes available.")
-    
-    headers = {"User-Agent": "RBWR-Overlay-Server"}
-    try:
-        r = requests.get(
-            "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest",
-            headers=headers,
-            timeout=3
-        )
-        if r.status_code == 200:
-            release_data = r.json()
-            tag_name = release_data.get("tag_name", "")
-            if tag_name:
-                latest_ver = tag_name.lstrip('v')
-                published_at = release_data.get("published_at", "")
-                if published_at:
-                    release_date = published_at.split('T')[0]
-            body_content = release_data.get("body", "No release notes available.")
-            if body_content:
-                release_notes = body_content.replace("\\r\\n", "\n").replace("\r\n", "\n")
-    except Exception:
-        pass
-
+    release = get_github_latest_release()
     return render_template(
         "index.html",
-        latest_version=latest_ver,
-        release_date=release_date,
-        release_notes=release_notes
+        latest_version=release.get("version", "2.0.5"),
+        release_date=release.get("release_date", "2026-09-23"),
+        release_notes=release.get("notes", "No release notes available.")
     )
 
 @app.route("/favicon.ico")
@@ -1028,11 +1058,8 @@ def favicon():
 @app.route("/api/status", methods=["GET", "HEAD"])
 def status_check():
     uptime_sec = max(0.0, round(time.time() - SERVER_START_TIME, 2))
-    try:
-        ver_data = load_versions()
-        version = ver_data.get("latest", "unknown")
-    except Exception:
-        version = "unknown"
+    release = get_github_latest_release()
+    version = release.get("version", "unknown")
 
     payload = {
         "status": "ok",
@@ -1285,6 +1312,41 @@ def invalidate_historical_cards_cache():
         _sc_active_cards_base = None
         _sc_active_cards_key = None
 
+def ensure_unit_output_mw(unit_dict):
+    """
+    Ensures 'Output (MW)' is automatically populated on a unit dictionary
+    """
+    if not isinstance(unit_dict, dict):
+        return unit_dict
+    if unit_dict.get("Output (MW)") is None:
+        val = unit_dict.get("PradDoSieci")
+        if val is None:
+            val = unit_dict.get("Output") or unit_dict.get("Power") or unit_dict.get("megawatts")
+        if val is not None:
+            try:
+                prec = SERVER_CHECKER_FIELD_PRECISION.get("Output (MW)", 0)
+                unit_dict["Output (MW)"] = round(float(val), prec) if prec is not None else float(val)
+            except (ValueError, TypeError):
+                unit_dict["Output (MW)"] = val
+    return unit_dict
+
+def normalize_snapshots_power(data):
+    """
+    Walks a servers dictionary {job_id: {timestamp: state}} and ensures
+    both Unit 1 and Unit 2 have 'Output (MW)' populated.
+    """
+    if not isinstance(data, dict):
+        return data
+    for job_id, snaps in data.items():
+        if isinstance(snaps, dict):
+            for ts, state in snaps.items():
+                if isinstance(state, dict):
+                    if isinstance(state.get("Unit2"), dict):
+                        ensure_unit_output_mw(state["Unit2"])
+                    if isinstance(state.get("Unit1"), dict):
+                        ensure_unit_output_mw(state["Unit1"])
+    return data
+
 def get_sc_data(filename: str, max_retries: int = 8):
     filepath = os.path.join(DATA_DIR, filename)
     if not os.path.exists(filepath):
@@ -1331,6 +1393,9 @@ def get_sc_data(filename: str, max_retries: int = 8):
             data = _json_loads(raw_bytes)
             if not isinstance(data, dict):
                 data = {}
+            else:
+                if filename.startswith("servers") or filename.startswith("archives"):
+                    normalize_snapshots_power(data)
 
             try:
                 mtime_after = os.path.getmtime(filepath)
@@ -1355,6 +1420,8 @@ def get_sc_data(filename: str, max_retries: int = 8):
     return {}
 
 def save_sc_data(data, filename: str, max_retries: int = 10):
+    if isinstance(data, dict) and (filename.startswith("servers") or filename.startswith("archives")):
+        normalize_snapshots_power(data)
     filepath = os.path.join(DATA_DIR, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     unique_id = f"{os.getpid()}_{threading.get_ident()}_{time.time_ns()}"
@@ -2036,6 +2103,13 @@ def pull_server_checker_data():
 
         _sc_latest_data.clear()
         _sc_latest_data.update(resp_json)
+        for s in _sc_latest_data.get('data', {}).get('servers', []):
+            st = s.get('state')
+            if isinstance(st, dict):
+                if isinstance(st.get('Unit2'), dict):
+                    ensure_unit_output_mw(st['Unit2'])
+                if isinstance(st.get('Unit1'), dict):
+                    ensure_unit_output_mw(st['Unit1'])
 
         persistent_data = load_persistent_servers()
         persistent_ids = set(persistent_data.get("persistent", {}).keys())
@@ -2110,6 +2184,7 @@ def pull_server_checker_data():
                             unit_dict[k] = round(v, prec) if prec is not None else v
                         else:
                             unit_dict[k] = v
+                    ensure_unit_output_mw(unit_dict)
                     state[unit] = unit_dict
                 else:
                     state[unit] = {}
@@ -2353,6 +2428,25 @@ def get_sc_latest_pps_map() -> dict[str, float]:
             pass
     return pps_map
 
+def get_unit_output_mw(unit_dict):
+    """
+    Extracts electrical power generation (MW) from a unit state dictionary.
+    Handles Roblox RBWR field aliases:
+    - Unit 1 uses 'Output (MW)'
+    - Unit 2 uses 'PradDoSieci' (grid electrical power in MW)
+    - Fallbacks: 'Output', 'Power', 'megawatts', 'output_mw'
+    """
+    if not isinstance(unit_dict, dict):
+        return 0.0
+    for k in ("Output (MW)", "PradDoSieci", "Output", "Power", "megawatts", "output_mw"):
+        v = unit_dict.get(k)
+        if v is not None:
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                continue
+    return 0.0
+
 def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, latest_state=None, pps_map=None):
     """
     Calculates whether Unit 1 / Unit 2 are running (APRM > 5%)
@@ -2426,6 +2520,9 @@ def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, late
         except (ValueError, TypeError):
             u2_rate = 0.0
 
+    if resolved_total_pps is None and (u1_rate > 0 or u2_rate > 0):
+        resolved_total_pps = u1_rate + u2_rate
+
     if resolved_total_pps is not None:
         total_rate = max(0.0, resolved_total_pps)
         demand_rate = max(0.0, total_rate - (u1_rate + u2_rate))
@@ -2447,6 +2544,12 @@ def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, late
         "points_rate": points_rate,
         "points_rate_str": points_rate_str,
     }
+
+try:
+    from server.scoring import calculate_server_top_score, extract_snap_pps
+except ImportError:
+    from scoring import calculate_server_top_score, extract_snap_pps
+
 
 def get_active_cards_base(servers_data, persistent_ids):
     global _sc_active_cards_base, _sc_active_cards_key
@@ -2489,6 +2592,7 @@ def get_active_cards_base(servers_data, persistent_ids):
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
+        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
 
         cards.append({
             "job_id": job_id,
@@ -2508,19 +2612,24 @@ def get_active_cards_base(servers_data, persistent_ids):
             "snapshot_count": len(snapshots),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
+            "top_score": top_score,
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
+                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
+                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
             },
@@ -2594,6 +2703,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
+        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
 
         cards.append({
             "job_id": job_id,
@@ -2613,19 +2723,24 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
             "snapshot_count": len(valid_ts_keys),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
+            "top_score": top_score,
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
+                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
+                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
             },
@@ -2756,6 +2871,7 @@ def compress_paired_points(u1_points, u2_points, precision=2, max_points=MAX_CHA
 def build_chart_payload(job_id, snapshots):
     metrics = {
         "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2),
+        "Output (MW)": ("3", "Electrical Output (MW)", ["Output (MW)", "PradDoSieci", "Output", "Power"], 2),
         "APRM": ("3", "APRM (%)", ["APRM"], 4),
         "RTP": ("2", "RTP (%)", ["RTP"], 4),
         "Xenon": ("3", "Xenon (%)", ["Xenon"], 6, 100.0),
@@ -3100,6 +3216,7 @@ def server_detail_page(job_id):
     first_ts = min(snapshots.keys()) if snapshots else None
     uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
     uptime_str = format_uptime_duration(uptime_sec)
+    server_top_score = calculate_server_top_score(snapshots)
 
     if not server:
         latest_ts = max(snapshots.keys()) if snapshots else None
@@ -3122,6 +3239,7 @@ def server_detail_page(job_id):
             "first_timestamp": first_ts,
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
+            "top_score": server_top_score,
             "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
             "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
@@ -3135,6 +3253,8 @@ def server_detail_page(job_id):
             "u2_running": pts_info["u2_running"],
             "u1_aprm": pts_info["u1_aprm"],
             "u2_aprm": pts_info["u2_aprm"],
+            "u1_output_mw": round(get_unit_output_mw(unit1_st), 1),
+            "u2_output_mw": round(get_unit_output_mw(unit2_st), 1),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
             "u1_rate": pts_info["u1_rate"],
@@ -3175,6 +3295,7 @@ def server_detail_page(job_id):
         "first_timestamp": first_ts,
         "uptime_seconds": uptime_sec,
         "uptime_str": uptime_str,
+        "top_score": server_top_score,
         "scram_reason_u1": scram_reasonU1 or "N/A",
         "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
@@ -3188,6 +3309,8 @@ def server_detail_page(job_id):
         "u2_running": pts_info["u2_running"],
         "u1_aprm": pts_info["u1_aprm"],
         "u2_aprm": pts_info["u2_aprm"],
+        "u1_output_mw": round(get_unit_output_mw(unit1_state), 1),
+        "u2_output_mw": round(get_unit_output_mw(unit2_state), 1),
         "points_rate": pts_info["points_rate"],
         "points_rate_str": pts_info["points_rate_str"],
         "u1_rate": pts_info["u1_rate"],
@@ -3196,6 +3319,26 @@ def server_detail_page(job_id):
     }
 
     return render_template("server_detail.html", **payload, **summary)
+
+@app.route("/api/servers/active", methods=["GET"])
+def get_active_servers_api():
+    query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip()
+    servers_data = get_sc_data("servers.json") or {}
+    global_data = get_sc_data("global.json") or {}
+    global_payload = build_global_chart_payload(global_data)
+    server_cards = build_server_cards(servers_data, search_query=query)
+
+    cards_html = "".join(
+        render_template("_server_card.html", server=c)
+        for c in server_cards
+    )
+
+    return jsonify({
+        "success": True,
+        "total": len(server_cards),
+        "cards_html": cards_html,
+        "charts": global_payload.get("charts", [])
+    })
 
 @app.route("/api/servers/latest", methods=["GET"])
 def get_latest_servers_api():
@@ -3234,6 +3377,53 @@ def lookup_server_api():
         "found": True,
         "server": target_card,
         "card_html": card_html
+    })
+
+@app.route("/api/servers/<job_id>/score_breakdown", methods=["GET"])
+def server_score_breakdown_api(job_id):
+    query = (job_id or "").strip()
+    if not query:
+        return jsonify({"success": False, "error": "Job ID is required"}), 400
+
+    servers_data = get_sc_data("servers.json") or {}
+    snapshots = servers_data.get(query)
+    matched_job_id = query
+
+    if not snapshots:
+        for jid, snaps in servers_data.items():
+            if is_exact_job_or_server_id_match(query, jid):
+                matched_job_id = jid
+                snapshots = snaps
+                break
+
+    if not snapshots and _sc_latest_data:
+        for s in _sc_latest_data.get('data', {}).get('servers', []):
+            s_jid = s.get('jobId', '')
+            if is_exact_job_or_server_id_match(query, s_jid):
+                matched_job_id = s_jid
+                snapshots = {s.get('lastHeartbeat', datetime.now(timezone.utc).isoformat()): s.get('state', {})}
+                break
+
+    if not snapshots:
+        archived_jid, archived_snaps = get_archived_server_snapshots(query)
+        if archived_jid and archived_snaps:
+            matched_job_id = archived_jid
+            snapshots = archived_snaps
+
+    if not snapshots:
+        return jsonify({"success": False, "error": f"Server '{query}' not found"}), 404
+
+    now_utc = datetime.now(timezone.utc)
+    score, breakdown = calculate_server_top_score(snapshots, now_utc=now_utc, return_breakdown=True)
+    breakdown["job_id"] = matched_job_id
+    j_parts = [p for p in matched_job_id.split("-") if p]
+    breakdown["short_id"] = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
+
+    return jsonify({
+        "success": True,
+        "job_id": matched_job_id,
+        "score": score,
+        "breakdown": breakdown
     })
 
 def get_historical_cards_base(servers_data, persistent_ids):
@@ -3278,6 +3468,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
+        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
 
         base_cards.append({
             "job_id": job_id,
@@ -3297,19 +3488,24 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "snapshot_count": len(snapshots),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
+            "top_score": top_score,
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
+                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
                 "demand_time_left": unit1.get("Demand Time Left", 0),
                 "aprm": unit1.get("APRM", 0),
                 "reactor_temp": unit1.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
+                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
                 "demand_time_left": unit2.get("Demand Time Left", 0),
                 "aprm": unit2.get("APRM", 0),
                 "reactor_temp": unit2.get("Reactor Temp", 0),
+                "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
             },
@@ -3369,7 +3565,7 @@ def get_historical_servers_api():
     else:
         historical_cards = list(base_cards)
 
-    sort_option = request.args.get("sort", "newest").strip().lower()
+    sort_option = request.args.get("sort", "top_servers").strip().lower()
     if sort_option == "players_desc":
         historical_cards.sort(key=lambda c: (c.get("player_count") or 0, c.get("snapshot_count", 0)), reverse=True)
     elif sort_option == "players_asc":
@@ -3378,14 +3574,20 @@ def get_historical_servers_api():
         historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0), reverse=True)
     elif sort_option == "snapshots_asc":
         historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0))
+    elif sort_option == "points_desc":
+        historical_cards.sort(key=lambda c: (c.get("points_rate") or 0.0, c.get("uptime_seconds", 0)), reverse=True)
+    elif sort_option == "running_first":
+        historical_cards.sort(key=lambda c: (1 if (c.get("u1_running") or c.get("u2_running")) else 0, c.get("points_rate") or 0.0), reverse=True)
     elif sort_option == "oldest":
         historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), c.get("player_count") or 0), reverse=True)
+    elif sort_option == "newest":
+        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), -(c.get("player_count") or 0)))
     elif sort_option == "public_first":
         historical_cards.sort(key=lambda c: (1 if c.get("is_private") else 0, -c.get("uptime_seconds", 0)))
     elif sort_option == "private_first":
         historical_cards.sort(key=lambda c: (0 if c.get("is_private") else 1, -c.get("uptime_seconds", 0)))
-    else:  # newest
-        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), -(c.get("player_count") or 0)))
+    else:  # top_servers (default)
+        historical_cards.sort(key=lambda c: (c.get("top_score") or 0.0, c.get("points_rate") or 0.0, c.get("uptime_seconds", 0)), reverse=True)
 
     total = len(historical_cards)
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
@@ -3582,6 +3784,12 @@ def get_public_servers_payload(public_only=False):
                 p_count = get_server_player_count(jid, is_private=False)
                 if p_count is not None:
                     s_copy["playerCount"] = p_count
+            st = s_copy.get("state")
+            if isinstance(st, dict):
+                if isinstance(st.get("Unit2"), dict):
+                    ensure_unit_output_mw(st["Unit2"])
+                if isinstance(st.get("Unit1"), dict):
+                    ensure_unit_output_mw(st["Unit1"])
             if public_only and is_priv:
                 continue
             enriched.append(s_copy)
@@ -3651,53 +3859,13 @@ def proxy_public_servers():
             return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
     return jsonify({"success": False, "error": "Unable to reach game API"}), 500
 
+@app.route("/version", methods=["GET"])
 @app.route("/version/latest", methods=["GET"])
+@app.route("/api/version", methods=["GET"])
+@app.route("/api/version/latest", methods=["GET"])
 def get_latest_version():
-    data = load_versions()
-    latest_ver = data.get("latest")
-    latest_meta = data.get("versions", {}).get(latest_ver)
-    if not latest_meta:
-        return jsonify({"detail": "Latest version metadata not found"}), 404
-    return jsonify(latest_meta)
-
-@app.route("/versions", methods=["GET"])
-def get_all_versions():
-    data = load_versions()
-    return jsonify(data.get("versions", {}))
-
-@app.route("/download/latest", methods=["GET"])
-def download_latest_file():
-    data = load_versions()
-    latest_ver = data.get("latest")
-    latest_meta = data.get("versions", {}).get(latest_ver)
-    if not latest_meta:
-        return jsonify({"detail": "Latest version metadata not found"}), 404
-    
-    filename = latest_meta.get("filename")
-    filepath = os.path.join(FILES_DIR, filename)
-    
-    if not os.path.exists(filepath):
-        parent_filepath = os.path.join(os.path.dirname(BASE_DIR), filename)
-        if os.path.exists(parent_filepath):
-            return send_from_directory(os.path.dirname(BASE_DIR), filename, as_attachment=True)
-        return jsonify({"detail": f"Latest release file '{filename}' is missing on the server."}), 404
-        
-    return send_from_directory(FILES_DIR, filename, as_attachment=True)
-
-@app.route("/download/<version>", methods=["GET"])
-def download_version_file(version):
-    data = load_versions()
-    version_meta = data.get("versions", {}).get(version)
-    if not version_meta:
-        return jsonify({"detail": f"Version '{version}' not found in the catalog."}), 404
-    
-    filename = version_meta.get("filename")
-    filepath = os.path.join(FILES_DIR, filename)
-    
-    if not os.path.exists(filepath):
-        return jsonify({"detail": f"File for version '{version}' is missing on the server."}), 404
-        
-    return send_from_directory(FILES_DIR, filename, as_attachment=True)
+    release = get_github_latest_release()
+    return jsonify(release)
 
 @app.route("/tickets", methods=["GET", "POST"])
 def tickets_route():

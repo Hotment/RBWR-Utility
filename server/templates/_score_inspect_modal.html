@@ -1,0 +1,815 @@
+<div id="scoreInspectModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="scoreModalTitle">
+    <div class="relative w-full max-w-5xl bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-gray-200">
+        <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between gap-4 bg-white/[0.02]">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 font-mono font-bold text-sm">
+                    SC
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h2 id="scoreModalTitle" class="text-base font-display font-semibold text-white tracking-wide">
+                            Score Calculation Breakdown
+                        </h2>
+                        <span id="scoreModalShortId" class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[11px] font-mono"></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-mono text-gray-400 truncate mt-0.5">
+                        <span class="text-gray-500">Job ID:</span>
+                        <span id="scoreModalJobId" class="text-gray-200 select-all font-semibold"></span>
+                        <button type="button" onclick="copyScoreJobId(this)"
+                            class="p-0.5 text-gray-400 hover:text-amber-300 transition-colors rounded cursor-pointer"
+                            title="Copy Job ID">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="copyScoreDebugJson()" id="copyScoreDebugBtn"
+                    class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-gray-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Copy full debug breakdown JSON to clipboard">
+                    <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>Copy JSON</span>
+                </button>
+                <button type="button" onclick="downloadScoreDebugJson()" id="exportScoreDebugBtn"
+                    class="hidden px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-gray-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Download debug breakdown JSON">
+                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    <span>Export</span>
+                </button>
+                <button type="button" onclick="closeScoreInspectModal()"
+                    class="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Close Modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="scoreModalBody" class="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+            <div id="scoreModalLoading" class="py-16 text-center flex flex-col items-center justify-center gap-3">
+                <div class="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                <span class="font-mono text-gray-400">Loading scoring calculation breakdown...</span>
+            </div>
+
+            <div id="scoreModalError" class="hidden py-12 text-center flex flex-col items-center justify-center gap-2">
+                <span class="text-rose-400 font-mono font-semibold" id="scoreModalErrorMessage">Failed to load score breakdown</span>
+                <span class="text-gray-500 font-mono text-[11px]">Server history or snapshots may be unavailable</span>
+            </div>
+
+            <div id="scoreModalContent" class="hidden space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col justify-between gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-400 font-medium text-[11px] uppercase tracking-wider">Top Score</span>
+                            <span id="scoreModalRatingPill" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border"></span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span id="scoreModalFinalScore" class="text-3xl font-mono font-bold text-white">--</span>
+                            <span class="text-gray-500 font-mono">/ 100</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-gray-400 border-t border-white/5 pt-2">
+                            <span>Raw: <span id="scoreModalRawScore" class="text-gray-200">--</span></span>
+                            <span>PPS Wt: <span id="scoreModalPpsWeight" class="text-cyan-300 font-semibold">100.0%</span></span>
+                            <span id="scoreModalGenBonus" class="hidden"></span>
+                            <span>Pen: <span id="scoreModalPenalties" class="text-rose-400">--</span></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col justify-between gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-400 font-medium text-[11px] uppercase tracking-wider">Evaluation Window</span>
+                            <span class="text-[10px] font-mono text-amber-300 font-semibold">Half-life: 10m</span>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-mono font-bold text-cyan-300" id="scoreModalWindowDuration">-- min</div>
+                            <span class="text-[11px] font-mono text-gray-400">1.50x curr &bull; 1.25x prev priority</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-gray-400 border-t border-white/5 pt-2">
+                            <span>Evaluated: <span id="scoreModalEvalCount" class="text-gray-200 font-semibold">--</span></span>
+                            <span>Total Stored: <span id="scoreModalTotalCount" class="text-gray-400">--</span></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col justify-between gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-400 font-medium text-[11px] uppercase tracking-wider">Unit Synergy</span>
+                            <span id="scoreModalSynergyMultiplier" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300"></span>
+                        </div>
+                        <div>
+                            <div class="text-xl font-mono font-bold text-emerald-300" id="scoreModalDualRunningCount">-- dual active</div>
+                            <span class="text-[11px] font-mono text-gray-400">+25% bonus when both units run</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-gray-400 border-t border-white/5 pt-2">
+                            <span>Single: <span id="scoreModalSingleRunningCount" class="text-gray-200">--</span></span>
+                            <span>Inactive: <span id="scoreModalInactiveCount" class="text-gray-400">--</span></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col justify-between gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-400 font-medium text-[11px] uppercase tracking-wider">Events &amp; Graces</span>
+                            <span class="text-[10px] font-mono text-gray-400">Tolerance</span>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-[11px] font-mono">
+                                <span class="text-gray-400">Demand Graces (60s):</span>
+                                <span id="scoreModalGraceCount" class="text-amber-300 font-bold">--</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] font-mono">
+                                <span class="text-gray-400">LOOP Outages Excused:</span>
+                                <span id="scoreModalLoopCount" class="text-purple-300 font-bold">--</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-gray-400 border-t border-white/5 pt-2">
+                            <span>SCRAMs: <span id="scoreModalScramCount" class="text-rose-400 font-semibold">--</span></span>
+                            <span>Trips: <span id="scoreModalTripCount" class="text-rose-400 font-semibold">--</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white/5 border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-300 font-bold text-xs">
+                            PPS
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-white font-semibold text-xs">Point Generation Sustainability</span>
+                                <span id="scoreModalPpsActiveBadge" class="px-1.5 py-0.2 rounded text-[10px] font-bold border"></span>
+                            </div>
+                            <div class="text-[11px] text-gray-400 mt-0.5">
+                                Current Snapshot: <span id="scoreModalCurrPps" class="text-gray-200 font-semibold">--/s</span> (1.50x wt) &bull;
+                                Previous: <span id="scoreModalPrevPps" class="text-gray-200 font-semibold">--/s</span> (1.25x wt) &bull;
+                                Weighted Avg: <span id="scoreModalAvgRecentPps" class="text-cyan-300 font-semibold">--/s</span> &bull;
+                                <span class="text-gray-500">Max Target: 2.9/s (U1: 1.2, U2: 1.7)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                        <div class="text-right">
+                            <div class="text-gray-400 text-[10px]">Points Efficiency Weight</div>
+                            <div id="scoreModalRecentPpsBonus" class="text-cyan-300 font-bold text-sm">--</div>
+                            <div id="scoreModalPointsLossText" class="text-[10px] text-rose-400 font-semibold"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between border-b border-white/5 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                                <span class="font-display font-semibold text-white text-sm">Unit 1 Performance</span>
+                            </div>
+                            <span id="scoreModalU1AvgScore" class="font-mono font-bold text-cyan-300 text-sm">-- pts avg</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Generation Active</div>
+                                <div id="scoreModalU1Active" class="font-mono font-bold text-white text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg MW Output</div>
+                                <div id="scoreModalU1Mw" class="font-mono font-bold text-cyan-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Demand Downtime</div>
+                                <div id="scoreModalU1Downtime" class="font-mono font-bold text-rose-400 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">60s Grace Periods</div>
+                                <div id="scoreModalU1Grace" class="font-mono font-bold text-amber-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">LOOP Outages Excused</div>
+                                <div id="scoreModalU1Loop" class="font-mono font-bold text-purple-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg Turbine Health</div>
+                                <div id="scoreModalU1Turbine" class="font-mono font-bold text-gray-200 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg Points/Sec</div>
+                                <div id="scoreModalU1Pps" class="font-mono font-bold text-gray-200 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Demand Band (&plusmn;40)</div>
+                                <div id="scoreModalU1DemandBand" class="font-mono font-bold text-emerald-400 text-xs mt-0.5">--</div>
+                            </div>
+                        </div>
+                        <div id="scoreModalU1Incidents" class="text-[11px] font-mono text-gray-400 hidden pt-1">
+                            <span class="text-rose-400 font-semibold">Incident notes:</span>
+                            <span id="scoreModalU1IncidentText" class="text-gray-300"></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between border-b border-white/5 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                                <span class="font-display font-semibold text-white text-sm">Unit 2 Performance</span>
+                            </div>
+                            <span id="scoreModalU2AvgScore" class="font-mono font-bold text-emerald-300 text-sm">-- pts avg</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Generation Active</div>
+                                <div id="scoreModalU2Active" class="font-mono font-bold text-white text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg MW Output</div>
+                                <div id="scoreModalU2Mw" class="font-mono font-bold text-amber-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Demand Downtime</div>
+                                <div id="scoreModalU2Downtime" class="font-mono font-bold text-rose-400 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">60s Grace Periods</div>
+                                <div id="scoreModalU2Grace" class="font-mono font-bold text-amber-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">LOOP Outages Excused</div>
+                                <div id="scoreModalU2Loop" class="font-mono font-bold text-purple-300 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg Turbine Health</div>
+                                <div id="scoreModalU2Turbine" class="font-mono font-bold text-gray-200 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Avg Points/Sec</div>
+                                <div id="scoreModalU2Pps" class="font-mono font-bold text-gray-200 text-xs mt-0.5">--</div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-2.5 border border-white/5">
+                                <div class="text-gray-400 text-[10px]">Demand Band (&plusmn;40)</div>
+                                <div id="scoreModalU2DemandBand" class="font-mono font-bold text-emerald-400 text-xs mt-0.5">--</div>
+                            </div>
+                        </div>
+                        <div id="scoreModalU2RefuelInfo" class="text-[11px] font-mono text-gray-400 hidden pt-1">
+                            <span class="text-sky-300 font-semibold">Refueling Outage:</span>
+                            <span id="scoreModalU2RefuelText" class="text-gray-300"></span>
+                        </div>
+                        <div id="scoreModalU2Incidents" class="text-[11px] font-mono text-gray-400 hidden pt-1">
+                            <span class="text-rose-400 font-semibold">Incident notes:</span>
+                            <span id="scoreModalU2IncidentText" class="text-gray-300"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="scoreModalDebugRulesPanel" class="hidden bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-[11px] font-mono text-gray-300 space-y-2">
+                    <div class="flex items-center justify-between text-amber-400 font-semibold text-xs uppercase tracking-wider">
+                        <span>Algorithm Reference &amp; Debug Rules</span>
+                        <span class="text-[10px] text-yellow-500/70 font-normal lowercase font-mono">In-Code Toggle: DEBUG_MODE</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-gray-400">
+                        <div>&bull; <strong class="text-gray-200">60s Grace Period:</strong> First 60s after demand change awards 75 pts to allow rod/flow adjustments.</div>
+                        <div>&bull; <strong class="text-gray-200">Demand Downtime:</strong> Active demand with APRM &lt; 5% or Out &lt;= 0 MW drops score to 5.0 pts.</div>
+                        <div>&bull; <strong class="text-gray-200">&plusmn;40 MW Demand Deadband:</strong> Output within &plusmn;40 MW of demand awards 100% target fulfillment; only extreme deviations past &plusmn;40 MW reduce score.</div>
+                        <div>&bull; <strong class="text-gray-200">LOOP Outage (Partial Deduction):</strong> Loss of Offsite Power (Offsite False or Demand -2) awards 50 pts; deducts some points, but not as heavily as unexcused active demand downtime.</div>
+                        <div>&bull; <strong class="text-gray-200">Refueling Outage Prediction:</strong> Unit 2 refuels (clean shutdown during event with no preceding demand downtime, depressurized, rods inserted) are evaluated by duration up to 5 hours. The fastest 50m refuel maintains high efficiency (70.0 pts, ~1,000 pts pred loss vs running). Extended refuels decay to 20.0 pts at 5h (~30,000 pts pred loss). Outages with preceding demand downtime or exceeding 5h decay to 5.0 pts (unexcused downtime).</div>
+                        <div>&bull; <strong class="text-gray-200">Multi-Unit Synergy:</strong> 1.25x (+25%) when both units run, 1.0x for one, 0.7x when both idle.</div>
+                        <div>&bull; <strong class="text-gray-200">Point Generation Weight &amp; Recency:</strong> Point generation acts as an overall sustainability weight. Maximum plant point generation is 2.9 pts/s (1.2 pts/s Unit 1 + 1.7 pts/s Unit 2 with demand bonus). Evaluated snapshots are recency-weighted with a 10-minute half-life (600s), with the current snapshot boosted by 1.50x and previous snapshot by 1.25x. If a server does not sustain the maximum 2.9 pts/s across its history, its score is directly scaled down by its point efficiency factor (efficiency = min(1.0, pps / 2.9)), causing it to lose score.</div>
+                        <div>&bull; <strong class="text-gray-200">SCRAM/Trip Deductions:</strong> -60% snapshot multiplier and -5 pts deduction per incident.</div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-display font-semibold text-white text-sm">Evaluated Snapshots Log</span>
+                            <span id="scoreModalSnapCountBadge" class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-400 text-[10px] font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
+                            <button type="button" onclick="filterScoreSnapshots('all', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/10 text-white font-semibold transition-colors cursor-pointer">
+                                All
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('refuel', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                Refueling
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('downtime', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                Demand Downtime
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('extreme', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                Extreme (&gt;&plusmn;40 MW)
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('grace', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                60s Grace Period
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('loop', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                LOOP Excused
+                            </button>
+                            <button type="button" onclick="filterScoreSnapshots('incident', this)"
+                                class="score-snap-filter-btn px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                                SCRAM / Trip
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border border-white/10 rounded-xl bg-black/40 max-h-[420px] overflow-x-auto overflow-y-auto">
+                        <table class="w-full min-w-[940px] text-left border-collapse text-[11px] font-mono">
+                            <thead class="sticky top-0 z-20">
+                                <tr class="bg-[#131922]">
+                                    <th class="py-2.5 px-3 bg-[#131922] sticky top-0 z-20 w-[115px] min-w-[115px] whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">Time / Age</th>
+                                    <th class="py-2.5 px-2 bg-[#131922] sticky top-0 z-20 w-[65px] min-w-[65px] text-center whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">Weight</th>
+                                    <th class="py-2.5 px-3 bg-[#131922] sticky top-0 z-20 min-w-[240px] text-gray-400 border-b border-white/10 shadow-sm font-semibold">Unit 1 Status</th>
+                                    <th class="py-2.5 px-2 bg-[#131922] sticky top-0 z-20 w-[80px] min-w-[80px] text-right whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">U1 Score</th>
+                                    <th class="py-2.5 px-3 bg-[#131922] sticky top-0 z-20 min-w-[240px] text-gray-400 border-b border-white/10 shadow-sm font-semibold">Unit 2 Status</th>
+                                    <th class="py-2.5 px-2 bg-[#131922] sticky top-0 z-20 w-[80px] min-w-[80px] text-right whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">U2 Score</th>
+                                    <th class="py-2.5 px-2 bg-[#131922] sticky top-0 z-20 w-[75px] min-w-[75px] text-center whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">Synergy</th>
+                                    <th class="py-2.5 px-3 bg-[#131922] sticky top-0 z-20 w-[100px] min-w-[100px] text-right whitespace-nowrap text-gray-400 border-b border-white/10 shadow-sm font-semibold">Snap Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scoreModalSnapshotsTbody" class="divide-y divide-white/5 text-gray-300">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-3 border-t border-white/10 flex items-center justify-between gap-4 bg-white/[0.02] text-xs font-mono">
+            <span class="text-gray-500">Edit scoring weights in <span class="text-gray-400">server/scoring.py</span> &rarr; <span class="text-gray-300">calculate_server_top_score()</span></span>
+            <button type="button" onclick="closeScoreInspectModal()"
+                class="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer font-semibold">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DEBUG MODE CONFIGURATION ---
+    const DEBUG_MODE = false;
+
+    let currentScoreBreakdownData = null;
+    let activeScoreSnapFilter = 'all';
+
+    function initScoreModalDebugMode() {
+        const isDebug = Boolean(
+            (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) ||
+            (typeof window !== 'undefined' && window.DEBUG_MODE)
+        );
+        const panel = document.getElementById('scoreModalDebugRulesPanel');
+        if (panel) {
+            if (isDebug) {
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+        const exportBtn = document.getElementById('exportScoreDebugBtn');
+        if (exportBtn) {
+            if (isDebug) {
+                exportBtn.classList.remove('hidden');
+            } else {
+                exportBtn.classList.add('hidden');
+            }
+        }
+    }
+
+    function copyScoreJobId(btn) {
+        const jobId = document.getElementById('scoreModalJobId')?.textContent?.trim();
+        if (!jobId || !navigator.clipboard) return;
+        navigator.clipboard.writeText(jobId).then(() => {
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                setTimeout(() => { btn.innerHTML = orig; }, 1500);
+            }
+        });
+    }
+
+    function copyScoreDebugJson() {
+        if (!currentScoreBreakdownData) return;
+        const text = JSON.stringify(currentScoreBreakdownData, null, 2);
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.getElementById('copyScoreDebugBtn');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<span class="text-emerald-400 font-semibold">Copied!</span>`;
+                setTimeout(() => { btn.innerHTML = orig; }, 1800);
+            }
+        });
+    }
+
+    function downloadScoreDebugJson() {
+        if (!currentScoreBreakdownData) return;
+        const jobId = currentScoreBreakdownData.job_id || 'server';
+        const jsonStr = JSON.stringify(currentScoreBreakdownData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rbwr_score_breakdown_${jobId}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    window.closeScoreInspectModal = function() {
+        const modal = document.getElementById('scoreInspectModal');
+        if (modal) modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    };
+
+    window.openScoreInspectModal = async function(jobId, event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const modal = document.getElementById('scoreInspectModal');
+        if (!modal) return;
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        initScoreModalDebugMode();
+
+        const loading = document.getElementById('scoreModalLoading');
+        const errorEl = document.getElementById('scoreModalError');
+        const content = document.getElementById('scoreModalContent');
+
+        if (loading) loading.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (content) content.classList.add('hidden');
+
+        document.getElementById('scoreModalJobId').textContent = jobId;
+        const parts = jobId.split('-').filter(Boolean);
+        const shortId = (parts.length >= 3) ? `${parts[1]}-${parts[2]}` : '';
+        document.getElementById('scoreModalShortId').textContent = shortId || 'Server';
+
+        activeScoreSnapFilter = 'all';
+
+        try {
+            const resp = await fetch(`/api/servers/${encodeURIComponent(jobId)}/score_breakdown`);
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            if (!data.success || !data.breakdown) {
+                throw new Error(data.error || 'Server breakdown unavailable');
+            }
+
+            currentScoreBreakdownData = data.breakdown;
+            renderScoreBreakdownUI(data.breakdown);
+
+            if (loading) loading.classList.add('hidden');
+            if (content) content.classList.remove('hidden');
+        } catch (err) {
+            console.error('Error fetching score breakdown:', err);
+            if (loading) loading.classList.add('hidden');
+            if (errorEl) {
+                errorEl.classList.remove('hidden');
+                document.getElementById('scoreModalErrorMessage').textContent = err.message || 'Failed to load score breakdown';
+            }
+        }
+    };
+
+    function renderScoreBreakdownUI(bd) {
+        const score = bd.top_score || 0.0;
+        const finalScoreEl = document.getElementById('scoreModalFinalScore');
+        if (finalScoreEl) finalScoreEl.textContent = score.toFixed(1);
+
+        const ratingPill = document.getElementById('scoreModalRatingPill');
+        if (ratingPill) {
+            if (score >= 80) {
+                ratingPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-cyan-500/15 border-cyan-500/30 text-cyan-300';
+                ratingPill.textContent = 'Top Tier';
+            } else if (score >= 50) {
+                ratingPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-blue-500/15 border-blue-500/30 text-blue-300';
+                ratingPill.textContent = 'Competent';
+            } else {
+                ratingPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-white/5 border-white/10 text-gray-400';
+                ratingPill.textContent = 'Low / Needs Attention';
+            }
+        }
+
+        document.getElementById('scoreModalRawScore').textContent = (bd.raw_score !== undefined ? bd.raw_score.toFixed(1) : '--');
+        const deductions = bd.penalties?.total_penalty_deduction || 0.0;
+        document.getElementById('scoreModalPenalties').textContent = deductions > 0 ? `-${deductions.toFixed(1)} pts` : '0.0 pts';
+
+        const rpg = bd.point_generation || bd.recent_point_generation || {};
+        const currPps = (rpg.current_points_rate !== undefined && rpg.current_points_rate !== null) ? rpg.current_points_rate.toFixed(2) : '--';
+        const prevPps = (rpg.previous_points_rate !== undefined && rpg.previous_points_rate !== null) ? rpg.previous_points_rate.toFixed(2) : '--';
+        const avgPps = (rpg.weighted_avg_pps !== undefined && rpg.weighted_avg_pps !== null) ? rpg.weighted_avg_pps.toFixed(2) : ((rpg.avg_recent_points_rate !== undefined && rpg.avg_recent_points_rate !== null) ? rpg.avg_recent_points_rate.toFixed(2) : '--');
+        const ppsWeight = rpg.point_generation_weight !== undefined ? rpg.point_generation_weight : (rpg.weighted_pps_efficiency !== undefined ? rpg.weighted_pps_efficiency : 1.0);
+        const ppsPct = (ppsWeight * 100).toFixed(1);
+        const ptsLost = rpg.points_score_loss !== undefined ? rpg.points_score_loss : 0.0;
+
+        const currPpsEl = document.getElementById('scoreModalCurrPps');
+        if (currPpsEl) currPpsEl.textContent = `${currPps}/s`;
+        const prevPpsEl = document.getElementById('scoreModalPrevPps');
+        if (prevPpsEl) prevPpsEl.textContent = `${prevPps}/s`;
+        const avgPpsEl = document.getElementById('scoreModalAvgRecentPps');
+        if (avgPpsEl) avgPpsEl.textContent = `${avgPps}/s`;
+
+        const ppsWeightCardEl = document.getElementById('scoreModalPpsWeight');
+        if (ppsWeightCardEl) {
+            ppsWeightCardEl.textContent = `${ppsPct}%`;
+            ppsWeightCardEl.className = ppsWeight >= 0.999 ? 'text-emerald-400 font-semibold' : (ppsWeight >= 0.80 ? 'text-cyan-300 font-semibold' : 'text-amber-400 font-semibold');
+        }
+        const genBonusEl = document.getElementById('scoreModalGenBonus');
+        if (genBonusEl) genBonusEl.textContent = `${ppsPct}%`;
+
+        const bonusEl = document.getElementById('scoreModalRecentPpsBonus');
+        if (bonusEl) {
+            bonusEl.textContent = `${ppsPct}% (${ppsWeight.toFixed(2)}x)`;
+            bonusEl.className = ppsWeight >= 0.999 ? 'text-emerald-400 font-bold text-sm' : (ppsWeight >= 0.80 ? 'text-cyan-300 font-bold text-sm' : 'text-amber-400 font-bold text-sm');
+        }
+        const ptsLossEl = document.getElementById('scoreModalPointsLossText');
+        if (ptsLossEl) {
+            if (ptsLost > 0.05) {
+                ptsLossEl.textContent = `-${ptsLost.toFixed(1)} pts lost`;
+                ptsLossEl.className = 'text-[10px] text-rose-400 font-semibold';
+            } else {
+                ptsLossEl.textContent = 'Max points sustained (0 pts lost)';
+                ptsLossEl.className = 'text-[10px] text-emerald-400 font-semibold';
+            }
+        }
+
+        const ppsActiveBadge = document.getElementById('scoreModalPpsActiveBadge');
+        if (ppsActiveBadge) {
+            if (rpg.is_sustaining_max || ppsWeight >= 0.999) {
+                ppsActiveBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold border bg-emerald-500/15 border-emerald-500/30 text-emerald-300';
+                ppsActiveBadge.textContent = 'Max Points Sustained (2.9/s)';
+            } else if (ppsWeight > 0.0) {
+                ppsActiveBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold border bg-amber-500/15 border-amber-500/30 text-amber-300';
+                ppsActiveBadge.textContent = 'Below 2.9 Max (Score Penalized)';
+            } else {
+                ppsActiveBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold border bg-white/5 border-white/10 text-gray-400';
+                ppsActiveBadge.textContent = 'Zero Points Detected';
+            }
+        }
+
+        document.getElementById('scoreModalWindowDuration').textContent = `${bd.time_window_minutes || 0} min`;
+        document.getElementById('scoreModalEvalCount').textContent = `${bd.evaluated_snapshots_count || 0}`;
+        document.getElementById('scoreModalTotalCount').textContent = `${bd.total_snapshots_count || 0}`;
+
+        const synergy = bd.synergy || {};
+        document.getElementById('scoreModalSynergyMultiplier').textContent = `${(synergy.avg_synergy_multiplier || 1.0).toFixed(2)}x avg`;
+        document.getElementById('scoreModalDualRunningCount').textContent = `${synergy.dual_active_count || 0} dual active`;
+        document.getElementById('scoreModalSingleRunningCount').textContent = `${synergy.single_active_count || 0}`;
+        document.getElementById('scoreModalInactiveCount').textContent = `${synergy.inactive_count || 0}`;
+
+        const u1 = bd.unit1_summary || {};
+        const u2 = bd.unit2_summary || {};
+        const penalties = bd.penalties || {};
+
+        document.getElementById('scoreModalGraceCount').textContent = `${(u1.grace_count || 0) + (u2.grace_count || 0)}`;
+        document.getElementById('scoreModalLoopCount').textContent = `${(u1.loop_count || 0) + (u2.loop_count || 0)}`;
+        document.getElementById('scoreModalScramCount').textContent = `${(penalties.u1_scrams || 0) + (penalties.u2_scrams || 0)}`;
+        document.getElementById('scoreModalTripCount').textContent = `${(penalties.u1_trips || 0) + (penalties.u2_trips || 0)}`;
+
+        // Unit 1
+        document.getElementById('scoreModalU1AvgScore').textContent = `${(u1.avg_score || 0).toFixed(1)} pts avg`;
+        document.getElementById('scoreModalU1Active').textContent = `${u1.active_snapshots || 0} (${u1.active_pct || 0}%)`;
+        document.getElementById('scoreModalU1Mw').textContent = `${(u1.avg_output_mw || 0).toFixed(0)} MW avg`;
+        document.getElementById('scoreModalU1Downtime').textContent = `${u1.downtime_demand_count || 0}`;
+        document.getElementById('scoreModalU1Grace').textContent = `${u1.grace_count || 0}`;
+        document.getElementById('scoreModalU1Loop').textContent = `${u1.loop_count || 0}`;
+        document.getElementById('scoreModalU1Turbine').textContent = u1.avg_turbine_health !== null && u1.avg_turbine_health !== undefined ? `${u1.avg_turbine_health.toFixed(1)}%` : 'N/A';
+        document.getElementById('scoreModalU1Pps').textContent = `${(u1.avg_points_per_sec || 0).toFixed(1)}/s`;
+        const u1BandEl = document.getElementById('scoreModalU1DemandBand');
+        if (u1BandEl) u1BandEl.textContent = `${u1.demand_tolerance_count || 0} in / ${u1.demand_extreme_count || 0} ext`;
+
+        const u1IncidentsEl = document.getElementById('scoreModalU1Incidents');
+        const u1IncidentText = document.getElementById('scoreModalU1IncidentText');
+        const u1IncidentNotes = [
+            ...(u1.scram_reasons || []).map(r => `SCRAM: ${r}`),
+            ...(u1.trip_reasons || []).map(r => `TRIP: ${r}`)
+        ];
+        if (u1IncidentNotes.length > 0) {
+            u1IncidentsEl.classList.remove('hidden');
+            u1IncidentText.textContent = u1IncidentNotes.join(', ');
+        } else {
+            u1IncidentsEl.classList.add('hidden');
+        }
+
+        document.getElementById('scoreModalU2AvgScore').textContent = `${(u2.avg_score || 0).toFixed(1)} pts avg`;
+        document.getElementById('scoreModalU2Active').textContent = `${u2.active_snapshots || 0} (${u2.active_pct || 0}%)`;
+        document.getElementById('scoreModalU2Mw').textContent = `${(u2.avg_output_mw || 0).toFixed(0)} MW avg`;
+        document.getElementById('scoreModalU2Downtime').textContent = `${u2.downtime_demand_count || 0}`;
+        document.getElementById('scoreModalU2Grace').textContent = `${u2.grace_count || 0}`;
+        document.getElementById('scoreModalU2Loop').textContent = `${u2.loop_count || 0}`;
+        document.getElementById('scoreModalU2Turbine').textContent = u2.avg_turbine_health !== null && u2.avg_turbine_health !== undefined ? `${u2.avg_turbine_health.toFixed(1)}%` : 'N/A';
+        document.getElementById('scoreModalU2Pps').textContent = `${(u2.avg_points_per_sec || 0).toFixed(1)}/s`;
+        const u2BandEl = document.getElementById('scoreModalU2DemandBand');
+        if (u2BandEl) u2BandEl.textContent = `${u2.demand_tolerance_count || 0} in / ${u2.demand_extreme_count || 0} ext`;
+
+        const u2RefuelEl = document.getElementById('scoreModalU2RefuelInfo');
+        const u2RefuelText = document.getElementById('scoreModalU2RefuelText');
+        if (u2RefuelEl && u2RefuelText) {
+            if (u2.refuel_count && u2.refuel_count > 0) {
+                u2RefuelEl.classList.remove('hidden');
+                const refuelMin = u2.refuel_minutes_latest !== null && u2.refuel_minutes_latest !== undefined ? Math.round(u2.refuel_minutes_latest) : 0;
+                const predLoss = u2.pred_points_lost_latest !== null && u2.pred_points_lost_latest !== undefined ? u2.pred_points_lost_latest.toLocaleString() : '0';
+                const avgScore = u2.avg_refuel_score !== null && u2.avg_refuel_score !== undefined ? u2.avg_refuel_score.toFixed(1) : '--';
+                u2RefuelText.textContent = `${u2.refuel_count} snapshots in refuel (${refuelMin}m elapsed, -${predLoss} pts pred loss, ${avgScore} pts avg)`;
+            } else {
+                u2RefuelEl.classList.add('hidden');
+            }
+        }
+
+        const u2IncidentsEl = document.getElementById('scoreModalU2Incidents');
+        const u2IncidentText = document.getElementById('scoreModalU2IncidentText');
+        const u2IncidentNotes = [
+            ...(u2.scram_reasons || []).map(r => `SCRAM: ${r}`),
+            ...(u2.trip_reasons || []).map(r => `TRIP: ${r}`)
+        ];
+        if (u2IncidentNotes.length > 0) {
+            u2IncidentsEl.classList.remove('hidden');
+            u2IncidentText.textContent = u2IncidentNotes.join(', ');
+        } else {
+            u2IncidentsEl.classList.add('hidden');
+        }
+
+        renderScoreSnapshotsTable();
+    }
+
+    function filterScoreSnapshots(filterType, btn) {
+        activeScoreSnapFilter = filterType;
+        document.querySelectorAll('.score-snap-filter-btn').forEach(b => {
+            b.classList.remove('bg-white/10', 'text-white', 'font-semibold');
+            b.classList.add('bg-white/5', 'text-gray-400');
+        });
+        if (btn) {
+            btn.classList.add('bg-white/10', 'text-white', 'font-semibold');
+            btn.classList.remove('bg-white/5', 'text-gray-400');
+        }
+        renderScoreSnapshotsTable();
+    }
+
+    function renderScoreSnapshotsTable() {
+        const tbody = document.getElementById('scoreModalSnapshotsTbody');
+        const badge = document.getElementById('scoreModalSnapCountBadge');
+        if (!tbody || !currentScoreBreakdownData) return;
+
+        const allSnaps = currentScoreBreakdownData.snapshots || [];
+        let filtered = allSnaps;
+
+        if (activeScoreSnapFilter === 'refuel') {
+            filtered = allSnaps.filter(s => s.u2.is_refuel);
+        } else if (activeScoreSnapFilter === 'downtime') {
+            filtered = allSnaps.filter(s => s.u1.is_downtime || s.u2.is_downtime);
+        } else if (activeScoreSnapFilter === 'extreme') {
+            filtered = allSnaps.filter(s => s.u1.in_demand_tolerance === false || s.u2.in_demand_tolerance === false);
+        } else if (activeScoreSnapFilter === 'grace') {
+            filtered = allSnaps.filter(s => s.u1.in_grace || s.u2.in_grace);
+        } else if (activeScoreSnapFilter === 'loop') {
+            filtered = allSnaps.filter(s => s.u1.is_loop || s.u2.is_loop);
+        } else if (activeScoreSnapFilter === 'incident') {
+            filtered = allSnaps.filter(s => s.u1.scram_reason || s.u1.trip_reason || s.u2.scram_reason || s.u2.trip_reason);
+        }
+
+        if (badge) {
+            badge.textContent = `${filtered.length} of ${allSnaps.length}`;
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="py-8 text-center text-gray-500 font-mono text-xs">
+                        No snapshots match the selected filter "${activeScoreSnapFilter}".
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        function formatAge(ageSec) {
+            if (ageSec < 60) return `${Math.round(ageSec)}s ago`;
+            const m = Math.floor(ageSec / 60);
+            const s = Math.round(ageSec % 60);
+            return `${m}m ${s}s ago`;
+        }
+
+        function getUnitBadge(u) {
+            if (u.is_refuel) {
+                const m = Math.round(u.refuel_minutes || 0);
+                return `<span class="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-sky-300 font-semibold">Refueling (${m}m)</span>`;
+            }
+            if (u.is_downtime) {
+                return `<span class="px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold">Demand Downtime</span>`;
+            }
+            if (u.in_grace) {
+                return `<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300">Grace Period</span>`;
+            }
+            if (u.is_loop) {
+                return `<span class="px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300">LOOP Excused</span>`;
+            }
+            if (u.scram_reason || u.trip_reason) {
+                return `<span class="px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-200">Incident</span>`;
+            }
+            if (u.aprm >= 5.0 && u.output_mw > 0) {
+                return `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">Active</span>`;
+            }
+            return `<span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400">Idle</span>`;
+        }
+
+        function getDemandDeltaBadge(u) {
+            if (u.demand === null || u.demand === undefined || u.demand <= 0) return '';
+            if (u.in_demand_tolerance === true) {
+                const deltaStr = u.demand_delta !== null && u.demand_delta !== undefined ? `${u.demand_delta >= 0 ? '+' : ''}${Math.round(u.demand_delta)} MW` : 'in-band';
+                return `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[10px]" title="Within ±40 MW demand band">Dem ${u.demand} (${deltaStr})</span>`;
+            } else if (u.in_demand_tolerance === false) {
+                const deltaStr = u.demand_delta !== null && u.demand_delta !== undefined ? `${u.demand_delta >= 0 ? '+' : ''}${Math.round(u.demand_delta)} MW` : 'extreme';
+                return `<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-semibold text-[10px]" title="Extreme deviation beyond ±40 MW">Dem ${u.demand} (${deltaStr})</span>`;
+            }
+            return `<span class="text-gray-500 text-[10px]">(Dem ${u.demand})</span>`;
+        }
+
+        tbody.innerHTML = filtered.map(s => {
+            const ageStr = formatAge(s.age_seconds);
+            const isoTime = s.timestamp ? s.timestamp.substring(11, 19) : '--';
+            const u1Badge = getUnitBadge(s.u1);
+            const u2Badge = getUnitBadge(s.u2);
+            const u1DemBadge = getDemandDeltaBadge(s.u1);
+            const u2DemBadge = getDemandDeltaBadge(s.u2);
+
+            const snapScoreColor = s.snap_score >= 80 ? 'text-cyan-300' : (s.snap_score >= 50 ? 'text-blue-300' : (s.snap_score >= 20 ? 'text-amber-300' : 'text-rose-400'));
+
+            return `
+                <tr class="hover:bg-white/[0.03] transition-colors">
+                    <td class="py-2.5 px-3 whitespace-nowrap">
+                        <span class="text-white font-semibold">${isoTime}</span>
+                        <span class="text-gray-500 block text-[10px]">${ageStr}</span>
+                    </td>
+                    <td class="py-2.5 px-2 text-center text-gray-400 whitespace-nowrap">
+                        <div class="font-semibold text-gray-200">${s.weight.toFixed(3)}</div>
+                        ${s.is_current_snapshot ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Current 1.5x</span>' : (s.is_previous_snapshot ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Prev 1.25x</span>' : '')}
+                    </td>
+                    <td class="py-2.5 px-3">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            ${u1Badge}
+                            <span class="text-gray-300">${s.u1.aprm}% APRM</span>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400">${s.u1.output_mw} MW</span>
+                            ${u1DemBadge}
+                            ${(s.u1.pps !== null && s.u1.pps !== undefined) ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[10px]" title="Unit 1 point generation rate">${s.u1.pps}/s</span>` : ''}
+                        </div>
+                        <div class="text-[10px] text-gray-500 truncate max-w-xs" title="${s.u1.desc}">${s.u1.desc}</div>
+                    </td>
+                    <td class="py-2.5 px-2 text-right font-semibold text-gray-200 whitespace-nowrap">
+                        ${s.u1.score.toFixed(1)}
+                    </td>
+                    <td class="py-2.5 px-3">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            ${u2Badge}
+                            <span class="text-gray-300">${s.u2.aprm}% APRM</span>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400">${s.u2.output_mw} MW</span>
+                            ${u2DemBadge}
+                            ${(s.u2.pps !== null && s.u2.pps !== undefined) ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[10px]" title="Unit 2 point generation rate">${s.u2.pps}/s</span>` : ''}
+                        </div>
+                        <div class="text-[10px] text-gray-500 truncate max-w-xs" title="${s.u2.desc}">${s.u2.desc}</div>
+                    </td>
+                    <td class="py-2.5 px-2 text-right font-semibold text-gray-200 whitespace-nowrap">
+                        ${s.u2.score.toFixed(1)}
+                    </td>
+                    <td class="py-2.5 px-2 text-center font-semibold whitespace-nowrap ${s.synergy_mult >= 1.25 ? 'text-amber-300' : (s.synergy_mult >= 1.0 ? 'text-gray-300' : 'text-gray-500')}">
+                        ${s.synergy_mult.toFixed(2)}x
+                    </td>
+                    <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                        <span class="font-bold ${snapScoreColor}">${s.snap_score.toFixed(1)}</span>
+                        <span class="text-gray-500 block text-[10px]">wt: ${s.weighted_contribution.toFixed(1)}</span>
+                        ${s.total_pps !== undefined ? `<span class="text-gray-500 block text-[9px]">${s.total_pps.toFixed(1)}/2.9 pps (${(s.pps_efficiency * 100).toFixed(0)}%)</span>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeScoreInspectModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initScoreModalDebugMode();
+        const modal = document.getElementById('scoreInspectModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeScoreInspectModal();
+                }
+            });
+        }
+    });
+</script>

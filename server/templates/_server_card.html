@@ -15,7 +15,8 @@
     data-raw-timestamp="{{ server.raw_timestamp }}"
     data-u1-running="{{ 'true' if server.u1_running else 'false' }}"
     data-u2-running="{{ 'true' if server.u2_running else 'false' }}"
-    data-points-rate="{{ server.points_rate | default(0) }}">
+    data-points-rate="{{ server.points_rate | default(0) }}"
+    data-top-score="{{ server.top_score | default(0) }}">
     <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between gap-2.5">
             <div class="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -48,9 +49,18 @@
                     Active
                 </span>
                 {% endif %}
+                <button type="button"
+                    onclick="openScoreInspectModal('{{ server.job_id }}', event)"
+                    class="px-2 py-0.5 rounded-full {% if server.top_score and server.top_score >= 80 %}bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25{% elif server.top_score and server.top_score >= 50 %}bg-blue-500/15 border-blue-500/30 text-blue-300 hover:bg-blue-500/25{% else %}bg-white/5 border-white/10 text-gray-400 hover:bg-white/10{% endif %} border text-[10px] font-mono font-bold whitespace-nowrap flex items-center gap-1 cursor-pointer transition-colors group/score"
+                    title="Click to inspect score calculation &amp; debug factors">
+                    <span>Score: {{ server.top_score | default(0) }}</span>
+                    <svg class="w-2.5 h-2.5 opacity-60 group-hover/score:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </button>
                 <span class="px-2 py-0.5 rounded-full {% if server.points_rate and server.points_rate > 0 %}bg-amber-500/15 border-amber-500/30 text-amber-300{% else %}bg-white/5 border-white/10 text-gray-400{% endif %} border text-[10px] font-mono font-bold whitespace-nowrap"
                     title="Points Generation Rate">
-                    ★ {{ server.points_rate_str | default('N/A') }}
+                    {{ server.points_rate_str | default('N/A') }}
                 </span>
             </div>
             <span class="px-2.5 py-1 rounded-full {% if server.is_archived %}bg-cyan-500/15 border-cyan-500/30 text-cyan-300{% else %}bg-emerald-500/15 border-emerald-500/30 text-emerald-300{% endif %} border text-[10px] font-mono font-bold whitespace-nowrap shrink-0">
@@ -75,16 +85,22 @@
 
         <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs">
             <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
-                <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
-                    Unit 1 APRM
-                </span>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400 text-[11px] font-medium">Unit 1 APRM</span>
+                    {% if server.unit1.output_mw is defined and server.unit1.output_mw > 0 %}
+                    <span class="text-[10px] font-mono text-cyan-400 font-semibold" title="Electrical Output: {{ '%.0f'|format(server.unit1.output_mw) }} MW{% if server.unit1.demand and server.unit1.demand > 0 %} (Demand: {{ '%.0f'|format(server.unit1.demand) }} MW){% endif %}">{{ "%.0f"|format(server.unit1.output_mw) }}{% if server.unit1.demand and server.unit1.demand > 0 %}/{{ "%.0f"|format(server.unit1.demand) }}{% endif %} MW</span>
+                    {% endif %}
+                </div>
                 <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit1.aprm) }}%</span>
             </div>
 
             <div class="bg-white/5 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1">
-                <span class="text-gray-400 text-[11px] font-medium flex items-center gap-1.5">
-                    Unit 2 APRM
-                </span>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400 text-[11px] font-medium">Unit 2 APRM</span>
+                    {% if server.unit2.output_mw is defined and server.unit2.output_mw > 0 %}
+                    <span class="text-[10px] font-mono text-amber-400 font-semibold" title="Electrical Output: {{ '%.0f'|format(server.unit2.output_mw) }} MW{% if server.unit2.demand and server.unit2.demand > 0 %} (Demand: {{ '%.0f'|format(server.unit2.demand) }} MW){% endif %}">{{ "%.0f"|format(server.unit2.output_mw) }}{% if server.unit2.demand and server.unit2.demand > 0 %}/{{ "%.0f"|format(server.unit2.demand) }}{% endif %} MW</span>
+                    {% endif %}
+                </div>
                 <span class="font-mono font-bold text-sm text-white">{{ "%.2f"|format(server.unit2.aprm) }}%</span>
             </div>
 
