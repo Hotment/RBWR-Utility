@@ -1,0 +1,196 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        x:Class="RbwrOverlay.UI.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Configuration Settings"
+        Icon="/Assets/icon.ico"
+        Background="{DynamicResource CyberCardBg}"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="380"
+        Height="490"
+        WindowStartupLocation="CenterOwner">
+
+    <Border BorderBrush="{DynamicResource NeonCyan}"
+            BorderThickness="1"
+            CornerRadius="4">
+
+        <Grid RowDefinitions="Auto,*">
+
+            <Border Grid.Row="0"
+                    Background="{DynamicResource CyberHeaderBg}"
+                    Padding="10,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="CONFIGURATION SETTINGS"
+                               Foreground="{DynamicResource NeonCyan}"
+                               FontWeight="Bold"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-close"
+                            Content="✕"
+                            Command="{Binding CloseCommand}"
+                            Padding="6,2" />
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1"
+                          Padding="15,12">
+                <StackPanel Spacing="10">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Site Usage (MWe):"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Usage, StringFormat='{}{0:F2}'}"
+                                   Foreground="{DynamicResource NeonCyan}"
+                                   FontWeight="Bold"
+                                   FontSize="13" />
+                    </Grid>
+
+                    <TextBlock Text="Use Recirc Speed Override if Site Usage is off by a lot (10-15 MW off)"
+                               Foreground="{DynamicResource NeonGold}"
+                               FontSize="9"
+                               FontStyle="Italic"
+                               TextWrapping="Wrap" />
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                        <TextBlock Grid.Column="0"
+                                   Text="Overlay Opacity:"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}"
+                                   Foreground="{DynamicResource NeonCyan}"
+                                   FontWeight="Bold" />
+                    </Grid>
+                    <Slider Minimum="0.10"
+                            Maximum="1.00"
+                            Value="{Binding OverlayOpacity}"
+                            TickFrequency="0.05"
+                            IsSnapToTickEnabled="True" />
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Topmost on Roblox:"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Content="{Binding TopmostStatusText}"
+                                Foreground="{Binding TopmostStatusBrush}"
+                                Command="{Binding ToggleRobloxTopmostCommand}"
+                                Padding="10,3" />
+                    </Grid>
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Next Demand Switch (s):"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Classes="cyber"
+                                 Text="{Binding DemandThresholdSeconds}"
+                                 Width="60"
+                                 Padding="4,2" />
+                    </Grid>
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Recirc Override (%):"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Classes="cyber"
+                                 Text="{Binding RecircOverride}"
+                                 Width="50"
+                                 Padding="4,2"
+                                 Margin="0,0,4,0" />
+                        <Button Grid.Column="2"
+                                Classes="cyber"
+                                Content="Reset"
+                                Command="{Binding ResetRecircOverrideCommand}"
+                                Padding="6,2" />
+                    </Grid>
+                    <TextBlock Text="Use this when running SELF-CIRC mode as it doesn't require recirc changes."
+                               Foreground="{DynamicResource NeonGold}"
+                               FontSize="9"
+                               FontStyle="Italic"
+                               TextWrapping="Wrap" />
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Turbine Health Alert:"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Content="{Binding TurbineAlertStatusText}"
+                                Foreground="{Binding TurbineAlertStatusBrush}"
+                                Command="{Binding ToggleTurbineAlertCommand}"
+                                Padding="10,3" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Health Threshold (%):"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Classes="cyber"
+                                 Text="{Binding TurbineHealthThreshold}"
+                                 Width="60"
+                                 Padding="4,2" />
+                    </Grid>
+
+                    <Rectangle Fill="{DynamicResource CyberBorder}" Height="1" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Diagnostics:"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Content="Open Log"
+                                Command="{Binding OpenLogCommand}"
+                                Padding="8,3" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="Feedback &amp; Help:"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Content="Feedback"
+                                Command="{Binding OpenFeedbackCommand}"
+                                Padding="8,3" />
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding VersionText}"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="10" />
+                        <TextBlock Text="•"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="10" />
+                        <TextBlock Text="Licensed under MIT"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="10" />
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+
+        </Grid>
+    </Border>
+</Window>

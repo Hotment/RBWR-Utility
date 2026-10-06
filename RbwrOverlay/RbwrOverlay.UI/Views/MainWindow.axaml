@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:views="using:RbwrOverlay.UI.Views"
+        x:Class="RbwrOverlay.UI.Views.MainWindow"
+        x:DataType="vm:MainOverlayViewModel"
+        Title="RBWR APRM Calculator"
+        Icon="/Assets/icon.ico"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="{Binding IsTopmost}"
+        Opacity="{Binding OverlayOpacity}"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True">
+
+    <Window.ContextMenu>
+        <ContextMenu Background="{DynamicResource CyberCardBg}"
+                     BorderBrush="{DynamicResource CyberBorder}"
+                     BorderThickness="1">
+            <MenuItem Header="Toggle Compact Pill HUD"
+                      Command="{Binding ToggleCompactCommand}" />
+            <MenuItem Header="Always on Top"
+                      Command="{Binding ToggleTopmostCommand}" />
+            <Separator Background="{DynamicResource CyberBorder}" />
+            <MenuItem Header="Reactor Monitor"
+                      Command="{Binding SwitchTabCommand}"
+                      CommandParameter="Monitor" />
+            <MenuItem Header="Server &amp; Sync"
+                      Command="{Binding SwitchTabCommand}"
+                      CommandParameter="Sync" />
+            <MenuItem Header="Configuration"
+                      Command="{Binding SwitchTabCommand}"
+                      CommandParameter="Settings" />
+            <MenuItem Header="Feedback &amp; Updates"
+                      Command="{Binding SwitchTabCommand}"
+                      CommandParameter="Feedback" />
+            <Separator Background="{DynamicResource CyberBorder}" />
+            <MenuItem Header="Exit Application"
+                      Command="{Binding QuitCommand}" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <LayoutTransformControl HorizontalAlignment="Left" VerticalAlignment="Top">
+        <LayoutTransformControl.LayoutTransform>
+            <ScaleTransform ScaleX="{Binding ActiveUiScale}" ScaleY="{Binding ActiveUiScale}" />
+        </LayoutTransformControl.LayoutTransform>
+        <Panel>
+            <views:DetailedOverlayView IsVisible="{Binding !IsCompact}" />
+
+            <views:CompactOverlayView IsVisible="{Binding IsCompact}" />
+        </Panel>
+    </LayoutTransformControl>
+
+</Window>

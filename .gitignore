@@ -27,3 +27,20 @@ RBWR_APRM_Calculator*.exe
 RBWR_APRM_Calculator*.zip
 todo.md
 internaldocs
+*S.md
+
+# --- .NET / C# / Avalonia Build & IDE Artifacts ---
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+publish_*/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+.vs/
+.idea/
+TestResults/
+*.nupkg
+*.snupkg
+scratch

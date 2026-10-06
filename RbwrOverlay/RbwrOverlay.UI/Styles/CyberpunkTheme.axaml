@@ -1,0 +1,248 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="using:RbwrOverlay.UI.Behaviors">
+
+    <Styles.Resources>
+        <Color x:Key="CyberMainColor">#070a12</Color>
+        <Color x:Key="CyberCardColor">#0f1422</Color>
+        <Color x:Key="CyberHeaderColor">#05070d</Color>
+        <Color x:Key="CyberBorderColor">#1b253b</Color>
+        <Color x:Key="CyberBorderGlowColor">#00f0ff</Color>
+
+        <Color x:Key="NeonCyanColor">#00f0ff</Color>
+        <Color x:Key="NeonGreenColor">#39ff14</Color>
+        <Color x:Key="NeonRedColor">#ff003c</Color>
+        <Color x:Key="NeonGoldColor">#ffaa00</Color>
+        <Color x:Key="NeonPurpleColor">#b026ff</Color>
+
+        <Color x:Key="TextLightColor">#ffffff</Color>
+        <Color x:Key="TextMutedColor">#73839c</Color>
+
+        <SolidColorBrush x:Key="CyberMainBg" Color="{StaticResource CyberMainColor}" Opacity="0.94" />
+        <SolidColorBrush x:Key="CyberCardBg" Color="{StaticResource CyberCardColor}" Opacity="0.85" />
+        <SolidColorBrush x:Key="CyberHeaderBg" Color="{StaticResource CyberHeaderColor}" Opacity="0.96" />
+        <SolidColorBrush x:Key="CyberBorder" Color="{StaticResource CyberBorderColor}" />
+        <SolidColorBrush x:Key="CyberBorderGlow" Color="{StaticResource CyberBorderGlowColor}" />
+
+        <SolidColorBrush x:Key="NeonCyan" Color="{StaticResource NeonCyanColor}" />
+        <SolidColorBrush x:Key="NeonGreen" Color="{StaticResource NeonGreenColor}" />
+        <SolidColorBrush x:Key="NeonRed" Color="{StaticResource NeonRedColor}" />
+        <SolidColorBrush x:Key="NeonGold" Color="{StaticResource NeonGoldColor}" />
+        <SolidColorBrush x:Key="NeonPurple" Color="{StaticResource NeonPurpleColor}" />
+        <SolidColorBrush x:Key="TextLight" Color="{StaticResource TextLightColor}" />
+        <SolidColorBrush x:Key="TextMuted" Color="{StaticResource TextMutedColor}" />
+    </Styles.Resources>
+
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', Inter, monospace" />
+        <Setter Property="Foreground" Value="{StaticResource TextLight}" />
+    </Style>
+
+    <Style Selector="Button.cyber-nav">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="BorderThickness" Value="0,0,0,2" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-nav:pointerover">
+        <Setter Property="Background" Value="#101828" />
+        <Setter Property="Foreground" Value="{StaticResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-nav.active">
+        <Setter Property="Background" Value="#141f33" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+    </Style>
+
+    <Style Selector="Button.cyber">
+        <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber:pointerover">
+        <Setter Property="Background" Value="#192338" />
+        <Setter Property="Foreground" Value="{StaticResource TextLight}" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber:pressed">
+        <Setter Property="Background" Value="#0e1726" />
+    </Style>
+    <Style Selector="Button.cyber.active">
+        <Setter Property="Background" Value="#141f33" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Button.cyber.error">
+        <Setter Property="BorderBrush" Value="#66ffaa00" />
+    </Style>
+    <Style Selector="Button.cyber.error:pointerover">
+        <Setter Property="BorderBrush" Value="{StaticResource NeonRed}" />
+        <Setter Property="Background" Value="#251419" />
+    </Style>
+
+    <Style Selector="Button.cyber-green">
+        <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
+        <Setter Property="Foreground" Value="{StaticResource NeonGreen}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="Consolas, monospace" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-green:pointerover">
+        <Setter Property="Background" Value="#10291d" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonGreen}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+
+    <Style Selector="Button.cyber-gold">
+        <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
+        <Setter Property="Foreground" Value="{StaticResource NeonGold}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="Consolas, monospace" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-gold:pointerover">
+        <Setter Property="Background" Value="#261b0a" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonGold}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+
+    <Style Selector="Button.cyber-red">
+        <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
+        <Setter Property="Foreground" Value="{StaticResource NeonRed}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="Consolas, monospace" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-red:pointerover">
+        <Setter Property="Background" Value="#290e14" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonRed}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+
+    <Style Selector="Button.cyber-header-btn">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="5,3" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-header-btn:pointerover">
+        <Setter Property="Background" Value="#1a2436" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+    </Style>
+
+    <Style Selector="Button.cyber-close, Button.cyber-close-btn">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-close:pointerover, Button.cyber-close-btn:pointerover">
+        <Setter Property="Background" Value="{StaticResource NeonRed}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+
+    <Style Selector="Button.cyber-preset">
+        <Setter Property="Background" Value="#121826" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.cyber-preset:pointerover">
+        <Setter Property="Background" Value="#1a253a" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-preset.active">
+        <Setter Property="Background" Value="#141f33" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="TextBox.cyber">
+        <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
+        <Setter Property="Foreground" Value="{StaticResource TextLight}" />
+        <Setter Property="CaretBrush" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="Consolas, monospace" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="behaviors:TextBoxBehaviors.AutoEndCaret" Value="True" />
+    </Style>
+    <Style Selector="TextBox.cyber:focus">
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyan}" />
+        <Setter Property="Background" Value="#131b2e" />
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="16" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,-2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="ProgressBar.cyber-power">
+        <Setter Property="Height" Value="6" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Background" Value="#0b101c" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+</Styles>

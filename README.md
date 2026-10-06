@@ -1,176 +1,235 @@
 # RBWR Utility & APRM Transparent Overlay Calculator
 
-A comprehensive suite of tools designed for the Roblox **Realistic Boiling Water Reactor (RBWR)** simulation. This project includes both a lightweight, always-on-top **Desktop Transparent Overlay Calculator** and a full-featured **Web Application & Server Suite** featuring real-time plant monitors, interactive graphs, points calculators, and server browsing.
+A comprehensive suite of tools designed for the Roblox **Realistic Boiling Water Reactor (RBWR)** simulation. This project includes both a lightweight, hardware-accelerated **Desktop Transparent Overlay Calculator** (.NET 8 / Avalonia UI) and a full-featured **Web Application & Server Suite** (Python 3.12 / Flask) with real-time plant monitors, interactive graphs, point generation analytics, and server browsing.
 
 ---
 
 ## Table of Contents
 
 - [Features](#features)
-  - [Desktop Transparent Overlay](#desktop-transparent-overlay)
-  - [Web Application & Server Suite](#web-application--server-suite)
+  - [Desktop Transparent Overlay (.NET 8 / Avalonia UI)](#desktop-transparent-overlay-net-8--avalonia-ui)
+  - [Web Application & Server Suite (Python / Flask)](#web-application--server-suite-python--flask)
+- [Architecture & Project Structure](#architecture--project-structure)
 - [Installation & Running](#installation--running)
-  - [Pre-built Releases (Desktop)](#pre-built-releases-desktop)
-  - [Running Desktop Overlay from Source](#running-desktop-overlay-from-source)
+  - [Pre-built Desktop Releases](#pre-built-desktop-releases)
+  - [Building & Running Desktop Overlay from Source](#building--running-desktop-overlay-from-source)
+  - [Multi-Platform Build Script (`build.bat`)](#multi-platform-build-script-buildbat)
   - [Running the Web Application Server](#running-the-web-application-server)
 - [Overlay Controls & Shortcuts](#overlay-controls--shortcuts)
-- [Web Application Pages](#web-application-pages)
-- [Configuration & Environment Variables](#configuration--environment-variables)
-- [Feedback & Suggestions](#feedback--suggestions)
+- [Web Application Routes](#web-application-routes)
+- [Server Performance Scoring Engine](#server-performance-scoring-engine)
 - [Calculation Reference](#calculation-reference)
+- [Configuration & Environment Variables](#configuration--environment-variables)
+- [License](#license)
 
 ---
 
 ## Features
 
-### Desktop Transparent Overlay
+### Desktop Transparent Overlay (.NET 8 / Avalonia UI)
 
-* **Transparent Overlay:** Borderless, always-on-top window that sits seamlessly over your Roblox game window. Opacity is adjustable (from 30% to 100%) via the settings panel.
-* **Dual UI Modes:** Toggle between a detailed view and a compact bar mode (465×60 px) that acts as an unobtrusive in-game HUD.
-* **Automatic Updates via Official API:** Synchronizes target demand values, live server data, and countdown timers in real-time via official server checker API integration.
-* **Job ID & Server ID Sync:** Connect directly using either a full Roblox Job ID (UUID) or the in-game shortened Server ID (e.g. `77f6-4b2f`), with built-in countdown calibration (+/- seconds).
-* **Dynamic Usage Solver:** Runs an iterative solver to calculate thermal requirements while dynamically accounting for current auxiliary site usage (recirculation pumps, feedwater pumps, condenser pumps, etc.).
-* **Overpower Safe Limit Alert:** Flashes a red warning indicator if the calculated core power exceeds safe operating thresholds (108% for both units).
-* **Smart Roblox Focus Detection:** Automatically brings the overlay to the front when Roblox is focused and can hide/minimize when Roblox is not active.
-* **System Tray & Hotkeys:** Minimizes to system tray with quick context menu controls.
-* **Automatic Update Checking:** Checks GitHub Releases on startup to notify you when a new release is available.
-* **Multi-Unit Layouts:** Dedicated calculations and settings for both Unit 1 and Unit 2.
+* **Hardware-Accelerated Alpha Transparency:** Uses native GPU-accelerated Alpha composition (`TransparencyLevelHint="Transparent"`), eliminating magenta color-key fringing, click-through dropouts, and OS lag.
+* **Dual UI Modes:**
+  * **Detailed Tactical Deck:** Full monitoring view with neon gauge displays, one-click power presets (0%, 20%, 40%, 60%, 80%, 100%), rapid stepper adjustments (+/- 10 MWe), and real-time turbine health alerts.
+  * **Ultra-Compact Floating Pill:** Minimalist horizontal floating bar (465x60 px) designed for distraction-free gameplay.
+* **Unified Interface:** Monitor, Server Sync, Configuration, Feedback, and Updates are consolidated into high-tech integrated tabs (`MONITOR`, `SYNC`, `CONFIG`, `FEEDBACK`), preventing secondary windows from getting hidden behind game sessions.
+* **Bidirectional Physics Solver:** Fixed-point iterative solver mapping demand to core thermal power, generator load, and feedwater flow while dynamically calculating auxiliary recirculation pump usage.
+* **Live Server Synchronization:** Connects via full Roblox Job ID (UUID) or shortened in-game Server ID (e.g. `77f6-4b2f`). Features sub-second countdown timers, -1s/+1s calibration offsets, and automatic demand transition tracking.
+* **Multi-Unit Layouts:** Independent quadratic curves, recirculation flow tables, and auxiliary usage formulas for Unit 1 and Unit 2.
+* **Roblox Window Focus Tracking:** Automatically detects when the Roblox game window is focused and brings the overlay topmost, automatically managing visibility.
+* **Resilient Crash Handler:** 
+  * Captures runtime and startup exceptions with full stack traces and inner exception chains in `RBWR_APRM_Calculator.log`.
+  * Generates an actionable `RBWR_Crash_Report.txt` dump on disk with system diagnostics.
+  * Displays a cyberpunk-themed modal window with copy traceback and GitHub reporting options, or a native Win32 system fallback dialog if the graphics engine cannot initialize.
+* **Standalone Single-File Distribution:** Supports building as a single, self-contained executable with embedded native libraries and runtime, requiring no external files or pre-installed .NET runtimes.
 
-### Web Application & Server Suite
+### Web Application & Server Suite (Python / Flask)
 
-* **Web Calculator (`/calculator`):** Full-featured in-browser APRM / thermal power calculator with real-time server synchronization.
+* **Web Calculator (`/calculator`):** Full-featured in-browser APRM and thermal power calculator with live server synchronization.
 * **Points & Rank Calculator (`/points`):** Comprehensive points-per-second, shift earnings, and operational rank requirements calculator.
 * **Operator Tablet (`/tablet`):** Live in-browser recreation of the game's Operator Tablet displaying reactor temperatures, APRM setpoints, pump speeds, control rod status, and SCRAM alarms.
-* **Server Browser (`/servers`):** Real-time monitoring of all public and private RBWR servers, with 20-servers-per-page pagination and search by full Job ID or shortened Server ID (`xxxx-xxxx`).
-* **Grid Analytics:** Pan and zoom global total power output graphs across the entire RBWR grid with customizable time windows (10m, 30m, 1h, 6h, 24h, or all).
-* **Server Detail & Graphs (`/servers/<job_id>`):** Interactive historical graphs (APRM, Power, Generator Load, Steam Flow, etc.) with touch, wheel zoom, and pan controls.
-* **Point History Graph & Local Viewer (`/points-graph`):** 100% client-side private parser and graph visualizer for local `sar_data.json` logs. No data leaves your browser.
-* **Community Suggestions (`/suggestions`):** Community proposal submission and upvoting board with administrator review statuses.
-* **Admin Portal (`/admin`):** Secure panel for managing persistent server tracking, reviewing crash reports, user suggestions, and contact messages.
+* **Server Browser (`/servers`):** Real-time monitoring of all public and tracked RBWR servers with pagination, search by Job ID or short ID, and grid power analytics.
+* **Server Detail & Analytics (`/servers/<job_id>`):** Interactive historical graphs for APRM, generator power, steam flow, turbine health, and reactor metrics with touch and zoom controls.
+* **Performance Scoring Engine:** Rolling 60-minute evaluation engine rating operational efficiency, PPS sustainability, outage recovery, and multi-unit synergy.
+* **Point History Graph (`/points-graph`):** Client-side parser and interactive visualizer for local `sar_data.json` logs with zero server uploads.
+* **Community Suggestions (`/suggestions`):** Community feature request and upvoting board with administrator review statuses.
+* **Admin Portal (`/admin`):** Management portal for persistent server tracking, moderation, crash reports, and operational metrics.
+
+---
+
+## Architecture & Project Structure
+
+```
+RBWR-Utility/
+|
+|-- RbwrOverlay/                      # Desktop Application (.NET 8 / Avalonia UI)
+|   |-- RbwrOverlay.Core/             # Core calculation engine & models
+|   |   |-- Calculations/             # Reactor models, solvers, recirculation tables
+|   |   |-- Models/                   # AppSettings, ServerInfo, UpdateInfo
+|   |   `-- Services/                 # ApiClient, LoggingService, SettingsService
+|   |-- RbwrOverlay.Platform/         # Cross-platform OS abstractions
+|   |   `-- Process tracking for Windows, Linux, and macOS
+|   |-- RbwrOverlay.UI/               # Avalonia UI desktop application
+|   |   |-- Assets/                   # Embedded icons and resources
+|   |   |-- Behaviors/                # AutoComplete and UI event behaviors
+|   |   |-- Services/                 # CrashHandler & error presentation
+|   |   |-- Styles/                   # CyberpunkTheme dark aesthetic tokens
+|   |   |-- ViewModels/               # MVVM reactive view models
+|   |   `-- Views/                    # Overlay, Sync, Config, Feedback, Crash windows
+|   |-- RbwrOverlay.Tests/            # xUnit test suite (50 unit tests)
+|   `-- RbwrOverlay.slnx              # Modern .NET solution definition
+|
+|-- server/                           # Web Application & Backend (Python / Flask)
+|   |-- app.py                        # Flask server, WebSocket routes, API endpoints
+|   |-- scoring.py                    # Server top score engine & PPS calculations
+|   |-- templates/                    # Jinja2 templates for web interface
+|   |-- static/                       # CSS stylesheets, JS utilities, brand icons
+|   `-- data/                         # Server state, persistent tracking, archives
+|
+|-- bot/                              # Optional Discord integration bot
+|-- build.bat                         # Multi-target builder for Windows & Linux
+`-- rbwr_overlay.py                   # Legacy Python Tkinter implementation
+```
 
 ---
 
 ## Installation & Running
 
-### Pre-built Releases (Desktop)
+### Pre-built Desktop Releases
 
-* **Windows:** Download the latest `RBWR_APRM_Calculator_vX.X.X.exe` or portable `.zip` from the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page.
-* **Linux (x86_64):** Download `RBWR_APRM_Calculator_Linux_x86_64_vX.X.X.tar.gz` or standalone binary from the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page. Extract and run `./RBWR_APRM_Calculator`.
-* **macOS (Apple Silicon - M1/M2/M3/M4):** Download `RBWR_APRM_Calculator_macOS_arm64.zip` from Releases. Extract the archive, then right-click `RBWR APRM Calculator.app` and select **Open** (required once on first launch for security approval).
+Pre-compiled desktop releases are available on the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page:
+
+* **Windows Standalone (Recommended):** Download `RbwrOverlay.exe` (or `RBWR_APRM_Calculator.exe`) from `publish/win-x64-standalone/`. This single executable is fully self-contained, requiring zero external files, no zip extraction, and no .NET installation.
+* **Windows Framework-Dependent:** Download the portable folder from `publish/win-x64/` (requires .NET 8 Desktop Runtime).
+* **Linux Standalone:** Download `RbwrOverlay` from `publish/linux-x64-standalone/`. Includes a ready-to-use desktop entry file (`rbwr-overlay.desktop`).
+* **Linux Framework-Dependent:** Download `publish/linux-x64/` (requires .NET 8 runtime).
 
 ---
 
-### Running Desktop Overlay from Source
+### Building & Running Desktop Overlay from Source
 
-Running natively from source is supported across Windows, Linux, and macOS (Python 3.10+):
+#### Prerequisites
+* [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (Version 8.0.x or newer).
 
-1. Clone or download the repository:
-   ```bash
-   git clone https://github.com/Hotment/RBWR-Utility.git
-   cd RBWR-Utility
-   ```
-2. Install desktop dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run the application:
-   ```bash
-   python rbwr_overlay.py
-   ```
+#### Run Directly:
+```bash
+dotnet run --project RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj
+```
 
-To compile your own standalone executable:
-* **Windows (`.exe`):**
-  ```cmd
-  compile.bat
-  ```
-* **Linux (`standalone binary`):**
-  ```bash
-  chmod +x compile.sh
-  ./compile.sh
-  ```
+#### Run Automated Test Suite:
+```bash
+dotnet test RbwrOverlay/RbwrOverlay.Tests/RbwrOverlay.Tests.csproj
+```
+
+---
+
+### Multi-Platform Build Script (`build.bat`)
+
+The repository includes an interactive and automated builder for Windows and Linux targets:
+
+```cmd
+build.bat [target]
+```
+
+#### Available Targets:
+* `all`: Builds all 4 release targets (default).
+* `windows-standalone` (or `win-standalone`): Builds the single-file Windows executable with embedded native libraries and runtime (no external files needed).
+* `windows` (or `win`): Builds the lightweight framework-dependent Windows executable.
+* `linux-standalone`: Builds the self-contained Linux executable with desktop launcher.
+* `linux`: Builds the framework-dependent Linux executable.
+* `clean`: Removes the `publish/` output directory.
+
+Output binaries are placed in:
+```
+publish/
+|-- win-x64-standalone/     # RbwrOverlay.exe / RBWR_APRM_Calculator.exe (Single-file)
+|-- win-x64/                # RbwrOverlay.exe + extracted native DLLs
+|-- linux-x64-standalone/   # RbwrOverlay (Self-contained) + rbwr-overlay.desktop
+`-- linux-x64/              # RbwrOverlay (Framework-dependent) + rbwr-overlay.desktop
+```
 
 ---
 
 ### Running the Web Application Server
 
-The Flask web server powers the website, web tools, live server cache, and APIs:
+The Flask application powers the browser tools, public APIs, live server tracking, and metrics calculation:
 
-1. Install web server dependencies:
+1. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv venv
+   # Windows:
+   venv\Scripts\activate
+   # Linux/macOS:
+   source venv/bin/activate
+   ```
+2. Install server dependencies:
    ```bash
    pip install -r server/requirements.txt
    ```
-2. Start the server:
+3. Start the application:
    ```bash
    python server/app.py
    ```
-3. Open your browser and navigate to:
-   ```
-   http://localhost:8400
-   ```
-
-To run in production with Gunicorn (Linux):
-```bash
-gunicorn -c server/gunicorn.conf.py server.app:app
-```
+4. Access the web interface at `http://127.0.0.1:8400`.
 
 ---
 
 ## Overlay Controls & Shortcuts
 
-* **Reposition Window:** Left-click and drag anywhere on the header bar or background panel.
-* **Toggle Always-on-Top:** Click the pin icon (`📌` / `📍`) in the top-right corner.
-* **Toggle Compact Mode:** Click the window expand/shrink icon (`⛶`) to switch to the minimal HUD bar. Double-clicking the compact bar background returns to detailed mode.
-* **Adjust Opacity:** Open the configuration panel (gear icon) and adjust the transparency slider (30%–100%).
-* **Toggle Unit:** Click the **UNIT 1** / **UNIT 2** tabs in detailed mode, or click the **U1** / **U2** indicator in compact mode.
-* **Server Sync:** Click the sync/link icon in the header to open the server connection dialog. Enter a full Job ID or in-game Server ID (e.g. `77f6-4b2f`) to auto-sync reactor demand.
-* **Exit Utility:** Click the `✕` button or right-click anywhere on the overlay to open the context menu and select Exit.
+* **Reposition HUD:** Left-click and drag anywhere on the header bar or background panel.
+* **Toggle Compact Mode:** Click the layout toggle button in the header to switch between Detailed Deck mode and Compact Bar mode. Double-clicking the compact bar returns to detailed mode.
+* **Toggle Always-on-Top:** Toggle the pin button in the header bar.
+* **Adjust Transparency:** Switch to the `CONFIG` tab and adjust the opacity slider (30% to 100%).
+* **Toggle Unit Focus:** Click the `UNIT 1` or `UNIT 2` header tabs in detailed view, or click `U1`/`U2` in compact view.
+* **Server Sync:** Switch to the `SYNC` tab. Enter a full Job ID or shortened Server ID (`xxxx-xxxx`) and press Enter to synchronize live demand setpoints and timers.
+* **Calibration Stepper:** Use the `-1s` / `+1s` calibration buttons in the sync tab to align countdown timers with actual server cycles.
+* **Exit Application:** Click the `X` button in the header bar, or right-click the system tray icon and select Exit.
 
 ---
 
-## Web Application Pages
+## Web Application Routes
 
 | Route | Description |
-|---|---|
-| `/` | Landing page introducing features and download links. |
+| :--- | :--- |
+| `/` | Landing page introducing features, guides, and download links. |
 | `/calculator` | In-browser Thermal Power & APRM Calculator with server auto-sync. |
 | `/points` | Points & Rank Calculator for shift earnings and goal progression. |
-| `/tablet` | Web recreation of the in-game Operator Tablet with real-time plant parameters. |
-| `/servers` | Server Browser with 20-per-page pagination and global power analytics. |
-| `/servers/<job_id>` | Detailed graphs, reactor history, and snapshot metrics for a specific server. |
-| `/points-graph` | Private, client-side Point History Graph & local `sar_data.json` log visualizer. |
+| `/tablet` | Real-time web recreation of the in-game Operator Tablet. |
+| `/servers` | Server Browser with search, pagination, and grid analytics. |
+| `/servers/<job_id>` | Historical snapshot graphs, operational logs, and score breakdown. |
+| `/api/servers/<job_id>/score_breakdown` | JSON API endpoint returning comprehensive top score breakdown. |
+| `/points-graph` | Client-side visualizer for local `sar_data.json` logs. |
 | `/suggestions` | Community feedback board with submission form and upvoting. |
-| `/contact` | Confidential direct contact form to the site administrator. |
-| `/privacy` | Privacy policy and details on data handling. |
-| `/admin` | Administrator portal for persistent server monitoring, crash reports, and suggestions moderation. |
+| `/contact` | Direct communication form to the administrator. |
+| `/admin` | Administrative portal for persistent tracking and server moderation. |
 
 ---
 
-## Configuration & Environment Variables
+## Server Performance Scoring Engine
 
-When running the web server (`server/app.py`), configuration can be customized via environment variables or a `.env` file in the `server/` directory:
+The scoring engine in `server/scoring.py` (`calculate_server_top_score`) evaluates plant performance over a rolling 60-minute window of snapshot history, outputting a Top Score between `0.0` and `100.0`.
 
-| Variable | Default | Description |
-|---|---|---|
-| `SERVER_PORT` | `8400` | Port the web application listens on. |
-| `HOST` | `0.0.0.0` | Host IP binding. |
-| `ADMIN_USERNAME` | *(auto-generated)* | Administrator account username for `/admin`. |
-| `ADMIN_PASSWORD` | *(auto-generated)* | Administrator account password for `/admin`. |
-| `FLASK_SECRET_KEY` | *(auto-generated)* | Session encryption secret key. |
-| `DISCORD_WEBHOOK_URL` | *(optional)* | Webhook for notifications on contact submissions and crash reports. |
-
----
-
-## Feedback & Suggestions
-
-I welcome your feedback and ideas! You can submit suggestions:
-1. **Via the Desktop Overlay:** Click the **💬 Feedback** button in the title bar of the detailed view.
-2. **Via the Web Application:** Visit the `/suggestions` page to post a new feature request or upvote existing ones.
+### Core Evaluation Mechanics:
+1. **Point Generation Sustainability (PPS):**
+   * Combined maximum sustainable plant output is **2.9 pts/s** (Unit 1: 1.2 pts/s, Unit 2: 1.7 pts/s).
+   * Rather than an additive bonus, point generation acts as a recency-weighted efficiency multiplier ($W_{\text{pps}} \le 1.0$). If a plant cannot sustain point output, its score scales downward proportionally.
+2. **Recency Weighting:**
+   * Snapshots decay with a 10-minute half-life (`600s`).
+   * Current snapshot receives a **1.50x** weight boost; previous snapshot receives a **1.25x** boost.
+3. **The +/- 40 MW Generation Deadband:**
+   * Generation within +/- 40 MW of target demand receives full 1.0 ratio credit.
+   * Includes a 60-second grace window following demand changes to permit rod and flow adjustments.
+4. **Unit 2 Refueling Outage Detection:**
+   * Outages beginning with qualified demand event codes (-1 Maintenance, -2 LOOP, -3 Reset, -4 Evacuation) are evaluated against an optimal 50-minute profile, avoiding unexcused downtime penalties.
+5. **Synergy & Incident Deductions:**
+   * **1.25x** multiplier when both reactor units generate power simultaneously.
+   * -60% snapshot reduction during active SCRAM or turbine trip events, with cumulative deductions for unrecovered incidents.
 
 ---
 
 ## Calculation Reference
 
-The calculator uses the following quadratic relationships to map core thermal power ($t$) to generator load and feedwater flow.
+The calculation engine uses quadratic relationships to map core thermal power ($t$, in %) to generator load ($GenLoad$, in MWe) and feedwater flow ($Flow$, in kg/s):
 
 ### Unit 1
 * **Thermal Power (%)** from Demand ($d$) and auxiliary usage ($u$):
@@ -187,6 +246,22 @@ The calculator uses the following quadratic relationships to map core thermal po
   $$GenLoad = \max\left(0, -82.3 + 10.9 \times t + 0.0238 \times t^2\right)$$
 * **Feedwater Flow (kg/s):**
   $$Flow = \max\left(0, 160.0 + 11.6 \times t + 0.0249 \times t^2\right) + 2$$
+
+---
+
+## Configuration & Environment Variables
+
+When running the web server (`server/app.py`), configuration can be customized via environment variables or a `.env` file:
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `SERVER_PORT` | `8400` | Port the web application listens on. |
+| `HOST` | `0.0.0.0` | Host IP address binding. |
+| `ADMIN_USERNAME` | *(auto-generated)* | Administrator username for `/admin`. |
+| `ADMIN_PASSWORD` | *(auto-generated)* | Administrator password for `/admin`. |
+| `FLASK_SECRET_KEY` | *(auto-generated)* | Session encryption key. |
+| `DISCORD_WEBHOOK_URL` | *(optional)* | Webhook for notifications on contact submissions and crash reports. |
+| `DISCORD_BOT_TOKEN` | *(optional)* | Token for optional Discord bot integration. |
 
 ---
 

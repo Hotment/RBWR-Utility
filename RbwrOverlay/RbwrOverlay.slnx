@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="RbwrOverlay.Core/RbwrOverlay.Core.csproj" />
+  <Project Path="RbwrOverlay.Platform/RbwrOverlay.Platform.csproj" />
+  <Project Path="RbwrOverlay.Tests/RbwrOverlay.Tests.csproj" />
+  <Project Path="RbwrOverlay.UI/RbwrOverlay.UI.csproj" />
+</Solution>

@@ -1,0 +1,41 @@
+name: Test Avalonia C# App (.NET Multi-Platform)
+
+on:
+  push:
+    paths:
+      - 'RbwrOverlay/**'
+      - '.github/workflows/dotnet-test.yml'
+  pull_request:
+    paths:
+      - 'RbwrOverlay/**'
+      - '.github/workflows/dotnet-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-14]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore RbwrOverlay/RbwrOverlay.slnx
+
+      - name: Build solution
+        run: dotnet build RbwrOverlay/RbwrOverlay.slnx -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test RbwrOverlay/RbwrOverlay.Tests/RbwrOverlay.Tests.csproj -c Release --no-build --verbosity normal

@@ -1,0 +1,100 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        x:Class="RbwrOverlay.UI.Views.CrashReportWindow"
+        x:DataType="vm:CrashReportViewModel"
+        Title="Application Crash Detected"
+        Icon="/Assets/icon.ico"
+        Background="{DynamicResource CyberMainBg}"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="560"
+        Height="400"
+        WindowStartupLocation="CenterScreen">
+
+    <Border BorderBrush="{DynamicResource NeonRed}"
+            BorderThickness="1"
+            CornerRadius="4">
+
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+
+            <Border Grid.Row="0"
+                    Background="{DynamicResource CyberHeaderBg}"
+                    Padding="12,8">
+                <TextBlock Text="CRITICAL EXCEPTION ENCOUNTERED"
+                           Foreground="{DynamicResource NeonRed}"
+                           FontWeight="Bold"
+                           FontSize="12" />
+            </Border>
+
+            <TextBlock Grid.Row="1"
+                       Text="The application encountered an unhandled exception. Please copy the traceback below to report this issue."
+                       Foreground="{DynamicResource TextMuted}"
+                       FontSize="11"
+                       Margin="15,10,15,6"
+                       TextWrapping="Wrap" />
+
+            <Border Grid.Row="2"
+                    Background="{DynamicResource CyberCardBg}"
+                    BorderBrush="{DynamicResource CyberBorder}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Margin="15,0,15,10"
+                    Padding="6">
+                <TextBox Text="{Binding Traceback}"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         FontFamily="Consolas, monospace"
+                         FontSize="10"
+                         Background="Transparent"
+                         Foreground="{DynamicResource TextLight}"
+                         BorderThickness="0"
+                         TextWrapping="NoWrap" />
+            </Border>
+
+            <TextBlock Grid.Row="3"
+                       Text="{Binding StatusText}"
+                       Foreground="{DynamicResource NeonCyan}"
+                       FontWeight="Bold"
+                       FontSize="11"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,8"
+                       MinHeight="16" />
+
+            <Border Grid.Row="4"
+                    Padding="15,0,15,15">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+                    <Button Grid.Column="0"
+                            Classes="cyber"
+                            Content="{Binding CopyButtonText}"
+                            Command="{Binding CopyTracebackCommand}"
+                            Padding="10,4"
+                            Margin="0,0,6,0" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber"
+                            Foreground="{DynamicResource NeonGold}"
+                            Content="Report on GitHub"
+                            Command="{Binding ReportGitHubCommand}"
+                            Padding="10,4"
+                            Margin="0,0,6,0" />
+
+                    <Button Grid.Column="2"
+                            Classes="cyber"
+                            Content="Send Report (Anon)"
+                            Command="{Binding SendReportCommand}"
+                            IsEnabled="{Binding !IsSending}"
+                            Padding="10,4" />
+
+                    <Button Grid.Column="4"
+                            Classes="cyber-red"
+                            Content="Exit App"
+                            Command="{Binding ExitAppCommand}"
+                            Padding="12,4" />
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</Window>

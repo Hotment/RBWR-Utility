@@ -1,0 +1,207 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RbwrOverlay.UI.Views.CustomMessageWindow"
+        Title="Notification"
+        Icon="/Assets/icon.ico"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner">
+
+    <Border Name="RootBorder"
+            Background="{DynamicResource CyberMainBg}"
+            BorderBrush="{DynamicResource NeonRed}"
+            BorderThickness="1"
+            CornerRadius="8"
+            BoxShadow="0 8 32 0 #99000000, 0 0 20 0 #33ff003c"
+            Margin="10">
+
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+
+            <Border Grid.Row="0"
+                    Name="HeaderBorder"
+                    Background="Transparent"
+                    Padding="14,10,14,8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+
+                        <TextBlock Name="TitleText"
+                                   Text="TURBINE HEALTH WARNING"
+                                   Foreground="{DynamicResource NeonRed}"
+                                   FontWeight="Bold"
+                                   FontSize="11"
+                                   LetterSpacing="0.8"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-close-btn"
+                            Content="✕"
+                            Click="OnCloseClick"
+                            Padding="6,2"
+                            ToolTip.Tip="Dismiss Alert" />
+                </Grid>
+            </Border>
+
+            <Rectangle Grid.Row="1"
+                       Fill="{DynamicResource CyberBorder}"
+                       Height="1"
+                       Margin="14,0" />
+
+            <StackPanel Grid.Row="2"
+                        Margin="14,12"
+                        Spacing="10">
+
+                <Border Name="TurbineDiagnosticsCard"
+                        Background="{DynamicResource CyberCardBg}"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,10"
+                        IsVisible="False">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0"
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="TURBINE DIAGNOSTICS"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="9"
+                                           FontWeight="Bold"
+                                           LetterSpacing="0.5" />
+                                <Border Name="TurbineUnitBadge"
+                                        Background="#141f33"
+                                        BorderBrush="{DynamicResource NeonCyan}"
+                                        BorderThickness="1"
+                                        CornerRadius="3"
+                                        Padding="5,1">
+                                    <TextBlock Name="TurbineUnitText"
+                                               Text="UNIT 2"
+                                               Foreground="{DynamicResource NeonCyan}"
+                                               FontSize="8"
+                                               FontWeight="Bold" />
+                                </Border>
+                            </StackPanel>
+
+                            <Border Name="TurbineConditionBadge"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Background="#290e14"
+                                    BorderBrush="{DynamicResource NeonRed}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="6,2">
+                                <TextBlock Name="TurbineConditionText"
+                                           Text="LOW HEALTH"
+                                           Foreground="{DynamicResource NeonRed}"
+                                           FontWeight="Bold"
+                                           FontSize="8" />
+                            </Border>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center" Margin="0,2">
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="CURRENT HEALTH"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="8"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Name="TurbineHealthPercentText"
+                                           Text="--%"
+                                           Foreground="{DynamicResource NeonRed}"
+                                           FontWeight="Bold"
+                                           FontSize="22"
+                                           FontFamily="Consolas, 'Segoe UI', monospace" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="2">
+                                <Grid ColumnDefinitions="Auto,Auto">
+                                    <TextBlock Text="SAFE THRESHOLD: " Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                                    <TextBlock Name="TurbineThresholdText" Grid.Column="1" Text="65.0%" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="9" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,Auto">
+                                    <TextBlock Text="OPERATING STATUS: " Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                                    <TextBlock Name="TurbineStatusLabel" Grid.Column="1" Text="BELOW SAFE LIMIT" Foreground="{DynamicResource NeonRed}" FontWeight="Bold" FontSize="9" />
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="3">
+                            <ProgressBar Name="TurbineHealthBar"
+                                         Classes="cyber-power"
+                                         Height="8"
+                                         Minimum="0"
+                                         Maximum="100"
+                                         Value="50"
+                                         Foreground="{DynamicResource NeonRed}" />
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <TextBlock Text="0%" Foreground="{DynamicResource TextMuted}" FontSize="8" />
+                                <TextBlock Name="ThresholdBarMarker" Grid.Column="1" HorizontalAlignment="Center" Text="65% SAFE THRESHOLD" Foreground="{DynamicResource NeonGold}" FontSize="8" />
+                                <TextBlock Grid.Column="2" Text="100%" Foreground="{DynamicResource TextMuted}" FontSize="8" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#0b101c"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,10">
+                    <TextBlock Name="MessageText"
+                               Foreground="{DynamicResource TextLight}"
+                               FontSize="11"
+                               LineHeight="16"
+                               TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+
+            <Rectangle Grid.Row="3"
+                       Fill="{DynamicResource CyberBorder}"
+                       Height="1"
+                       Margin="14,0" />
+
+            <Border Grid.Row="4"
+                    Name="FooterBorder"
+                    Background="Transparent"
+                    Padding="14,8,14,10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="SYSTEM ALERT •"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="9"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Name="TimestampText"
+                                   Text="00:00:00"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="9"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Button Name="OkButton"
+                            Grid.Column="1"
+                            Classes="cyber-red"
+                            Content="ACKNOWLEDGE"
+                            Click="OnCloseClick"
+                            Padding="16,5"
+                            FontWeight="Bold"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</Window>

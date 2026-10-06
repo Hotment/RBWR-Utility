@@ -1,0 +1,503 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+             xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
+             x:Class="RbwrOverlay.UI.Views.DetailedOverlayView"
+             x:DataType="vm:MainOverlayViewModel">
+
+    <Border Background="{DynamicResource CyberMainBg}"
+            BorderBrush="{DynamicResource CyberBorderGlow}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12"
+            Width="470"
+            Height="455"
+            BoxShadow="0 8 32 0 #55000000">
+
+        <Grid RowDefinitions="Auto,Auto,*">
+
+            <Grid Grid.Row="0"
+                  ColumnDefinitions="Auto,*,Auto"
+                  Margin="0,0,0,10">
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="RBWR OVERLAY"
+                               Foreground="{DynamicResource NeonCyan}"
+                               FontWeight="Bold"
+                               FontSize="12"
+                               LetterSpacing="1"
+                               VerticalAlignment="Center" />
+
+                    <Border Background="#101828"
+                            BorderBrush="{Binding ConnectionStatusBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="6,2">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding ConnectionStatusText}"
+                                       Foreground="{Binding ConnectionStatusBrush}"
+                                       FontSize="9"
+                                       FontWeight="Bold" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            VerticalAlignment="Center">
+
+                    <Border Background="#261b0a"
+                            BorderBrush="{DynamicResource NeonGold}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="5,1"
+                            IsVisible="{Binding IsRecircOverrideActive}">
+                        <TextBlock Text="{Binding RecircIndicatorText}"
+                                   Foreground="{DynamicResource NeonGold}"
+                                   FontSize="9"
+                                   FontWeight="Bold" />
+                    </Border>
+
+                    <Button Classes="cyber-header-btn"
+                            Content="{Binding PinSymbol}"
+                            Command="{Binding ToggleTopmostCommand}"
+                            ToolTip.Tip="Toggle Always-on-Top" />
+
+                    <Button Classes="cyber-header-btn"
+                            Content="—"
+                            Command="{Binding ToggleCompactCommand}"
+                            ToolTip.Tip="Switch to Compact Floating HUD" />
+
+                    <Button Classes="cyber-close-btn"
+                            Content="X"
+                            Command="{Binding QuitCommand}"
+                            ToolTip.Tip="Exit Application" />
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Background="{DynamicResource CyberCardBg}"
+                    BorderBrush="{DynamicResource CyberBorder}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Margin="0,0,0,10">
+
+                <Grid ColumnDefinitions="*,*,*,*">
+                    <Button Grid.Column="0"
+                            Classes="cyber-nav"
+                            Classes.active="{Binding IsMonitorTabActive}"
+                            Content="MONITOR"
+                            Command="{Binding SwitchTabCommand}"
+                            CommandParameter="Monitor"
+                            HorizontalAlignment="Stretch" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-nav"
+                            Classes.active="{Binding IsSyncTabActive}"
+                            Content="SERVER SYNC"
+                            Command="{Binding SwitchTabCommand}"
+                            CommandParameter="Sync"
+                            HorizontalAlignment="Stretch" />
+
+                    <Button Grid.Column="2"
+                            Classes="cyber-nav"
+                            Classes.active="{Binding IsSettingsTabActive}"
+                            Content="CONFIG"
+                            Command="{Binding SwitchTabCommand}"
+                            CommandParameter="Settings"
+                            HorizontalAlignment="Stretch" />
+
+                    <Button Grid.Column="3"
+                            Classes="cyber-nav"
+                            Classes.active="{Binding IsFeedbackTabActive}"
+                            Content="FEEDBACK"
+                            Command="{Binding SwitchTabCommand}"
+                            CommandParameter="Feedback"
+                            HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+
+            <Panel Grid.Row="2">
+
+                <Grid RowDefinitions="Auto,Auto,Auto,*,Auto"
+                      IsVisible="{Binding IsMonitorTabActive}">
+
+                    <Grid Grid.Row="0"
+                          ColumnDefinitions="*,*"
+                          Margin="0,0,0,8">
+                        <Button Grid.Column="0"
+                                Classes="cyber"
+                                Classes.active="{Binding IsUnit1Active}"
+                                Content="UNIT 01 (APRM)"
+                                Command="{Binding SelectUnitCommand}"
+                                CommandParameter="1"
+                                Margin="0,0,4,0"
+                                HorizontalAlignment="Stretch" />
+
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Classes.active="{Binding IsUnit2Active}"
+                                Content="UNIT 02 (RTP)"
+                                Command="{Binding SelectUnitCommand}"
+                                CommandParameter="2"
+                                Margin="4,0,0,0"
+                                HorizontalAlignment="Stretch" />
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Background="{DynamicResource CyberCardBg}"
+                            BorderBrush="{Binding MainPowerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding MainStatusPowerText}"
+                                       Foreground="{Binding MainPowerBrush}"
+                                       FontWeight="Bold"
+                                       FontSize="24"
+                                       HorizontalAlignment="Center" />
+
+                            <ProgressBar Classes="cyber-power"
+                                         Value="{Binding ThermalPowerPercent}"
+                                         Minimum="0"
+                                         Maximum="120"
+                                         Foreground="{Binding PowerBarBrush}"
+                                         Margin="10,2" />
+
+                            <TextBlock Text="{Binding MainStatusSubText}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontWeight="Bold"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="4"
+                                Margin="0,0,0,8">
+                        <Button Classes="cyber-preset" Content="0 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="0" />
+                        <Button Classes="cyber-preset" Content="300 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="300" />
+                        <Button Classes="cyber-preset" Content="600 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="600" />
+                        <Button Classes="cyber-preset" Content="950 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="950" />
+                        <Button Classes="cyber-preset" Content="1100 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="1100" />
+                        <Button Classes="cyber-preset" Content="1200 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="1200" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="3"
+                          ColumnDefinitions="*,*"
+                          RowDefinitions="*,*"
+                          Margin="0,0,0,8">
+
+                        <Border Grid.Row="0" Grid.Column="0"
+                                Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,6"
+                                Margin="0,0,4,4">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="DEMAND LOAD (MWt)" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
+                                    <Button Grid.Column="0" Classes="cyber" Content="-50" Command="{Binding AdjustDemandCommand}" CommandParameter="-50" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="-10" Command="{Binding AdjustDemandCommand}" CommandParameter="-10" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Classes="cyber" Text="{Binding DemandInput}" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="3" Classes="cyber" Content="+10" Command="{Binding AdjustDemandCommand}" CommandParameter="10" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="4" Classes="cyber" Content="+50" Command="{Binding AdjustDemandCommand}" CommandParameter="50" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.Column="1"
+                                Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,6"
+                                Margin="4,0,0,4">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding UnitSuffix, StringFormat='CORE POWER ({0}%)'}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" VerticalAlignment="Center">
+                                    <TextBox Classes="cyber" Text="{Binding RtpInput}" Width="74" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <TextBlock Text="%" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="0"
+                                Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,6"
+                                Margin="0,4,4,0">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="GENERATOR LOAD" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock Text="{Binding GeneratorLoadText}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="1"
+                                Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,6"
+                                Margin="4,4,0,0">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="FEEDWATER FLOW" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock Text="{Binding FeedwaterFlowText}" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="13" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="4"
+                            Background="#111726"
+                            BorderBrush="{DynamicResource CyberBorder}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8,5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                <TextBlock Text="UPCOMING DEMAND:" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ServerDtlText}" Foreground="{Binding ServerDtlBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding AuxUsageText, StringFormat='Aux Usage: {0}'}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontSize="9"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                </Grid>
+
+                <ScrollViewer IsVisible="{Binding IsSyncTabActive}">
+                    <StackPanel Spacing="10">
+
+                        <Border Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="10,8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="SERVER CONNECTION" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" />
+                                    <TextBlock Text="{Binding HeartbeatAgeText}" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Classes="cyber-green"
+                                        Content="Sync Now"
+                                        Command="{Binding ConnectServerFromInputCommand}"
+                                        Padding="10,3" />
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Enter Roblox Job ID or Server Short ID (e.g. 77f6-4b2f):" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                            <AutoCompleteBox ItemsSource="{Binding CachedJobIds}"
+                                             Text="{Binding JobIdInput}"
+                                             behaviors:AutoCompleteBehaviors.JobIdFilter="True"
+                                             FontSize="11"
+                                             FontFamily="Consolas, monospace" />
+                        </StackPanel>
+
+                        <Border Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="10,8">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="DEMAND TIME LEFT (DTL)" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DtlCountdownText}" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="14" />
+                                </Grid>
+
+                                <ProgressBar Classes="cyber-power" Value="{Binding DtlProgressPercent}" Minimum="0" Maximum="100" Foreground="{DynamicResource NeonGold}" />
+
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Calibrate:" Foreground="{DynamicResource TextMuted}" FontSize="9" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="-5s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-5" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <Button Grid.Column="2" Classes="cyber" Content="-1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-1" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <Button Grid.Column="3" Classes="cyber" Content="+1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="1" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <TextBox Grid.Column="4" Classes="cyber" Text="{Binding CustomCalibInput}" PlaceholderText="Sec" FontSize="9" Padding="2,0" Width="42" Margin="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="5" Classes="cyber-green" Content="Set" Command="{Binding ApplyCustomCalibCommand}" Padding="8,2" FontSize="9" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="10,8">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="TURBINE HEALTH DIAGNOSTICS" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding TurbineHealthText}" Foreground="{Binding TurbineHealthBrush}" FontWeight="Bold" FontSize="10" />
+                                </Grid>
+                                <ProgressBar Classes="cyber-power" Value="{Binding TurbineHealthValue}" Minimum="0" Maximum="100" Foreground="{Binding TurbineHealthBrush}" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{Binding SyncStatusMessage}"
+                                   Foreground="{Binding SyncStatusBrush}"
+                                   FontSize="10"
+                                   TextWrapping="Wrap" />
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer IsVisible="{Binding IsSettingsTabActive}">
+                    <StackPanel Spacing="10" Margin="0,0,6,0">
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                            <StackPanel Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="HUD Opacity:" VerticalAlignment="Center" FontSize="11" />
+                                    <TextBlock Grid.Column="1" Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" />
+                                </Grid>
+                                <Slider Minimum="0.20" Maximum="1.00" Value="{Binding OverlayOpacity}" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,-2" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                            <StackPanel Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="UI Scale (Full HUD):" VerticalAlignment="Center" FontSize="11" />
+                                    <TextBlock Grid.Column="1" Text="{Binding UiScalePreview, StringFormat='{}{0:P0}'}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" />
+                                </Grid>
+                                <Slider x:Name="UiScaleSlider" Minimum="0.75" Maximum="2.00" Value="{Binding UiScalePreview}" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,-2" />
+                                <Grid ColumnDefinitions="*,*,*,*,*" Margin="0,2,0,0">
+                                    <Button Grid.Column="0" Classes="cyber-preset" Content="75%" Command="{Binding SetUiScalePresetCommand}" CommandParameter="0.75" Margin="0,0,2,0" />
+                                    <Button Grid.Column="1" Classes="cyber-preset" Content="100%" Command="{Binding SetUiScalePresetCommand}" CommandParameter="1.0" Margin="1,0" />
+                                    <Button Grid.Column="2" Classes="cyber-preset" Content="125%" Command="{Binding SetUiScalePresetCommand}" CommandParameter="1.25" Margin="1,0" />
+                                    <Button Grid.Column="3" Classes="cyber-preset" Content="150%" Command="{Binding SetUiScalePresetCommand}" CommandParameter="1.5" Margin="1,0" />
+                                    <Button Grid.Column="4" Classes="cyber-preset" Content="200%" Command="{Binding SetUiScalePresetCommand}" CommandParameter="2.0" Margin="2,0,0,0" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                            <StackPanel Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Compact Mode Scale:" VerticalAlignment="Center" FontSize="11" />
+                                    <TextBlock Grid.Column="1" Text="{Binding CompactUiScalePreview, StringFormat='{}{0:P0}'}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" />
+                                </Grid>
+                                <Slider x:Name="CompactUiScaleSlider" Minimum="0.75" Maximum="2.00" Value="{Binding CompactUiScalePreview}" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,-2" />
+                                <Grid ColumnDefinitions="*,*,*,*,*" Margin="0,2,0,0">
+                                    <Button Grid.Column="0" Classes="cyber-preset" Content="75%" Command="{Binding SetCompactUiScalePresetCommand}" CommandParameter="0.75" Margin="0,0,2,0" />
+                                    <Button Grid.Column="1" Classes="cyber-preset" Content="100%" Command="{Binding SetCompactUiScalePresetCommand}" CommandParameter="1.0" Margin="1,0" />
+                                    <Button Grid.Column="2" Classes="cyber-preset" Content="125%" Command="{Binding SetCompactUiScalePresetCommand}" CommandParameter="1.25" Margin="1,0" />
+                                    <Button Grid.Column="3" Classes="cyber-preset" Content="150%" Command="{Binding SetCompactUiScalePresetCommand}" CommandParameter="1.5" Margin="1,0" />
+                                    <Button Grid.Column="4" Classes="cyber-preset" Content="200%" Command="{Binding SetCompactUiScalePresetCommand}" CommandParameter="2.0" Margin="2,0,0,0" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Topmost on Roblox (Auto-Detect):" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="{Binding TopmostStatusText}" Foreground="{Binding TopmostStatusBrush}" Command="{Binding ToggleRobloxTopmostCommand}" Padding="10,3" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBlock Grid.Column="0" Text="Recirc Override (%):" VerticalAlignment="Center" FontSize="11" />
+                                <TextBox Grid.Column="1" Classes="cyber" Text="{Binding RecircOverrideInput}" Width="45" Padding="2,0" Margin="0,0,4,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                <Button Grid.Column="2" Classes="cyber" Content="Reset" Command="{Binding ResetRecircOverrideCommand}" Padding="6,2" FontSize="11" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Next Demand Switch Timer (s):" VerticalAlignment="Center" FontSize="11" />
+                                <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandThresholdSecondsInput}" Width="45" Padding="2,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Turbine Health Alarm:" VerticalAlignment="Center" FontSize="11" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="{Binding TurbineAlertStatusText}" Foreground="{Binding TurbineAlertStatusBrush}" Command="{Binding ToggleTurbineAlertSettingCommand}" Padding="10,3" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Alarm Threshold (%):" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextMuted}" />
+                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding TurbineHealthThresholdInput}" Width="45" Padding="2,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Diagnostics &amp; Log File:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="Open Log" Command="{Binding OpenLogCommand}" Padding="8,3" />
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,2,0,4">
+                            <TextBlock Text="RBWR Overlay v2.1.0" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                            <TextBlock Text="•" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                            <TextBlock Text="MIT License" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer IsVisible="{Binding IsFeedbackTabActive}">
+                    <StackPanel Spacing="10" Margin="0,0,6,0">
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="COMMUNITY FEEDBACK &amp; SUGGESTIONS" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" />
+
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0" Text="Name:" VerticalAlignment="Center" FontSize="10" Margin="0,0,6,0" />
+                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding FeedbackAuthor}" IsEnabled="{Binding !FeedbackIsAnonymous}" FontSize="10" Padding="4,2" />
+                                </Grid>
+
+                                <CheckBox Content="Submit Anonymously" IsChecked="{Binding FeedbackIsAnonymous}" FontSize="10" />
+
+                                <TextBox Classes="cyber" Text="{Binding FeedbackContent}" AcceptsReturn="True" Height="70" TextWrapping="Wrap" PlaceholderText="Type your suggestion or feedback here..." FontSize="10" />
+
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding FeedbackStatusMessage}" Foreground="{Binding FeedbackStatusBrush}" FontSize="9" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Classes="cyber-green" Content="Submit" Command="{Binding SubmitFeedbackCommand}" IsEnabled="{Binding !IsSubmittingFeedback}" Padding="10,3" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="SYSTEM UPDATES" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="Check Now" Command="{Binding CheckUpdatesCommand}" Padding="8,2" FontSize="9" />
+                                </Grid>
+
+                                <TextBlock Text="{Binding UpdateStatusText}" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+
+                                <StackPanel Spacing="4" IsVisible="{Binding IsUpdateAvailable}">
+                                    <TextBlock Text="{Binding LatestVersionText}" Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="10" />
+                                    <Button Classes="cyber-green" Content="Download &amp; Install" Command="{Binding UpdateNowCommand}" HorizontalAlignment="Left" Padding="8,3" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+            </Panel>
+
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,107 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        x:Class="RbwrOverlay.UI.Views.FeedbackWindow"
+        x:DataType="vm:FeedbackViewModel"
+        Title="Submit Feedback &amp; Suggestions"
+        Icon="/Assets/icon.ico"
+        Background="{DynamicResource CyberCardBg}"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="390"
+        Height="390"
+        WindowStartupLocation="CenterOwner">
+
+    <Border BorderBrush="{DynamicResource NeonCyan}"
+            BorderThickness="1"
+            CornerRadius="4">
+
+        <Grid RowDefinitions="Auto,*">
+
+            <Border Grid.Row="0"
+                    Background="{DynamicResource CyberHeaderBg}"
+                    Padding="10,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="SUBMIT FEEDBACK &amp; SUGGESTIONS"
+                               Foreground="{DynamicResource NeonCyan}"
+                               FontWeight="Bold"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-close"
+                            Content="✕"
+                            Command="{Binding CancelCommand}"
+                            Padding="6,2" />
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1"
+                        Margin="15,12"
+                        Spacing="8">
+
+                <TextBlock Text="Warning: Inappropriate feedback/suggestions or spam can result in a permanent or temporary IP ban."
+                           Foreground="{DynamicResource NeonGold}"
+                           FontSize="10"
+                           FontWeight="Bold"
+                           TextWrapping="Wrap" />
+
+                <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Column="0"
+                               Text="Your Name:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+                    <TextBox Grid.Column="1"
+                             Classes="cyber"
+                             Text="{Binding AuthorName}"
+                             IsEnabled="{Binding !IsAnonymous}"
+                             FontSize="11"
+                             Padding="6,3" />
+                </Grid>
+
+                <CheckBox Content="Submit Anonymously"
+                          IsChecked="{Binding IsAnonymous}"
+                          Foreground="{DynamicResource TextLight}"
+                          FontSize="11" />
+
+                <TextBlock Text="Feedback / Suggestion details:"
+                           Foreground="{DynamicResource TextLight}"
+                           FontSize="11" />
+
+                <TextBox Classes="cyber"
+                         Text="{Binding FeedbackContent}"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         Height="110"
+                         FontSize="11"
+                         Padding="6,4" />
+
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="{Binding StatusBrush}"
+                           FontWeight="Bold"
+                           FontSize="11"
+                           TextAlignment="Center"
+                           MinHeight="18" />
+
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Spacing="8">
+                    <Button Classes="cyber"
+                            Content="Cancel"
+                            Command="{Binding CancelCommand}"
+                            Padding="12,4" />
+
+                    <Button Classes="cyber-green"
+                            Content="Submit"
+                            Command="{Binding SubmitCommand}"
+                            IsEnabled="{Binding !IsSubmitting}"
+                            Padding="14,4" />
+                </StackPanel>
+
+            </StackPanel>
+
+        </Grid>
+    </Border>
+</Window>

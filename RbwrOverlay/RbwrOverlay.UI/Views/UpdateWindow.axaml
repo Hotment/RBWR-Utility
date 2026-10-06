@@ -1,0 +1,110 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        x:Class="RbwrOverlay.UI.Views.UpdateWindow"
+        x:DataType="vm:UpdateViewModel"
+        Title="System Update Available"
+        Icon="/Assets/icon.ico"
+        Background="{DynamicResource CyberCardBg}"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="380"
+        Height="290"
+        WindowStartupLocation="CenterOwner">
+
+    <Border BorderBrush="{DynamicResource NeonCyan}"
+            BorderThickness="1"
+            CornerRadius="4">
+
+        <Grid RowDefinitions="Auto,*">
+        
+            <Border Grid.Row="0"
+                    Background="{DynamicResource CyberHeaderBg}"
+                    Padding="10,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="SYSTEM UPDATE AVAILABLE"
+                               Foreground="{DynamicResource NeonGold}"
+                               FontWeight="Bold"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-close"
+                            Content="✕"
+                            Command="{Binding RemindLaterCommand}"
+                            Padding="6,2" />
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1"
+                        Margin="15,12"
+                        Spacing="8">
+
+                <TextBlock Text="{Binding LatestVersion, StringFormat='A new version (v{0}) is ready!'}"
+                           Foreground="{DynamicResource TextLight}"
+                           FontWeight="Bold"
+                           FontSize="12" />
+
+                <TextBlock Text="{Binding CurrentVersion, StringFormat='Your version: v{0}'}"
+                           Foreground="{DynamicResource TextMuted}"
+                           FontSize="10" />
+
+                <Border Background="{DynamicResource CyberMainBg}"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Height="100"
+                        Padding="8">
+                    <ScrollViewer>
+                        <TextBlock Text="{Binding ReleaseNotes}"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="10"
+                                   TextWrapping="Wrap" />
+                    </ScrollViewer>
+                </Border>
+
+                <ProgressBar Value="{Binding DownloadProgress}"
+                             Minimum="0"
+                             Maximum="100"
+                             IsVisible="{Binding IsDownloading}"
+                             Height="6" />
+
+                <TextBlock Text="{Binding DownloadStatus}"
+                           Foreground="{DynamicResource NeonCyan}"
+                           FontSize="10"
+                           HorizontalAlignment="Center"
+                           MinHeight="14" />
+
+                <Grid ColumnDefinitions="*,*,*">
+                    <Button Grid.Column="0"
+                            Classes="cyber-green"
+                            Content="Update Now"
+                            Command="{Binding UpdateNowCommand}"
+                            IsEnabled="{Binding !IsDownloading}"
+                            Margin="0,0,4,0"
+                            HorizontalAlignment="Stretch" />
+
+                    <Button Grid.Column="1"
+                            Classes="cyber-red"
+                            Content="Skip Version"
+                            Command="{Binding SkipVersionCommand}"
+                            IsEnabled="{Binding !IsDownloading}"
+                            Margin="2,0,2,0"
+                            HorizontalAlignment="Stretch" />
+
+                    <Button Grid.Column="2"
+                            Classes="cyber"
+                            Content="Later"
+                            Command="{Binding RemindLaterCommand}"
+                            IsEnabled="{Binding !IsDownloading}"
+                            Margin="4,0,0,0"
+                            HorizontalAlignment="Stretch" />
+                </Grid>
+
+            </StackPanel>
+
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,331 @@
+name: Build & Package Avalonia C# App (.NET Multi-Platform)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish release assets to GitHub Release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-14]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore RbwrOverlay/RbwrOverlay.slnx
+
+      - name: Build solution
+        run: dotnet build RbwrOverlay/RbwrOverlay.slnx -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test RbwrOverlay/RbwrOverlay.Tests/RbwrOverlay.Tests.csproj -c Release --no-build --verbosity normal
+
+  publish-windows:
+    name: Publish Windows (${{ matrix.rid }})
+    needs: test
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Single-File Executable
+        run: |
+          dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish/${{ matrix.rid }}
+
+      - name: Prepare Windows Release Package
+        run: |
+          # Copy standalone executable to release artifact (ready to double-click with no unzip needed)
+          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "RBWR_APRM_Calculator_${{ matrix.rid }}.exe"
+
+          # Create directory bundle with icon and both names
+          $bundleDir = "RBWR_APRM_Calculator_Windows_${{ matrix.rid }}"
+          New-Item -ItemType Directory -Path $bundleDir -Force
+          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "$bundleDir/RbwrOverlay.exe"
+          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "$bundleDir/RBWR_APRM_Calculator.exe"
+          if (Test-Path "icon.ico") { Copy-Item "icon.ico" "$bundleDir/" }
+          if (Test-Path "icon.png") { Copy-Item "icon.png" "$bundleDir/" }
+
+          Compress-Archive -Path "$bundleDir/*" -DestinationPath "${bundleDir}.zip"
+
+      - name: Upload Windows Standalone Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_${{ matrix.rid }}_exe
+          path: RBWR_APRM_Calculator_${{ matrix.rid }}.exe
+
+      - name: Upload Windows Zip Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_Windows_${{ matrix.rid }}
+          path: RBWR_APRM_Calculator_Windows_${{ matrix.rid }}.zip
+
+  publish-linux:
+    name: Publish Linux (${{ matrix.rid }})
+    needs: test
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        rid: [linux-x64, linux-arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Linux Standalone Binary
+        run: |
+          dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -o publish/${{ matrix.rid }}
+
+      - name: Package Linux Bundle (tar.gz & zip)
+        run: |
+          BUNDLE_NAME="RBWR_APRM_Calculator_Linux_${{ matrix.rid }}"
+          mkdir -p "${BUNDLE_NAME}"
+          cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
+          
+          # Ensure execution rights
+          chmod +x "${BUNDLE_NAME}/RbwrOverlay"
+          cp "${BUNDLE_NAME}/RbwrOverlay" "${BUNDLE_NAME}/RBWR_APRM_Calculator"
+          
+          if [ -f "icon.png" ]; then cp "icon.png" "${BUNDLE_NAME}/"; fi
+          if [ -f "icon.ico" ]; then cp "icon.ico" "${BUNDLE_NAME}/"; fi
+
+          # Double-clickable shell launcher script
+          cat << 'EOF' > "${BUNDLE_NAME}/run.sh"
+          #!/usr/bin/env bash
+          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="${SCRIPT_DIR}:${LD_LIBRARY_PATH}"
+          chmod +x "${SCRIPT_DIR}/RbwrOverlay" 2>/dev/null
+          exec "${SCRIPT_DIR}/RbwrOverlay" "$@"
+          EOF
+          chmod +x "${BUNDLE_NAME}/run.sh"
+
+          # Double-clickable desktop launcher entry
+          cat << 'EOF' > "${BUNDLE_NAME}/rbwr-overlay.desktop"
+          [Desktop Entry]
+          Name=RBWR APRM Calculator
+          Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+          Exec=sh -c '"$(dirname "%k")/run.sh"'
+          Icon=icon.png
+          Terminal=false
+          Type=Application
+          Categories=Utility;Game;
+          EOF
+          chmod +x "${BUNDLE_NAME}/rbwr-overlay.desktop"
+
+          # Create both tar.gz (preserves +x permissions) and zip
+          tar -czvf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
+          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
+
+          # Standalone binary for direct curl / terminal download
+          cp "${BUNDLE_NAME}/RbwrOverlay" "RbwrOverlay_${{ matrix.rid }}"
+          chmod +x "RbwrOverlay_${{ matrix.rid }}"
+
+      - name: Upload Linux Package (tar.gz)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_Linux_${{ matrix.rid }}_targz
+          path: RBWR_APRM_Calculator_Linux_${{ matrix.rid }}.tar.gz
+
+      - name: Upload Linux Package (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_Linux_${{ matrix.rid }}_zip
+          path: RBWR_APRM_Calculator_Linux_${{ matrix.rid }}.zip
+
+      - name: Upload Linux Standalone Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: RbwrOverlay_${{ matrix.rid }}_binary
+          path: RbwrOverlay_${{ matrix.rid }}
+
+  publish-macos:
+    name: Publish macOS (${{ matrix.rid }})
+    needs: test
+    runs-on: macos-14
+    strategy:
+      matrix:
+        rid: [osx-arm64, osx-x64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Generate macOS Application Icon (.icns)
+        run: |
+          if [ -f "icon.png" ]; then
+            mkdir -p icon.iconset
+            sips -z 16 16     icon.png --out icon.iconset/icon_16x16.png
+            sips -z 32 32     icon.png --out icon.iconset/icon_16x16@2x.png
+            sips -z 32 32     icon.png --out icon.iconset/icon_32x32.png
+            sips -z 64 64     icon.png --out icon.iconset/icon_32x32@2x.png
+            sips -z 128 128   icon.png --out icon.iconset/icon_128x128.png
+            sips -z 256 256   icon.png --out icon.iconset/icon_128x128@2x.png
+            sips -z 512 512   icon.png --out icon.iconset/icon_512x512.png
+            sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png
+            iconutil -c icns icon.iconset -o icon.icns
+            rm -rf icon.iconset
+          fi
+
+      - name: Publish macOS Standalone Binary
+        run: |
+          dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -o publish/${{ matrix.rid }}
+
+      - name: Build macOS Application Bundle (.app)
+        run: |
+          BUNDLE_NAME="RBWR_APRM_Calculator_macOS_${{ matrix.rid }}"
+          APP_NAME="RBWR APRM Calculator.app"
+          mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS"
+          mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources"
+
+          # Copy binaries and native dylibs into bundle
+          cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/"
+          chmod +x "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay"
+
+          # Copy icon
+          if [ -f "icon.icns" ]; then
+            cp icon.icns "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.icns"
+          fi
+          if [ -f "icon.png" ]; then
+            cp icon.png "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.png"
+          fi
+
+          # Generate Info.plist for macOS Finder integration
+          cat << 'EOF' > "${BUNDLE_NAME}/${APP_NAME}/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>RBWR APRM Calculator</string>
+              <key>CFBundleDisplayName</key>
+              <string>RBWR APRM Calculator</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.hotment.rbwroverlay</string>
+              <key>CFBundleVersion</key>
+              <string>1.0.0</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleExecutable</key>
+              <string>RbwrOverlay</string>
+              <key>CFBundleIconFile</key>
+              <string>icon.icns</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          # Ad-hoc sign bundle for Gatekeeper compatibility
+          codesign --force --deep -s - "${BUNDLE_NAME}/${APP_NAME}" || true
+
+          # Provide terminal execution: ./RbwrOverlay directly in bundle root
+          cp "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay" "${BUNDLE_NAME}/RbwrOverlay"
+          chmod +x "${BUNDLE_NAME}/RbwrOverlay"
+
+          # Provide double-clickable terminal script launcher for macOS Finder
+          cat << 'EOF' > "${BUNDLE_NAME}/run.command"
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          chmod +x "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" 2>/dev/null
+          exec "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" "$@"
+          EOF
+          chmod +x "${BUNDLE_NAME}/run.command"
+
+          # Package as Zip Archive
+          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
+
+      - name: Upload macOS Package (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_macOS_${{ matrix.rid }}
+          path: RBWR_APRM_Calculator_macOS_${{ matrix.rid }}.zip
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+    needs: [publish-windows, publish-linux, publish-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-downloads
+
+      - name: Consolidate Release Assets
+        run: |
+          mkdir -p release-assets
+          find release-downloads -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz" -o -name "RbwrOverlay_*" \) -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
+          files: release-assets/*
+          generate_release_notes: true
