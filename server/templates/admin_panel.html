@@ -1749,16 +1749,35 @@
                     const bubbleBg = isAdminMsg ? 'bg-blue-950/30 border-blue-500/30' : 'bg-emerald-950/30 border-emerald-500/30';
                     const tagColor = isAdminMsg ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
                     const senderRole = isAdminMsg ? 'Administrator' : 'Author';
+                    const editedBadge = m.edited ? '<span class="text-[9px] text-slate-500 font-mono">(edited)</span>' : '';
                     return `
-                        <div class="p-2.5 rounded-lg border ${bubbleBg} flex flex-col gap-1 text-xs">
+                        <div id="ticket-msg-card-${s.id}-${m.id}" class="p-2.5 rounded-lg border ${bubbleBg} flex flex-col gap-1 text-xs">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-1.5 min-w-0">
                                     <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
                                     <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderRole}</span>
+                                    ${editedBadge}
                                 </div>
-                                <span class="text-[10px] text-slate-400 font-mono">${formatTimestamp(m.timestamp)}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] text-slate-400 font-mono">${formatTimestamp(m.timestamp)}</span>
+                                    ${isAdminMsg ? `
+                                        <div class="flex items-center gap-1">
+                                            <button onclick="startEditAdminReply(${s.id}, ${m.id})" title="Edit Reply" class="text-[10px] font-mono text-slate-400 hover:text-blue-300 px-1.5 py-0.5 rounded border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/10 transition">Edit</button>
+                                            <button onclick="deleteAdminReply(${s.id}, ${m.id})" title="Delete Reply" class="text-[10px] font-mono text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded border border-white/5 hover:border-rose-500/30 hover:bg-rose-500/10 transition">Delete</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </div>
-                            <p class="text-xs text-slate-200 font-mono whitespace-pre-wrap pl-1">${escapeHtml(m.message)}</p>
+                            <div id="ticket-msg-content-${s.id}-${m.id}">
+                                <p id="ticket-msg-text-${s.id}-${m.id}" class="text-xs text-slate-200 font-mono whitespace-pre-wrap pl-1">${escapeHtml(m.message)}</p>
+                            </div>
+                            <div id="ticket-msg-edit-${s.id}-${m.id}" class="hidden flex flex-col gap-1.5 pt-1">
+                                <textarea id="ticket-msg-edit-input-${s.id}-${m.id}" rows="2" class="premium-input text-xs p-2 rounded-lg outline-none resize-none font-mono text-slate-200">${escapeHtml(m.message)}</textarea>
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="cancelEditAdminReply(${s.id}, ${m.id})" class="text-[10px] font-mono text-slate-400 hover:text-white px-2 py-0.5 rounded border border-white/10 hover:bg-white/5 transition">Cancel</button>
+                                    <button onclick="saveEditAdminReply(${s.id}, ${m.id})" class="text-[10px] font-mono bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-0.5 rounded font-bold shadow-sm transition">Save</button>
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -1887,6 +1906,70 @@
                 }
             } catch (err) {
                 alert('Network error posting reply.');
+            }
+        }
+
+        function startEditAdminReply(ticketId, msgId) {
+            const contentEl = document.getElementById(`ticket-msg-content-${ticketId}-${msgId}`);
+            const editEl = document.getElementById(`ticket-msg-edit-${ticketId}-${msgId}`);
+            if (contentEl && editEl) {
+                contentEl.classList.add('hidden');
+                editEl.classList.remove('hidden');
+                const textarea = document.getElementById(`ticket-msg-edit-input-${ticketId}-${msgId}`);
+                if (textarea) textarea.focus();
+            }
+        }
+
+        function cancelEditAdminReply(ticketId, msgId) {
+            const contentEl = document.getElementById(`ticket-msg-content-${ticketId}-${msgId}`);
+            const editEl = document.getElementById(`ticket-msg-edit-${ticketId}-${msgId}`);
+            if (contentEl && editEl) {
+                editEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+            }
+        }
+
+        async function saveEditAdminReply(ticketId, msgId) {
+            const textarea = document.getElementById(`ticket-msg-edit-input-${ticketId}-${msgId}`);
+            if (!textarea || !textarea.value.trim()) return;
+
+            const newText = textarea.value.trim();
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: newText })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    const textEl = document.getElementById(`ticket-msg-text-${ticketId}-${msgId}`);
+                    if (textEl) textEl.textContent = newText;
+                    cancelEditAdminReply(ticketId, msgId);
+                } else {
+                    alert(data.detail || 'Failed to update reply.');
+                }
+            } catch (err) {
+                alert('Network error updating reply.');
+            }
+        }
+
+        async function deleteAdminReply(ticketId, msgId) {
+            if (!confirm('Are you sure you want to delete this admin reply? It will also be removed from the Discord discussion thread.')) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    const card = document.getElementById(`ticket-msg-card-${ticketId}-${msgId}`);
+                    if (card) card.remove();
+                } else {
+                    alert(data.detail || 'Failed to delete reply.');
+                }
+            } catch (err) {
+                alert('Network error deleting reply.');
             }
         }
 

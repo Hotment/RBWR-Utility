@@ -73,20 +73,26 @@ try:
     from bot.bot import (
         create_discord_ticket_channel,
         forward_ticket_reply_to_discord,
+        edit_ticket_reply_in_discord,
+        delete_ticket_reply_in_discord,
         start_bot_thread,
         is_user_in_guild,
         notify_ticket_author_dm,
         update_discussion_thread_status,
+        update_ticket_channel_message,
         notify_ticket_deleted,
     )
 except Exception:
     from bot import (
         create_discord_ticket_channel,  # pyright: ignore[reportAttributeAccessIssue]
         forward_ticket_reply_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        edit_ticket_reply_in_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        delete_ticket_reply_in_discord,  # pyright: ignore[reportAttributeAccessIssue]
         start_bot_thread,  # pyright: ignore[reportAttributeAccessIssue]
         is_user_in_guild,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_author_dm,  # pyright: ignore[reportAttributeAccessIssue]
         update_discussion_thread_status,  # pyright: ignore[reportAttributeAccessIssue]
+        update_ticket_channel_message,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
     )
 
@@ -4033,11 +4039,13 @@ def add_ticket_message_api(ticket_id):
             logger.warning(f"[Ticket Message] Failed to notify author via DM: {dm_err}")
 
     discord_channel_id = target_ticket.get("discord_channel_id")
-    if discord_channel_id:
-        def _fwd_to_discord(ch_id, m_text, s_name, is_adm, current_msg_id):
+    discussion_thread_id = target_ticket.get("discussion_thread_id")
+    channels_to_fwd = [c for c in [discord_channel_id, discussion_thread_id] if c]
+    if channels_to_fwd:
+        def _fwd_to_discord(chs, m_text, s_name, is_adm, current_msg_id):
             try:
                 d_id = forward_ticket_reply_to_discord(
-                    channel_id=str(ch_id),
+                    channel_id=chs,
                     message_text=m_text,
                     sender_name=s_name,
                     is_admin=is_adm,
@@ -4057,7 +4065,7 @@ def add_ticket_message_api(ticket_id):
 
         threading.Thread(
             target=_fwd_to_discord,
-            args=(discord_channel_id, msg_text, msg_obj.get("sender_name", "User"), is_admin, msg_obj.get("id")),
+            args=(channels_to_fwd, msg_text, msg_obj.get("sender_name", "User"), is_admin, msg_obj.get("id")),
             daemon=True
         ).start()
 
@@ -4065,6 +4073,133 @@ def add_ticket_message_api(ticket_id):
         "message": "Reply posted successfully.",
         "ticket_id": ticket_id,
         "new_message": msg_obj,
+        "messages": messages
+    })
+
+@app.route("/api/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["PATCH", "PUT"])
+def edit_ticket_message_api(ticket_id, message_id):
+    if not session.get("admin_logged_in"):
+        return jsonify({"detail": "Administrator authentication required."}), 403
+
+    req_json = request.get_json() or {}
+    new_text = str(req_json.get("message", "")).strip()
+    if not new_text:
+        return jsonify({"detail": "Message content cannot be empty."}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target_ticket = None
+    for s in suggestions:
+        if s.get("id") == ticket_id:
+            target_ticket = s
+            break
+
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    messages = target_ticket.setdefault("messages", [])
+    target_msg = next((m for m in messages if m.get("id") == message_id), None)
+    if not target_msg:
+        return jsonify({"detail": f"Message #{message_id} not found in Ticket #{ticket_id}."}), 404
+
+    target_msg["message"] = new_text
+    target_msg["edited"] = True
+    target_msg["edited_at"] = datetime.now(timezone.utc).isoformat()
+
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    broadcast_ticket_update(
+        ticket_id,
+        target_msg,
+        messages,
+        target_ticket.get("discord_id"),
+        target_ticket.get("anonymous")
+    )
+
+    d_msg_id = target_msg.get("discord_message_id")
+    if d_msg_id:
+        discord_channel_id = target_ticket.get("discord_channel_id")
+        discussion_thread_id = target_ticket.get("discussion_thread_id")
+        channels_to_sync = [c for c in [discord_channel_id, discussion_thread_id] if c]
+        if channels_to_sync:
+            def _edit_discord(chs, d_id, text, s_name):
+                try:
+                    edit_ticket_reply_in_discord(chs, d_id, text, s_name, True)
+                except Exception as ex:
+                    logger.warning(f"[Disnake Edit Forward] Failed to edit message in Discord: {ex}")
+
+            threading.Thread(
+                target=_edit_discord,
+                args=(channels_to_sync, d_msg_id, new_text, target_msg.get("sender_name", "Administrator")),
+                daemon=True
+            ).start()
+
+    return jsonify({
+        "success": True,
+        "message": "Reply updated successfully.",
+        "ticket_id": ticket_id,
+        "updated_message": target_msg,
+        "messages": messages
+    })
+
+@app.route("/api/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["DELETE"])
+def delete_ticket_message_api(ticket_id, message_id):
+    if not session.get("admin_logged_in"):
+        return jsonify({"detail": "Administrator authentication required."}), 403
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target_ticket = None
+    for s in suggestions:
+        if s.get("id") == ticket_id:
+            target_ticket = s
+            break
+
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    messages = target_ticket.setdefault("messages", [])
+    target_msg = next((m for m in messages if m.get("id") == message_id), None)
+    if not target_msg:
+        return jsonify({"detail": f"Message #{message_id} not found in Ticket #{ticket_id}."}), 404
+
+    d_msg_id = target_msg.get("discord_message_id")
+    messages[:] = [m for m in messages if m.get("id") != message_id]
+
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    broadcast_ticket_update(
+        ticket_id,
+        {"id": message_id, "deleted": True, "discord_message_id": d_msg_id},
+        messages,
+        target_ticket.get("discord_id"),
+        target_ticket.get("anonymous")
+    )
+
+    if d_msg_id:
+        discord_channel_id = target_ticket.get("discord_channel_id")
+        discussion_thread_id = target_ticket.get("discussion_thread_id")
+        channels_to_sync = [c for c in [discord_channel_id, discussion_thread_id] if c]
+        if channels_to_sync:
+            def _delete_discord(chs, d_id):
+                try:
+                    delete_ticket_reply_in_discord(chs, d_id)
+                except Exception as ex:
+                    logger.warning(f"[Disnake Delete Forward] Failed to delete message in Discord: {ex}")
+
+            threading.Thread(
+                target=_delete_discord,
+                args=(channels_to_sync, d_msg_id),
+                daemon=True
+            ).start()
+
+    return jsonify({
+        "success": True,
+        "message": "Reply deleted successfully.",
+        "ticket_id": ticket_id,
+        "deleted_message_id": message_id,
         "messages": messages
     })
 
@@ -4316,6 +4451,10 @@ def update_suggestion_status(username):
                 update_discussion_thread_status(s, payload.status)
             except Exception as dt_err:
                 logger.warning(f"Failed to update discussion thread status: {dt_err}")
+            try:
+                update_ticket_channel_message(s)
+            except Exception as tcm_err:
+                logger.warning(f"Failed to update ticket channel message: {tcm_err}")
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
@@ -4348,6 +4487,14 @@ def update_suggestion_comment(username):
                 )
             except Exception as dm_err:
                 logger.warning(f"Failed to notify author of note change via DM: {dm_err}")
+            try:
+                update_ticket_channel_message(s)
+            except Exception as tcm_err:
+                logger.warning(f"Failed to update ticket channel message: {tcm_err}")
+            try:
+                update_discussion_thread_status(s, s.get("status") or "open")
+            except Exception as dt_err:
+                logger.warning(f"Failed to update discussion thread note: {dt_err}")
             return jsonify({"message": "Admin comment saved successfully.", "id": payload.id, "comment": payload.comment.strip(), "comment_by": username})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 

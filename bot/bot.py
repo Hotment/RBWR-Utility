@@ -443,7 +443,7 @@ def notify_ticket_author_dm(
         log.warning(f"[DM Notify] Failed to dispatch DM task: {ex}")
 
 class TicketPanelView(disnake.ui.View):
-    def __init__(self, ticket_id: int, ticket_type: str, current_status: str):
+    def __init__(self, ticket_id: int, ticket_type: str, current_status: str, has_note: bool = False):
         super().__init__(timeout=None)
         self.ticket_id = ticket_id
         self.ticket_type = ticket_type
@@ -478,12 +478,44 @@ class TicketPanelView(disnake.ui.View):
         )
         self.add_item(self.select_menu)
 
+        note_label = "Edit Note" if has_note else "Add Note"
+        self.note_button = disnake.ui.Button(
+            label=note_label,
+            style=disnake.ButtonStyle.secondary,
+            custom_id=f"ticket_edit_note:{ticket_id}",
+        )
+        self.add_item(self.note_button)
+
         self.discuss_button = disnake.ui.Button(
             label="Open Discussions",
             style=disnake.ButtonStyle.primary,
             custom_id=f"ticket_open_discussions:{ticket_id}",
         )
         self.add_item(self.discuss_button)
+
+class TicketNoteModal(disnake.ui.Modal):
+    def __init__(self, ticket_id: int, current_note: str = ""):
+        self.ticket_id = ticket_id
+        components = [
+            disnake.ui.TextInput(
+                label="Admin Note",
+                custom_id="ticket_note_text",
+                style=disnake.TextInputStyle.paragraph,
+                placeholder="Enter official developer / administrator note...",
+                value=current_note[:2000] if current_note else None,
+                required=False,
+                max_length=2000,
+            )
+        ]
+        title = f"Edit Note: Ticket #{ticket_id}" if current_note else f"Add Note: Ticket #{ticket_id}"
+        super().__init__(
+            title=title[:45],
+            custom_id=f"ticket_note_modal:{ticket_id}",
+            components=components,
+        )
+
+    async def callback(self, inter: disnake.ModalInteraction):
+        await handle_ticket_note_submission(inter, self.ticket_id)
 
 _handled_interaction_ids: set[int] = set()
 
@@ -498,7 +530,12 @@ def _check_and_mark_interaction(inter_id: int) -> bool:
             _handled_interaction_ids.pop()
     return False
 
-def build_ticket_panel(ticket_id: int, ticket_type: str, current_status: str) -> tuple[disnake.Embed, disnake.ui.View]:
+def build_ticket_panel(
+    ticket_id: int,
+    ticket_type: str,
+    current_status: str,
+    admin_comment: str | None = None,
+) -> tuple[disnake.Embed, disnake.ui.View]:
     is_bug = (ticket_type == "bug_report")
     status_clean = (current_status or ("open" if is_bug else "pending")).lower()
 
@@ -507,6 +544,7 @@ def build_ticket_panel(ticket_id: int, ticket_type: str, current_status: str) ->
         description=(
             "**Admin Management Controls**\n"
             "• Use the dropdown menu below to change ticket state.\n"
+            "• Click **Add Note** / **Edit Note** to attach an official administrator note.\n"
             "• Click **Open Discussions** to create a community thread and ping the author."
         ),
         color=disnake.Color.dark_theme() if hasattr(disnake.Color, "dark_theme") else disnake.Color.blurple(),
@@ -514,9 +552,12 @@ def build_ticket_panel(ticket_id: int, ticket_type: str, current_status: str) ->
     )
     panel_embed.add_field(name="Current State", value=f"`{status_clean.upper()}`", inline=True)
     panel_embed.add_field(name="Ticket Type", value="Bug Report" if is_bug else "Feature Suggestion", inline=True)
+    if admin_comment and admin_comment.strip():
+        panel_embed.add_field(name="Admin Note", value=admin_comment.strip()[:1000], inline=False)
     panel_embed.set_footer(text=f"RBWR Utility • Admin Ticket Panel #{ticket_id}")
 
-    view = TicketPanelView(ticket_id=ticket_id, ticket_type=ticket_type, current_status=status_clean)
+    has_note = bool(admin_comment and admin_comment.strip())
+    view = TicketPanelView(ticket_id=ticket_id, ticket_type=ticket_type, current_status=status_clean, has_note=has_note)
     return panel_embed, view
 
 def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> None:
@@ -595,6 +636,23 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
             elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
                 new_embed.color = disnake.Color.red()
 
+            admin_comment = (ticket.get("admin_comment") or "").strip()
+            comment_by = ticket.get("comment_by") or "Administrator"
+            note_idx = None
+            for idx, field in enumerate(new_embed.fields):
+                if field.name and field.name.strip().lower() in ("admin note", "developer note", "note"):
+                    note_idx = idx
+                    break
+
+            if admin_comment:
+                note_val = f"**[{comment_by}]**:\n{admin_comment}"
+                if note_idx is not None:
+                    new_embed.set_field_at(note_idx, name="Admin Note", value=note_val[:1024], inline=False)
+                else:
+                    new_embed.add_field(name="Admin Note", value=note_val[:1024], inline=False)
+            elif note_idx is not None:
+                new_embed.remove_field(note_idx)
+
             await msg.edit(embed=new_embed)
             log.info(f"[Discussion Status Update] Updated discussion embed for ticket #{ticket.get('id')} to {status_upper}")
         except Exception as e:
@@ -604,6 +662,194 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
         asyncio.run_coroutine_threadsafe(_update_async(), disnake_bot_loop)
     except Exception as ex:
         log.warning(f"[Discussion Status Update] Failed to dispatch update task: {ex}")
+
+def update_ticket_channel_message(ticket: dict[str, Any]) -> None:
+    """
+    Updates the Discord ticket channel messages (overview embed and panel view)
+    to reflect changes in ticket state or admin note.
+    Can be safely invoked from web server worker threads or the bot event loop.
+    """
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return
+
+    ticket_id = ticket.get("id")
+    if not ticket_id:
+        return
+
+    channel_id_val = ticket.get("discord_channel_id")
+    bot_ref = disnake_bot
+
+    async def _update_async():
+        ch = None
+        if channel_id_val:
+            try:
+                ch = bot_ref.get_channel(int(channel_id_val))
+                if not ch:
+                    ch = await bot_ref.fetch_channel(int(channel_id_val))
+            except Exception as ex:
+                log.warning(f"[Ticket Channel Update] Could not fetch channel {channel_id_val}: {ex}")
+
+        if not ch:
+            cat_id = int(TICKETS_CATEGORY_ID) if TICKETS_CATEGORY_ID.isdigit() else None
+            for g in bot_ref.guilds:
+                for c in g.text_channels:
+                    if cat_id and c.category_id != cat_id:
+                        continue
+                    name_lower = c.name.lower()
+                    if (
+                        name_lower == f"ticket-{ticket_id}"
+                        or name_lower.startswith(f"ticket-{ticket_id}-")
+                        or name_lower == f"suggestion-{ticket_id}"
+                        or name_lower.startswith(f"suggestion-{ticket_id}-")
+                        or name_lower == f"bug-{ticket_id}"
+                        or name_lower.startswith(f"bug-{ticket_id}-")
+                    ):
+                        ch = c
+                        break
+                if ch:
+                    break
+
+        if not ch or not isinstance(ch, disnake.TextChannel):
+            log.warning(f"[Ticket Channel Update] Text channel for ticket #{ticket_id} not found.")
+            return
+
+        is_bug = (ticket.get("type") == "bug_report")
+        current_status = str(ticket.get("status") or ("open" if is_bug else "pending")).lower()
+        admin_comment = (ticket.get("admin_comment") or "").strip()
+        comment_by = ticket.get("comment_by") or "Administrator"
+
+        overview_msg = None
+        panel_msg = None
+
+        overview_msg_id = ticket.get("discord_message_id")
+        if overview_msg_id:
+            try:
+                overview_msg = await ch.fetch_message(int(overview_msg_id))
+            except Exception:
+                overview_msg = None
+
+        panel_msg_id = ticket.get("panel_message_id")
+        if panel_msg_id:
+            try:
+                panel_msg = await ch.fetch_message(int(panel_msg_id))
+            except Exception:
+                panel_msg = None
+
+        if not overview_msg or not panel_msg:
+            try:
+                async for m in ch.history(oldest_first=True, limit=20):
+                    if bot_ref.user and m.author.id == bot_ref.user.id and m.embeds:
+                        emb = m.embeds[0]
+                        title = emb.title or ""
+                        if not overview_msg and ("Bug Report #" in title or "Feature Suggestion #" in title or f"#{ticket_id}" in title) and "Ticket Panel" not in title:
+                            overview_msg = m
+                        elif not panel_msg and ("Ticket Panel" in title or f"Admin Ticket Panel #{ticket_id}" in (getattr(emb.footer, "text", "") or "")):
+                            panel_msg = m
+            except Exception as h_err:
+                log.warning(f"[Ticket Channel Update] Error scanning history: {h_err}")
+
+        new_disc_id = str(overview_msg.id) if overview_msg else None
+        new_panel_id = str(panel_msg.id) if panel_msg else None
+        if (new_disc_id and new_disc_id != ticket.get("discord_message_id")) or (new_panel_id and new_panel_id != ticket.get("panel_message_id")):
+            if ticket_bridge.load_suggestions and ticket_bridge.save_suggestions:
+                try:
+                    data = ticket_bridge.load_suggestions()
+                    for s in data.get("suggestions", []):
+                        if s.get("id") == ticket_id:
+                            if new_disc_id:
+                                s["discord_message_id"] = new_disc_id
+                            if new_panel_id:
+                                s["panel_message_id"] = new_panel_id
+                            break
+                    ticket_bridge.save_suggestions(data)
+                except Exception as save_err:
+                    log.warning(f"[Ticket Channel Update] Error saving message IDs: {save_err}")
+
+        if overview_msg and overview_msg.embeds:
+            try:
+                old_emb = overview_msg.embeds[0]
+                new_emb = disnake.Embed.from_dict(old_emb.to_dict())
+
+                status_upper = current_status.upper()
+                found_status = False
+                for idx, fld in enumerate(new_emb.fields):
+                    if fld.name and fld.name.strip().lower() == "status":
+                        new_emb.set_field_at(idx, name="Status", value=f"`{status_upper}`", inline=True)
+                        found_status = True
+                        break
+                if not found_status:
+                    new_emb.add_field(name="Status", value=f"`{status_upper}`", inline=True)
+
+                note_field_idx = None
+                admin_replies_idx = None
+                for idx, fld in enumerate(new_emb.fields):
+                    if fld.name and fld.name.strip().lower() in ("admin note", "developer note", "note"):
+                        note_field_idx = idx
+                    elif fld.name and fld.name.strip().lower() == "admin replies":
+                        admin_replies_idx = idx
+
+                if admin_comment:
+                    note_val = f"**[{comment_by}]**:\n{admin_comment}"
+                    if note_field_idx is not None:
+                        new_emb.set_field_at(note_field_idx, name="Admin Note", value=note_val[:1024], inline=False)
+                    else:
+                        if admin_replies_idx is not None:
+                            new_emb.insert_field_at(admin_replies_idx, name="Admin Note", value=note_val[:1024], inline=False)
+                        else:
+                            new_emb.add_field(name="Admin Note", value=note_val[:1024], inline=False)
+                else:
+                    if note_field_idx is not None:
+                        new_emb.remove_field(note_field_idx)
+
+                if status_upper in ("FIXED", "RESOLVED", "IMPLEMENTED", "ACCEPTED"):
+                    new_emb.color = disnake.Color.green()
+                elif status_upper == "PLANNED":
+                    new_emb.color = disnake.Color.teal()
+                elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
+                    new_emb.color = disnake.Color.red()
+                else:
+                    new_emb.color = disnake.Color.red() if is_bug else disnake.Color.blurple()
+
+                await overview_msg.edit(embed=new_emb)
+                log.info(f"[Ticket Channel Update] Updated overview message for ticket #{ticket_id}")
+            except Exception as e:
+                log.warning(f"[Ticket Channel Update] Failed to update overview message: {e}")
+
+        panel_embed, panel_view = build_ticket_panel(
+            ticket_id=ticket_id,
+            ticket_type=ticket.get("type", "suggestion"),
+            current_status=current_status,
+            admin_comment=admin_comment
+        )
+
+        if panel_msg:
+            try:
+                await panel_msg.edit(embed=panel_embed, view=panel_view)
+                log.info(f"[Ticket Channel Update] Updated panel message for ticket #{ticket_id}")
+            except Exception as e:
+                log.warning(f"[Ticket Channel Update] Failed to update panel message: {e}")
+        else:
+            try:
+                sent_panel = await ch.send(embed=panel_embed, view=panel_view)
+                if ticket_bridge.load_suggestions and ticket_bridge.save_suggestions:
+                    try:
+                        d = ticket_bridge.load_suggestions()
+                        for s in d.get("suggestions", []):
+                            if s.get("id") == ticket_id:
+                                s["panel_message_id"] = str(sent_panel.id)
+                                break
+                        ticket_bridge.save_suggestions(d)
+                    except Exception:
+                        pass
+                log.info(f"[Ticket Channel Update] Created panel message for ticket #{ticket_id}")
+            except Exception as e:
+                log.warning(f"[Ticket Channel Update] Failed to send new panel message: {e}")
+
+    try:
+        asyncio.run_coroutine_threadsafe(_update_async(), disnake_bot_loop)
+    except Exception as ex:
+        log.warning(f"[Ticket Channel Update] Failed to dispatch update task: {ex}")
 
 def notify_ticket_deleted(ticket: dict[str, Any], deleted_by: str = "Administrator") -> None:
     """
@@ -693,6 +939,96 @@ def notify_ticket_deleted(ticket: dict[str, Any], deleted_by: str = "Administrat
     except Exception as ex:
         log.warning(f"[Ticket Deletion Notification] Failed to dispatch task: {ex}")
 
+async def handle_ticket_edit_note_button(inter: disnake.MessageInteraction, ticket_id: int):
+    sender_discord_id = str(inter.author.id)
+    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
+    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+
+    if not is_admin:
+        await inter.response.send_message("Only website administrators can edit ticket notes.", ephemeral=True)
+        return
+
+    if not ticket_bridge.load_suggestions:
+        await inter.response.send_message("Ticket bridge is not configured.", ephemeral=True)
+        return
+
+    data = ticket_bridge.load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target = next((s for s in suggestions if s.get("id") == ticket_id), None)
+    if not target:
+        await inter.response.send_message(f"Ticket #{ticket_id} not found in database.", ephemeral=True)
+        return
+
+    current_note = target.get("admin_comment") or ""
+    await inter.response.send_modal(TicketNoteModal(ticket_id=ticket_id, current_note=current_note))
+
+async def handle_ticket_note_submission(inter: disnake.ModalInteraction, ticket_id: int):
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
+        return
+
+    sender_discord_id = str(inter.author.id)
+    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
+    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+
+    if not is_admin:
+        await inter.response.send_message("Only website administrators can edit ticket notes.", ephemeral=True)
+        return
+
+    note_text = inter.text_values.get("ticket_note_text", "").strip()
+
+    if not ticket_bridge.load_suggestions or not ticket_bridge.save_suggestions:
+        await inter.response.send_message("Ticket bridge is not configured.", ephemeral=True)
+        return
+
+    data = ticket_bridge.load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target = next((s for s in suggestions if s.get("id") == ticket_id), None)
+    if not target:
+        await inter.response.send_message(f"Ticket #{ticket_id} not found in database.", ephemeral=True)
+        return
+
+    prev_note = target.get("admin_comment") or ""
+    author_name = inter.author.display_name
+
+    target["admin_comment"] = note_text
+    target["comment_by"] = author_name
+    target["comment_timestamp"] = datetime.now(timezone.utc).isoformat()
+
+    ticket_bridge.save_suggestions(data)
+
+    if ticket_bridge.broadcast_dashboard:
+        ticket_bridge.broadcast_dashboard()
+
+    if ticket_bridge.broadcast_ticket_update:
+        ticket_bridge.broadcast_ticket_update(
+            ticket_id,
+            None,
+            target.get("messages", []),
+            target.get("discord_id"),
+            target.get("anonymous")
+        )
+
+    if note_text:
+        notify_ticket_author_dm(
+            ticket=target,
+            event_type="note",
+            details={
+                "comment_by": author_name,
+                "comment": note_text
+            }
+        )
+
+    update_ticket_channel_message(target)
+    update_discussion_thread_status(target, target.get("status") or "open")
+
+    action_word = "updated" if prev_note else "added"
+    if not note_text:
+        action_word = "cleared"
+
+    await inter.response.send_message(
+        f"Admin note for Ticket #{ticket_id} has been {action_word} by {inter.author.mention}."
+    )
+
 async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_id: int):
     if _check_and_mark_interaction(inter.id) or inter.response.is_done():
         return
@@ -748,6 +1084,10 @@ async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_
     update_discussion_thread_status(
         ticket=target,
         new_status=new_status
+    )
+
+    update_ticket_channel_message(
+        ticket=target
     )
 
     await inter.response.send_message(
@@ -1605,21 +1945,34 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.listen("on_interaction")
     async def global_ticket_interaction_listener(inter: disnake.Interaction):
-        if not isinstance(inter, disnake.MessageInteraction):
-            return
-        cid = str(getattr(inter.data, "custom_id", "") or "")
-        if cid.startswith("ticket_status_select:"):
-            try:
-                t_id = int(cid.split(":")[1])
-                await handle_ticket_status_select(inter, t_id)
-            except Exception as ex:
-                log.error(f"[Component Handler] Status select error: {ex}", exc_info=True)
-        elif cid.startswith("ticket_open_discussions:"):
-            try:
-                t_id = int(cid.split(":")[1])
-                await handle_ticket_open_discussions(inter, t_id)
-            except Exception as ex:
-                log.error(f"[Component Handler] Open discussions error: {ex}", exc_info=True)
+        if isinstance(inter, disnake.MessageInteraction):
+            cid = str(getattr(inter.data, "custom_id", "") or "")
+            if cid.startswith("ticket_status_select:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_status_select(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] Status select error: {ex}", exc_info=True)
+            elif cid.startswith("ticket_edit_note:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_edit_note_button(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] Edit note button error: {ex}", exc_info=True)
+            elif cid.startswith("ticket_open_discussions:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_open_discussions(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] Open discussions error: {ex}", exc_info=True)
+        elif isinstance(inter, disnake.ModalInteraction):
+            cid = str(getattr(inter.data, "custom_id", "") or "")
+            if cid.startswith("ticket_note_modal:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_note_submission(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] Modal note error: {ex}", exc_info=True)
 
     async def _show_panel_interactive(
         inter: disnake.ApplicationCommandInteraction,
@@ -1661,8 +2014,16 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         t_type = target.get("type", "suggestion")
         st = target.get("status") or ("open" if t_type == "bug_report" else "pending")
 
-        panel_embed, panel_view = build_ticket_panel(ticket_id=t_id, ticket_type=t_type, current_status=st)
-        await inter.channel.send(embed=panel_embed, view=panel_view)
+        panel_embed, panel_view = build_ticket_panel(
+            ticket_id=t_id,
+            ticket_type=t_type,
+            current_status=st,
+            admin_comment=target.get("admin_comment")
+        )
+        sent_panel = await inter.channel.send(embed=panel_embed, view=panel_view)
+        target["panel_message_id"] = str(sent_panel.id)
+        if ticket_bridge.save_suggestions:
+            ticket_bridge.save_suggestions(data)
         await inter.followup.send(f"Spawned Ticket Admin Panel for Ticket #{t_id}!", ephemeral=True)
 
     admin_guild_ids = [int(GUILD_ID)] if GUILD_ID.isdigit() else None
@@ -1715,19 +2076,16 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         target_ticket = None
         for s in suggestions:
-            if str(s.get("discord_channel_id", "")) == ch_id:
+            if str(s.get("discord_channel_id", "")) == ch_id or str(s.get("discussion_thread_id", "")) == ch_id:
                 target_ticket = s
                 break
 
-        if not target_ticket and cat_id != target_cat_id:
-            return
-
-        if not target_ticket and cat_id == target_cat_id:
+        if not target_ticket:
             ch_name = getattr(message.channel, "name", "")
             for s in suggestions:
-                if f"ticket-{s.get('id')}" in ch_name or f"bug-{s.get('id')}" in ch_name:
+                tid = str(s.get("id"))
+                if f"ticket-{tid}" in ch_name or f"bug-{tid}" in ch_name or f"#{tid}" in ch_name:
                     target_ticket = s
-                    target_ticket["discord_channel_id"] = ch_id
                     break
 
         if not target_ticket:
@@ -1790,11 +2148,6 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         log.info(f"[Disnake Bot] Ingested admin reply from #{getattr(message.channel, 'name', ch_id)} (Author: {sender_name}) for ticket #{target_ticket.get('id')}")
 
-        try:
-            await message.add_reaction("📨")
-        except Exception:
-            pass
-
         if ticket_bridge.broadcast_ticket_update:
             ticket_bridge.broadcast_ticket_update(
                 target_ticket.get("id"),
@@ -1815,6 +2168,121 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             )
         except Exception as dm_err:
             log.warning(f"[Disnake Bot] Failed to send author DM on Discord admin message: {dm_err}")
+
+    @b.event
+    async def on_message_edit(before: disnake.Message, after: disnake.Message):
+        if not after.guild or after.author.bot:
+            return
+        if b.user and after.author.id == b.user.id:
+            return
+        if not ticket_bridge.is_configured():
+            return
+
+        ch_id = str(after.channel.id)
+        assert ticket_bridge.load_suggestions is not None
+        data = ticket_bridge.load_suggestions()
+        suggestions = data.get("suggestions", [])
+
+        target_ticket = None
+        for s in suggestions:
+            if str(s.get("discord_channel_id", "")) == ch_id or str(s.get("discussion_thread_id", "")) == ch_id:
+                target_ticket = s
+                break
+
+        if not target_ticket:
+            ch_name = getattr(after.channel, "name", "")
+            for s in suggestions:
+                tid = str(s.get("id"))
+                if f"ticket-{tid}" in ch_name or f"bug-{tid}" in ch_name or f"#{tid}" in ch_name:
+                    target_ticket = s
+                    break
+
+        if not target_ticket:
+            return
+
+        d_msg_id = str(after.id)
+        messages = target_ticket.setdefault("messages", [])
+        target_msg = next((m for m in messages if str(m.get("discord_message_id", "")) == d_msg_id), None)
+        if not target_msg:
+            return
+
+        new_content = (after.clean_content or after.content or "").strip()
+        if not new_content and after.attachments:
+            new_content = "\n".join(a.url for a in after.attachments)
+        if not new_content:
+            return
+
+        target_msg["message"] = new_content
+        target_msg["edited"] = True
+        target_msg["edited_at"] = datetime.now(timezone.utc).isoformat()
+
+        assert ticket_bridge.save_suggestions is not None
+        ticket_bridge.save_suggestions(data)
+
+        if ticket_bridge.broadcast_dashboard:
+            ticket_bridge.broadcast_dashboard()
+
+        if ticket_bridge.broadcast_ticket_update:
+            ticket_bridge.broadcast_ticket_update(
+                target_ticket.get("id"),
+                target_msg,
+                messages,
+                target_ticket.get("discord_id"),
+                target_ticket.get("anonymous")
+            )
+        log.info(f"[Disnake Bot] Synchronized edited message {d_msg_id} for ticket #{target_ticket.get('id')}")
+
+    @b.event
+    async def on_message_delete(message: disnake.Message):
+        if not message.guild:
+            return
+        if not ticket_bridge.is_configured():
+            return
+
+        ch_id = str(message.channel.id)
+        assert ticket_bridge.load_suggestions is not None
+        data = ticket_bridge.load_suggestions()
+        suggestions = data.get("suggestions", [])
+
+        target_ticket = None
+        for s in suggestions:
+            if str(s.get("discord_channel_id", "")) == ch_id or str(s.get("discussion_thread_id", "")) == ch_id:
+                target_ticket = s
+                break
+
+        if not target_ticket:
+            ch_name = getattr(message.channel, "name", "")
+            for s in suggestions:
+                tid = str(s.get("id"))
+                if f"ticket-{tid}" in ch_name or f"bug-{tid}" in ch_name or f"#{tid}" in ch_name:
+                    target_ticket = s
+                    break
+
+        if not target_ticket:
+            return
+
+        d_msg_id = str(message.id)
+        messages = target_ticket.setdefault("messages", [])
+        before_count = len(messages)
+        messages[:] = [m for m in messages if str(m.get("discord_message_id", "")) != d_msg_id]
+        if len(messages) == before_count:
+            return
+
+        assert ticket_bridge.save_suggestions is not None
+        ticket_bridge.save_suggestions(data)
+
+        if ticket_bridge.broadcast_dashboard:
+            ticket_bridge.broadcast_dashboard()
+
+        if ticket_bridge.broadcast_ticket_update:
+            ticket_bridge.broadcast_ticket_update(
+                target_ticket.get("id"),
+                {"id": 0, "deleted": True, "discord_message_id": d_msg_id},
+                messages,
+                target_ticket.get("discord_id"),
+                target_ticket.get("anonymous")
+            )
+        log.info(f"[Disnake Bot] Synchronized deleted message {d_msg_id} for ticket #{target_ticket.get('id')}")
 
 def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
     global disnake_bot, disnake_bot_loop
@@ -1886,19 +2354,39 @@ def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
         embed.add_field(name="Category", value=target_labels.get(target, target), inline=True)
         embed.add_field(name="Status", value=(ticket.get("status") or ("open" if is_bug else "pending")).upper(), inline=True)
         embed.add_field(name="Author", value=author_display, inline=True)
+        if ticket.get("admin_comment"):
+            comment_by = ticket.get("comment_by") or "Administrator"
+            embed.add_field(name="Admin Note", value=f"**[{comment_by}]**:\n{ticket.get('admin_comment')}"[:1024], inline=False)
         embed.add_field(name="Admin Replies", value="Type any message in this channel to send a reply directly to the ticket author. When the author replies on the website, their message will appear here in real time.", inline=False)
         embed.set_footer(text=f"RBWR Utility Ticket #{ticket_id}")
 
-        await ch.send(embed=embed)
+        main_msg = await ch.send(embed=embed)
+        panel_msg = None
         try:
             panel_embed, panel_view = build_ticket_panel(
                 ticket_id=ticket_id,  # pyright: ignore[reportArgumentType]
                 ticket_type=ticket_type,
-                current_status=ticket.get("status") or ("open" if is_bug else "pending")
+                current_status=ticket.get("status") or ("open" if is_bug else "pending"),
+                admin_comment=ticket.get("admin_comment")
             )
-            await ch.send(embed=panel_embed, view=panel_view)
+            panel_msg = await ch.send(embed=panel_embed, view=panel_view)
         except Exception as panel_err:
             log.warning(f"[Disnake Channel] Failed to send ticket panel: {panel_err}", exc_info=True)
+
+        if ticket_bridge.load_suggestions and ticket_bridge.save_suggestions:
+            try:
+                data = ticket_bridge.load_suggestions()
+                for s in data.get("suggestions", []):
+                    if s.get("id") == ticket_id:
+                        s["discord_channel_id"] = str(ch.id)
+                        s["discord_message_id"] = str(main_msg.id)
+                        if panel_msg:
+                            s["panel_message_id"] = str(panel_msg.id)
+                        break
+                ticket_bridge.save_suggestions(data)
+            except Exception as e:
+                log.warning(f"[Disnake Channel] Failed to save message IDs to suggestions: {e}")
+
         return str(ch.id)
 
     try:
@@ -1911,7 +2399,7 @@ def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
         return None
 
 def forward_ticket_reply_to_discord(
-    channel_id: str,
+    channel_id: str | list[str],
     message_text: str,
     sender_name: str,
     is_admin: bool,
@@ -1924,17 +2412,25 @@ def forward_ticket_reply_to_discord(
     content = f"**[{sender_label}] {sender_name}**:\n{message_text}"
     bot_ref = disnake_bot
 
+    c_list = [channel_id] if isinstance(channel_id, str) else list(channel_id)
+    c_list = [str(c) for c in c_list if c]
+
     async def _send_fwd_async():
-        ch = bot_ref.get_channel(int(channel_id))
-        if not ch:
-            ch = await bot_ref.fetch_channel(int(channel_id))
+        last_id = None
+        for ch_id in c_list:
+            try:
+                ch = bot_ref.get_channel(int(ch_id))
+                if not ch:
+                    ch = await bot_ref.fetch_channel(int(ch_id))
 
-        if not ch or not isinstance(ch, disnake.TextChannel):
-            log.warning(f"[Disnake Forward] Channel {channel_id} is not a text channel or doesn't exist.")
-            return None
+                if not ch or not hasattr(ch, "send") or not isinstance(ch, disnake.TextChannel):
+                    continue
 
-        sent = await ch.send(content=content)
-        return str(sent.id)
+                sent = await ch.send(content=content)
+                last_id = str(sent.id)
+            except Exception as e:
+                log.warning(f"[Disnake Forward] Channel {ch_id} send failed: {e}")
+        return last_id
 
     try:
         fut = asyncio.run_coroutine_threadsafe(_send_fwd_async(), disnake_bot_loop)
@@ -1942,6 +2438,103 @@ def forward_ticket_reply_to_discord(
     except Exception as ex:
         log.warning(f"[Disnake Forward] Failed to forward message to Discord: {ex}")
         return None
+
+def edit_ticket_reply_in_discord(
+    channel_ids: str | list[str],
+    discord_message_id: str,
+    message_text: str,
+    sender_name: str,
+    is_admin: bool,
+) -> bool:
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return False
+    if not discord_message_id:
+        return False
+
+    c_list = [channel_ids] if isinstance(channel_ids, str) else list(channel_ids)
+    c_list = [str(c) for c in c_list if c]
+
+    sender_label = "Administrator" if is_admin else "Ticket Author"
+    new_content = f"**[{sender_label}] {sender_name}**:\n{message_text}"
+    bot_ref = disnake_bot
+    msg_id_int = int(discord_message_id)
+
+    async def _edit_fwd_async():
+        edited_any = False
+        for ch_id in c_list:
+            try:
+                ch = bot_ref.get_channel(int(ch_id))
+                if not ch:
+                    ch = await bot_ref.fetch_channel(int(ch_id))
+                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, disnake.TextChannel):
+                    continue
+                try:
+                    target_msg = await ch.fetch_message(msg_id_int)
+                    if target_msg and bot_ref.user and target_msg.author.id == bot_ref.user.id:
+                        await target_msg.edit(content=new_content)
+                        log.info(f"[Disnake Edit] Successfully edited bot message {discord_message_id} in channel {ch_id}")
+                        edited_any = True
+                except disnake.NotFound:
+                    continue
+                except Exception as msg_err:
+                    log.warning(f"[Disnake Edit] Error editing message in {ch_id}: {msg_err}")
+            except Exception as ch_err:
+                log.warning(f"[Disnake Edit] Error accessing channel {ch_id}: {ch_err}")
+        return edited_any
+
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_edit_fwd_async(), disnake_bot_loop)
+        return fut.result(timeout=8)
+    except Exception as ex:
+        log.warning(f"[Disnake Edit] Failed to edit message in Discord: {ex}")
+        return False
+
+def delete_ticket_reply_in_discord(
+    channel_ids: str | list[str],
+    discord_message_id: str,
+) -> bool:
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return False
+    if not discord_message_id:
+        return False
+
+    c_list = [channel_ids] if isinstance(channel_ids, str) else list(channel_ids)
+    c_list = [str(c) for c in c_list if c]
+
+    bot_ref = disnake_bot
+    msg_id_int = int(discord_message_id)
+
+    async def _delete_fwd_async():
+        deleted_any = False
+        for ch_id in c_list:
+            try:
+                ch = bot_ref.get_channel(int(ch_id))
+                if not ch:
+                    ch = await bot_ref.fetch_channel(int(ch_id))
+                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, disnake.TextChannel):
+                    continue
+                try:
+                    target_msg = await ch.fetch_message(msg_id_int)
+                    if target_msg:
+                        await target_msg.delete()
+                        log.info(f"[Disnake Delete] Successfully deleted message {discord_message_id} in channel {ch_id}")
+                        deleted_any = True
+                except disnake.NotFound:
+                    continue
+                except Exception as msg_err:
+                    log.warning(f"[Disnake Delete] Error deleting message in {ch_id}: {msg_err}")
+            except Exception as ch_err:
+                log.warning(f"[Disnake Delete] Error accessing channel {ch_id}: {ch_err}")
+        return deleted_any
+
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_delete_fwd_async(), disnake_bot_loop)
+        return fut.result(timeout=8)
+    except Exception as ex:
+        log.warning(f"[Disnake Delete] Failed to delete message in Discord: {ex}")
+        return False
 
 def start_bot_thread(
     load_suggestions: Callable[[], dict[str, Any]] | None = None,

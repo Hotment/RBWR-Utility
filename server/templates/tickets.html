@@ -943,17 +943,38 @@
                     </div>
                 `;
 
+                const editedBadge = m.edited ? '<span class="text-[9px] text-gray-400 font-mono">(edited)</span>' : '';
+                const adminActionBtns = (IS_ADMIN && isAdminMsg) ? `
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="startEditPublicReply(${item.id}, ${m.id})" title="Edit Reply" class="text-[10px] font-mono text-gray-400 hover:text-blue-300 px-1.5 py-0.5 rounded border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/10 transition">Edit</button>
+                        <button onclick="deletePublicReply(${item.id}, ${m.id})" title="Delete Reply" class="text-[10px] font-mono text-gray-400 hover:text-rose-400 px-1.5 py-0.5 rounded border border-white/5 hover:border-rose-500/30 hover:bg-rose-500/10 transition">Delete</button>
+                    </div>
+                ` : '';
+
                 return `
-                    <div class="flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg}">
+                    <div id="public-msg-card-${item.id}-${m.id}" class="flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg}">
                         <div class="flex items-center justify-between gap-2 text-xs">
                             <div class="flex items-center gap-2 min-w-0">
                                 ${avatar}
                                 <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
                                 <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                                ${editedBadge}
                             </div>
-                            <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(m.timestamp)}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(m.timestamp)}</span>
+                                ${adminActionBtns}
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(m.message)}</p>
+                        <div id="public-msg-content-${item.id}-${m.id}">
+                            <p id="public-msg-text-${item.id}-${m.id}" class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(m.message)}</p>
+                        </div>
+                        <div id="public-msg-edit-${item.id}-${m.id}" class="hidden flex flex-col gap-1.5 pt-1 pl-7">
+                            <textarea id="public-msg-edit-input-${item.id}-${m.id}" rows="2" class="premium-input text-xs p-2 rounded-lg outline-none resize-none font-mono text-gray-200">${escapeHtml(m.message)}</textarea>
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button onclick="cancelEditPublicReply(${item.id}, ${m.id})" class="text-[10px] font-mono text-gray-400 hover:text-white px-2 py-0.5 rounded border border-white/10 hover:bg-white/5 transition">Cancel</button>
+                                <button onclick="saveEditPublicReply(${item.id}, ${m.id})" class="text-[10px] font-mono bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-0.5 rounded font-bold shadow-sm transition">Save</button>
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -1204,6 +1225,82 @@
             }
         } finally {
             btn.disabled = false;
+        }
+    }
+
+    function startEditPublicReply(ticketId, msgId) {
+        const contentEl = document.getElementById(`public-msg-content-${ticketId}-${msgId}`);
+        const editEl = document.getElementById(`public-msg-edit-${ticketId}-${msgId}`);
+        if (contentEl && editEl) {
+            contentEl.classList.add('hidden');
+            editEl.classList.remove('hidden');
+            const textarea = document.getElementById(`public-msg-edit-input-${ticketId}-${msgId}`);
+            if (textarea) textarea.focus();
+        }
+    }
+
+    function cancelEditPublicReply(ticketId, msgId) {
+        const contentEl = document.getElementById(`public-msg-content-${ticketId}-${msgId}`);
+        const editEl = document.getElementById(`public-msg-edit-${ticketId}-${msgId}`);
+        if (contentEl && editEl) {
+            editEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
+        }
+    }
+
+    async function saveEditPublicReply(ticketId, msgId) {
+        const textarea = document.getElementById(`public-msg-edit-input-${ticketId}-${msgId}`);
+        if (!textarea || !textarea.value.trim()) return;
+
+        const newText = textarea.value.trim();
+        try {
+            const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: newText })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const textEl = document.getElementById(`public-msg-text-${ticketId}-${msgId}`);
+                if (textEl) textEl.textContent = newText;
+                cancelEditPublicReply(ticketId, msgId);
+                const ticket = allTickets.find(t => t.id === ticketId);
+                if (ticket && Array.isArray(ticket.messages)) {
+                    const m = ticket.messages.find(x => x.id === msgId);
+                    if (m) {
+                        m.message = newText;
+                        m.edited = true;
+                    }
+                }
+            } else {
+                alert(data.detail || 'Failed to update reply.');
+            }
+        } catch (err) {
+            alert('Network error updating reply.');
+        }
+    }
+
+    async function deletePublicReply(ticketId, msgId) {
+        if (!confirm('Are you sure you want to delete this reply? It will also be removed from the Discord discussion thread.')) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const card = document.getElementById(`public-msg-card-${ticketId}-${msgId}`);
+                if (card) card.remove();
+                const ticket = allTickets.find(t => t.id === ticketId);
+                if (ticket && Array.isArray(ticket.messages)) {
+                    ticket.messages = ticket.messages.filter(x => x.id !== msgId);
+                }
+            } else {
+                alert(data.detail || 'Failed to delete reply.');
+            }
+        } catch (err) {
+            alert('Network error deleting reply.');
         }
     }
 
