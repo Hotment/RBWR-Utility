@@ -482,7 +482,6 @@ class TicketPanelView(disnake.ui.View):
             label="Open Discussions",
             style=disnake.ButtonStyle.primary,
             custom_id=f"ticket_open_discussions:{ticket_id}",
-            emoji="💬",
         )
         self.add_item(self.discuss_button)
 
@@ -1055,7 +1054,7 @@ class ServerBrowserView(disnake.ui.View):
         )
 
         embed = disnake.Embed(
-            title="⚡ RBWR Live Server Browser",
+            title="RBWR Live Server Browser",
             color=disnake.Color.teal() if total_matched > 0 else disnake.Color.dark_grey(),
             timestamp=datetime.now(timezone.utc),
         )
@@ -1080,10 +1079,10 @@ class ServerBrowserView(disnake.ui.View):
             f"**Filter:** `{filter_names.get(self.filter_status, self.filter_status)}` • **Sort:** `{sort_names.get(self.sort_by, self.sort_by)}`"
         ]
         if self.query:
-            desc_lines.append(f"🔍 **Search Query:** `{self.query}`")
+            desc_lines.append(f"**Search Query:** `{self.query}`")
 
         desc_lines.append(
-            f"**Matching:** `{total_matched}` • **Active Units:** `{active_reactors}` • ⚡ **Total Gen:** `{total_gen:.2f} pts/s`\n"
+            f"**Matching:** `{total_matched}` • **Active Units:** `{active_reactors}` • **Total Gen:** `{total_gen:.2f} pts/s`\n"
         )
 
         if not page_servers:
