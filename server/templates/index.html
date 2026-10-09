@@ -63,9 +63,15 @@
         </div>
 
         <div class="lg:col-span-5 flex justify-center items-center">
-            <img src="/static/rbwrapp.png" alt="Overlay HUD Screenshot"
-                class="w-[420px] max-w-full border border-white/5 bg-[#121217] shadow-2xl"
-                style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
+            <div class="relative group max-w-full">
+                <div class="absolute -inset-1 bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-cyan-500/15 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition duration-500 pointer-events-none"></div>
+                <img src="/static/rbwrapp.png"
+                    srcset="/static/rbwrapp-preview.png 1x, /static/rbwrapp.png 2x"
+                    alt="RBWR Overlay HUD Preview"
+                    class="relative w-[480px] max-w-full drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)] transition-transform duration-300 group-hover:scale-[1.01]"
+                    loading="eager"
+                    decoding="async">
+            </div>
         </div>
     </section>
 
