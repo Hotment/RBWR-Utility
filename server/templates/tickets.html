@@ -179,6 +179,8 @@
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted</button>
                 <button onclick="filterStatus('declined')" id="tab-status-declined"
                     class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined</button>
+                <button onclick="filterStatus('invalid')" id="tab-status-invalid"
+                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Invalid</button>
             </div>
 
             <div class="relative shrink-0 min-w-[150px]">
@@ -556,6 +558,24 @@
             }
         }
 
+        const statusParam = urlParams.get('status');
+        if (statusParam) {
+            const normStatus = statusParam.toLowerCase().trim();
+            if (['invalid'].includes(normStatus)) {
+                currentStatusFilter = 'invalid';
+            } else if (['open', 'pending'].includes(normStatus)) {
+                currentStatusFilter = 'pending';
+            } else if (['investigating', 'considering', 'confirmed'].includes(normStatus)) {
+                currentStatusFilter = 'considering';
+            } else if (['planned'].includes(normStatus)) {
+                currentStatusFilter = 'planned';
+            } else if (['resolved', 'accepted', 'fixed', 'completed', 'implemented'].includes(normStatus)) {
+                currentStatusFilter = 'accepted';
+            } else if (['closed', 'declined', 'rejected'].includes(normStatus)) {
+                currentStatusFilter = 'declined';
+            }
+        }
+
         const searchParam = urlParams.get('q') || urlParams.get('search');
         if (searchParam) {
             const searchInput = document.getElementById('search-input');
@@ -585,8 +605,8 @@
 
         updateTypeTabsUI();
         updateStatusTabLabels();
+        filterStatus(currentStatusFilter);
         updateStats();
-        renderTickets();
         initTicketWebSocket();
 
         const ticketForm = document.getElementById('public-ticket-form');
@@ -630,6 +650,7 @@
         const btnPlanned = document.getElementById('tab-status-planned');
         const btnAccepted = document.getElementById('tab-status-accepted');
         const btnDeclined = document.getElementById('tab-status-declined');
+        const btnInvalid = document.getElementById('tab-status-invalid');
 
         if (currentTypeFilter === 'bug_report') {
             if (btnAll) btnAll.innerText = 'All Status';
@@ -638,6 +659,23 @@
             if (btnPlanned) btnPlanned.innerText = 'Planned';
             if (btnAccepted) btnAccepted.innerText = 'Resolved';
             if (btnDeclined) btnDeclined.innerText = 'Closed';
+            if (btnInvalid) {
+                btnInvalid.innerText = 'Invalid';
+                btnInvalid.style.display = '';
+            }
+        } else if (currentTypeFilter === 'suggestion') {
+            if (btnAll) btnAll.innerText = 'All Status';
+            if (btnPending) btnPending.innerText = 'Pending';
+            if (btnConsidering) btnConsidering.innerText = 'Considering';
+            if (btnPlanned) btnPlanned.innerText = 'Planned';
+            if (btnAccepted) btnAccepted.innerText = 'Accepted';
+            if (btnDeclined) btnDeclined.innerText = 'Declined';
+            if (btnInvalid) {
+                btnInvalid.style.display = 'none';
+                if (currentStatusFilter === 'invalid') {
+                    currentStatusFilter = 'all';
+                }
+            }
         } else {
             if (btnAll) btnAll.innerText = 'All Status';
             if (btnPending) btnPending.innerText = 'Pending';
@@ -645,6 +683,10 @@
             if (btnPlanned) btnPlanned.innerText = 'Planned';
             if (btnAccepted) btnAccepted.innerText = 'Accepted';
             if (btnDeclined) btnDeclined.innerText = 'Declined';
+            if (btnInvalid) {
+                btnInvalid.innerText = 'Invalid';
+                btnInvalid.style.display = '';
+            }
         }
     }
 
@@ -700,7 +742,7 @@
 
     function filterStatus(status) {
         currentStatusFilter = status;
-        const statuses = ['all', 'pending', 'considering', 'planned', 'accepted', 'declined'];
+        const statuses = ['all', 'pending', 'considering', 'planned', 'accepted', 'declined', 'invalid'];
         statuses.forEach(s => {
             const btn = document.getElementById(`tab-status-${s}`);
             if (!btn) return;
@@ -762,13 +804,16 @@
         if (s === 'implemented') {
             return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Implemented</span>`;
         }
-        if (['accepted', 'resolved', 'completed'].includes(s)) {
+        if (['accepted', 'resolved', 'completed', 'fixed'].includes(s)) {
             const label = isBug ? 'Resolved' : 'Accepted';
             return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${label}</span>`;
         }
-        if (['considering', 'investigating', 'in-progress'].includes(s)) {
-            const label = isBug ? 'Investigating' : 'Considering';
+        if (['considering', 'investigating', 'in-progress', 'confirmed'].includes(s)) {
+            const label = isBug ? (s === 'confirmed' ? 'Confirmed' : 'Investigating') : 'Considering';
             return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${label}</span>`;
+        }
+        if (s === 'invalid') {
+            return `<span class="px-2.5 py-1 rounded-lg text-xs font-mono uppercase font-semibold bg-red-500/10 text-red-400 border border-red-500/20">Invalid</span>`;
         }
         if (['declined', 'closed', 'rejected'].includes(s)) {
             const label = isBug ? 'Closed' : 'Declined';
@@ -818,13 +863,15 @@
                 if (currentStatusFilter === 'pending') {
                     if (!['pending', 'open'].includes(itemStatus)) return false;
                 } else if (currentStatusFilter === 'considering') {
-                    if (!['considering', 'investigating', 'in-progress'].includes(itemStatus)) return false;
+                    if (!['considering', 'investigating', 'in-progress', 'confirmed'].includes(itemStatus)) return false;
                 } else if (currentStatusFilter === 'planned') {
                     if (itemStatus !== 'planned') return false;
                 } else if (currentStatusFilter === 'accepted') {
-                    if (!['accepted', 'resolved', 'completed', 'implemented'].includes(itemStatus)) return false;
+                    if (!['accepted', 'resolved', 'completed', 'implemented', 'fixed'].includes(itemStatus)) return false;
                 } else if (currentStatusFilter === 'declined') {
                     if (!['declined', 'closed', 'rejected'].includes(itemStatus)) return false;
+                } else if (currentStatusFilter === 'invalid') {
+                    if (itemStatus !== 'invalid') return false;
                 }
             }
 
