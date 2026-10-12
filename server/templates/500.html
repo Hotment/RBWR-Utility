@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}RBWR Utility - 500 Internal Server Error{% endblock %}
+
+{% block meta_tags %}
+<meta name="description" content="500 - Internal Server Error on RBWR Utility.">
+<meta name="theme-color" content="#ef4444">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - 500 Internal Server Error">
+<meta property="og:description" content="An unexpected server error occurred on RBWR Utility.">
+<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - 500 Internal Server Error">
+<meta name="twitter:description" content="An unexpected server error occurred on RBWR Utility.">
+<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="flex-1 max-w-3xl mx-auto px-4 py-16 sm:py-24 w-full flex flex-col items-center justify-center text-center gap-8">
+    <div class="flex flex-col gap-3">
+        <h1 class="text-7xl sm:text-9xl font-display font-black tracking-tight text-white drop-shadow-2xl select-none">
+            500
+        </h1>
+        <h2 class="text-2xl sm:text-3xl font-display font-semibold text-white tracking-tight">
+            Internal Server Error
+        </h2>
+        <p class="text-gray-400 text-sm sm:text-base leading-relaxed max-w-md mx-auto">
+            An unexpected error occurred while processing this request. The incident details and traceback have been automatically dispatched to the development team.
+        </p>
+    </div>
+
+    <a href="/"
+        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-sm font-display shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Return to Home</span>
+    </a>
+</main>
+{% endblock %}

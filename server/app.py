@@ -5,6 +5,8 @@ import sys
 import json
 import gzip
 import queue
+import traceback
+from werkzeug.exceptions import HTTPException
 orjson = None
 try:
     import orjson
@@ -81,6 +83,7 @@ try:
         update_discussion_thread_status,
         update_ticket_channel_message,
         notify_ticket_deleted,
+        report_error_to_discord,
     )
 except Exception:
     from bot import (
@@ -94,7 +97,14 @@ except Exception:
         update_discussion_thread_status,  # pyright: ignore[reportAttributeAccessIssue]
         update_ticket_channel_message,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
+        report_error_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
     )
+
+try:
+    report_error_to_discord  # pyright: ignore[reportUnusedExpression]
+except NameError:
+    def report_error_to_discord(*args, **kwargs) -> bool:
+        return False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -154,6 +164,32 @@ werkzeug_logger.setLevel(logging.INFO)
 
 logger = app.logger.getChild("main")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
+
+def _global_threading_excepthook(args):
+    try:
+        exc_type = args.exc_type
+        exc_val = args.exc_value
+        exc_tb = args.exc_traceback
+        thread_name = args.thread.name if args.thread else "UnknownThread"
+        tb_str = "".join(traceback.format_exception(exc_type, exc_val, exc_tb)) if exc_val else ""
+        logger.critical(f"[Thread Crash] Unhandled exception in thread {thread_name}: {exc_val}", exc_info=(exc_type, exc_val, exc_tb))
+        report_error_to_discord(
+            origin=f"Website Background Thread ({thread_name})",
+            error=exc_val or "Thread crashed",
+            traceback_str=tb_str,
+            context_info={"Thread": thread_name},
+        )
+    except Exception:
+        pass
+    if _prev_threading_excepthook:
+        try:
+            _prev_threading_excepthook(args)
+        except Exception:
+            pass
+
+_prev_threading_excepthook = getattr(threading, "excepthook", None)
+if hasattr(threading, "excepthook"):
+    threading.excepthook = _global_threading_excepthook
 
 SERVER_START_TIME = time.time()
 
@@ -1123,6 +1159,77 @@ def page_not_found(e):
     if request.path.startswith("/api/") or request.headers.get("Accept") == "application/json":
         return jsonify({"detail": "Not found", "status": 404}), 404
     return render_template("404.html"), 404
+
+@app.errorhandler(Exception)
+def handle_unhandled_exception(e):
+    if isinstance(e, HTTPException) and e.code and e.code < 500:
+        return e
+
+    req_method = getattr(request, "method", "UNKNOWN")
+    req_path = getattr(request, "path", "UNKNOWN")
+    req_url = getattr(request, "url", "UNKNOWN")
+
+    client_ip = getattr(request, "remote_addr", "unknown") or "unknown"
+    forwarded = request.headers.get("X-Forwarded-For") if hasattr(request, "headers") else None
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    user_info = "Anonymous"
+    try:
+        sess_discord = session.get("discord_user")
+        sess_user = session.get("username") or session.get("user")
+        if sess_discord and isinstance(sess_discord, dict):
+            user_info = f"@{sess_discord.get('username', 'unknown')} (ID: {sess_discord.get('id', 'unknown')})"
+        elif sess_user:
+            user_info = f"Admin: {sess_user}"
+    except Exception:
+        pass
+
+    context_info = {
+        "Request": f"{req_method} {req_path}",
+        "URL": req_url[:200],
+        "Client IP": client_ip,
+        "User": user_info,
+        "User-Agent": request.headers.get("User-Agent", "Unknown")[:120] if hasattr(request, "headers") else "Unknown",
+    }
+
+    try:
+        if hasattr(request, "args") and request.args:
+            sanitized_args = {}
+            for k, v in request.args.items():
+                if any(s in k.lower() for s in ["pass", "token", "secret", "auth", "key", "cookie"]):
+                    sanitized_args[k] = "[REDACTED]"
+                else:
+                    sanitized_args[k] = v[:100] if isinstance(v, str) else v
+            context_info["Query Params"] = json.dumps(sanitized_args)[:300]
+    except Exception:
+        pass
+
+    tb_str = traceback.format_exc()
+    logger.error(f"[Website Exception] {req_method} {req_path} encountered unhandled exception: {e}", exc_info=True)
+
+    try:
+        report_error_to_discord(
+            origin=f"Website ({req_method} {req_path})",
+            error=e,
+            traceback_str=tb_str,
+            context_info=context_info,
+        )
+    except Exception as dispatch_err:
+        logger.error(f"[Website Exception] Failed to send error alert to Discord: {dispatch_err}")
+
+    if req_path.startswith("/api/") or (hasattr(request, "headers") and request.headers.get("Accept") == "application/json"):
+        return jsonify({"detail": "Internal server error", "status": 500}), 500
+
+    try:
+        return render_template("500.html"), 500
+    except Exception:
+        return (
+            "<!DOCTYPE html><html><head><title>500 Internal Server Error</title></head>"
+            "<body style='font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:40px;text-align:center;'>"
+            "<h1>500 - Internal Server Error</h1><p>An unexpected error occurred. The incident has been recorded and reported.</p>"
+            "<a href='/' style='color:#38bdf8;'>Return to Home</a></body></html>"
+        ), 500
 
 @app.route("/api/contact", methods=["POST"])
 def submit_contact_message():

@@ -1,14 +1,20 @@
 import asyncio
 from datetime import datetime, timezone
+import io
+import json
 import logging
 import os
+import sys
 import threading
+import time
+import traceback
 from typing import Any, Callable
 
 import aiohttp
 import disnake
 from disnake.ext import commands
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
@@ -17,6 +23,9 @@ GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1547514559097733141").strip()
 TICKETS_CATEGORY_ID = os.getenv("DISCORD_TICKETS_CATEGORY_ID", "1547529007334162432").strip()
 SUGGESTIONS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_SUGGESTIONS_DISCUSSION_CHANNEL_ID", "1555617766827098192").strip())
 BUGS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_BUGS_DISCUSSION_CHANNEL_ID", "1555618312333951066").strip())
+
+ERROR_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_ERROR_ALERT_CHANNEL_ID", "1559242589251702895").strip())
+ERROR_ALERT_PING_USER_ID = os.getenv("DISCORD_ERROR_ALERT_PING_USER_ID", "1096176878575956119").strip()
 
 DEFAULT_SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "https://rbwr.hotment.dev").rstrip("/")
 RBWR_API_URL = os.getenv("RBWR_API_URL", f"{DEFAULT_SERVER_BASE_URL}/api/public-servers")
@@ -254,6 +263,224 @@ class RBWRClient:
 
 disnake_bot: commands.InteractionBot | None = None
 disnake_bot_loop: asyncio.AbstractEventLoop | None = None
+
+_last_error_hashes: dict[str, float] = {}
+_error_lock = threading.Lock()
+
+def _should_suppress_error(origin: str, error_type: str, error_msg: str, cooldown_seconds: float = 5.0) -> bool:
+    """
+    Prevents flooding Discord channels / hitting 429 rate limits if identical errors
+    occur rapidly in a loop. Allows new/different errors through immediately.
+    """
+    signature = f"{origin}:{error_type}:{error_msg[:120]}"
+    now = time.time()
+    with _error_lock:
+        for k in list(_last_error_hashes.keys()):
+            if now - _last_error_hashes[k] > 60:
+                del _last_error_hashes[k]
+        last_time = _last_error_hashes.get(signature, 0.0)
+        if (now - last_time) < cooldown_seconds:
+            return True
+        _last_error_hashes[signature] = now
+        return False
+
+def _build_alert_payload_dict(
+    origin: str,
+    error: BaseException | str,
+    full_traceback: str,
+    context_info: dict[str, Any] | None = None,
+    ping_user_id: str = ERROR_ALERT_PING_USER_ID,
+) -> tuple[str, dict[str, Any], bytes | None]:
+    err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
+    err_msg = str(error) if error else "Unknown error"
+
+    mention_content = f"<@{ping_user_id}> [CRITICAL] Exception Alert in {origin}"
+
+    embed = disnake.Embed(
+        title=f"[{origin}] {err_type}"[:256],
+        color=0xEF4444,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+    if context_info:
+        for k, v in context_info.items():
+            if v is not None and str(v).strip():
+                embed.add_field(name=str(k)[:256], value=str(v)[:1024], inline=True)
+
+    err_display = f"{err_type}: {err_msg}"
+    embed.add_field(name="Error Details", value=err_display[:1024], inline=False)
+
+    tb_clean = (full_traceback or "").strip()
+    file_bytes: bytes | None = None
+
+    if len(tb_clean) <= 3200:
+        embed.description = f"```py\n{tb_clean}\n```" if tb_clean else "```py\nNo traceback available\n```"
+    else:
+        top_slice = tb_clean[:350]
+        bottom_slice = tb_clean[-2600:]
+        embed.description = (
+            f"```py\n{top_slice}\n\n"
+            f"... [Traceback truncated. Full stack trace attached as traceback.txt] ...\n\n"
+            f"{bottom_slice}\n```"
+        )
+        file_bytes = tb_clean.encode("utf-8")
+
+    embed.set_footer(text="RBWR System Fault Monitor")
+    return mention_content, embed.to_dict(), file_bytes  # pyright: ignore[reportReturnType]
+
+async def _send_alert_coro(
+    channel_id: int,
+    content: str,
+    embed_dict: dict[str, Any],
+    file_bytes: bytes | None = None,
+) -> bool:
+    global disnake_bot
+    if not disnake_bot:
+        return False
+    try:
+        channel = disnake_bot.get_channel(channel_id)
+        if not channel:
+            channel = await disnake_bot.fetch_channel(channel_id)
+
+        if not channel or not hasattr(channel, "send") or not isinstance(channel, disnake.abc.Messageable):
+            log.warning(f"[Discord Alert] Channel {channel_id} not found or cannot send messages.")
+            return False
+
+        embed = disnake.Embed.from_dict(embed_dict)  # pyright: ignore[reportArgumentType]
+        if file_bytes:
+            file_obj = disnake.File(io.BytesIO(file_bytes), filename="traceback.txt")
+            await channel.send(content=content, embed=embed, file=file_obj)
+        else:
+            await channel.send(content=content, embed=embed)
+        log.info(f"[Discord Alert] Successfully sent alert to channel {channel_id} via Disnake bot")
+        return True
+    except Exception as ex:
+        log.warning(f"[Discord Alert] Disnake channel send failed: {ex}")
+        return False
+
+def _send_error_alert_http(
+    content: str,
+    embed_dict: dict[str, Any],
+    file_bytes: bytes | None = None,
+    channel_id: int = ERROR_ALERT_CHANNEL_ID,
+    token: str | None = None,
+) -> bool:
+    bot_token = token or TOKEN or os.getenv("DISCORD_BOT_TOKEN", "").strip()
+    if not bot_token:
+        log.warning("[Discord Alert] DISCORD_BOT_TOKEN not configured; cannot dispatch alert via REST API.")
+        return False
+
+    url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+    headers = {"Authorization": f"Bot {bot_token}"}
+    payload_data = {
+        "content": content,
+        "embeds": [embed_dict],
+    }
+
+    try:
+        if file_bytes:
+            data = {"payload_json": json.dumps(payload_data)}
+            files = {"files[0]": ("traceback.txt", file_bytes, "text/plain")}
+            resp = requests.post(url, headers=headers, data=data, files=files, timeout=8)
+        else:
+            headers["Content-Type"] = "application/json"
+            resp = requests.post(url, headers=headers, json=payload_data, timeout=8)
+
+        if resp.status_code in (200, 201):
+            log.info(f"[Discord Alert] Error alert dispatched via HTTP REST API to channel {channel_id}")
+            return True
+        else:
+            log.warning(f"[Discord Alert] Discord REST API error {resp.status_code}: {resp.text}")
+            return False
+    except Exception as ex:
+        log.warning(f"[Discord Alert] HTTP REST request failed: {ex}")
+        return False
+
+async def send_error_alert_async(
+    origin: str,
+    error: BaseException | str,
+    traceback_str: str | None = None,
+    context_info: dict[str, Any] | None = None,
+    channel_id: int = ERROR_ALERT_CHANNEL_ID,
+    ping_user_id: str = ERROR_ALERT_PING_USER_ID,
+) -> bool:
+    try:
+        err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
+        err_msg = str(error) if error else "Unknown"
+        if _should_suppress_error(origin, err_type, err_msg):
+            log.info(f"[Discord Alert] Suppressed duplicate alert for {origin} ({err_type}) within cooldown.")
+            return False
+
+        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
+        content, embed_dict, file_bytes = _build_alert_payload_dict(
+            origin=origin,
+            error=error,
+            full_traceback=full_tb,
+            context_info=context_info,
+            ping_user_id=ping_user_id,
+        )
+
+        sent = await _send_alert_coro(channel_id, content, embed_dict, file_bytes)
+        if sent:
+            return True
+
+        return _send_error_alert_http(
+            content=content,
+            embed_dict=embed_dict,
+            file_bytes=file_bytes,
+            channel_id=channel_id,
+        )
+    except Exception as ex:
+        log.error(f"[Discord Alert] Unexpected error in send_error_alert_async: {ex}", exc_info=True)
+        return False
+
+def report_error_to_discord(
+    origin: str,
+    error: BaseException | str,
+    traceback_str: str | None = None,
+    context_info: dict[str, Any] | None = None,
+    channel_id: int = ERROR_ALERT_CHANNEL_ID,
+    ping_user_id: str = ERROR_ALERT_PING_USER_ID,
+    token: str | None = None,
+) -> bool:
+    try:
+        err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
+        err_msg = str(error) if error else "Unknown"
+        if _should_suppress_error(origin, err_type, err_msg):
+            log.info(f"[Discord Alert] Suppressed duplicate alert for {origin} ({err_type}) within cooldown.")
+            return False
+
+        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
+        content, embed_dict, file_bytes = _build_alert_payload_dict(
+            origin=origin,
+            error=error,
+            full_traceback=full_tb,
+            context_info=context_info,
+            ping_user_id=ping_user_id,
+        )
+
+        global disnake_bot, disnake_bot_loop
+        if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
+            try:
+                fut = asyncio.run_coroutine_threadsafe(
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes),
+                    disnake_bot_loop,
+                )
+                if fut.result(timeout=6):
+                    return True
+            except Exception as bot_send_err:
+                log.warning(f"[Discord Alert] Disnake loop send failed: {bot_send_err}. Falling back to REST API.")
+
+        return _send_error_alert_http(
+            content=content,
+            embed_dict=embed_dict,
+            file_bytes=file_bytes,
+            channel_id=channel_id,
+            token=token,
+        )
+    except Exception as ex:
+        log.error(f"[Discord Alert] Unexpected error in report_error_to_discord: {ex}", exc_info=True)
+        return False
 
 class TicketBridge:
     def __init__(self):
@@ -493,6 +720,31 @@ class TicketPanelView(disnake.ui.View):
         )
         self.add_item(self.discuss_button)
 
+    async def on_error(self, error: Exception, item: disnake.ui.Item, interaction: disnake.MessageInteraction) -> None:
+        log.error(f"[TicketPanelView] Interaction error in component {getattr(item, 'custom_id', item)}: {error}", exc_info=error)
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__)) if error and getattr(error, "__traceback__", None) else traceback.format_exc()
+        ctx = {
+            "View": "TicketPanelView",
+            "Ticket ID": str(getattr(self, "ticket_id", "unknown")),
+            "Component": str(getattr(item, "custom_id", item)),
+            "User": f"{interaction.author.name} (ID: {interaction.author.id})",
+            "Channel": f"#{getattr(interaction.channel, 'name', 'unknown')} (ID: {interaction.channel_id})",
+        }
+        await send_error_alert_async(
+            origin="Bot Ticket Panel View",
+            error=error,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+        try:
+            msg = "An error occurred while handling this ticket action. An alert with the traceback has been reported."
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
+
 class TicketNoteModal(disnake.ui.Modal):
     def __init__(self, ticket_id: int, current_note: str = ""):
         self.ticket_id = ticket_id
@@ -516,6 +768,30 @@ class TicketNoteModal(disnake.ui.Modal):
 
     async def callback(self, inter: disnake.ModalInteraction):
         await handle_ticket_note_submission(inter, self.ticket_id)
+
+    async def on_error(self, error: Exception, interaction: disnake.ModalInteraction) -> None:
+        log.error(f"[TicketNoteModal] Modal submission error for ticket #{self.ticket_id}: {error}", exc_info=error)
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__)) if error and getattr(error, "__traceback__", None) else traceback.format_exc()
+        ctx = {
+            "Modal": "TicketNoteModal",
+            "Ticket ID": str(self.ticket_id),
+            "User": f"{interaction.author.name} (ID: {interaction.author.id})",
+            "Channel": f"#{getattr(interaction.channel, 'name', 'unknown')} (ID: {interaction.channel_id})",
+        }
+        await send_error_alert_async(
+            origin="Bot Ticket Note Modal",
+            error=error,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+        try:
+            msg = "An error occurred while saving the note. An alert with the traceback has been reported."
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
 
 _handled_interaction_ids: set[int] = set()
 
@@ -1478,7 +1754,7 @@ class ServerBrowserView(disnake.ui.View):
             color = disnake.Color.dark_theme() if hasattr(disnake.Color, "dark_theme") else disnake.Color.greyple()
 
         embed = disnake.Embed(
-            title=f"RBWR Server Telemetry — {short}",
+            title=f"RBWR Server Metrics — {short}",
             description=(
                 f"**Job ID:** `{jid}`\n"
                 f"**Points Generation:** `{pts_str}`\n"
@@ -1602,7 +1878,7 @@ class ServerBrowserView(disnake.ui.View):
                 ))
             inspect_select = disnake.ui.StringSelect(
                 custom_id="browser_inspect_select",
-                placeholder="Select a server to inspect full telemetry...",
+                placeholder="Select a server to inspect full operational stats...",
                 options=inspect_options,
                 row=2,
             )
@@ -1705,7 +1981,32 @@ class ServerBrowserView(disnake.ui.View):
         self.rebuild_components()
         await inter.edit_original_response(embed=self.build_embed(), view=self)
 
+    async def on_error(self, error: Exception, item: disnake.ui.Item, interaction: disnake.MessageInteraction) -> None:
+        log.error(f"[ServerBrowserView] Interaction error on item {getattr(item, 'custom_id', item)}: {error}", exc_info=error)
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__)) if error and getattr(error, "__traceback__", None) else traceback.format_exc()
+        ctx = {
+            "View": "ServerBrowserView",
+            "Component": str(getattr(item, "custom_id", item)),
+            "User": f"{interaction.author.name} (ID: {interaction.author.id})",
+            "Channel": f"#{getattr(interaction.channel, 'name', 'unknown')} (ID: {interaction.channel_id})",
+        }
+        await send_error_alert_async(
+            origin="Bot Server Browser View",
+            error=error,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+        try:
+            msg = "An error occurred while interacting with the server browser. An alert with the traceback has been reported."
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
+
 def create_bot_instance(data_supplier: Callable[[bool], dict[str, Any]] | None = None) -> commands.InteractionBot:
+    global disnake_bot
     intents = disnake.Intents.default()
     intents.message_content = True
     intents.guilds = True
@@ -1719,6 +2020,7 @@ def create_bot_instance(data_supplier: Callable[[bool], dict[str, Any]] | None =
     new_bot.rbwr = RBWRClient(data_supplier=data_supplier)  # pyright: ignore[reportAttributeAccessIssue]
 
     register_bot_events_and_commands(new_bot)
+    disnake_bot = new_bot
     return new_bot
 
 def fmt(value: Any) -> str:
@@ -1793,11 +2095,112 @@ FILTER_CHOICES = [
 def register_bot_events_and_commands(b: commands.InteractionBot):
     @b.event
     async def on_ready():
+        global disnake_bot, disnake_bot_loop
+        disnake_bot = b
+        try:
+            disnake_bot_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
         log.info(f"[Disnake Bot] Connected and active as {b.user} (ID: {b.user.id if b.user else 'N/A'})")
+
+    @b.event
+    async def on_slash_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
+        log.error(f"[Disnake Bot] Slash command error in /{getattr(inter.data, 'name', 'unknown')}: {error}", exc_info=error)
+        orig_err = getattr(error, "original", error)
+        tb_str = "".join(traceback.format_exception(type(orig_err), orig_err, orig_err.__traceback__)) if orig_err and getattr(orig_err, "__traceback__", None) else traceback.format_exc()
+
+        cmd_name = getattr(inter.data, "name", "unknown") if hasattr(inter, "data") else "unknown"
+        ctx = {
+            "Command": f"/{cmd_name}",
+            "User": f"{inter.author.name} (ID: {inter.author.id})",
+            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+            "Guild": f"{inter.guild.name} (ID: {inter.guild.id})" if inter.guild else "Direct Message",
+        }
+        if hasattr(inter, "filled_options") and inter.filled_options:
+            ctx["Options"] = str(inter.filled_options)[:500]
+
+        await send_error_alert_async(
+            origin=f"Bot Slash Command (/{cmd_name})",
+            error=orig_err,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+
+        try:
+            msg = "An unexpected error occurred while processing this command. An alert with the traceback has been automatically dispatched."
+            if inter.response.is_done():
+                await inter.followup.send(msg, ephemeral=True)
+            else:
+                await inter.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
+
+    @b.event
+    async def on_user_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
+        log.error(f"[Disnake Bot] User command error: {error}", exc_info=error)
+        orig_err = getattr(error, "original", error)
+        tb_str = "".join(traceback.format_exception(type(orig_err), orig_err, orig_err.__traceback__)) if orig_err and getattr(orig_err, "__traceback__", None) else traceback.format_exc()
+        cmd_name = getattr(inter.data, "name", "unknown") if hasattr(inter, "data") else "unknown"
+        ctx = {
+            "Command": f"User Command: {cmd_name}",
+            "User": f"{inter.author.name} (ID: {inter.author.id})",
+            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+        }
+        await send_error_alert_async(
+            origin="Bot User Command",
+            error=orig_err,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+
+    @b.event
+    async def on_message_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
+        log.error(f"[Disnake Bot] Message command error: {error}", exc_info=error)
+        orig_err = getattr(error, "original", error)
+        tb_str = "".join(traceback.format_exception(type(orig_err), orig_err, orig_err.__traceback__)) if orig_err and getattr(orig_err, "__traceback__", None) else traceback.format_exc()
+        cmd_name = getattr(inter.data, "name", "unknown") if hasattr(inter, "data") else "unknown"
+        ctx = {
+            "Command": f"Message Command: {cmd_name}",
+            "User": f"{inter.author.name} (ID: {inter.author.id})",
+            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+        }
+        await send_error_alert_async(
+            origin="Bot Message Command",
+            error=orig_err,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+
+    @b.event
+    async def on_error(event_method: str, *args, **kwargs):
+        log.error(f"[Disnake Bot] Unhandled event error in {event_method}", exc_info=True)
+        exc_type, exc_val, exc_tb = sys.exc_info()
+        tb_str = "".join(traceback.format_exception(exc_type, exc_val, exc_tb)) if exc_val else traceback.format_exc()
+
+        ctx = {"Event": event_method}
+        if args and isinstance(args[0], disnake.Message):
+            msg = args[0]
+            ctx["Author"] = f"{msg.author.name} (ID: {msg.author.id})"
+            ctx["Channel"] = f"#{getattr(msg.channel, 'name', 'unknown')} (ID: {msg.channel.id})"
+            if msg.guild:
+                ctx["Guild"] = f"{msg.guild.name} (ID: {msg.guild.id})"
+            if msg.content:
+                ctx["Message Preview"] = msg.content[:200]
+        elif args and isinstance(args[0], disnake.Interaction):
+            it = args[0]
+            ctx["User"] = f"{it.author.name} (ID: {it.author.id})"
+            ctx["Interaction Type"] = str(it.type)
+
+        await send_error_alert_async(
+            origin=f"Bot Event ({event_method})",
+            error=exc_val or f"Error in event {event_method}",
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
 
     @b.slash_command(
         name="server",
-        description="View real-time telemetry and stats for an RBWR server",
+        description="View real-time metrics and operational stats for an RBWR server",
         install_types=disnake.ApplicationInstallTypes.all(),
         contexts=disnake.InteractionContextTypes.all(),
     )
@@ -1857,7 +2260,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 color=disnake.Color.teal(),
                 timestamp=datetime.now(timezone.utc),
             )
-            footer_text = f"Players: {players} • RBWR Telemetry" if is_pub else "Private Server • RBWR Telemetry"
+            footer_text = f"Players: {players} • RBWR Metrics" if is_pub else "Private Server • RBWR Metrics"
             embed.set_footer(text=footer_text)
             add_info(embed, server, 1, info_val)
             add_info(embed, server, 2, info_val)
@@ -1945,6 +2348,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.listen("on_interaction")
     async def global_ticket_interaction_listener(inter: disnake.Interaction):
+        t_id: int | None = None
         if isinstance(inter, disnake.MessageInteraction):
             cid = str(getattr(inter.data, "custom_id", "") or "")
             if cid.startswith("ticket_status_select:"):
@@ -1953,18 +2357,45 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                     await handle_ticket_status_select(inter, t_id)
                 except Exception as ex:
                     log.error(f"[Component Handler] Status select error: {ex}", exc_info=True)
+                    await send_error_alert_async(
+                        origin="Bot Component Interaction (ticket_status_select)",
+                        error=ex,
+                        context_info={
+                            "Ticket ID": t_id or "unknown",
+                            "User": f"{inter.author.name} (ID: {inter.author.id})",
+                            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+                        },
+                    )
             elif cid.startswith("ticket_edit_note:"):
                 try:
                     t_id = int(cid.split(":")[1])
                     await handle_ticket_edit_note_button(inter, t_id)
                 except Exception as ex:
                     log.error(f"[Component Handler] Edit note button error: {ex}", exc_info=True)
+                    await send_error_alert_async(
+                        origin="Bot Component Interaction (ticket_edit_note)",
+                        error=ex,
+                        context_info={
+                            "Ticket ID": t_id or "unknown",
+                            "User": f"{inter.author.name} (ID: {inter.author.id})",
+                            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+                        },
+                    )
             elif cid.startswith("ticket_open_discussions:"):
                 try:
                     t_id = int(cid.split(":")[1])
                     await handle_ticket_open_discussions(inter, t_id)
                 except Exception as ex:
                     log.error(f"[Component Handler] Open discussions error: {ex}", exc_info=True)
+                    await send_error_alert_async(
+                        origin="Bot Component Interaction (ticket_open_discussions)",
+                        error=ex,
+                        context_info={
+                            "Ticket ID": t_id or "unknown",
+                            "User": f"{inter.author.name} (ID: {inter.author.id})",
+                            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+                        },
+                    )
         elif isinstance(inter, disnake.ModalInteraction):
             cid = str(getattr(inter.data, "custom_id", "") or "")
             if cid.startswith("ticket_note_modal:"):
@@ -1973,6 +2404,15 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                     await handle_ticket_note_submission(inter, t_id)
                 except Exception as ex:
                     log.error(f"[Component Handler] Modal note error: {ex}", exc_info=True)
+                    await send_error_alert_async(
+                        origin="Bot Modal Interaction (ticket_note_modal)",
+                        error=ex,
+                        context_info={
+                            "Ticket ID": t_id or "unknown",
+                            "User": f"{inter.author.name} (ID: {inter.author.id})",
+                            "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
+                        },
+                    )
 
     async def _show_panel_interactive(
         inter: disnake.ApplicationCommandInteraction,
@@ -2396,6 +2836,7 @@ def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
         return channel_id
     except Exception as ex:
         log.error(f"[Disnake Channel] Error creating channel: {ex}", exc_info=True)
+        report_error_to_discord("Ticket Bridge (create_discord_ticket_channel)", ex, context_info={"Ticket ID": ticket.get("id"), "Type": ticket.get("type")})
         return None
 
 def forward_ticket_reply_to_discord(
@@ -2592,8 +3033,10 @@ def start_bot_thread(
                 loop.run_until_complete(bot.start(bot_token))
             except Exception as retry_err:
                 log.error(f"[Disnake Bot] Fallback start failed: {retry_err}")
+                report_error_to_discord("Bot Fallback Startup", retry_err, context_info={"Intents": "Basic fallback"})
         except Exception as e:
             log.error(f"[Disnake Bot] Bot encountered error: {e}", exc_info=True)
+            report_error_to_discord("Bot Daemon Thread", e, context_info={"Thread": "DisnakeBotThread"})
 
     thread = threading.Thread(target=_worker, daemon=True, name="DisnakeBotThread")
     thread.start()
@@ -2605,5 +3048,11 @@ if __name__ == "__main__":
         log.error("DISCORD_BOT_TOKEN is not set in environment or .env file.")
         exit(1)
 
-    standalone_bot = create_bot_instance()
-    standalone_bot.run(bot_token)
+    try:
+        standalone_bot = create_bot_instance()
+        disnake_bot = standalone_bot
+        standalone_bot.run(bot_token)
+    except Exception as e:
+        log.critical(f"Bot terminated with fatal error: {e}", exc_info=True)
+        report_error_to_discord("Bot Standalone Process", e)
+        raise
