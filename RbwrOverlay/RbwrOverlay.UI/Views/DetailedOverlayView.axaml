@@ -11,8 +11,7 @@
             CornerRadius="8"
             Padding="12"
             Width="470"
-            Height="455"
-            BoxShadow="0 8 32 0 #55000000">
+            Height="455">
 
         <Grid RowDefinitions="Auto,Auto,*">
 
@@ -446,7 +445,7 @@
                         </Border>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,2,0,4">
-                            <TextBlock Text="RBWR Overlay v2.1.0" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                            <TextBlock Text="{Binding GlobalAppVersion, StringFormat='RBWR Overlay v{0}'}" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                             <TextBlock Text="•" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                             <TextBlock Text="MIT License" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                         </StackPanel>
@@ -457,23 +456,52 @@
                 <ScrollViewer IsVisible="{Binding IsFeedbackTabActive}">
                     <StackPanel Spacing="10" Margin="0,0,6,0">
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="COMMUNITY FEEDBACK &amp; SUGGESTIONS" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" />
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="COMMUNITY TICKETS &amp; FEEDBACK" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" />
 
-                                <Grid ColumnDefinitions="Auto,*">
-                                    <TextBlock Grid.Column="0" Text="Name:" VerticalAlignment="Center" FontSize="10" Margin="0,0,6,0" />
-                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding FeedbackAuthor}" IsEnabled="{Binding !FeedbackIsAnonymous}" FontSize="10" Padding="4,2" />
+                                <TextBlock Text="Bug reports, feature suggestions, and discussions have moved to the online web portal and Discord server for live responses and tracking."
+                                           Foreground="{DynamicResource TextLight}"
+                                           FontSize="9"
+                                           TextWrapping="Wrap"
+                                           LineHeight="14" />
+
+                                <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                                    <Button Grid.Column="0"
+                                            Classes="cyber-blue"
+                                            Content="Open Tickets Portal"
+                                            Command="{Binding OpenTicketsPageCommand}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Center"
+                                            Margin="0,0,4,0"
+                                            Padding="0,6"
+                                            FontSize="10"
+                                            FontWeight="SemiBold" />
+
+                                    <Button Grid.Column="1"
+                                            Classes="cyber"
+                                            Content="Join Discord Server"
+                                            Command="{Binding OpenDiscordServerCommand}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Center"
+                                            Margin="4,0,0,0"
+                                            Padding="0,6"
+                                            FontSize="10"
+                                            FontWeight="SemiBold" />
                                 </Grid>
 
-                                <CheckBox Content="Submit Anonymously" IsChecked="{Binding FeedbackIsAnonymous}" FontSize="10" />
-
-                                <TextBox Classes="cyber" Text="{Binding FeedbackContent}" AcceptsReturn="True" Height="70" TextWrapping="Wrap" PlaceholderText="Type your suggestion or feedback here..." FontSize="10" />
-
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="{Binding FeedbackStatusMessage}" Foreground="{Binding FeedbackStatusBrush}" FontSize="9" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Classes="cyber-green" Content="Submit" Command="{Binding SubmitFeedbackCommand}" IsEnabled="{Binding !IsSubmittingFeedback}" Padding="10,3" />
-                                </Grid>
+                                <Border Background="{DynamicResource DarkPanelBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,2,0,0">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Web Portal: rbwr.hotment.dev/tickets"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   FontSize="8"
+                                                   FontFamily="Consolas" />
+                                        <TextBlock Text="Discord Community: discord.gg/4eUQQcuv87"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   FontSize="8"
+                                                   FontFamily="Consolas" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
 

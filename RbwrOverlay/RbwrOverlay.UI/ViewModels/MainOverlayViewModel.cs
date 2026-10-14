@@ -2,6 +2,7 @@ using System.Net;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -23,7 +24,10 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.1.0";
+    public const string AppVersion = "2.1.1-dev1";
+    public string GlobalAppVersion => AppVersion;
+    public string AppVersionText => $"RBWR Overlay v{AppVersion}";
+    public string VersionText => $"RBWR Overlay v{AppVersion}";
 
     private readonly Calculator _calc;
     private readonly ISettingsService _settingsService;
@@ -1221,6 +1225,48 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
     }
 
+    [RelayCommand]
+    public void OpenTicketsPage()
+    {
+        OpenBrowser("https://rbwr.hotment.dev/tickets");
+    }
+
+    [RelayCommand]
+    public void OpenDiscordServer()
+    {
+        OpenBrowser("https://discord.gg/4eUQQcuv87");
+    }
+
+    private static void OpenBrowser(string url)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                Process.Start("xdg-open", url);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Process.Start("open", url);
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+        }
+        catch
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch { }
+        }
+    }
 
     [RelayCommand]
     public async Task SubmitFeedbackAsync()

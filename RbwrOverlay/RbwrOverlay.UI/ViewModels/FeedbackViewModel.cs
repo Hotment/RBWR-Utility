@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -34,6 +36,49 @@ public partial class FeedbackViewModel : ViewModelBase
     {
         _apiClient = apiClient;
         _logger = logger ?? LoggingService.Instance;
+    }
+
+    [RelayCommand]
+    public void OpenTicketsPage()
+    {
+        OpenBrowser("https://rbwr.hotment.dev/tickets");
+    }
+
+    [RelayCommand]
+    public void OpenDiscordServer()
+    {
+        OpenBrowser("https://discord.gg/4eUQQcuv87");
+    }
+
+    private static void OpenBrowser(string url)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                Process.Start("xdg-open", url);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Process.Start("open", url);
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+        }
+        catch
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch { }
+        }
     }
 
     [RelayCommand]

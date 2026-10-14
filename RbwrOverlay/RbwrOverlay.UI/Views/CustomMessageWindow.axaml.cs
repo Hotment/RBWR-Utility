@@ -126,9 +126,6 @@ public partial class CustomMessageWindow : Window
             : new SolidColorBrush(Color.Parse("#261b0a"));
 
         RootBorder.BorderBrush = accentBrush;
-        RootBorder.BoxShadow = BoxShadows.Parse(healthVal <= 45.0
-            ? "0 8 32 0 #99000000, 0 0 20 0 #44ff003c"
-            : "0 8 32 0 #99000000, 0 0 20 0 #44ffaa00");
 
         TitleText.Foreground = accentBrush;
 
@@ -157,7 +154,6 @@ public partial class CustomMessageWindow : Window
         var redBrush = new SolidColorBrush(redColor);
 
         RootBorder.BorderBrush = redBrush;
-        RootBorder.BoxShadow = BoxShadows.Parse("0 8 32 0 #99000000, 0 0 20 0 #44ff003c");
 
         TitleText.Foreground = redBrush;
 
@@ -176,7 +172,6 @@ public partial class CustomMessageWindow : Window
         var cyanBrush = new SolidColorBrush(cyanColor);
 
         RootBorder.BorderBrush = cyanBrush;
-        RootBorder.BoxShadow = BoxShadows.Parse("0 8 32 0 #99000000, 0 0 18 0 #3300f0ff");
 
         TitleText.Foreground = cyanBrush;
 

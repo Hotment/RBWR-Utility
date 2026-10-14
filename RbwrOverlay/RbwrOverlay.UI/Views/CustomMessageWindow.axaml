@@ -8,7 +8,7 @@
         WindowDecorations="None"
         CanResize="False"
         Topmost="True"
-        Width="460"
+        Width="440"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
 
@@ -16,9 +16,7 @@
             Background="{DynamicResource CyberMainBg}"
             BorderBrush="{DynamicResource NeonRed}"
             BorderThickness="1"
-            CornerRadius="8"
-            BoxShadow="0 8 32 0 #99000000, 0 0 20 0 #33ff003c"
-            Margin="10">
+            CornerRadius="8">
 
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 

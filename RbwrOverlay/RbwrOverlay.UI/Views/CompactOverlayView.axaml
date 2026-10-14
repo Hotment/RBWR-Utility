@@ -10,8 +10,7 @@
             CornerRadius="18"
             Padding="8,4"
             HorizontalAlignment="Left"
-            VerticalAlignment="Top"
-            BoxShadow="0 4 16 0 #33000000">
+            VerticalAlignment="Top">
 
         <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
               VerticalAlignment="Center">

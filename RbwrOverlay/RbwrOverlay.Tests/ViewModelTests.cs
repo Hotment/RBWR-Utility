@@ -63,6 +63,15 @@ public class ViewModelTests
     }
 
     [Fact]
+    public void TestGlobalAppVersionProperties()
+    {
+        var vm = CreateTestVm();
+        Assert.Equal(MainOverlayViewModel.AppVersion, vm.GlobalAppVersion);
+        Assert.Equal($"RBWR Overlay v{MainOverlayViewModel.AppVersion}", vm.AppVersionText);
+        Assert.Equal($"RBWR Overlay v{MainOverlayViewModel.AppVersion}", vm.VersionText);
+    }
+
+    [Fact]
     public void TestUnitSwitching()
     {
         var vm = CreateTestVm();
