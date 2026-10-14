@@ -1368,6 +1368,55 @@ _sc_server_ids = []
 _sc_latest_data = {}
 _sc_server_meta = {}
 
+def safe_dict_items(d, max_retries=3):
+    """
+    Safely returns list(d.items()) even if the dictionary is being modified concurrently in another thread.
+    """
+    if not isinstance(d, dict):
+        return []
+    for attempt in range(max_retries):
+        try:
+            return list(d.items())
+        except RuntimeError:
+            if attempt == max_retries - 1:
+                try:
+                    keys = list(d.keys())
+                    return [(k, d[k]) for k in keys if k in d]
+                except Exception:
+                    return []
+            time.sleep(0.005)
+    return []
+
+def safe_dict_keys(d, max_retries=3):
+    """
+    Safely returns list(d.keys()) even if the dictionary is being modified concurrently in another thread.
+    """
+    if not isinstance(d, dict):
+        return []
+    for attempt in range(max_retries):
+        try:
+            return list(d.keys())
+        except RuntimeError:
+            if attempt == max_retries - 1:
+                return []
+            time.sleep(0.005)
+    return []
+
+def safe_dict_values(d, max_retries=3):
+    """
+    Safely returns list(d.values()) even if the dictionary is being modified concurrently in another thread.
+    """
+    if not isinstance(d, dict):
+        return []
+    for attempt in range(max_retries):
+        try:
+            return list(d.values())
+        except RuntimeError:
+            if attempt == max_retries - 1:
+                return []
+            time.sleep(0.005)
+    return []
+
 def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
     if job_id in _sc_public_server_ids:
         return False
@@ -1377,7 +1426,7 @@ def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=F
     if latest_state and "IsPrivate" in latest_state:
         return bool(latest_state["IsPrivate"])
     if snapshots:
-        for snap in snapshots.values():
+        for snap in safe_dict_values(snapshots):
             if isinstance(snap, dict) and "IsPrivate" in snap:
                 return bool(snap["IsPrivate"])
     if is_active and _sc_public_server_ids:
@@ -1397,10 +1446,13 @@ def get_server_player_count(job_id, snapshots=None, latest_state=None, is_privat
     if meta and meta.get("last_player_count", 0) > 0:
         return int(meta["last_player_count"])
     if snapshots:
-        for ts in sorted(snapshots.keys(), reverse=True):
-            p = snapshots[ts].get("PlayerCount", 0)
-            if p > 0:
-                return int(p)
+        valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+        for ts in sorted(valid_ts, reverse=True):
+            snap = snapshots.get(ts)
+            if isinstance(snap, dict):
+                p = snap.get("PlayerCount", 0)
+                if p > 0:
+                    return int(p)
     return 0
 
 _sc_file_cache = {}
@@ -1450,9 +1502,9 @@ def normalize_snapshots_power(data):
     """
     if not isinstance(data, dict):
         return data
-    for job_id, snaps in data.items():
+    for job_id, snaps in safe_dict_items(data):
         if isinstance(snaps, dict):
-            for ts, state in snaps.items():
+            for ts, state in safe_dict_items(snaps):
                 if isinstance(state, dict):
                     if isinstance(state.get("Unit2"), dict):
                         ensure_unit_output_mw(state["Unit2"])
@@ -1600,8 +1652,7 @@ def load_server_meta():
     global _sc_server_meta
     data = get_sc_data("server_meta.json")
     if isinstance(data, dict):
-        _sc_server_meta.clear()
-        _sc_server_meta.update(data)
+        _sc_server_meta = dict(data)
     return _sc_server_meta
 
 load_server_meta()
@@ -1622,13 +1673,15 @@ def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
     if st_ts and len(st_ts) >= 10 and st_ts[4] == '-' and st_ts[7] == '-':
         return st_ts[:10]
         
-    if snaps:
-        earliest_ts = min(snaps.keys())
-        if earliest_ts and len(earliest_ts) >= 10 and earliest_ts[4] == '-' and earliest_ts[7] == '-':
-            if job_id not in _sc_server_meta:
-                _sc_server_meta[job_id] = {}
-            _sc_server_meta[job_id]["start_timestamp"] = earliest_ts
-            return earliest_ts[:10]
+    if snaps and isinstance(snaps, dict):
+        valid_ts = [k for k in safe_dict_keys(snaps) if not k.startswith('_')]
+        if valid_ts:
+            earliest_ts = min(valid_ts)
+            if len(earliest_ts) >= 10 and earliest_ts[4] == '-' and earliest_ts[7] == '-':
+                if job_id not in _sc_server_meta:
+                    _sc_server_meta[job_id] = {}
+                _sc_server_meta[job_id]["start_timestamp"] = earliest_ts
+                return earliest_ts[:10]
             
     if os.path.exists(ARCHIVES_DIR):
         try:
@@ -1639,7 +1692,9 @@ def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
                     if isinstance(day_data, dict) and job_id in day_data:
                         if job_id not in _sc_server_meta:
                             _sc_server_meta[job_id] = {}
-                        first_ts = min(day_data[job_id].keys()) if day_data[job_id] else None
+                        day_snaps = day_data.get(job_id)
+                        valid_day_ts = [k for k in safe_dict_keys(day_snaps) if not k.startswith('_')] if isinstance(day_snaps, dict) else []
+                        first_ts = min(valid_day_ts) if valid_day_ts else None
                         _sc_server_meta[job_id]["start_timestamp"] = first_ts or f"{date_str}T00:00:00Z"
                         return date_str
         except Exception:
@@ -1659,10 +1714,10 @@ def get_active_server_start_dates(current_data: dict | None = None) -> set:
         return active_dates
 
     now_utc = datetime.now(timezone.utc)
-    for s_id, snaps in current_data.items():
-        if not snaps:
+    for s_id, snaps in safe_dict_items(current_data):
+        if not snaps or not isinstance(snaps, dict):
             continue
-        valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
+        valid_ts_keys = [k for k in safe_dict_keys(snaps) if not k.startswith('_')]
         if not valid_ts_keys:
             continue
         latest_ts = max(valid_ts_keys)
@@ -1779,7 +1834,7 @@ def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
                 if isinstance(snaps, dict):
                     merged_snapshots.update(snaps)
             else:
-                for j_id, snaps in day_data.items():
+                for j_id, snaps in safe_dict_items(day_data):
                     if is_exact_job_or_server_id_match(clean_q, j_id):
                         matched_job_id = j_id
                         if isinstance(snaps, dict):
@@ -1864,7 +1919,7 @@ def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]
             day_data = get_sc_data(rel_path)
             if isinstance(day_data, dict):
                 s_count = len(day_data)
-                snap_count = sum(len(snaps) for snaps in day_data.values() if isinstance(snaps, dict))
+                snap_count = sum(len(snaps) for snaps in safe_dict_values(day_data) if isinstance(snaps, dict))
             else:
                 s_count = 0
                 snap_count = 0
@@ -1944,13 +1999,14 @@ def compress_finalized_archives(current_data: dict | None = None):
                     day_json = get_sc_data(json_rel)
                     day_gz = get_sc_data(gz_rel)
                     if isinstance(day_json, dict) and isinstance(day_gz, dict):
-                        for j_id, snaps in day_json.items():
-                            if j_id not in day_gz:
-                                day_gz[j_id] = {}
+                        merged_gz = {jid: dict(snaps) for jid, snaps in safe_dict_items(day_gz)}
+                        for j_id, snaps in safe_dict_items(day_json):
+                            if j_id not in merged_gz:
+                                merged_gz[j_id] = {}
                             else:
-                                day_gz[j_id] = dict(day_gz[j_id])
-                            day_gz[j_id].update(snaps)
-                        save_sc_data(day_gz, gz_rel)
+                                merged_gz[j_id] = dict(merged_gz[j_id])
+                            merged_gz[j_id].update(snaps)
+                        save_sc_data(merged_gz, gz_rel)
                     try:
                         os.remove(uncompressed_path)
                     except Exception:
@@ -2149,10 +2205,9 @@ def update_public_roblox_servers():
 
         if public_ids or public_info:
             with _sc_lock:
-                _sc_public_server_ids.clear()
-                _sc_public_server_ids.extend(public_ids)
-                _sc_public_servers_info.clear()
-                _sc_public_servers_info.update(public_info)
+                global _sc_public_server_ids, _sc_public_servers_info
+                _sc_public_server_ids = list(public_ids)
+                _sc_public_servers_info = dict(public_info)
 
                 meta_dirty = False
                 for s_id in public_ids:
@@ -2201,8 +2256,12 @@ def pull_server_checker_data():
         logger.error(f"Failed to decode server response JSON: {e}")
         return False
 
+    success_public = update_public_roblox_servers()
+
     with _sc_lock:
-        current_data = get_sc_data("servers.json")
+        raw_current = get_sc_data("servers.json") or {}
+        
+        current_data = {jid: dict(snaps) for jid, snaps in safe_dict_items(raw_current)}
         found_new_server = False
         servers_list = resp_json.get('data', {}).get('servers', [])
 
@@ -2211,11 +2270,9 @@ def pull_server_checker_data():
             if job_id and job_id not in _sc_server_ids:
                 _sc_server_ids.append(job_id)
                 found_new_server = True
-        
-        success_public = update_public_roblox_servers()
 
-        _sc_latest_data.clear()
-        _sc_latest_data.update(resp_json)
+        global _sc_latest_data
+        _sc_latest_data = resp_json
         for s in _sc_latest_data.get('data', {}).get('servers', []):
             st = s.get('state')
             if isinstance(st, dict):
@@ -2320,7 +2377,8 @@ def pull_server_checker_data():
         if meta_dirty:
             save_server_meta()
 
-        global_data = get_sc_data("global.json")
+        raw_global = get_sc_data("global.json") or {}
+        global_data = dict(raw_global)
         stats_payload = resp_json.get('data', {}).get('stats', {})
         if stats_payload:
             global_data[str(datetime.now(timezone.utc).isoformat())] = stats_payload
@@ -2432,11 +2490,14 @@ def format_heartbeat_age(seconds: float) -> str:
     return f"{y}y {rem_mo}mo ago" if rem_mo > 0 else f"{y}y ago"
 
 def get_server_uptime_seconds(snapshots, is_historical, age_sec=None):
-    if not snapshots:
+    if not snapshots or not isinstance(snapshots, dict):
         return 0
     try:
-        first_ts = min(snapshots.keys())
-        latest_ts = max(snapshots.keys())
+        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+        if not valid_ts_keys:
+            return 0
+        first_ts = min(valid_ts_keys)
+        latest_ts = max(valid_ts_keys)
         first_sec_ago = convert_ISO_to_secs(first_ts)
         latest_sec_ago = convert_ISO_to_secs(latest_ts) if age_sec is None else age_sec
         if is_historical:
@@ -2493,15 +2554,21 @@ def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=N
       or heartbeat age > 600s, it is marked historical.
     """
     if age_sec is None:
-        if snapshots:
-            latest_ts = max(snapshots.keys())
-            age_sec = convert_ISO_to_secs(latest_ts)
+        if snapshots and isinstance(snapshots, dict):
+            valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+            if valid_ts:
+                latest_ts = max(valid_ts)
+                age_sec = convert_ISO_to_secs(latest_ts)
+            else:
+                age_sec = 0
         else:
             age_sec = 0
 
-    if latest_state is None and snapshots:
-        latest_ts = max(snapshots.keys())
-        latest_state = snapshots.get(latest_ts, {})
+    if latest_state is None and snapshots and isinstance(snapshots, dict):
+        valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+        if valid_ts:
+            latest_ts = max(valid_ts)
+            latest_state = snapshots.get(latest_ts, {})
     if latest_state is None:
         latest_state = {}
 
@@ -2674,11 +2741,18 @@ def get_active_cards_base(servers_data, persistent_ids):
     now_utc = datetime.now(timezone.utc)
     pps_map = get_sc_latest_pps_map()
     cards = []
-    for job_id, snapshots in sorted(servers_data.items()):
-        if not snapshots:
+    server_items = safe_dict_items(servers_data)
+    server_items.sort(key=lambda x: str(x[0]))
+    for job_id, snapshots in server_items:
+        if not snapshots or not isinstance(snapshots, dict):
             continue
-        latest_timestamp = max(snapshots.keys())
-        latest_state = snapshots[latest_timestamp]
+        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+        if not valid_ts_keys:
+            continue
+        latest_timestamp = max(valid_ts_keys)
+        latest_state = snapshots.get(latest_timestamp)
+        if not latest_state or not isinstance(latest_state, dict):
+            continue
         info = _sc_public_servers_info.get(job_id, {})
         age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
         is_persistent = job_id in persistent_ids
@@ -2695,7 +2769,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
             max_players = info.get("maxPlayers", 12) if info else 12
 
-        first_timestamp = min(snapshots.keys())
+        first_timestamp = min(valid_ts_keys)
         uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
         uptime_str = format_uptime_duration(uptime_sec)
 
@@ -2722,7 +2796,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             "latest_timestamp": format_heartbeat_age(age_sec),
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
-            "snapshot_count": len(snapshots),
+            "snapshot_count": len(valid_ts_keys),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
             "top_score": top_score,
@@ -2768,14 +2842,18 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
     cards = []
     now_utc = datetime.now(timezone.utc)
     pps_map = get_sc_latest_pps_map()
-    for job_id, snapshots in sorted(data.items()):
-        if not snapshots:
+    data_items = safe_dict_items(data)
+    data_items.sort(key=lambda x: str(x[0]))
+    for job_id, snapshots in data_items:
+        if not snapshots or not isinstance(snapshots, dict):
             continue
-        valid_ts_keys = [k for k in snapshots.keys() if not k.startswith('_')]
+        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
         if not valid_ts_keys:
             continue
         latest_timestamp = max(valid_ts_keys)
-        latest_state = snapshots[latest_timestamp]
+        latest_state = snapshots.get(latest_timestamp)
+        if not latest_state or not isinstance(latest_state, dict):
+            continue
         unit1 = latest_state.get("Unit1", {})
         unit2 = latest_state.get("Unit2", {})
 
@@ -3009,7 +3087,9 @@ def build_chart_payload(job_id, snapshots):
             "charts": [],
         }
 
-    for timestamp, state in sorted(snapshots.items()):
+    valid_items = safe_dict_items(snapshots)
+    valid_items.sort(key=lambda x: str(x[0]))
+    for timestamp, state in valid_items:
         sec_ago = convert_ISO_to_secs(timestamp)
         ordered_snapshots.append({
             "timestamp": timestamp,
@@ -3149,11 +3229,13 @@ def build_global_chart_payload(snapshots, max_history_seconds=7 * 24 * 3600):
     u1_points = []
     u2_points = []
 
-    for timestamp in sorted(snapshots.keys()):
+    valid_ts_list = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+    valid_ts_list.sort()
+    for timestamp in valid_ts_list:
         sec_ago = convert_ISO_to_secs(timestamp)
         if max_history_seconds is not None and sec_ago > max_history_seconds:
             continue
-        data_entry = snapshots[timestamp] or {}
+        data_entry = snapshots.get(timestamp) or {}
         unit1 = data_entry.get("unit1", {})
         unit2 = data_entry.get("unit2", {})
 
@@ -3312,7 +3394,8 @@ def server_detail_page(job_id):
     is_persistent = job_id in persistent_data.get("persistent", {})
 
     info = _sc_public_servers_info.get(job_id, {})
-    latest_ts = max(snapshots.keys()) if snapshots else None
+    valid_detail_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')] if isinstance(snapshots, dict) else []
+    latest_ts = max(valid_detail_ts) if valid_detail_ts else None
     latest_state = snapshots.get(latest_ts, {}) if latest_ts else {}
     age_sec = convert_ISO_to_secs(latest_ts) if latest_ts else 0
 
@@ -3326,14 +3409,13 @@ def server_detail_page(job_id):
         max_players = info.get("maxPlayers", 12) if info else 12
     is_admin = bool(get_authenticated_user())
 
-    first_ts = min(snapshots.keys()) if snapshots else None
+    first_ts = min(valid_detail_ts) if valid_detail_ts else None
     uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
     uptime_str = format_uptime_duration(uptime_sec)
     server_top_score = calculate_server_top_score(snapshots)
 
     if not server:
-        latest_ts = max(snapshots.keys()) if snapshots else None
-        latest_st = snapshots.get(latest_ts, {}) if latest_ts else {}
+        latest_st = latest_state
         unit1_st = latest_st.get("Unit1", {})
         unit2_st = latest_st.get("Unit2", {})
 
@@ -3503,7 +3585,7 @@ def server_score_breakdown_api(job_id):
     matched_job_id = query
 
     if not snapshots:
-        for jid, snaps in servers_data.items():
+        for jid, snaps in safe_dict_items(servers_data):
             if is_exact_job_or_server_id_match(query, jid):
                 matched_job_id = jid
                 snapshots = snaps
@@ -3549,11 +3631,16 @@ def get_historical_cards_base(servers_data, persistent_ids):
     now_utc = datetime.now(timezone.utc)
     pps_map = get_sc_latest_pps_map()
     base_cards = []
-    for job_id, snapshots in servers_data.items():
-        if not snapshots:
+    for job_id, snapshots in safe_dict_items(servers_data):
+        if not snapshots or not isinstance(snapshots, dict):
             continue
-        latest_timestamp = max(snapshots.keys())
-        latest_state = snapshots[latest_timestamp]
+        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
+        if not valid_ts_keys:
+            continue
+        latest_timestamp = max(valid_ts_keys)
+        latest_state = snapshots.get(latest_timestamp)
+        if not latest_state or not isinstance(latest_state, dict):
+            continue
         age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
 
         info = _sc_public_servers_info.get(job_id, {})
@@ -3574,7 +3661,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
         j_parts = [p for p in job_id.split("-") if p]
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
 
-        first_timestamp = min(snapshots.keys())
+        first_timestamp = min(valid_ts_keys)
         uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
         uptime_str = format_uptime_duration(uptime_sec)
 
@@ -3598,7 +3685,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "latest_timestamp": format_heartbeat_age(age_sec),
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
-            "snapshot_count": len(snapshots),
+            "snapshot_count": len(valid_ts_keys),
             "points_rate": pts_info["points_rate"],
             "points_rate_str": pts_info["points_rate_str"],
             "top_score": top_score,

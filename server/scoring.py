@@ -112,7 +112,14 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
             }
         return 0.0
 
-    valid_ts_keys = sorted([k for k in snapshots.keys() if not k.startswith('_')])
+    valid_ts_keys = []
+    for _ in range(3):
+        try:
+            valid_ts_keys = sorted([k for k in list(snapshots.keys()) if not str(k).startswith('_')])
+            break
+        except RuntimeError:
+            continue
+
     if not valid_ts_keys:
         if return_breakdown:
             return 0.0, {
@@ -127,7 +134,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
 
     parsed_snaps = []
     for ts in valid_ts_keys:
-        st = snapshots[ts]
+        st = snapshots.get(ts)
         if not isinstance(st, dict):
             continue
         try:
