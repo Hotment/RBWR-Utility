@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
+from collections import OrderedDict
 import os
 import sys
 import json
@@ -109,6 +110,8 @@ except NameError:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ARCHIVES_DIR = os.path.join(DATA_DIR, "archives")
+ARCHIVES_META_FILE = os.path.join(DATA_DIR, "archives_meta.json")
+ARCHIVES_INDEX_FILE = os.path.join(DATA_DIR, "archives_index.json")
 SUGGESTIONS_FILE = os.path.join(BASE_DIR, "suggestions.json")
 CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
 BANNED_FILE = os.path.join(BASE_DIR, "banned_ips.json")
@@ -1456,8 +1459,30 @@ def get_server_player_count(job_id, snapshots=None, latest_state=None, is_privat
     return 0
 
 _sc_file_cache = {}
+_sc_archive_cache = OrderedDict()
+_sc_max_archive_cache_entries = 2
 _sc_cache_lock = threading.Lock()
 _sc_file_io_lock = threading.RLock()
+
+def is_archive_filename(filename: str) -> bool:
+    normalized = filename.replace("\\", "/").strip()
+    return normalized.startswith("archives/") or "servers_" in normalized
+
+def _update_sc_cache(filename: str, mtime: float, data: dict):
+    with _sc_cache_lock:
+        if is_archive_filename(filename):
+            _sc_archive_cache[filename] = (mtime, data)
+            _sc_archive_cache.move_to_end(filename)
+            while len(_sc_archive_cache) > _sc_max_archive_cache_entries:
+                _sc_archive_cache.popitem(last=False)
+            _sc_file_cache.pop(filename, None)
+        else:
+            _sc_file_cache[filename] = (mtime, data)
+
+def _invalidate_sc_cache(filename: str):
+    with _sc_cache_lock:
+        _sc_file_cache.pop(filename, None)
+        _sc_archive_cache.pop(filename, None)
 
 _sc_historical_cards_base = None
 _sc_historical_cards_key = None
@@ -1522,11 +1547,19 @@ def get_sc_data(filename: str, max_retries: int = 8):
     except OSError:
         current_mtime = None
 
+    is_archive = is_archive_filename(filename)
+
     if current_mtime is not None:
         with _sc_cache_lock:
-            cached_entry = _sc_file_cache.get(filename)
-            if cached_entry and cached_entry[0] == current_mtime:
-                return cached_entry[1]
+            if is_archive:
+                cached_entry = _sc_archive_cache.get(filename)
+                if cached_entry and cached_entry[0] == current_mtime:
+                    _sc_archive_cache.move_to_end(filename)
+                    return cached_entry[1]
+            else:
+                cached_entry = _sc_file_cache.get(filename)
+                if cached_entry and cached_entry[0] == current_mtime:
+                    return cached_entry[1]
 
     for attempt in range(max_retries):
         try:
@@ -1542,8 +1575,9 @@ def get_sc_data(filename: str, max_retries: int = 8):
                     time.sleep(0.05 * (attempt + 1))
                     continue
                 with _sc_cache_lock:
-                    if filename in _sc_file_cache:
-                        return _sc_file_cache[filename][1]
+                    target_cache = _sc_archive_cache if is_archive else _sc_file_cache
+                    if filename in target_cache:
+                        return target_cache[filename][1]
                 return {}
 
             if filename.endswith(".gz") or filepath.endswith(".gz"):
@@ -1567,21 +1601,22 @@ def get_sc_data(filename: str, max_retries: int = 8):
             except OSError:
                 mtime_after = current_mtime
 
-            with _sc_cache_lock:
-                _sc_file_cache[filename] = (mtime_after, data)
+            _update_sc_cache(filename, mtime_after or 0.0, data)
             return data
         except (PermissionError, Exception) as e:
             if attempt < max_retries - 1:
                 time.sleep(0.05 * (attempt + 1))
             else:
                 with _sc_cache_lock:
-                    if filename in _sc_file_cache:
-                        return _sc_file_cache[filename][1]
+                    target_cache = _sc_archive_cache if is_archive else _sc_file_cache
+                    if filename in target_cache:
+                        return target_cache[filename][1]
                 logger.error(f"Error loading sc data from {filename}: {e}")
 
     with _sc_cache_lock:
-        if filename in _sc_file_cache:
-            return _sc_file_cache[filename][1]
+        target_cache = _sc_archive_cache if is_archive else _sc_file_cache
+        if filename in target_cache:
+            return target_cache[filename][1]
     return {}
 
 def save_sc_data(data, filename: str, max_retries: int = 10):
@@ -1608,8 +1643,7 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
                     new_mtime = os.path.getmtime(filepath)
                 except OSError:
                     new_mtime = time.time()
-                with _sc_cache_lock:
-                    _sc_file_cache[filename] = (new_mtime, data)
+                _update_sc_cache(filename, new_mtime, data)
                 if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
                     invalidate_historical_cards_cache()
                 return True
@@ -1625,8 +1659,7 @@ def save_sc_data(data, filename: str, max_retries: int = 10):
                             new_mtime = os.path.getmtime(filepath)
                         except OSError:
                             new_mtime = time.time()
-                        with _sc_cache_lock:
-                            _sc_file_cache[filename] = (new_mtime, data)
+                        _update_sc_cache(filename, new_mtime, data)
                         if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
                             invalidate_historical_cards_cache()
                         return True
@@ -1660,10 +1693,166 @@ load_server_meta()
 def save_server_meta():
     save_sc_data(_sc_server_meta, "server_meta.json")
 
+_sc_archives_meta_cache = {}
+
+def load_archives_meta():
+    global _sc_archives_meta_cache
+    if os.path.exists(ARCHIVES_META_FILE):
+        try:
+            with open(ARCHIVES_META_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                _sc_archives_meta_cache = {
+                    k: (float(v[0]), int(v[1]), int(v[2]), int(v[3]))
+                    for k, v in data.items()
+                    if isinstance(v, (list, tuple)) and len(v) >= 4
+                }
+        except Exception as e:
+            logger.error(f"Error loading archives meta cache from {ARCHIVES_META_FILE}: {e}")
+
+def save_archives_meta():
+    try:
+        data = {
+            k: list(v) for k, v in safe_dict_items(_sc_archives_meta_cache)
+        }
+        temp_path = f"{ARCHIVES_META_FILE}.{os.getpid()}_{time.time_ns()}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(temp_path, ARCHIVES_META_FILE)
+    except Exception as e:
+        logger.error(f"Error saving archives meta cache to {ARCHIVES_META_FILE}: {e}")
+
+_sc_archive_server_index = {}
+
+def load_archive_server_index():
+    global _sc_archive_server_index
+    if os.path.exists(ARCHIVES_INDEX_FILE):
+        try:
+            with open(ARCHIVES_INDEX_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and data:
+                _sc_archive_server_index = data
+                return
+        except Exception as e:
+            logger.error(f"Error loading archive server index from {ARCHIVES_INDEX_FILE}: {e}")
+    rebuild_archive_server_index()
+
+def save_archive_server_index():
+    try:
+        temp_path = f"{ARCHIVES_INDEX_FILE}.{os.getpid()}_{time.time_ns()}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(_sc_archive_server_index, f)
+        os.replace(temp_path, ARCHIVES_INDEX_FILE)
+    except Exception as e:
+        logger.error(f"Error saving archive server index to {ARCHIVES_INDEX_FILE}: {e}")
+
+def rebuild_archive_server_index():
+    global _sc_archive_server_index
+    if not os.path.exists(ARCHIVES_DIR):
+        return
+    logger.info("Rebuilding archive server index from archives directory...")
+    new_index = {}
+    try:
+        for fname in sorted(os.listdir(ARCHIVES_DIR)):
+            if not fname.startswith("servers_"):
+                continue
+            is_gz = fname.endswith(".json.gz")
+            is_json = fname.endswith(".json") and not is_gz
+            if not (is_gz or is_json):
+                continue
+            date_str = fname[len("servers_"):-len(".json.gz")] if is_gz else fname[len("servers_"):-len(".json")]
+            rel_path = os.path.join("archives", fname)
+            day_data = get_sc_data(rel_path)
+            if isinstance(day_data, dict):
+                for jid in day_data.keys():
+                    new_index[jid] = date_str
+        _sc_archive_server_index = new_index
+        save_archive_server_index()
+        logger.info(f"Rebuilt archive server index: {len(_sc_archive_server_index)} servers indexed.")
+    except Exception as e:
+        logger.error(f"Error during archive server index rebuild: {e}")
+
+load_archives_meta()
+load_archive_server_index()
+
+def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
+    """
+    Returns True ONLY if query is an exact match for:
+    1. The full Job ID (with or without hyphens).
+    2. The shortened Server ID (e.g. '77f6-4b2f' or '77f64b2f'), which is parts[1]-parts[2] of the UUID.
+    3. The first 8-character block of the UUID (e.g. '00109df1').
+    Partial queries (e.g. '77f6', 'b', '001') return False.
+    """
+    if not query or not job_id:
+        return False
+    q = query.strip().lower()
+    jid = job_id.strip().lower()
+    if not q or not jid:
+        return False
+
+    if q == jid:
+        return True
+
+    clean_jid = jid.replace("-", "")
+    clean_q = q.replace("-", "")
+    if len(clean_q) == 32 and clean_q == clean_jid:
+        return True
+
+    j_parts = [p for p in jid.split("-") if p]
+    if len(j_parts) >= 3:
+        short_id = f"{j_parts[1]}-{j_parts[2]}"
+        short_id_compact = f"{j_parts[1]}{j_parts[2]}"
+        if q == short_id or q == short_id_compact:
+            return True
+
+        q_parts = [p for p in q.split("-") if p]
+        if len(q_parts) == 2 and q_parts[0] == j_parts[1] and q_parts[1] == j_parts[2]:
+            return True
+
+    if len(j_parts) >= 1 and len(q) == 8 and q == j_parts[0]:
+        return True
+
+    return False
+
+def lookup_archive_server_date(query: str) -> tuple[str | None, str | None]:
+    """
+    Finds the matched full job_id and the archive date (YYYY-MM-DD) for a given query
+    (full UUID, clean UUID, or shortened server ID) using in-memory indices without
+    scanning archive files.
+    """
+    if not query:
+        return None, None
+
+    clean_q = query.strip()
+    clean_q_lower = clean_q.lower()
+
+    if clean_q in _sc_archive_server_index:
+        return clean_q, _sc_archive_server_index[clean_q]
+    if clean_q_lower in _sc_archive_server_index:
+        return clean_q_lower, _sc_archive_server_index[clean_q_lower]
+
+    meta = _sc_server_meta.get(clean_q) or _sc_server_meta.get(clean_q_lower)
+    if meta and isinstance(meta, dict):
+        st = meta.get("start_timestamp")
+        if st and len(st) >= 10 and st[4] == '-' and st[7] == '-':
+            return clean_q, st[:10]
+
+    for jid, date_str in safe_dict_items(_sc_archive_server_index):
+        if is_exact_job_or_server_id_match(clean_q, jid):
+            return jid, date_str
+
+    for jid, meta_entry in safe_dict_items(_sc_server_meta):
+        if is_exact_job_or_server_id_match(clean_q, jid):
+            st = meta_entry.get("start_timestamp") if isinstance(meta_entry, dict) else None
+            if st and len(st) >= 10 and st[4] == '-' and st[7] == '-':
+                return jid, st[:10]
+
+    return None, None
+
 def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
     """
     Returns the YYYY-MM-DD date when this server first started.
-    Checks server_meta, then earliest snapshot in snaps, then archives, then today.
+    Checks server_meta, then earliest snapshot in snaps, then archive index, then archives, then today.
     """
     if not job_id:
         return datetime.now(timezone.utc).strftime('%Y-%m-%d')
@@ -1683,22 +1872,12 @@ def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
                 _sc_server_meta[job_id]["start_timestamp"] = earliest_ts
                 return earliest_ts[:10]
             
-    if os.path.exists(ARCHIVES_DIR):
-        try:
-            for fname in sorted(os.listdir(ARCHIVES_DIR)):
-                if fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz")):
-                    date_str = fname[len("servers_"):len("servers_")+10]
-                    day_data = get_sc_data(os.path.join("archives", fname))
-                    if isinstance(day_data, dict) and job_id in day_data:
-                        if job_id not in _sc_server_meta:
-                            _sc_server_meta[job_id] = {}
-                        day_snaps = day_data.get(job_id)
-                        valid_day_ts = [k for k in safe_dict_keys(day_snaps) if not k.startswith('_')] if isinstance(day_snaps, dict) else []
-                        first_ts = min(valid_day_ts) if valid_day_ts else None
-                        _sc_server_meta[job_id]["start_timestamp"] = first_ts or f"{date_str}T00:00:00Z"
-                        return date_str
-        except Exception:
-            pass
+    if job_id in _sc_archive_server_index:
+        date_str = _sc_archive_server_index[job_id]
+        if job_id not in _sc_server_meta:
+            _sc_server_meta[job_id] = {}
+        _sc_server_meta[job_id]["start_timestamp"] = f"{date_str}T00:00:00Z"
+        return date_str
 
     return datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
@@ -1783,16 +1962,19 @@ def archive_expired_server_data(expired_by_date: dict, current_data: dict | None
             else:
                 existing_archive[job_id] = dict(existing_archive[job_id])
             existing_archive[job_id].update(snaps)
+            _sc_archive_server_index[job_id] = date_str
             
         day_has_active_servers = (date_str in active_dates)
+        target_full = json_full if day_has_active_servers else gz_full
+        target_fname = json_filename if day_has_active_servers else gz_filename
+        alt_fname = gz_filename if day_has_active_servers else json_filename
         
         if day_has_active_servers:
             save_sc_data(existing_archive, json_rel)
             if os.path.exists(gz_full):
                 try:
                     os.remove(gz_full)
-                    with _sc_cache_lock:
-                        _sc_file_cache.pop(gz_rel, None)
+                    _invalidate_sc_cache(gz_rel)
                 except Exception:
                     pass
             logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {json_rel} (active day, uncompressed)")
@@ -1801,58 +1983,51 @@ def archive_expired_server_data(expired_by_date: dict, current_data: dict | None
             if os.path.exists(json_full):
                 try:
                     os.remove(json_full)
-                    with _sc_cache_lock:
-                        _sc_file_cache.pop(json_rel, None)
+                    _invalidate_sc_cache(json_rel)
                 except Exception:
                     pass
             logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {gz_rel} (finalized, compressed)")
 
+        try:
+            mtime = os.path.getmtime(target_full)
+            size_b = os.path.getsize(target_full)
+            s_cnt = len(existing_archive)
+            snap_cnt = sum(len(snaps) for snaps in safe_dict_values(existing_archive) if isinstance(snaps, dict))
+            _sc_archives_meta_cache[target_fname] = (mtime, size_b, s_cnt, snap_cnt)
+            _sc_archives_meta_cache.pop(alt_fname, None)
+        except Exception:
+            pass
+
+    save_archive_server_index()
+    save_archives_meta()
+
 def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
     """
     Looks up snapshots for a given job_id or short in-game ID across archive files in ARCHIVES_DIR.
-    Returns (matched_job_id, merged_snapshots) or (None, None).
+    Uses the archive server index to jump directly to the target archive file.
+    Returns (matched_job_id, snapshots) or (None, None).
     """
     if not query or not os.path.exists(ARCHIVES_DIR):
         return None, None
 
     clean_q = query.strip()
-    merged_snapshots = {}
-    matched_job_id = None
 
-    try:
-        archive_files = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
-        for fname in archive_files:
-            if not (fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz"))):
-                continue
-            day_data = get_sc_data(os.path.join("archives", fname))
-            if not isinstance(day_data, dict):
-                continue
+    matched_job_id, date_str = lookup_archive_server_date(clean_q)
+    if matched_job_id and date_str:
+        gz_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json.gz")
+        json_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json")
+        target_rel = None
+        if os.path.exists(gz_path):
+            target_rel = os.path.join("archives", f"servers_{date_str}.json.gz")
+        elif os.path.exists(json_path):
+            target_rel = os.path.join("archives", f"servers_{date_str}.json")
 
-            if clean_q in day_data:
-                matched_job_id = clean_q
-                snaps = day_data[clean_q]
+        if target_rel:
+            day_data = get_sc_data(target_rel)
+            if isinstance(day_data, dict) and matched_job_id in day_data:
+                snaps = day_data[matched_job_id]
                 if isinstance(snaps, dict):
-                    merged_snapshots.update(snaps)
-            else:
-                for j_id, snaps in safe_dict_items(day_data):
-                    if is_exact_job_or_server_id_match(clean_q, j_id):
-                        matched_job_id = j_id
-                        if isinstance(snaps, dict):
-                            merged_snapshots.update(snaps)
-                        break
-
-        if matched_job_id:
-            for fname in archive_files:
-                if not (fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz"))):
-                    continue
-                day_data = get_sc_data(os.path.join("archives", fname))
-                if isinstance(day_data, dict) and matched_job_id in day_data:
-                    snaps = day_data[matched_job_id]
-                    if isinstance(snaps, dict):
-                        merged_snapshots.update(snaps)
-            return matched_job_id, merged_snapshots
-    except Exception as e:
-        logger.error(f"Error querying archived snapshots for {query}: {e}")
+                    return matched_job_id, snaps
 
     return None, None
 
@@ -1864,11 +2039,10 @@ def format_file_size(size_bytes: int) -> str:
     else:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
-_sc_archives_meta_cache = {}
-
 def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]:
     """
     Returns (days_list, summary_stats) for all archived days in ARCHIVES_DIR.
+    Uses precomputed and persistent summary metadata cache to avoid reading files from disk.
     Accepts optional progress_callback(current_idx, total_count, filename, percent).
     """
     if not os.path.exists(ARCHIVES_DIR):
@@ -1890,6 +2064,7 @@ def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]
             continue
         valid_filenames.append(fname)
 
+    meta_dirty = False
     total_files = len(valid_filenames)
     for idx, fname in enumerate(valid_filenames, 1):
         is_gz = fname.endswith(".json.gz")
@@ -1920,10 +2095,13 @@ def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]
             if isinstance(day_data, dict):
                 s_count = len(day_data)
                 snap_count = sum(len(snaps) for snaps in safe_dict_values(day_data) if isinstance(snaps, dict))
+                for jid in day_data.keys():
+                    _sc_archive_server_index[jid] = date_str
             else:
                 s_count = 0
                 snap_count = 0
             _sc_archives_meta_cache[fname] = (mtime, size_bytes, s_count, snap_count)
+            meta_dirty = True
 
         if progress_callback:
             pct = int((idx / total_files) * 100) if total_files > 0 else 100
@@ -1947,6 +2125,10 @@ def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]
             "snapshot_count": snap_count,
             "rel_path": os.path.join("archives", fname)
         }
+
+    if meta_dirty:
+        save_archives_meta()
+        save_archive_server_index()
 
     days_list = sorted(archive_map.values(), key=lambda d: d["date"], reverse=True)
     total_days = len(days_list)
@@ -2030,8 +2212,18 @@ def compress_finalized_archives(current_data: dict | None = None):
                     except Exception:
                         pass
 
-                with _sc_cache_lock:
-                    _sc_file_cache.pop(json_rel, None)
+                _invalidate_sc_cache(json_rel)
+                _sc_archives_meta_cache.pop(fname, None)
+                try:
+                    gz_mtime = os.path.getmtime(gz_path)
+                    gz_size = os.path.getsize(gz_path)
+                    day_gz = get_sc_data(gz_rel)
+                    s_cnt = len(day_gz) if isinstance(day_gz, dict) else 0
+                    snap_cnt = sum(len(snaps) for snaps in safe_dict_values(day_gz) if isinstance(snaps, dict)) if isinstance(day_gz, dict) else 0
+                    _sc_archives_meta_cache[gz_filename] = (gz_mtime, gz_size, s_cnt, snap_cnt)
+                    save_archives_meta()
+                except Exception as comp_meta_err:
+                    logger.error(f"Error updating meta cache after compression of {gz_filename}: {comp_meta_err}")
                     
                 logger.info(f"Compressed finalized archive {fname} -> {gz_filename} (all servers for {date_part} are historical)")
             except Exception as comp_err:
@@ -2505,45 +2697,6 @@ def get_server_uptime_seconds(snapshots, is_historical, age_sec=None):
         return max(0, first_sec_ago)
     except Exception:
         return 0
-
-def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
-    """
-    Returns True ONLY if query is an exact match for:
-    1. The full Job ID (with or without hyphens).
-    2. The shortened Server ID (e.g. '77f6-4b2f' or '77f64b2f'), which is parts[1]-parts[2] of the UUID.
-    3. The first 8-character block of the UUID (e.g. '00109df1').
-    Partial queries (e.g. '77f6', 'b', '001') return False.
-    """
-    if not query or not job_id:
-        return False
-    q = query.strip().lower()
-    jid = job_id.strip().lower()
-    if not q or not jid:
-        return False
-
-    if q == jid:
-        return True
-
-    clean_jid = jid.replace("-", "")
-    clean_q = q.replace("-", "")
-    if len(clean_q) == 32 and clean_q == clean_jid:
-        return True
-
-    j_parts = [p for p in jid.split("-") if p]
-    if len(j_parts) >= 3:
-        short_id = f"{j_parts[1]}-{j_parts[2]}"
-        short_id_compact = f"{j_parts[1]}{j_parts[2]}"
-        if q == short_id or q == short_id_compact:
-            return True
-
-        q_parts = [p for p in q.split("-") if p]
-        if len(q_parts) == 2 and q_parts[0] == j_parts[1] and q_parts[1] == j_parts[2]:
-            return True
-
-    if len(j_parts) >= 1 and len(q) == 8 and q == j_parts[0]:
-        return True
-
-    return False
 
 def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=None, age_sec=None):
     """
