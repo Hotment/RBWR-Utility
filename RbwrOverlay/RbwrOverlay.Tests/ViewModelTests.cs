@@ -12,6 +12,11 @@ public class ViewModelTests
     {
         public AppSettings Settings { get; set; } = new();
 
+        public DummySettingsService(AppSettings? settings = null)
+        {
+            if (settings != null) Settings = settings;
+        }
+
         public AppSettings LoadSettings() => Settings;
         public void SaveSettings(AppSettings settings) => Settings = settings;
     }
@@ -495,12 +500,108 @@ public class ViewModelTests
         Assert.Contains("not found in public list", vm.SyncStatusMessage);
     }
 
+    [Fact]
+    public async Task UpdateCheck_FiresRequestShowUpdate_WhenUpdateAvailable()
+    {
+        var dummyApi = new DummyApiClient();
+        dummyApi.UpdateInfoToReturn = new UpdateInfo
+        {
+            IsAvailable = true,
+            Version = "9.9.9",
+            ReleaseNotes = "Exciting new features",
+            DownloadUrl = "https://example.com/update.exe",
+            FileName = "update.exe"
+        };
+
+        var settingsService = new DummySettingsService(new AppSettings());
+        var vm = new MainOverlayViewModel(settingsService, dummyApi, new DummyProcessMonitor());
+
+        UpdateInfo? receivedInfo = null;
+        vm.RequestShowUpdate += info => receivedInfo = info;
+
+        await vm.RunUpdateCheckAsync(isManual: true);
+
+        Assert.NotNull(receivedInfo);
+        Assert.Equal("9.9.9", receivedInfo.Version);
+        Assert.True(vm.IsUpdateAvailable);
+    }
+
+    [Fact]
+    public async Task UpdateCheck_SuppressesUpdate_WhenVersionSkipped()
+    {
+        var dummyApi = new DummyApiClient();
+        dummyApi.UpdateInfoToReturn = new UpdateInfo
+        {
+            IsAvailable = true,
+            Version = "9.9.9"
+        };
+
+        var settings = new AppSettings { SkippedVersion = "9.9.9" };
+        var settingsService = new DummySettingsService(settings);
+        var vm = new MainOverlayViewModel(settingsService, dummyApi, new DummyProcessMonitor());
+
+        UpdateInfo? receivedInfo = null;
+        vm.RequestShowUpdate += info => receivedInfo = info;
+
+        // Startup check (isManual = false) respects SkippedVersion
+        await vm.RunUpdateCheckAsync(isManual: false);
+
+        Assert.Null(receivedInfo);
+        Assert.False(vm.IsUpdateAvailable);
+    }
+
+    [Fact]
+    public void UpdateViewModel_SkipVersion_InvokesCallbackAndRequestsClose()
+    {
+        var dummyApi = new DummyApiClient();
+        var updateInfo = new UpdateInfo
+        {
+            IsAvailable = true,
+            Version = "3.0.0",
+            ReleaseNotes = "Big changes",
+            DownloadUrl = "https://example.com/test.exe",
+            FileName = "test.exe"
+        };
+
+        string? skippedVer = null;
+        bool closeRequested = false;
+
+        var vm = new UpdateViewModel(
+            dummyApi,
+            updateInfo,
+            "2.1.0",
+            ver => skippedVer = ver);
+
+        vm.RequestClose += (s, e) => closeRequested = true;
+
+        vm.SkipVersion();
+
+        Assert.Equal("3.0.0", skippedVer);
+        Assert.True(closeRequested);
+    }
+
+    [Fact]
+    public void UpdateViewModel_RemindLater_RequestsClose()
+    {
+        var dummyApi = new DummyApiClient();
+        var updateInfo = new UpdateInfo { Version = "3.0.0" };
+
+        bool closeRequested = false;
+        var vm = new UpdateViewModel(dummyApi, updateInfo, "2.1.0", _ => { });
+        vm.RequestClose += (s, e) => closeRequested = true;
+
+        vm.RemindLater();
+
+        Assert.True(closeRequested);
+    }
+
     private class DummyApiClient : IApiClient
     {
         public List<ServerInfo> ServersToReturn { get; set; } = new();
         public ServerFetchResult? CustomDetailedResult { get; set; }
         public Queue<ServerFetchResult> ResultQueue { get; } = new();
         public int FetchDetailedCalls { get; private set; }
+        public UpdateInfo UpdateInfoToReturn { get; set; } = new() { IsAvailable = false };
 
         public Task<ServerFetchResult> GetLatestServersDetailedAsync(CancellationToken ct = default)
         {
@@ -525,7 +626,13 @@ public class ViewModelTests
             => Task.FromResult(true);
 
         public Task<UpdateInfo> CheckForUpdatesAsync(string currentVersion, string skippedVersion, CancellationToken ct = default)
-            => Task.FromResult(new UpdateInfo { IsAvailable = false, Version = currentVersion });
+        {
+            if (!string.IsNullOrEmpty(skippedVersion) && UpdateInfoToReturn.Version == skippedVersion)
+            {
+                return Task.FromResult(new UpdateInfo { IsAvailable = false, Version = currentVersion });
+            }
+            return Task.FromResult(UpdateInfoToReturn);
+        }
 
         public Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default)
             => Task.CompletedTask;

@@ -24,7 +24,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.1.1-dev1";
+    public const string AppVersion = "2.1.1-dev2";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -305,7 +305,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _downloadFileName = string.Empty;
 
     public event Action<string, string, bool>? RequestShowMessage;
+    public event Action<UpdateInfo>? RequestShowUpdate;
     public event Action? RequestQuit;
+    public IApiClient ApiClient => _apiClient;
 
     public MainOverlayViewModel(
         ISettingsService? settingsService = null,
@@ -362,7 +364,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             Dispatcher.UIThread.Post(async () => await ConnectServerAsync(_currentJobId, false));
         }
 
-        _ = CheckUpdatesAsync();
+        _ = RunUpdateCheckAsync(isManual: false);
     }
 
 
@@ -1302,10 +1304,17 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
 
     [RelayCommand]
-    public async Task CheckUpdatesAsync()
+    public async Task CheckUpdatesAsync() => await RunUpdateCheckAsync(isManual: true);
+
+    public async Task RunUpdateCheckAsync(bool isManual = false)
     {
+        if (!isManual)
+        {
+            await Task.Delay(1500);
+        }
+
         UpdateStatusText = "Checking for latest release...";
-        var info = await _apiClient.CheckForUpdatesAsync(AppVersion, _settings.SkippedVersion);
+        var info = await _apiClient.CheckForUpdatesAsync(AppVersion, isManual ? string.Empty : _settings.SkippedVersion);
         if (info.IsAvailable)
         {
             IsUpdateAvailable = true;
@@ -1314,12 +1323,27 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             DownloadUrl = info.DownloadUrl;
             DownloadFileName = info.FileName;
             UpdateStatusText = "Update ready to install.";
+
+            RequestShowUpdate?.Invoke(info);
         }
         else
         {
             IsUpdateAvailable = false;
             UpdateStatusText = $"Application is up to date (v{AppVersion}).";
+            if (isManual)
+            {
+                RequestShowMessage?.Invoke("SYSTEM UPDATE", $"Application is up to date (v{AppVersion}).", false);
+            }
         }
+    }
+
+    public void SkipVersion(string version)
+    {
+        _settings.SkippedVersion = version;
+        _settingsService.SaveSettings(_settings);
+        IsUpdateAvailable = false;
+        UpdateStatusText = $"Version {version} skipped.";
+        _logger.Info($"Update check: Version {version} skipped by user and saved to settings.");
     }
 
     [RelayCommand]

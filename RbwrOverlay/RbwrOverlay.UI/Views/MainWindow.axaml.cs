@@ -2,7 +2,9 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using RbwrOverlay.Core.Models;
 using RbwrOverlay.UI.ViewModels;
 
 namespace RbwrOverlay.UI.Views;
@@ -10,6 +12,7 @@ namespace RbwrOverlay.UI.Views;
 public partial class MainWindow : Window
 {
     private CustomMessageWindow? _messageWindow;
+    private UpdateWindow? _updateWindow;
 
     public MainWindow()
     {
@@ -24,6 +27,7 @@ public partial class MainWindow : Window
         {
             vm.PropertyChanged += OnViewModelPropertyChanged;
             vm.RequestShowMessage += OnShowMessage;
+            vm.RequestShowUpdate += OnShowUpdate;
             vm.RequestQuit += OnQuit;
 
             UpdateWindowSize(vm.IsCompact);
@@ -94,6 +98,42 @@ public partial class MainWindow : Window
         _messageWindow = new CustomMessageWindow(title, message, isError);
         _messageWindow.Closed += (s, ev) => _messageWindow = null;
         _messageWindow.Show(this);
+    }
+
+    private void OnShowUpdate(UpdateInfo info)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_updateWindow != null)
+            {
+                _updateWindow.Activate();
+                return;
+            }
+
+            if (DataContext is not MainOverlayViewModel vm) return;
+
+            var updateVm = new UpdateViewModel(
+                vm.ApiClient,
+                info,
+                MainOverlayViewModel.AppVersion,
+                skippedVersion => vm.SkipVersion(skippedVersion));
+
+            _updateWindow = new UpdateWindow
+            {
+                DataContext = updateVm
+            };
+
+            _updateWindow.Closed += (s, ev) => _updateWindow = null;
+
+            if (IsVisible)
+            {
+                _updateWindow.Show(this);
+            }
+            else
+            {
+                _updateWindow.Show();
+            }
+        });
     }
 
     private void OnQuit()

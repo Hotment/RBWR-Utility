@@ -69,6 +69,7 @@ public partial class UpdateViewModel : ViewModelBase
             string currentExe = Process.GetCurrentProcess().MainModule?.FileName ?? AppDomain.CurrentDomain.BaseDirectory;
             string exeDir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
             string newExePath = Path.Combine(exeDir, string.IsNullOrEmpty(DownloadFileName) ? $"RBWR_APRM_Calculator_v{LatestVersion}.exe" : DownloadFileName);
+            string tempDownloadPath = newExePath + ".download.tmp";
 
             var progressReporter = new Progress<double>(p =>
             {
@@ -76,14 +77,14 @@ public partial class UpdateViewModel : ViewModelBase
                 DownloadStatus = $"Downloading: {DownloadProgress:F0}%";
             });
 
-            await _apiClient.DownloadUpdateAsync(DownloadUrl, newExePath, progressReporter);
+            await _apiClient.DownloadUpdateAsync(DownloadUrl, tempDownloadPath, progressReporter);
 
             DownloadStatus = "Rebooting into new version...";
             await Task.Delay(1000);
 
             if (OperatingSystem.IsWindows())
             {
-                string cmdScript = $"timeout /t 2 /nobreak && del \"{currentExe}\" && start \"\" \"{newExePath}\"";
+                string cmdScript = $"timeout /t 2 /nobreak && del \"{currentExe}\" && move /y \"{tempDownloadPath}\" \"{newExePath}\" && start \"\" \"{newExePath}\"";
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -94,6 +95,7 @@ public partial class UpdateViewModel : ViewModelBase
             }
             else
             {
+                File.Move(tempDownloadPath, newExePath, overwrite: true);
                 Process.Start(new ProcessStartInfo(newExePath) { UseShellExecute = true });
             }
 

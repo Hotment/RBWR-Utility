@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using RbwrOverlay.Core.Models;
 
@@ -343,21 +344,9 @@ public class ApiClient : IApiClient
 
                         if (root.TryGetProperty("assets", out var assetsProp) && assetsProp.ValueKind == JsonValueKind.Array)
                         {
-                            foreach (var asset in assetsProp.EnumerateArray())
-                            {
-                                if (asset.TryGetProperty("name", out var nameProp) &&
-                                    asset.TryGetProperty("browser_download_url", out var urlProp))
-                                {
-                                    string assetName = nameProp.GetString() ?? string.Empty;
-                                    if (assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-                                        assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        info.FileName = assetName;
-                                        info.DownloadUrl = urlProp.GetString() ?? string.Empty;
-                                        break;
-                                    }
-                                }
-                            }
+                            var bestAsset = SelectBestAsset(assetsProp);
+                            info.FileName = bestAsset.FileName;
+                            info.DownloadUrl = bestAsset.DownloadUrl;
                         }
                     }
                 }
@@ -373,6 +362,64 @@ public class ApiClient : IApiClient
         }
 
         return info;
+    }
+
+    private static (string FileName, string DownloadUrl) SelectBestAsset(JsonElement assetsProp)
+    {
+        var candidateList = new List<(string Name, string Url)>();
+        foreach (var asset in assetsProp.EnumerateArray())
+        {
+            if (asset.TryGetProperty("name", out var nameProp) &&
+                asset.TryGetProperty("browser_download_url", out var urlProp))
+            {
+                string name = nameProp.GetString() ?? string.Empty;
+                string url = urlProp.GetString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(url))
+                {
+                    candidateList.Add((name, url));
+                }
+            }
+        }
+
+        if (candidateList.Count == 0) return (string.Empty, string.Empty);
+
+        string arch = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.Arm64 => "arm64",
+            _ => "x64"
+        };
+
+        if (OperatingSystem.IsWindows())
+        {
+            var match = candidateList.FirstOrDefault(c => c.Name.EndsWith($"-{arch}.exe", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+
+            match = candidateList.FirstOrDefault(c => c.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+
+            match = candidateList.FirstOrDefault(c => c.Name.Contains("win", StringComparison.OrdinalIgnoreCase) && c.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            var match = candidateList.FirstOrDefault(c => c.Name.Contains(arch, StringComparison.OrdinalIgnoreCase) &&
+                (c.Name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) || c.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+
+            match = candidateList.FirstOrDefault(c => c.Name.Contains("linux", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            var match = candidateList.FirstOrDefault(c => c.Name.Contains(arch, StringComparison.OrdinalIgnoreCase) && c.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+
+            match = candidateList.FirstOrDefault(c => c.Name.Contains("osx", StringComparison.OrdinalIgnoreCase) || c.Name.Contains("macos", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(match.Name)) return match;
+        }
+
+        var fallback = candidateList.FirstOrDefault(c => c.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || c.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        return !string.IsNullOrEmpty(fallback.Name) ? fallback : candidateList[0];
     }
 
     public async Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default)
