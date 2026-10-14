@@ -99,10 +99,11 @@ RBWR-Utility/
 
 Pre-compiled desktop releases are available on the [Releases](https://github.com/Hotment/RBWR-Utility/releases) page:
 
-* **Windows Standalone (Recommended):** Download `RbwrOverlay.exe` (or `RBWR_APRM_Calculator.exe`) from `publish/win-x64-standalone/`. This single executable is fully self-contained, requiring zero external files, no zip extraction, and no .NET installation.
-* **Windows Framework-Dependent:** Download the portable folder from `publish/win-x64/` (requires .NET 8 Desktop Runtime).
-* **Linux Standalone:** Download `RbwrOverlay` from `publish/linux-x64-standalone/`. Includes a ready-to-use desktop entry file (`rbwr-overlay.desktop`).
-* **Linux Framework-Dependent:** Download `publish/linux-x64/` (requires .NET 8 runtime).
+* **Windows x64 Standalone (Recommended):** `RBWR_APRM_Calculator_win-x64.exe` — Single-file executable, double-click to run with zero installation or extraction required.
+* **Windows ARM64 Standalone:** `RBWR_APRM_Calculator_win-arm64.exe` — Native build for Snapdragon X and Surface Pro ARM64 devices.
+* **Linux x86_64 AppImage:** `RBWR_APRM_Calculator_linux-x64.AppImage` — Universal single-file Linux package, double-click to run or execute in terminal (`chmod +x && ./RBWR_APRM_Calculator_linux-x64.AppImage`).
+* **Linux x86_64 / ARM64 Tarball:** `RBWR_APRM_Calculator_Linux_linux-x64.tar.gz` and `linux-arm64` — Includes `./RbwrOverlay`, launcher script (`run.sh`), and desktop entry (`rbwr-overlay.desktop`).
+* **macOS Apple Silicon & Intel:** `RBWR_APRM_Calculator_macOS_osx-arm64.zip` and `osx-x64.zip` — Includes `RBWR APRM Calculator.app` bundle and terminal executable.
 
 ---
 
@@ -125,28 +126,22 @@ dotnet test RbwrOverlay/RbwrOverlay.Tests/RbwrOverlay.Tests.csproj
 
 ### Multi-Platform Build Script (`build.bat`)
 
-The repository includes an interactive and automated builder for Windows and Linux targets:
+The repository includes an interactive and automated builder for Windows, Linux, and macOS targets:
 
 ```cmd
 build.bat [target]
 ```
 
 #### Available Targets:
-* `all`: Builds all 4 release targets (default).
-* `windows-standalone` (or `win-standalone`): Builds the single-file Windows executable with embedded native libraries and runtime (no external files needed).
-* `windows` (or `win`): Builds the lightweight framework-dependent Windows executable.
-* `linux-standalone`: Builds the self-contained Linux executable with desktop launcher.
-* `linux`: Builds the framework-dependent Linux executable.
+* `all`: Builds all release packages (Windows x64/ARM64, Linux x64/ARM64/AppImage, macOS Apple Silicon/Intel).
+* `win-standalone`: Builds the single-file Windows x64 executable.
+* `win-arm64`: Builds the single-file Windows ARM64 executable.
+* `linux-standalone`: Builds the self-contained Linux x64 package.
+* `linux-arm64`: Builds the Linux ARM64 standalone package.
+* `appimage`: Builds the Linux x64 `.AppImage` package via WSL or Linux.
+* `mac-arm64`: Builds macOS Apple Silicon (.app bundle + binary).
+* `mac-x64`: Builds macOS Intel (.app bundle + binary).
 * `clean`: Removes the `publish/` output directory.
-
-Output binaries are placed in:
-```
-publish/
-|-- win-x64-standalone/     # RbwrOverlay.exe / RBWR_APRM_Calculator.exe (Single-file)
-|-- win-x64/                # RbwrOverlay.exe + extracted native DLLs
-|-- linux-x64-standalone/   # RbwrOverlay (Self-contained) + rbwr-overlay.desktop
-`-- linux-x64/              # RbwrOverlay (Framework-dependent) + rbwr-overlay.desktop
-```
 
 ---
 

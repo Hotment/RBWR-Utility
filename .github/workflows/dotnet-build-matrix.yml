@@ -187,6 +187,63 @@ jobs:
           name: RbwrOverlay_${{ matrix.rid }}_binary
           path: RbwrOverlay_${{ matrix.rid }}
 
+      - name: Build Linux AppImage (x86_64)
+        if: matrix.rid == 'linux-x64'
+        run: |
+          APPDIR="RBWR_APRM_Calculator.AppDir"
+          rm -rf "${APPDIR}"
+          mkdir -p "${APPDIR}/usr/bin"
+          mkdir -p "${APPDIR}/usr/lib"
+
+          # Copy binaries and native libraries into AppDir
+          cp -r publish/linux-x64/* "${APPDIR}/usr/bin/"
+          chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
+
+          # Desktop entry in AppDir root
+          cat << 'EOF' > "${APPDIR}/rbwr-overlay.desktop"
+          [Desktop Entry]
+          Name=RBWR APRM Calculator
+          Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+          Exec=RbwrOverlay
+          Icon=icon
+          Terminal=false
+          Type=Application
+          Categories=Utility;Game;
+          EOF
+
+          # Icons in AppDir root and standard icon theme paths
+          if [ -f "icon.png" ]; then
+            cp icon.png "${APPDIR}/icon.png"
+            cp icon.png "${APPDIR}/rbwr-overlay.png"
+            mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
+            cp icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/rbwr-overlay.png"
+          fi
+
+          # AppRun launcher script
+          cat << 'EOF' > "${APPDIR}/AppRun"
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/RbwrOverlay" "$@"
+          EOF
+          chmod +x "${APPDIR}/AppRun"
+
+          # Download and extract appimagetool to bypass FUSE requirements in CI
+          wget -q -O appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract >/dev/null 2>&1
+
+          # Build standalone AppImage
+          ARCH=x86_64 ./squashfs-root/AppRun "${APPDIR}" "RBWR_APRM_Calculator_linux-x64.AppImage"
+          chmod +x "RBWR_APRM_Calculator_linux-x64.AppImage"
+
+      - name: Upload Linux AppImage
+        if: matrix.rid == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_APRM_Calculator_linux-x64_AppImage
+          path: RBWR_APRM_Calculator_linux-x64.AppImage
+
   publish-macos:
     name: Publish macOS (${{ matrix.rid }})
     needs: test
@@ -318,7 +375,7 @@ jobs:
       - name: Consolidate Release Assets
         run: |
           mkdir -p release-assets
-          find release-downloads -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz" -o -name "RbwrOverlay_*" \) -exec cp {} release-assets/ \;
+          find release-downloads -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz" -o -name "*.AppImage" -o -name "RbwrOverlay_*" \) -exec cp {} release-assets/ \;
           ls -la release-assets
 
       - name: Create or Update GitHub Release

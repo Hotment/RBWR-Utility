@@ -40,6 +40,7 @@ if /i "%TARGET%"=="win-arm64" goto build_win_arm64_only
 if /i "%TARGET%"=="windows" goto build_windows_only
 if /i "%TARGET%"=="linux-standalone" goto build_linux_standalone_only
 if /i "%TARGET%"=="linux-arm64" goto build_linux_arm64_only
+if /i "%TARGET%"=="appimage" goto build_appimage_only
 if /i "%TARGET%"=="linux" goto build_linux_only
 if /i "%TARGET%"=="mac-arm64" goto build_mac_arm64_only
 if /i "%TARGET%"=="mac-x64" goto build_mac_x64_only
@@ -55,18 +56,19 @@ if not "%TARGET%"=="" (
 echo.
 echo Select build target:
 echo.
-echo   [1] Build All Releases: Windows (x64+ARM64), Linux (x64+ARM64), macOS (ARM64+Intel) [Default]
+echo   [1] Build All Releases: Windows (x64+ARM64), Linux (x64+ARM64+AppImage), macOS (ARM64+Intel) [Default]
 echo   [2] Windows x64 Standalone - Single-File .exe (Shareable - Double-click to run)
 echo   [3] Windows ARM64 Standalone - Single-File .exe (Snapdragon X / Surface Pro)
 echo   [4] Windows x64 Framework-Dependent (Directory with DLLs)
 echo   [5] Linux x64 Standalone (Terminal ./RbwrOverlay + Double-click run.sh + .desktop)
 echo   [6] Linux ARM64 Standalone (Raspberry Pi 4/5 / Linux ARM64)
-echo   [7] macOS Apple Silicon (ARM64) Standalone (Double-click .app + Terminal ./RbwrOverlay)
-echo   [8] macOS Intel (x64) Standalone (Double-click .app + Terminal ./RbwrOverlay)
-echo   [9] Clean Publish Directory
+echo   [7] Linux x64 AppImage (.AppImage Package via WSL or Linux)
+echo   [8] macOS Apple Silicon (ARM64) Standalone (Double-click .app + Terminal ./RbwrOverlay)
+echo   [9] macOS Intel (x64) Standalone (Double-click .app + Terminal ./RbwrOverlay)
+echo  [10] Clean Publish Directory
 echo   [0] Exit
 echo.
-set /p "CHOICE=Enter choice [1-9, 0 to exit] (Default: 1): "
+set /p "CHOICE=Enter choice [1-10, 0 to exit] (Default: 1): "
 if "%CHOICE%"=="" set "CHOICE=1"
 
 if "%CHOICE%"=="1" goto build_all
@@ -75,9 +77,10 @@ if "%CHOICE%"=="3" goto build_win_arm64_only
 if "%CHOICE%"=="4" goto build_windows_only
 if "%CHOICE%"=="5" goto build_linux_standalone_only
 if "%CHOICE%"=="6" goto build_linux_arm64_only
-if "%CHOICE%"=="7" goto build_mac_arm64_only
-if "%CHOICE%"=="8" goto build_mac_x64_only
-if "%CHOICE%"=="9" goto do_clean
+if "%CHOICE%"=="7" goto build_appimage_only
+if "%CHOICE%"=="8" goto build_mac_arm64_only
+if "%CHOICE%"=="9" goto build_mac_x64_only
+if "%CHOICE%"=="10" goto do_clean
 if "%CHOICE%"=="0" exit /b 0
 
 echo [WARN] Invalid option selected. Please select a valid number.
@@ -111,6 +114,10 @@ goto build_finish
 call :do_build_linux
 goto build_finish
 
+:build_appimage_only
+call :do_build_appimage
+goto build_finish
+
 :build_mac_arm64_only
 call :do_build_mac_arm64
 goto build_finish
@@ -127,6 +134,7 @@ call :do_build_win_arm64
 call :do_build_windows
 call :do_build_linux_standalone
 call :do_build_linux_arm64
+call :do_build_appimage
 call :do_build_mac_arm64
 call :do_build_mac_x64
 goto build_finish
@@ -334,6 +342,42 @@ if exist "icon.png" copy /y "icon.png" "publish\linux-x64\icon.png" >nul
 echo [OK] Linux framework-dependent published to: publish\linux-x64\
 exit /b 0
 
+:do_build_appimage
+echo.
+echo ==================================================
+echo Building: Linux x64 AppImage (.AppImage Package)
+echo ==================================================
+if not exist "publish\linux-x64-standalone\RbwrOverlay" (
+    echo [INFO] Linux x64 standalone build not found. Building prerequisite first...
+    call :do_build_linux_standalone
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] Failed to build Linux x64 prerequisite for AppImage.
+        set "ERR_APPIMAGE=1"
+        exit /b 1
+    )
+)
+
+where wsl >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo [INFO] WSL detected. Packaging AppImage via build_appimage.sh...
+    wsl bash build_appimage.sh
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] AppImage generation encountered an error in WSL.
+        set "ERR_APPIMAGE=1"
+        exit /b 1
+    )
+    if exist "publish\releases\RBWR_APRM_Calculator_linux-x64.AppImage" (
+        echo [OK] Linux x64 AppImage published:
+        echo      - AppImage: publish\releases\RBWR_APRM_Calculator_linux-x64.AppImage
+        exit /b 0
+    )
+) else (
+    echo [WARN] WSL is not available on this Windows host.
+    echo        AppImage packaging runs automatically in GitHub Actions CI on Linux runners.
+    echo        To build locally on Windows, enable WSL or run build_appimage.sh in a Linux environment.
+)
+exit /b 0
+
 :do_build_mac_arm64
 echo.
 echo ==================================================
@@ -507,6 +551,10 @@ if defined ERR_LINUX_ARM64 (
     echo [!] Linux ARM64 standalone build encountered errors.
     set "HAS_FAILURES=1"
 )
+if defined ERR_APPIMAGE (
+    echo [!] Linux x64 AppImage build encountered errors.
+    set "HAS_FAILURES=1"
+)
 if defined ERR_MAC_ARM64 (
     echo [!] macOS ARM64 build encountered errors.
     set "HAS_FAILURES=1"
@@ -542,6 +590,7 @@ echo   win-arm64           Build Windows ARM64 standalone single-file (Snapdrago
 echo   windows             Build Windows framework-dependent (publish\win-x64)
 echo   linux-standalone    Build Linux x64 standalone (terminal ./RbwrOverlay, run.sh, .desktop)
 echo   linux-arm64         Build Linux ARM64 standalone (Raspberry Pi 4/5)
+echo   appimage            Build Linux x64 AppImage (.AppImage package via WSL or Linux)
 echo   linux               Build Linux framework-dependent (publish\linux-x64)
 echo   mac-arm64           Build macOS Apple Silicon ARM64 standalone (.app + ./RbwrOverlay)
 echo   mac-x64             Build macOS Intel x64 standalone (.app + ./RbwrOverlay)
