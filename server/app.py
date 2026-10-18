@@ -4137,6 +4137,15 @@ def get_public_servers_payload(public_only=False):
                 p_count = get_server_player_count(jid, is_private=False)
                 if p_count is not None:
                     s_copy["playerCount"] = p_count
+            if "top_score" not in s_copy:
+                score = None
+                if _sc_active_cards_base:
+                    for card in _sc_active_cards_base:
+                        if card.get("job_id") == jid and "top_score" in card:
+                            score = card["top_score"]
+                            break
+                if score is not None:
+                    s_copy["top_score"] = score
             st = s_copy.get("state")
             if isinstance(st, dict):
                 if isinstance(st.get("Unit2"), dict):

@@ -16,6 +16,14 @@ from disnake.ext import commands
 from dotenv import load_dotenv
 import requests
 
+try:
+    from server.scoring import calculate_server_top_score
+except ImportError:
+    try:
+        from scoring import calculate_server_top_score  # pyright: ignore[reportMissingImports]
+    except ImportError:
+        calculate_server_top_score = None  # pyright: ignore[reportConstantRedefinition]
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
@@ -1918,6 +1926,11 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
 ROBLOX_PLACE_ID = "11765852158"
 
 def get_server_points_rate(server: dict[str, Any]) -> float | None:
+    if "points_rate" in server and server["points_rate"] is not None:
+        try:
+            return float(server["points_rate"])
+        except (ValueError, TypeError):
+            pass
     misc = server.get("state", {}).get("Misc", {})
     if isinstance(misc, dict) and "Total points/second" in misc:
         val = misc.get("Total points/second")
@@ -1927,6 +1940,33 @@ def get_server_points_rate(server: dict[str, Any]) -> float | None:
             except (ValueError, TypeError):
                 pass
     return None
+
+def get_server_top_score(server: dict[str, Any]) -> float:
+    for key in ("top_score", "topScore", "score", "TopScore"):
+        val = server.get(key)
+        if val is not None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                pass
+    st = server.get("state")
+    if isinstance(st, dict):
+        for key in ("top_score", "topScore", "score"):
+            val = st.get(key)
+            if val is not None:
+                try:
+                    return float(st[key])
+                except (ValueError, TypeError):
+                    pass
+    if calculate_server_top_score and "snapshots" in server and isinstance(server["snapshots"], dict):
+        try:
+            return float(calculate_server_top_score(server["snapshots"]))
+        except Exception:
+            pass
+    pts = get_server_points_rate(server)
+    if pts is not None and pts > 0.0:
+        return round(min(100.0, (pts / 2.9) * 100.0), 1)
+    return 0.0
 
 def get_unit_state(server: dict[str, Any], unit: int) -> dict[str, Any]:
     st = server.get("state", {})
@@ -1990,6 +2030,23 @@ class ServerBrowserView(disnake.ui.View):
         self.rebuild_components()
 
     def _apply_filtering_and_sorting(self):
+        max_public_score = 0.0
+        best_server_tuple = None
+        if self.filter_status in ("top_server", "top_servers", "top"):
+            for s in self.raw_servers:
+                if not is_server_public(s):
+                    continue
+                sc = get_server_top_score(s)
+                if sc > max_public_score:
+                    max_public_score = sc
+                u1 = get_unit_state(s, 1)
+                u2 = get_unit_state(s, 2)
+                p = get_server_points_rate(s) or 0.0
+                run_c = int(is_unit_running(u1)) + int(is_unit_running(u2))
+                cand_tuple = (sc, p, run_c)
+                if best_server_tuple is None or cand_tuple > best_server_tuple:
+                    best_server_tuple = cand_tuple
+
         matched = []
         for s in self.raw_servers:
             if not is_server_public(s):
@@ -2005,6 +2062,7 @@ class ServerBrowserView(disnake.ui.View):
             u1_scram = str(u1.get("SCRAMreason", "None")).strip()
             u2_scram = str(u2.get("SCRAMreason", "None")).strip()
             has_scram = (u1_scram not in ("None", "", "null")) or (u2_scram not in ("None", "", "null"))
+            top_score = get_server_top_score(s)
 
             if self.query:
                 q = self.query.replace("-", "")
@@ -2013,7 +2071,24 @@ class ServerBrowserView(disnake.ui.View):
                 if (q not in norm_jid) and (q not in norm_short) and (q not in u1_scram.lower()) and (q not in u2_scram.lower()):
                     continue
 
-            if self.filter_status == "running":
+            if self.filter_status == "top_server":
+                cand_tuple = (top_score, pts or 0.0, int(u1_running) + int(u2_running))
+                if best_server_tuple and cand_tuple < best_server_tuple:
+                    continue
+            elif self.filter_status in ("top_servers", "top"):
+                if max_public_score >= 70.0:
+                    if top_score < 70.0:
+                        continue
+                elif max_public_score >= 50.0:
+                    if top_score < 50.0:
+                        continue
+                elif max_public_score > 0.0:
+                    if top_score < max_public_score * 0.8:
+                        continue
+                else:
+                    if (not (u1_running or u2_running)) or (pts is None or pts <= 0):
+                        continue
+            elif self.filter_status == "running":
                 if not (u1_running or u2_running):
                     continue
             elif self.filter_status == "both":
@@ -2036,25 +2111,28 @@ class ServerBrowserView(disnake.ui.View):
             u1_aprm = get_unit_aprm(u1)
             u2_aprm = get_unit_aprm(u2)
             run_count = int(is_unit_running(u1)) + int(is_unit_running(u2))
+            top_score = get_server_top_score(s)
 
-            if self.sort_by == "points":
-                return (pts_val, run_count, u1_aprm + u2_aprm)
+            if self.sort_by in ("top_servers", "top", "top_score", "top_server"):
+                return (top_score, pts_val, run_count, u1_aprm + u2_aprm)
+            elif self.sort_by == "points":
+                return (pts_val, top_score, run_count, u1_aprm + u2_aprm)
             elif self.sort_by == "active_reactors":
-                return (run_count, u1_aprm + u2_aprm, pts_val)
+                return (run_count, top_score, u1_aprm + u2_aprm, pts_val)
             elif self.sort_by == "aprm_u1":
-                return (u1_aprm, u2_aprm)
+                return (u1_aprm, u2_aprm, top_score)
             elif self.sort_by == "aprm_u2":
-                return (u2_aprm, u1_aprm)
+                return (u2_aprm, u1_aprm, top_score)
             elif self.sort_by == "players":
                 p_str = get_player_count(s)
                 try:
                     p_num = int(p_str)
                 except ValueError:
                     p_num = -1
-                return (p_num, pts_val)
+                return (p_num, top_score, pts_val)
             elif self.sort_by == "id":
                 return self.client.short_id(str(s.get("jobId", "")))
-            return pts_val
+            return (top_score, pts_val)
 
         reverse = (self.sort_by != "id")
         matched.sort(key=sort_key_fn, reverse=reverse)
@@ -2094,12 +2172,18 @@ class ServerBrowserView(disnake.ui.View):
 
         filter_names = {
             "all": "All Public",
+            "top_servers": "Top Servers",
+            "top_server": "Top Server",
+            "top": "Top Servers",
             "running": "Running (≥ 1 Unit)",
             "both": "Dual Running",
             "points": "Points (> 0/s)",
             "scrammed": "Scrammed",
         }
         sort_names = {
+            "top_servers": "Top Servers",
+            "top": "Top Servers",
+            "top_server": "Top Server",
             "points": "Points / sec",
             "active_reactors": "Active Units",
             "aprm_u1": "U1 APRM",
@@ -2131,6 +2215,8 @@ class ServerBrowserView(disnake.ui.View):
                 u2_badge = get_unit_status_badge(u2)
                 pts = get_server_points_rate(s)
                 pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
+                top_score = get_server_top_score(s)
+                score_str = f"{top_score:.1f}" if top_score > 0 else "0.0"
                 players = get_player_count(s)
                 p_display = f"{players}/12" if players != "?" else "?"
                 web_url = make_web_server_url(jid)
@@ -2139,8 +2225,8 @@ class ServerBrowserView(disnake.ui.View):
                 desc_lines.append(
                     f"**[`{short}`]({web_url})** • [`Join Game`]({join_url})\n"
                     f"`Job ID:` `{jid}`\n"
+                    f"• **Score:** `{score_str}/100` | **Points:** `{pts_str}` | **Players:** `{p_display}`\n"
                     f"• **U1:** {u1_badge} | **U2:** {u2_badge}\n"
-                    f"• **Points:** `{pts_str}` | **Players:** `{p_display}`\n"
                 )
 
         embed.description = "\n".join(desc_lines)
@@ -2156,6 +2242,8 @@ class ServerBrowserView(disnake.ui.View):
         u2 = get_unit_state(server, 2)
         pts = get_server_points_rate(server)
         pts_str = f"{pts:.4f}".rstrip("0").rstrip(".") + " pts/s" if pts is not None else "N/A"
+        top_score = get_server_top_score(server)
+        score_str = f"{top_score:.1f}/100" if top_score > 0 else "0.0/100"
         is_pub = is_server_public(server)
         vis_label = "Public" if is_pub else "Private"
         players = get_player_count(server)
@@ -2174,6 +2262,7 @@ class ServerBrowserView(disnake.ui.View):
             title=f"RBWR Server Metrics — {short}",
             description=(
                 f"**Job ID:** `{jid}`\n"
+                f"**Top Score:** `{score_str}`\n"
                 f"**Points Generation:** `{pts_str}`\n"
                 f"**Active Players:** `{p_display}`\n"
                 f"**Visibility:** `{vis_label}`"
@@ -2244,6 +2333,8 @@ class ServerBrowserView(disnake.ui.View):
 
         filter_options = [
             disnake.SelectOption(label="All Public Servers", value="all", description="Show all online public servers", default=(self.filter_status == "all")),
+            disnake.SelectOption(label="Top Servers", value="top_servers", description="Highest scoring operational servers", default=(self.filter_status in ("top", "top_servers"))),
+            disnake.SelectOption(label="Top Server", value="top_server", description="Show only the single #1 ranked server", default=(self.filter_status == "top_server")),
             disnake.SelectOption(label="Running Reactors", value="running", description="At least 1 unit running (>5% APRM)", default=(self.filter_status == "running")),
             disnake.SelectOption(label="Dual Running Reactors", value="both", description="Both units actively running", default=(self.filter_status == "both")),
             disnake.SelectOption(label="Earning Points", value="points", description="Points rate > 0 pts/sec", default=(self.filter_status == "points")),
@@ -2259,6 +2350,7 @@ class ServerBrowserView(disnake.ui.View):
         self.add_item(filter_select)
 
         sort_options = [
+            disnake.SelectOption(label="Top Servers", value="top_servers", description="Sort by Top Score and points rate", default=(self.sort_by in ("top", "top_servers"))),
             disnake.SelectOption(label="Highest Points / sec", value="points", description="Sort by highest points generation rate", default=(self.sort_by == "points")),
             disnake.SelectOption(label="Most Running Reactors", value="active_reactors", description="Dual running > single running > offline", default=(self.sort_by == "active_reactors")),
             disnake.SelectOption(label="Highest Unit 1 APRM", value="aprm_u1", description="Sort by Unit 1 core power", default=(self.sort_by == "aprm_u1")),
@@ -2286,8 +2378,10 @@ class ServerBrowserView(disnake.ui.View):
                 u2 = get_unit_state(s, 2)
                 pts = get_server_points_rate(s)
                 pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
+                top_score = get_server_top_score(s)
+                score_badge = f"Score: {top_score:.1f}" if top_score > 0 else "Score: 0.0"
                 label = f"{short} • {pts_str}"
-                desc = f"U1: {get_unit_aprm(u1):.0f}% | U2: {get_unit_aprm(u2):.0f}%"
+                desc = f"{score_badge} | U1: {get_unit_aprm(u1):.0f}% | U2: {get_unit_aprm(u2):.0f}%"
                 inspect_options.append(disnake.SelectOption(
                     label=label[:100],
                     value=jid,
@@ -2494,6 +2588,7 @@ def add_info(embed: disnake.Embed, server: dict[str, Any], unit: int, info: str)
     embed.add_field(name=f"U{unit} — {label}", value=fmt(value), inline=True)
 
 SORT_CHOICES = [
+    disnake.OptionChoice(name="Top Servers (Top Score)", value="top_servers"),
     disnake.OptionChoice(name="Highest Points / sec", value="points"),
     disnake.OptionChoice(name="Most Running Reactors", value="active_reactors"),
     disnake.OptionChoice(name="Highest Unit 1 APRM", value="aprm_u1"),
@@ -2504,6 +2599,8 @@ SORT_CHOICES = [
 
 FILTER_CHOICES = [
     disnake.OptionChoice(name="All Public Servers", value="all"),
+    disnake.OptionChoice(name="Top Servers (High Score & Performance)", value="top_servers"),
+    disnake.OptionChoice(name="Top Server (#1 Ranked Server)", value="top_server"),
     disnake.OptionChoice(name="Running Reactors (≥ 1 Unit)", value="running"),
     disnake.OptionChoice(name="Dual Running Reactors (Both Units)", value="both"),
     disnake.OptionChoice(name="Earning Points (> 0 pts/s)", value="points"),
@@ -2728,7 +2825,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     async def servers_command(
         inter: disnake.ApplicationCommandInteraction,
         query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
-        sort_by: str = commands.Param(default="points", description="Sorting criteria", choices=SORT_CHOICES),
+        sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
     ):
         await inter.response.defer()
@@ -2759,7 +2856,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     async def serverlist_command(
         inter: disnake.ApplicationCommandInteraction,
         query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
-        sort_by: str = commands.Param(default="points", description="Sorting criteria", choices=SORT_CHOICES),
+        sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
     ):
         await servers_command(inter, query=query, sort_by=sort_by, filter=filter)
