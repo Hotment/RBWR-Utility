@@ -806,6 +806,423 @@ def _check_and_mark_interaction(inter_id: int) -> bool:
             _handled_interaction_ids.pop()
     return False
 
+def is_inter_admin(inter: disnake.Interaction) -> bool:
+    """
+    Checks if an interaction author is an authorized administrator,
+    either via Discord guild administrator permissions or through website admin config.
+    """
+    sender_discord_id = str(inter.author.id)
+    is_guild_admin = (
+        inter.author.guild_permissions.administrator
+        if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member))
+        else False
+    )
+    is_web_admin = bool(ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id))
+    return bool(is_guild_admin or is_web_admin)
+
+def parse_embed_color(val: str | None) -> disnake.Color | None:
+    if not val:
+        return None
+    val = val.strip().lower()
+    color_map: dict[str, disnake.Color] = {
+        "blurple": disnake.Color.blurple(),
+        "blue": disnake.Color.blue(),
+        "dark_blue": disnake.Color.dark_blue(),
+        "red": disnake.Color.red(),
+        "dark_red": disnake.Color.dark_red(),
+        "green": disnake.Color.green(),
+        "dark_green": disnake.Color.dark_green(),
+        "gold": disnake.Color.gold(),
+        "yellow": disnake.Color.yellow(),
+        "orange": disnake.Color.orange(),
+        "dark_orange": disnake.Color.dark_orange(),
+        "purple": disnake.Color.purple(),
+        "dark_purple": disnake.Color.dark_purple(),
+        "magenta": disnake.Color.magenta(),
+        "dark_theme": disnake.Color.dark_theme(),
+        "dark": disnake.Color.dark_theme(),
+        "teal": disnake.Color.teal(),
+        "dark_teal": disnake.Color.dark_teal(),
+        "cyan": disnake.Color.teal(),
+        "grey": disnake.Color.greyple(),
+        "gray": disnake.Color.greyple(),
+    }
+    if val in color_map:
+        return color_map[val]
+    clean_hex = val.lstrip("#").lstrip("0x")
+    if len(clean_hex) == 3:
+        clean_hex = "".join(c * 2 for c in clean_hex)
+    try:
+        hex_int = int(clean_hex, 16)
+        return disnake.Color(hex_int)
+    except ValueError:
+        return None
+
+def build_custom_embed(
+    title: str | None = None,
+    description: str | None = None,
+    color: str | None = None,
+    image_url: str | None = None,
+    thumbnail_url: str | None = None,
+    footer: str | None = None,
+    footer_icon_url: str | None = None,
+    author_name: str | None = None,
+    author_icon_url: str | None = None,
+    url: str | None = None,
+    fields_str: str | None = None,
+    json_data: str | None = None,
+    include_timestamp: bool = True,
+) -> disnake.Embed:
+    if json_data:
+        try:
+            raw = json.loads(json_data.strip())
+            if isinstance(raw, dict):
+                embed_payload = raw.get("embed") or raw.get("embeds", [None])[0] or raw
+                if isinstance(embed_payload, dict):
+                    return disnake.Embed.from_dict(embed_payload)  # pyright: ignore[reportArgumentType]
+            raise ValueError("JSON data must represent an embed dictionary object.")
+        except json.JSONDecodeError as jde:
+            raise ValueError(f"Invalid JSON syntax: {jde}")
+
+    parsed_color = parse_embed_color(color) or disnake.Color(0x00D1FF)
+
+    clean_title = title.replace(r"\n", "\n")[:256] if title else None
+    clean_desc = description.replace(r"\n", "\n")[:4096] if description else None
+
+    if not any([clean_title, clean_desc, image_url, thumbnail_url, fields_str, footer, author_name]):
+        raise ValueError("Embed must contain at least one of: title, description, image, thumbnail, fields, or footer.")
+
+    embed = disnake.Embed(
+        title=clean_title,
+        description=clean_desc,
+        color=parsed_color,
+        url=url or None,
+    )
+
+    if include_timestamp:
+        embed.timestamp = datetime.now(timezone.utc)
+
+    if footer:
+        clean_footer = footer.replace(r"\n", "\n")[:2048]
+        embed.set_footer(text=clean_footer, icon_url=footer_icon_url or None)
+
+    if image_url:
+        embed.set_image(url=image_url.strip())
+
+    if thumbnail_url:
+        embed.set_thumbnail(url=thumbnail_url.strip())
+
+    if author_name:
+        clean_author = author_name.replace(r"\n", "\n")[:256]
+        embed.set_author(name=clean_author, icon_url=author_icon_url or None)
+
+    if fields_str:
+        fields_str = fields_str.strip()
+        if fields_str.startswith("[") and fields_str.endswith("]"):
+            try:
+                f_list = json.loads(fields_str)
+                if isinstance(f_list, list):
+                    for item in f_list:
+                        if isinstance(item, dict) and "name" in item and "value" in item:
+                            embed.add_field(
+                                name=str(item["name"])[:256],
+                                value=str(item["value"])[:1024],
+                                inline=bool(item.get("inline", False)),
+                            )
+            except Exception as e:
+                log.warning(f"[Embed Build] Failed to parse fields JSON: {e}")
+        else:
+            parts = fields_str.split("|")
+            for part in parts:
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    k_clean = k.strip().replace(r"\n", "\n")[:256]
+                    v_clean = v.strip().replace(r"\n", "\n")[:1024]
+                    if k_clean and v_clean:
+                        embed.add_field(name=k_clean, value=v_clean, inline=False)
+
+    return embed
+
+class EmbedBuilderModal(disnake.ui.Modal):
+    def __init__(self, target_channel_id: int):
+        self.target_channel_id = target_channel_id
+        components = [
+            disnake.ui.TextInput(
+                label="Embed Title",
+                custom_id="embed_title",
+                style=disnake.TextInputStyle.short,
+                placeholder="Title text (optional)...",
+                required=False,
+                max_length=256,
+            ),
+            disnake.ui.TextInput(
+                label="Embed Description",
+                custom_id="embed_description",
+                style=disnake.TextInputStyle.paragraph,
+                placeholder="Enter description / body text...",
+                required=True,
+                max_length=4000,
+            ),
+            disnake.ui.TextInput(
+                label="Color (Hex or Name)",
+                custom_id="embed_color",
+                style=disnake.TextInputStyle.short,
+                placeholder="#00D1FF, blurple, red, green, gold...",
+                required=False,
+                max_length=32,
+            ),
+            disnake.ui.TextInput(
+                label="Image URL",
+                custom_id="embed_image_url",
+                style=disnake.TextInputStyle.short,
+                placeholder="https://example.com/image.png (optional)...",
+                required=False,
+                max_length=1024,
+            ),
+            disnake.ui.TextInput(
+                label="Footer Text",
+                custom_id="embed_footer",
+                style=disnake.TextInputStyle.short,
+                placeholder="Footer text (optional)...",
+                required=False,
+                max_length=2048,
+            ),
+        ]
+        super().__init__(
+            title="Create Custom Embed",
+            custom_id=f"embed_builder_modal:{target_channel_id}",
+            components=components,
+        )
+
+    async def callback(self, inter: disnake.ModalInteraction):
+        await handle_embed_modal_submission(inter, self.target_channel_id)
+
+    async def on_error(self, error: Exception, interaction: disnake.ModalInteraction) -> None:
+        log.error(f"[EmbedBuilderModal] Modal submission error: {error}", exc_info=error)
+        tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__)) if error and getattr(error, "__traceback__", None) else traceback.format_exc()
+        ctx = {
+            "Modal": "EmbedBuilderModal",
+            "Target Channel ID": str(self.target_channel_id),
+            "User": f"{interaction.author.name} (ID: {interaction.author.id})",
+        }
+        await send_error_alert_async(
+            origin="Bot Embed Builder Modal",
+            error=error,
+            traceback_str=tb_str,
+            context_info=ctx,
+        )
+        try:
+            msg = "An error occurred while dispatching the embed. An alert with the traceback has been reported."
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
+
+async def handle_embed_modal_submission(inter: disnake.ModalInteraction, target_channel_id: int):
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
+        return
+
+    if not is_inter_admin(inter):
+        await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+        return
+
+    await inter.response.defer(ephemeral=True)
+
+    guild = inter.guild
+    target_channel = None
+    if guild:
+        target_channel = guild.get_channel(target_channel_id)
+        if not target_channel:
+            try:
+                target_channel = await guild.fetch_channel(target_channel_id)
+            except Exception:
+                target_channel = None
+
+    if not target_channel or not hasattr(target_channel, "send") or not isinstance(target_channel, (disnake.TextChannel, disnake.Thread, disnake.VoiceChannel)):
+        await inter.followup.send("Could not access target channel to send embed.", ephemeral=True)
+        return
+
+    title = inter.text_values.get("embed_title", "").strip() or None
+    description = inter.text_values.get("embed_description", "").strip()
+    color_str = inter.text_values.get("embed_color", "").strip() or None
+    image_url = inter.text_values.get("embed_image_url", "").strip() or None
+    footer = inter.text_values.get("embed_footer", "").strip() or None
+
+    try:
+        embed = build_custom_embed(
+            title=title,
+            description=description,
+            color=color_str,
+            image_url=image_url,
+            footer=footer,
+            include_timestamp=True,
+        )
+        sent_msg = await target_channel.send(embed=embed)
+        log.info(
+            f"[Embed Modal] Dispatched embed message {sent_msg.id} to #{getattr(target_channel, 'name', target_channel.id)} "
+            f"by admin {inter.author.name} (ID: {inter.author.id})"
+        )
+        await inter.followup.send(
+            f"Embed successfully dispatched to {target_channel.mention} (Message ID: `{sent_msg.id}`).",
+            ephemeral=True,
+        )
+    except Exception as ex:
+        log.error(f"[Embed Modal] Failed to send modal embed to channel {target_channel_id}: {ex}", exc_info=ex)
+        await inter.followup.send(f"Failed to send embed: `{ex}`", ephemeral=True)
+
+AUTOROLE_CONFIG_FILENAME = "autorole.json"
+
+def get_autorole_config_path() -> str:
+    bot_dir = os.path.dirname(os.path.abspath(__file__))
+    server_data_dir = os.path.abspath(os.path.join(bot_dir, "..", "server", "data"))
+    if os.path.isdir(server_data_dir):
+        return os.path.join(server_data_dir, AUTOROLE_CONFIG_FILENAME)
+    return os.path.join(bot_dir, AUTOROLE_CONFIG_FILENAME)
+
+def load_autorole_config() -> dict[str, Any]:
+    path = get_autorole_config_path()
+    if not os.path.exists(path):
+        return {"guilds": {}, "default_role_id": None, "default_role_name": None}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception as ex:
+        log.warning(f"[Autorole] Error loading config from {path}: {ex}")
+    return {"guilds": {}, "default_role_id": None, "default_role_name": None}
+
+def save_autorole_config(config: dict[str, Any]) -> bool:
+    path = get_autorole_config_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+        return True
+    except Exception as ex:
+        log.error(f"[Autorole] Error saving config to {path}: {ex}")
+        return False
+
+def resolve_autorole_for_guild(guild: disnake.Guild) -> tuple[disnake.Role | None, str | None, bool]:
+    config = load_autorole_config()
+    guild_id_str = str(guild.id)
+    guild_cfg = config.get("guilds", {}).get(guild_id_str, {})
+
+    is_enabled = bool(guild_cfg.get("enabled", True))
+    role_id = guild_cfg.get("role_id") or config.get("default_role_id") or os.getenv("DISCORD_AUTOROLE_ROLE_ID", "").strip() or None
+    role_name = guild_cfg.get("role_name") or config.get("default_role_name") or os.getenv("DISCORD_AUTOROLE_ROLE_NAME", "").strip() or None
+
+    role: disnake.Role | None = None
+    source: str | None = None
+
+    if role_id:
+        try:
+            role = guild.get_role(int(role_id))
+            if role:
+                source = f"Configured Role ID ({role_id})"
+        except (ValueError, TypeError):
+            pass
+
+    if not role and role_name:
+        role = disnake.utils.get(guild.roles, name=str(role_name))
+        if role:
+            source = f"Configured Role Name ('{role_name}')"
+
+    if not role and not role_id and not role_name:
+        for fallback_name in ("Member", "Members", "User", "Verified"):
+            found = disnake.utils.get(guild.roles, name=fallback_name)
+            if found:
+                role = found
+                source = f"Default Server Role ('{fallback_name}')"
+                break
+
+    return role, source, is_enabled
+
+async def assign_autorole_to_member(member: disnake.Member) -> bool:
+    if not member.guild:
+        return False
+
+    config = load_autorole_config()
+    guild_cfg = config.get("guilds", {}).get(str(member.guild.id), {})
+    include_bots = bool(guild_cfg.get("include_bots", False))
+
+    if member.bot and not include_bots:
+        log.info(f"[Autorole] Skipping bot member join: {member.name} (ID: {member.id}) in guild {member.guild.name}")
+        return False
+
+    target_role, source_desc, is_enabled = resolve_autorole_for_guild(member.guild)
+
+    if not is_enabled:
+        log.info(f"[Autorole] Autorole is currently disabled for guild {member.guild.name} ({member.guild.id})")
+        return False
+
+    if not target_role:
+        log.info(f"[Autorole] No autorole configured or matched for guild {member.guild.name} ({member.guild.id})")
+        return False
+
+    if target_role in member.roles:
+        log.debug(f"[Autorole] Member {member.name} ({member.id}) already possesses role '{target_role.name}'")
+        return True
+
+    me = member.guild.me
+    if not me:
+        try:
+            me = await member.guild.fetch_member(member.guild.me.id if member.guild.me else member._state.self_id)  # pyright: ignore[reportArgumentType]
+        except Exception:
+            pass
+
+    if me:
+        if not me.guild_permissions.manage_roles:
+            log.warning(f"[Autorole] Bot lacks 'Manage Roles' permission in guild {member.guild.name} ({member.guild.id})")
+            await send_error_alert_async(
+                origin="Bot Autorole (assign_autorole_to_member)",
+                error=RuntimeError("Bot lacks Manage Roles permission"),
+                context_info={
+                    "Guild": f"{member.guild.name} ({member.guild.id})",
+                    "Member": f"{member.name} ({member.id})",
+                    "Target Role": f"{target_role.name} ({target_role.id})",
+                    "Issue": "Manage Roles permission not granted to bot in Discord",
+                },
+            )
+            return False
+
+        if target_role >= me.top_role:
+            log.warning(f"[Autorole] Target role '{target_role.name}' ({target_role.id}) is higher than or equal to bot's top role '{me.top_role.name}' ({me.top_role.id})")
+            await send_error_alert_async(
+                origin="Bot Autorole (assign_autorole_to_member)",
+                error=RuntimeError("Role hierarchy conflict"),
+                context_info={
+                    "Guild": f"{member.guild.name} ({member.guild.id})",
+                    "Member": f"{member.name} ({member.id})",
+                    "Target Role": f"{target_role.name} ({target_role.id})",
+                    "Bot Top Role": f"{me.top_role.name} ({me.top_role.id})",
+                    "Issue": "Target role position must be below the bot role",
+                },
+            )
+            return False
+
+    try:
+        await member.add_roles(target_role, reason="Autorole assignment on join")
+        log.info(f"[Autorole] Assigned role '{target_role.name}' ({target_role.id}) to {member.name} ({member.id}) in {member.guild.name}")
+        return True
+    except disnake.Forbidden as fb:
+        log.error(f"[Autorole] Forbidden: Failed to assign role '{target_role.name}' to {member.name}: {fb}")
+        return False
+    except Exception as ex:
+        log.error(f"[Autorole] Unexpected error assigning role '{target_role.name}' to {member.name}: {ex}", exc_info=ex)
+        await send_error_alert_async(
+            origin="Bot Autorole (assign_autorole_to_member)",
+            error=ex,
+            context_info={
+                "Guild": f"{member.guild.name} ({member.guild.id})",
+                "Member": f"{member.name} ({member.id})",
+                "Target Role": f"{target_role.name} ({target_role.id})",
+            },
+        )
+        return False
+
 def build_ticket_panel(
     ticket_id: int,
     ticket_type: str,
@@ -2010,6 +2427,7 @@ def create_bot_instance(data_supplier: Callable[[bool], dict[str, Any]] | None =
     intents = disnake.Intents.default()
     intents.message_content = True
     intents.guilds = True
+    intents.members = True
 
     new_bot = commands.InteractionBot(
         intents=intents,
@@ -2413,6 +2831,20 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                             "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
                         },
                     )
+            elif cid.startswith("embed_builder_modal:"):
+                try:
+                    ch_id = int(cid.split(":")[1])
+                    await handle_embed_modal_submission(inter, ch_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] Embed modal error: {ex}", exc_info=True)
+                    await send_error_alert_async(
+                        origin="Bot Modal Interaction (embed_builder_modal)",
+                        error=ex,
+                        context_info={
+                            "Channel ID": cid.split(":")[1] if ":" in cid else "unknown",
+                            "User": f"{inter.author.name} (ID: {inter.author.id})",
+                        },
+                    )
 
     async def _show_panel_interactive(
         inter: disnake.ApplicationCommandInteraction,
@@ -2495,6 +2927,336 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         id: int | None = commands.Param(default=None, description="Optional ticket ID (defaults to current channel's ticket)"),
     ):
         await _show_panel_interactive(inter, id)
+
+    @b.event
+    async def on_member_join(member: disnake.Member):
+        try:
+            await assign_autorole_to_member(member)
+        except Exception as ex:
+            log.error(f"[Disnake Bot] Error in on_member_join event for {member}: {ex}", exc_info=ex)
+
+    @b.slash_command(
+        name="embed",
+        description="Force the bot to send an embed into a channel",
+        default_member_permissions=disnake.Permissions(administrator=True),
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def embed_command(
+        inter: disnake.ApplicationCommandInteraction,
+        description: str | None = commands.Param(default=None, description="Body description text of the embed"),
+        title: str | None = commands.Param(default=None, description="Title of the embed"),
+        channel: disnake.TextChannel | None = commands.Param(default=None, description="Target channel to send the embed (defaults to current channel)"),
+        color: str | None = commands.Param(default=None, description="Hex color (e.g. #00D1FF) or color name (e.g. blurple, red, green, gold)"),
+        content: str | None = commands.Param(default=None, description="Optional text content outside the embed (e.g. mentions)"),
+        image_url: str | None = commands.Param(default=None, description="Image URL to display inside the embed"),
+        thumbnail_url: str | None = commands.Param(default=None, description="Thumbnail URL to display in upper-right corner"),
+        footer: str | None = commands.Param(default=None, description="Footer text for the embed"),
+        footer_icon_url: str | None = commands.Param(default=None, description="Footer icon URL"),
+        author_name: str | None = commands.Param(default=None, description="Author header text"),
+        author_icon_url: str | None = commands.Param(default=None, description="Author header icon URL"),
+        url: str | None = commands.Param(default=None, description="Clickable URL link for the title"),
+        fields: str | None = commands.Param(default=None, description="Custom fields ('Name: Value | Name2: Value2' or JSON array)"),
+        json_data: str | None = commands.Param(default=None, description="Raw embed JSON dictionary"),
+        timestamp: bool = commands.Param(default=True, description="Whether to include current timestamp on embed"),
+    ):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        target_channel = channel or inter.channel
+        if not target_channel or not hasattr(target_channel, "send") or not isinstance(target_channel, (disnake.TextChannel, disnake.Thread, disnake.VoiceChannel)):
+            await inter.response.send_message("The specified or current channel does not support sending messages.", ephemeral=True)
+            return
+
+        has_any_content = any([description, title, image_url, thumbnail_url, json_data, fields, footer, author_name])
+        if not has_any_content:
+            await inter.response.send_modal(EmbedBuilderModal(target_channel_id=target_channel.id))
+            return
+
+        await inter.response.defer(ephemeral=True)
+
+        try:
+            embed = build_custom_embed(
+                title=title,
+                description=description,
+                color=color,
+                image_url=image_url,
+                thumbnail_url=thumbnail_url,
+                footer=footer,
+                footer_icon_url=footer_icon_url,
+                author_name=author_name,
+                author_icon_url=author_icon_url,
+                url=url,
+                fields_str=fields,
+                json_data=json_data,
+                include_timestamp=timestamp,
+            )
+        except Exception as build_err:
+            await inter.followup.send(f"Invalid embed specification: `{build_err}`", ephemeral=True)
+            return
+
+        if inter.guild and inter.guild.me:
+            perms = target_channel.permissions_for(inter.guild.me)
+            if not perms.send_messages or not perms.embed_links:
+                await inter.followup.send(
+                    f"Bot lacks permissions to send messages or embeds in {target_channel.mention}.",
+                    ephemeral=True,
+                )
+                return
+
+        try:
+            sent_msg = await target_channel.send(content=content, embed=embed)
+            log.info(
+                f"[Embed Command] Sent embed message {sent_msg.id} in #{getattr(target_channel, 'name', target_channel.id)} "
+                f"by admin {inter.author.name} (ID: {inter.author.id})"
+            )
+            await inter.followup.send(
+                f"Embed successfully dispatched to {target_channel.mention} (Message ID: `{sent_msg.id}`).",
+                ephemeral=True,
+            )
+        except Exception as send_err:
+            log.error(f"[Embed Command] Error sending embed to {target_channel.id}: {send_err}", exc_info=send_err)
+            await inter.followup.send(f"Failed to send embed: `{send_err}`", ephemeral=True)
+
+    @b.slash_command(
+        name="autorole",
+        description="Manage automatic role assignment for new server members",
+        default_member_permissions=disnake.Permissions(administrator=True),
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def autorole_group(inter: disnake.ApplicationCommandInteraction):
+        pass
+
+    @autorole_group.sub_command(
+        name="set",
+        description="Configure the role to automatically assign to new members upon joining",
+    )
+    async def autorole_set(
+        inter: disnake.ApplicationCommandInteraction,
+        role: disnake.Role = commands.Param(description="Role to automatically assign to joining members"),
+        enabled: bool = commands.Param(default=True, description="Enable autorole assignment immediately"),
+        include_bots: bool = commands.Param(default=False, description="Whether to also assign role to newly added bots"),
+    ):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        if not inter.guild:
+            await inter.response.send_message("This command must be run within a server.", ephemeral=True)
+            return
+
+        if role.is_default():
+            await inter.response.send_message("Cannot use @everyone as an autorole.", ephemeral=True)
+            return
+
+        if role.managed:
+            await inter.response.send_message("Cannot use a managed integration/bot role as an autorole.", ephemeral=True)
+            return
+
+        guild_id_str = str(inter.guild.id)
+        config = load_autorole_config()
+        if "guilds" not in config or not isinstance(config["guilds"], dict):
+            config["guilds"] = {}
+
+        config["guilds"][guild_id_str] = {
+            "role_id": role.id,
+            "role_name": role.name,
+            "enabled": enabled,
+            "include_bots": include_bots,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": str(inter.author.id),
+        }
+        save_autorole_config(config)
+
+        warnings = []
+        me = inter.guild.me
+        if me:
+            if not me.guild_permissions.manage_roles:
+                warnings.append("[WARNING] Bot lacks 'Manage Roles' permission in this server.")
+            if role >= me.top_role:
+                warnings.append(f"[WARNING] Role '{role.name}' is higher than or equal to bot's highest role '{me.top_role.name}'. Move the bot's role above this role in Server Settings > Roles.")
+
+        embed = disnake.Embed(
+            title="Autorole Configuration Updated",
+            color=disnake.Color.teal(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(name="Target Role", value=f"{role.mention} (`{role.id}`)", inline=True)
+        embed.add_field(name="Status", value="Enabled" if enabled else "Disabled", inline=True)
+        embed.add_field(name="Include Bots", value="Yes" if include_bots else "No", inline=True)
+        if warnings:
+            embed.add_field(name="Advisory Warnings", value="\n".join(warnings), inline=False)
+        else:
+            embed.add_field(name="Verification", value="Role hierarchy and bot permissions verified. Ready for incoming members.", inline=False)
+        embed.set_footer(text=f"Guild: {inter.guild.name} ({inter.guild.id})")
+
+        await inter.response.send_message(embed=embed, ephemeral=True)
+
+    @autorole_group.sub_command(
+        name="view",
+        description="View current autorole configuration and permissions for this server",
+    )
+    async def autorole_view(inter: disnake.ApplicationCommandInteraction):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        if not inter.guild:
+            await inter.response.send_message("This command must be run within a server.", ephemeral=True)
+            return
+
+        target_role, source_desc, is_enabled = resolve_autorole_for_guild(inter.guild)
+        config = load_autorole_config()
+        guild_cfg = config.get("guilds", {}).get(str(inter.guild.id), {})
+
+        embed = disnake.Embed(
+            title="Autorole System Status",
+            color=disnake.Color.teal() if is_enabled else disnake.Color.orange(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        status_str = "Enabled" if is_enabled else "Disabled"
+        if not target_role:
+            status_str = "Not Configured"
+        embed.add_field(name="Status", value=status_str, inline=True)
+
+        if target_role:
+            embed.add_field(name="Target Role", value=f"{target_role.mention} (`{target_role.id}`)", inline=True)
+            embed.add_field(name="Source", value=source_desc or "Configured", inline=True)
+            embed.add_field(name="Include Bots", value="Yes" if guild_cfg.get("include_bots") else "No", inline=True)
+
+            me = inter.guild.me
+            can_assign = True
+            hierarchy_msg = "Valid (Role is below bot role)"
+            perm_msg = "Granted (Manage Roles)"
+
+            if me:
+                if not me.guild_permissions.manage_roles:
+                    can_assign = False
+                    perm_msg = "[MISSING] Bot lacks 'Manage Roles' permission"
+                if target_role >= me.top_role:
+                    can_assign = False
+                    hierarchy_msg = f"[CONFLICT] Target role >= Bot top role ({me.top_role.name})"
+
+            embed.add_field(name="Bot Permission", value=perm_msg, inline=False)
+            embed.add_field(name="Role Hierarchy", value=hierarchy_msg, inline=False)
+            embed.add_field(name="Operational Ready", value="Yes" if (can_assign and is_enabled) else "No", inline=False)
+        else:
+            embed.add_field(name="Target Role", value="None configured", inline=True)
+            embed.add_field(name="Configuration Help", value="Use `/autorole set role:@YourRole` to configure automatic role assignment for incoming members.", inline=False)
+
+        embed.set_footer(text=f"Guild: {inter.guild.name} ({inter.guild.id})")
+        await inter.response.send_message(embed=embed, ephemeral=True)
+
+    @autorole_group.sub_command(
+        name="disable",
+        description="Disable automatic role assignment for this server",
+    )
+    async def autorole_disable(inter: disnake.ApplicationCommandInteraction):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        if not inter.guild:
+            await inter.response.send_message("This command must be run within a server.", ephemeral=True)
+            return
+
+        config = load_autorole_config()
+        if "guilds" not in config or not isinstance(config["guilds"], dict):
+            config["guilds"] = {}
+
+        guild_id_str = str(inter.guild.id)
+        if guild_id_str not in config["guilds"]:
+            config["guilds"][guild_id_str] = {}
+
+        config["guilds"][guild_id_str]["enabled"] = False
+        config["guilds"][guild_id_str]["updated_at"] = datetime.now(timezone.utc).isoformat()
+        config["guilds"][guild_id_str]["updated_by"] = str(inter.author.id)
+        save_autorole_config(config)
+
+        await inter.response.send_message("Autorole assignment has been disabled for this server.", ephemeral=True)
+
+    @autorole_group.sub_command(
+        name="enable",
+        description="Enable automatic role assignment for this server",
+    )
+    async def autorole_enable(inter: disnake.ApplicationCommandInteraction):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        if not inter.guild:
+            await inter.response.send_message("This command must be run within a server.", ephemeral=True)
+            return
+
+        config = load_autorole_config()
+        if "guilds" not in config or not isinstance(config["guilds"], dict):
+            config["guilds"] = {}
+
+        guild_id_str = str(inter.guild.id)
+        if guild_id_str not in config["guilds"]:
+            config["guilds"][guild_id_str] = {}
+
+        config["guilds"][guild_id_str]["enabled"] = True
+        config["guilds"][guild_id_str]["updated_at"] = datetime.now(timezone.utc).isoformat()
+        config["guilds"][guild_id_str]["updated_by"] = str(inter.author.id)
+        save_autorole_config(config)
+
+        await inter.response.send_message("Autorole assignment has been enabled for this server.", ephemeral=True)
+
+    @autorole_group.sub_command(
+        name="sync",
+        description="Backfill autorole to existing members who do not currently have the role",
+    )
+    async def autorole_sync(
+        inter: disnake.ApplicationCommandInteraction,
+        include_bots: bool = commands.Param(default=False, description="Whether to also assign role to bots"),
+    ):
+        if not is_inter_admin(inter):
+            await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
+            return
+
+        if not inter.guild:
+            await inter.response.send_message("This command must be run within a server.", ephemeral=True)
+            return
+
+        target_role, _, is_enabled = resolve_autorole_for_guild(inter.guild)
+        if not target_role:
+            await inter.response.send_message("No autorole is configured for this server. Use `/autorole set` first.", ephemeral=True)
+            return
+
+        await inter.response.defer(ephemeral=True)
+
+        me = inter.guild.me
+        if me:
+            if not me.guild_permissions.manage_roles:
+                await inter.followup.send("Bot lacks 'Manage Roles' permission in this server.", ephemeral=True)
+                return
+            if target_role >= me.top_role:
+                await inter.followup.send(f"Role '{target_role.name}' is higher than or equal to bot's highest role '{me.top_role.name}'.", ephemeral=True)
+                return
+
+        assigned_count = 0
+        failed_count = 0
+        total_members = inter.guild.members
+
+        for member in total_members:
+            if member.bot and not include_bots:
+                continue
+            if target_role not in member.roles:
+                try:
+                    await member.add_roles(target_role, reason=f"Autorole sync initiated by admin {inter.author.name}")
+                    assigned_count += 1
+                    await asyncio.sleep(0.3)
+                except Exception as ex:
+                    log.warning(f"[Autorole Sync] Failed to assign role to {member.name}: {ex}")
+                    failed_count += 1
+
+        await inter.followup.send(
+            f"Autorole sync completed for role '{target_role.name}': {assigned_count} members updated, {failed_count} errors.",
+            ephemeral=True,
+        )
 
     @b.event
     async def on_message(message: disnake.Message):
@@ -3016,11 +3778,12 @@ def start_bot_thread(
         try:
             loop.run_until_complete(bot.start(bot_token))
         except disnake.errors.PrivilegedIntentsRequired:
-            log.warning("[Disnake Bot] Privileged Message Content Intent is disabled in Discord Developer Portal. Retrying with basic intents...")
+            log.warning("[Disnake Bot] Privileged intents (Message Content / Server Members) are disabled in Discord Developer Portal. Retrying with basic intents...")
             try:
                 intents = disnake.Intents.default()
                 intents.message_content = False
                 intents.guilds = True
+                intents.members = False
                 bot = commands.InteractionBot(
                     intents=intents,
                     test_guilds=None,
