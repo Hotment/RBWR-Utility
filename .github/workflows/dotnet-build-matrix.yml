@@ -299,7 +299,7 @@ jobs:
             cp icon.png "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.png"
           fi
 
-          APP_VER="2.1.1-dev3"
+          APP_VER="2.1.1"
           if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
             DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
             if [ -n "${DETECTED}" ]; then

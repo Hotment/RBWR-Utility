@@ -21,7 +21,7 @@
     <_VmFileContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\ViewModels\MainOverlayViewModel.cs'))</_VmFileContent>
     <_ExtractedVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_VmFileContent)', 'public const string AppVersion = "([^"]+)"').Groups[1].Value)</_ExtractedVersion>
     <AppVersion Condition="'$(_ExtractedVersion)' != ''">$(_ExtractedVersion)</AppVersion>
-    <AppVersion Condition="'$(AppVersion)' == ''">2.1.1-dev3</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">2.1.1</AppVersion>
 
     <_NumMatch>$([System.Text.RegularExpressions.Regex]::Match('$(AppVersion)', '^\d+(\.\d+)*').Value)</_NumMatch>
     <CleanNumericVersion Condition="'$(_NumMatch)' != ''">$(_NumMatch).0</CleanNumericVersion>
