@@ -24,7 +24,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.1.1-dev3";
+    public const string AppVersion = "2.1.1";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -160,6 +160,53 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private double _compactUiScalePreview = 1.0;
 
     public double ActiveUiScale => IsCompact ? CompactUiScale : UiScale;
+
+    public double DemandSliderValue
+    {
+        get
+        {
+            if (double.TryParse(DemandInput, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
+            {
+                return Math.Clamp(val, 0.0, 1200.0);
+            }
+            return 0.0;
+        }
+        set
+        {
+            if (_isUpdatingFields) return;
+            double clamped = Math.Clamp(value, 0.0, 1200.0);
+            double snapped = Math.Round(clamped / 10.0) * 10.0;
+
+            if (double.TryParse(DemandInput, NumberStyles.Any, CultureInfo.InvariantCulture, out double cur) && Math.Abs(cur - snapped) < 0.001)
+            {
+                return;
+            }
+
+            DemandInput = ((int)snapped).ToString(CultureInfo.InvariantCulture);
+            OnPropertyChanged(nameof(DemandSliderValue));
+            OnPropertyChanged(nameof(DemandSliderText));
+            NotifyPresetStates();
+        }
+    }
+
+    public string DemandSliderText => $"{DemandSliderValue:F0} MW";
+
+    public bool IsPreset0Active => Math.Abs(DemandSliderValue - 0.0) < 0.001;
+    public bool IsPreset300Active => Math.Abs(DemandSliderValue - 300.0) < 0.001;
+    public bool IsPreset600Active => Math.Abs(DemandSliderValue - 600.0) < 0.001;
+    public bool IsPreset950Active => Math.Abs(DemandSliderValue - 950.0) < 0.001;
+    public bool IsPreset1100Active => Math.Abs(DemandSliderValue - 1100.0) < 0.001;
+    public bool IsPreset1200Active => Math.Abs(DemandSliderValue - 1200.0) < 0.001;
+
+    private void NotifyPresetStates()
+    {
+        OnPropertyChanged(nameof(IsPreset0Active));
+        OnPropertyChanged(nameof(IsPreset300Active));
+        OnPropertyChanged(nameof(IsPreset600Active));
+        OnPropertyChanged(nameof(IsPreset950Active));
+        OnPropertyChanged(nameof(IsPreset1100Active));
+        OnPropertyChanged(nameof(IsPreset1200Active));
+    }
 
     [ObservableProperty]
     private string _pinSymbol = "UNPIN";
@@ -391,6 +438,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     partial void OnDemandInputChanged(string value)
     {
+        OnPropertyChanged(nameof(DemandSliderValue));
+        OnPropertyChanged(nameof(DemandSliderText));
+        NotifyPresetStates();
+
         if (_isUpdatingFields) return;
         if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double dem))
         {

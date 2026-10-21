@@ -637,4 +637,65 @@ public class ViewModelTests
         public Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default)
             => Task.CompletedTask;
     }
+
+    [Fact]
+    public void TestDemandSliderValue_SnappingAndClamping()
+    {
+        var vm = CreateTestVm();
+
+        Assert.Equal(0.0, vm.DemandSliderValue);
+        Assert.Equal("0 MW", vm.DemandSliderText);
+        Assert.True(vm.IsPreset0Active);
+        Assert.False(vm.IsPreset300Active);
+
+        vm.DemandSliderValue = 304;
+        Assert.Equal(300.0, vm.DemandSliderValue);
+        Assert.Equal("300", vm.DemandInput);
+        Assert.Equal("300 MW", vm.DemandSliderText);
+        Assert.False(vm.IsPreset0Active);
+        Assert.True(vm.IsPreset300Active);
+
+        vm.DemandSliderValue = 306;
+        Assert.Equal(310.0, vm.DemandSliderValue);
+        Assert.Equal("310", vm.DemandInput);
+        Assert.Equal("310 MW", vm.DemandSliderText);
+        Assert.False(vm.IsPreset300Active);
+
+        vm.DemandSliderValue = -50;
+        Assert.Equal(0.0, vm.DemandSliderValue);
+        Assert.Equal("0", vm.DemandInput);
+        Assert.True(vm.IsPreset0Active);
+
+        vm.DemandSliderValue = 1300;
+        Assert.Equal(1200.0, vm.DemandSliderValue);
+        Assert.Equal("1200", vm.DemandInput);
+        Assert.True(vm.IsPreset1200Active);
+    }
+
+    [Fact]
+    public void TestDemandSliderValue_PresetValuesAndSync()
+    {
+        var vm = CreateTestVm();
+
+        double[] presets = [0, 300, 600, 950, 1100, 1200];
+        foreach (var p in presets)
+        {
+            vm.SetPresetDemand(p);
+            Assert.Equal(p, vm.DemandSliderValue);
+            Assert.Equal(p.ToString(System.Globalization.CultureInfo.InvariantCulture), vm.DemandInput);
+            Assert.Equal($"{p:F0} MW", vm.DemandSliderText);
+        }
+
+        Assert.True(vm.IsPreset1200Active);
+        Assert.False(vm.IsPreset1100Active);
+
+        vm.DemandInput = "950";
+        Assert.Equal(950.0, vm.DemandSliderValue);
+        Assert.True(vm.IsPreset950Active);
+        Assert.False(vm.IsPreset1200Active);
+
+        vm.DemandInput = "600";
+        Assert.Equal(600.0, vm.DemandSliderValue);
+        Assert.True(vm.IsPreset600Active);
+    }
 }

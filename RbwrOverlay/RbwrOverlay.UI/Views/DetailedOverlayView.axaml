@@ -177,18 +177,97 @@
                         </StackPanel>
                     </Border>
 
-                    <StackPanel Grid.Row="2"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                Spacing="4"
-                                Margin="0,0,0,8">
-                        <Button Classes="cyber-preset" Content="0 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="0" />
-                        <Button Classes="cyber-preset" Content="300 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="300" />
-                        <Button Classes="cyber-preset" Content="600 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="600" />
-                        <Button Classes="cyber-preset" Content="950 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="950" />
-                        <Button Classes="cyber-preset" Content="1100 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="1100" />
-                        <Button Classes="cyber-preset" Content="1200 MW" Command="{Binding SetPresetDemandCommand}" CommandParameter="1200" />
-                    </StackPanel>
+                    <Border Grid.Row="2"
+                            Background="{DynamicResource CyberCardBg}"
+                            BorderBrush="{DynamicResource CyberBorder}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8,6"
+                            Margin="0,0,0,8">
+                        <StackPanel Spacing="3">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0"
+                                           Text="DEMAND PRESET"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="9"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DemandSliderText}"
+                                           Foreground="{DynamicResource NeonCyan}"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Slider x:Name="DemandPresetSlider"
+                                    Minimum="0"
+                                    Maximum="1200"
+                                    TickFrequency="10"
+                                    IsSnapToTickEnabled="True"
+                                    SmallChange="10"
+                                    LargeChange="50"
+                                    Value="{Binding DemandSliderValue, Mode=TwoWay}"
+                                    ToolTip.Tip="Demand setpoint slider (10 MW increments)"
+                                    Margin="0,-2" />
+
+                            <Grid ColumnDefinitions="300*,300*,350*,150*,100*"
+                                  Margin="6,0,6,0">
+                                <Button Grid.Column="0"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset0Active}"
+                                        Content="0"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="0"
+                                        ToolTip.Tip="Snap to 0 MW"
+                                        HorizontalAlignment="Left" />
+                                <Button Grid.Column="0"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset300Active}"
+                                        Content="300"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="300"
+                                        ToolTip.Tip="Snap to 300 MW"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,-12,0" />
+                                <Button Grid.Column="1"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset600Active}"
+                                        Content="600"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="600"
+                                        ToolTip.Tip="Snap to 600 MW"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,-12,0" />
+                                <Button Grid.Column="2"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset950Active}"
+                                        Content="950"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="950"
+                                        ToolTip.Tip="Snap to 950 MW"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,-12,0" />
+                                <Button Grid.Column="3"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset1100Active}"
+                                        Content="1100"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="1100"
+                                        ToolTip.Tip="Snap to 1100 MW"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,-14,0" />
+                                <Button Grid.Column="4"
+                                        Classes="cyber-tick"
+                                        Classes.active="{Binding IsPreset1200Active}"
+                                        Content="1200"
+                                        Command="{Binding SetPresetDemandCommand}"
+                                        CommandParameter="1200"
+                                        ToolTip.Tip="Snap to 1200 MW"
+                                        HorizontalAlignment="Right" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
 
                     <Grid Grid.Row="3"
                           ColumnDefinitions="*,*"

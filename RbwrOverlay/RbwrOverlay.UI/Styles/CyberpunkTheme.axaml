@@ -206,6 +206,28 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
+    <Style Selector="Button.cyber-tick">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontSize" Value="8" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="2,1" />
+        <Setter Property="MinHeight" Value="14" />
+        <Setter Property="MinWidth" Value="20" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cyber-tick:pointerover">
+        <Setter Property="Background" Value="#1a253a" />
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-tick.active">
+        <Setter Property="Foreground" Value="{StaticResource NeonCyan}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
     <Style Selector="TextBox.cyber">
         <Setter Property="Background" Value="{StaticResource CyberCardBg}" />
         <Setter Property="Foreground" Value="{StaticResource TextLight}" />
