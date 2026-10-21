@@ -146,13 +146,14 @@ jobs:
 
           cat << 'EOF' > "${BUNDLE_NAME}/rbwr-overlay.desktop"
           [Desktop Entry]
+          Version=1.0
           Name=RBWR APRM Calculator
           Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
           Exec=sh -c '"$(dirname "%k")/run.sh"'
           Icon=icon.png
           Terminal=false
           Type=Application
-          Categories=Utility;Game;
+          Categories=Utility;
           EOF
           chmod +x "${BUNDLE_NAME}/rbwr-overlay.desktop"
 
@@ -199,15 +200,15 @@ jobs:
 
           cat << EOF > "${APPDIR}/rbwr-overlay.desktop"
           [Desktop Entry]
+          Version=1.0
           Name=RBWR APRM Calculator
           GenericName=Reactor Overlay
           Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
-          Version=${APP_VER}
           Exec=RbwrOverlay
           Icon=icon
           Terminal=false
           Type=Application
-          Categories=Utility;Game;
+          Categories=Utility;
           X-AppImage-Version=${APP_VER}
           EOF
 

@@ -283,15 +283,16 @@ if exist "icon.png" copy /y "icon.png" "publish\linux-x64-standalone\icon.png" >
 >> "publish\linux-x64-standalone\run.sh" echo exec "${SCRIPT_DIR}/RbwrOverlay" "$@"
 
 > "publish\linux-x64-standalone\rbwr-overlay.desktop" echo [Desktop Entry]
+>> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Version=1.0
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Name=RBWR APRM Calculator
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo GenericName=Reactor Overlay
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
->> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Version=!APP_VER!
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Exec=sh -c '"$(dirname "%%k")/run.sh"'
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Icon=icon.png
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Terminal=false
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Type=Application
->> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Categories=Utility;Game;
+>> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Categories=Utility;
+>> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo X-AppImage-Version=!APP_VER!
 
 where tar >nul 2>&1
 if %ERRORLEVEL% equ 0 (
@@ -334,15 +335,16 @@ if exist "icon.png" copy /y "icon.png" "publish\linux-arm64-standalone\icon.png"
 >> "publish\linux-arm64-standalone\run.sh" echo exec "${SCRIPT_DIR}/RbwrOverlay" "$@"
 
 > "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo [Desktop Entry]
+>> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Version=1.0
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Name=RBWR APRM Calculator
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo GenericName=Reactor Overlay
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
->> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Version=!APP_VER!
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Exec=sh -c '"$(dirname "%%k")/run.sh"'
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Icon=icon.png
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Terminal=false
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Type=Application
->> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Categories=Utility;Game;
+>> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Categories=Utility;
+>> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo X-AppImage-Version=!APP_VER!
 
 where tar >nul 2>&1
 if %ERRORLEVEL% equ 0 (

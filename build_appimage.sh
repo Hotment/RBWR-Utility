@@ -12,7 +12,7 @@ mkdir -p "${APPDIR}/usr/lib"
 cp -r publish/linux-x64-standalone/* "${APPDIR}/usr/bin/"
 chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
 
-APP_VER="2.1.1-dev3"
+APP_VER="2.1.1"
 if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
   DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
   if [ -n "${DETECTED}" ]; then
@@ -22,15 +22,15 @@ fi
 
 cat << EOF > "${APPDIR}/rbwr-overlay.desktop"
 [Desktop Entry]
+Version=1.0
 Name=RBWR APRM Calculator
 GenericName=Reactor Overlay
 Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
-Version=${APP_VER}
 Exec=RbwrOverlay
 Icon=icon
 Terminal=false
 Type=Application
-Categories=Utility;Game;
+Categories=Utility;
 X-AppImage-Version=${APP_VER}
 EOF
 
