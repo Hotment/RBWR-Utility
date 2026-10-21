@@ -74,10 +74,8 @@ jobs:
 
       - name: Prepare Windows Release Package
         run: |
-          # Copy standalone executable to release artifact (ready to double-click with no unzip needed)
           Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "RBWR_APRM_Calculator_${{ matrix.rid }}.exe"
 
-          # Create directory bundle with icon and both names
           $bundleDir = "RBWR_APRM_Calculator_Windows_${{ matrix.rid }}"
           New-Item -ItemType Directory -Path $bundleDir -Force
           Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "$bundleDir/RbwrOverlay.exe"
@@ -131,14 +129,12 @@ jobs:
           mkdir -p "${BUNDLE_NAME}"
           cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
           
-          # Ensure execution rights
           chmod +x "${BUNDLE_NAME}/RbwrOverlay"
           cp "${BUNDLE_NAME}/RbwrOverlay" "${BUNDLE_NAME}/RBWR_APRM_Calculator"
           
           if [ -f "icon.png" ]; then cp "icon.png" "${BUNDLE_NAME}/"; fi
           if [ -f "icon.ico" ]; then cp "icon.ico" "${BUNDLE_NAME}/"; fi
 
-          # Double-clickable shell launcher script
           cat << 'EOF' > "${BUNDLE_NAME}/run.sh"
           #!/usr/bin/env bash
           SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -148,7 +144,6 @@ jobs:
           EOF
           chmod +x "${BUNDLE_NAME}/run.sh"
 
-          # Double-clickable desktop launcher entry
           cat << 'EOF' > "${BUNDLE_NAME}/rbwr-overlay.desktop"
           [Desktop Entry]
           Name=RBWR APRM Calculator
@@ -161,11 +156,9 @@ jobs:
           EOF
           chmod +x "${BUNDLE_NAME}/rbwr-overlay.desktop"
 
-          # Create both tar.gz (preserves +x permissions) and zip
           tar -czvf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
           zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
 
-          # Standalone binary for direct curl / terminal download
           cp "${BUNDLE_NAME}/RbwrOverlay" "RbwrOverlay_${{ matrix.rid }}"
           chmod +x "RbwrOverlay_${{ matrix.rid }}"
 
@@ -195,23 +188,29 @@ jobs:
           mkdir -p "${APPDIR}/usr/bin"
           mkdir -p "${APPDIR}/usr/lib"
 
-          # Copy binaries and native libraries into AppDir
           cp -r publish/linux-x64/* "${APPDIR}/usr/bin/"
-          chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
+          APP_VER="2.1.1"
+          if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
+            DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
+            if [ -n "${DETECTED}" ]; then
+              APP_VER="${DETECTED}"
+            fi
+          fi
 
-          # Desktop entry in AppDir root
-          cat << 'EOF' > "${APPDIR}/rbwr-overlay.desktop"
+          cat << EOF > "${APPDIR}/rbwr-overlay.desktop"
           [Desktop Entry]
           Name=RBWR APRM Calculator
+          GenericName=Reactor Overlay
           Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+          Version=${APP_VER}
           Exec=RbwrOverlay
           Icon=icon
           Terminal=false
           Type=Application
           Categories=Utility;Game;
+          X-AppImage-Version=${APP_VER}
           EOF
 
-          # Icons in AppDir root and standard icon theme paths
           if [ -f "icon.png" ]; then
             cp icon.png "${APPDIR}/icon.png"
             cp icon.png "${APPDIR}/rbwr-overlay.png"
@@ -219,7 +218,6 @@ jobs:
             cp icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/rbwr-overlay.png"
           fi
 
-          # AppRun launcher script
           cat << 'EOF' > "${APPDIR}/AppRun"
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "${0}")")"
@@ -228,12 +226,10 @@ jobs:
           EOF
           chmod +x "${APPDIR}/AppRun"
 
-          # Download and extract appimagetool to bypass FUSE requirements in CI
           wget -q -O appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
           ./appimagetool --appimage-extract >/dev/null 2>&1
 
-          # Build standalone AppImage
           ARCH=x86_64 ./squashfs-root/AppRun "${APPDIR}" "RBWR_APRM_Calculator_linux-x64.AppImage"
           chmod +x "RBWR_APRM_Calculator_linux-x64.AppImage"
 
@@ -293,11 +289,9 @@ jobs:
           mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS"
           mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources"
 
-          # Copy binaries and native dylibs into bundle
           cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/"
           chmod +x "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay"
 
-          # Copy icon
           if [ -f "icon.icns" ]; then
             cp icon.icns "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.icns"
           fi
@@ -305,8 +299,16 @@ jobs:
             cp icon.png "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.png"
           fi
 
-          # Generate Info.plist for macOS Finder integration
-          cat << 'EOF' > "${BUNDLE_NAME}/${APP_NAME}/Contents/Info.plist"
+          APP_VER="2.1.1-dev3"
+          if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
+            DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
+            if [ -n "${DETECTED}" ]; then
+              APP_VER="${DETECTED}"
+            fi
+          fi
+          NUM_VER=$(echo "${APP_VER}" | cut -d'-' -f1)
+
+          cat << EOF > "${BUNDLE_NAME}/${APP_NAME}/Contents/Info.plist"
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -318,7 +320,11 @@ jobs:
               <key>CFBundleIdentifier</key>
               <string>com.hotment.rbwroverlay</string>
               <key>CFBundleVersion</key>
-              <string>1.0.0</string>
+              <string>${NUM_VER}.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${APP_VER}</string>
+              <key>NSHumanReadableCopyright</key>
+              <string>Copyright © 2026 Hotment</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleSignature</key>
@@ -333,14 +339,11 @@ jobs:
           </plist>
           EOF
 
-          # Ad-hoc sign bundle for Gatekeeper compatibility
           codesign --force --deep -s - "${BUNDLE_NAME}/${APP_NAME}" || true
 
-          # Provide terminal execution: ./RbwrOverlay directly in bundle root
           cp "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay" "${BUNDLE_NAME}/RbwrOverlay"
           chmod +x "${BUNDLE_NAME}/RbwrOverlay"
 
-          # Provide double-clickable terminal script launcher for macOS Finder
           cat << 'EOF' > "${BUNDLE_NAME}/run.command"
           #!/usr/bin/env bash
           DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -349,7 +352,6 @@ jobs:
           EOF
           chmod +x "${BUNDLE_NAME}/run.command"
 
-          # Package as Zip Archive
           zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
 
       - name: Upload macOS Package (zip)

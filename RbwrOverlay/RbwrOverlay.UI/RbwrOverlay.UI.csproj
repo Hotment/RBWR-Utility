@@ -8,6 +8,30 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <AssemblyName>RbwrOverlay</AssemblyName>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+
+    <Title>RBWR APRM Calculator</Title>
+    <Product>RBWR APRM Calculator</Product>
+    <Description>Realistic Boiling Water Reactor Transparent APRM &amp; Thermal Calculator Overlay</Description>
+    <Company>Hotment</Company>
+    <Authors>Hotment</Authors>
+    <Copyright>Copyright © 2026 Hotment</Copyright>
+    <AssemblyTitle>RBWR APRM Calculator</AssemblyTitle>
+    <NeutralLanguage>en-US</NeutralLanguage>
+
+    <_VmFileContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\ViewModels\MainOverlayViewModel.cs'))</_VmFileContent>
+    <_ExtractedVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_VmFileContent)', 'public const string AppVersion = "([^"]+)"').Groups[1].Value)</_ExtractedVersion>
+    <AppVersion Condition="'$(_ExtractedVersion)' != ''">$(_ExtractedVersion)</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">2.1.1-dev3</AppVersion>
+
+    <_NumMatch>$([System.Text.RegularExpressions.Regex]::Match('$(AppVersion)', '^\d+(\.\d+)*').Value)</_NumMatch>
+    <CleanNumericVersion Condition="'$(_NumMatch)' != ''">$(_NumMatch).0</CleanNumericVersion>
+    <CleanNumericVersion Condition="'$(CleanNumericVersion)' == ''">2.1.1.0</CleanNumericVersion>
+
+    <Version>$(AppVersion)</Version>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+    <AssemblyVersion>$(CleanNumericVersion)</AssemblyVersion>
+    <FileVersion>$(CleanNumericVersion)</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

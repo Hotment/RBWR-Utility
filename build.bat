@@ -30,6 +30,35 @@ if not exist "%PROJECT_PATH%" (
     exit /b 1
 )
 
+set "APP_VER=2.1.1"
+set "VM_FILE=RbwrOverlay\RbwrOverlay.UI\ViewModels\MainOverlayViewModel.cs"
+if exist "%VM_FILE%" (
+    for /f "tokens=2 delims==" %%A in ('findstr /i /C:"public const string AppVersion" "%VM_FILE%"') do (
+        set "RAW_VER=%%~A"
+    )
+    set "RAW_VER=!RAW_VER:;=!"
+    set "RAW_VER=!RAW_VER:"=!"
+    for /f "tokens=*" %%A in ("!RAW_VER!") do set "APP_VER=%%A"
+)
+
+for /f "tokens=1 delims=-" %%A in ("!APP_VER!") do set "SEM_BASE=%%A"
+for /f "tokens=1,2,3,4 delims=." %%A in ("!SEM_BASE!") do (
+    set "P1=%%A"
+    set "P2=%%B"
+    set "P3=%%C"
+    set "P4=%%D"
+)
+if "!P1!"=="" set "P1=1"
+if "!P2!"=="" set "P2=0"
+if "!P3!"=="" set "P3=0"
+if "!P4!"=="" set "P4=0"
+set "NUMERIC_VER=!P1!.!P2!.!P3!.!P4!"
+
+echo [INFO] Detected Application Version: !APP_VER! (PE File Version: !NUMERIC_VER!)
+echo [INFO] Executable Details: RBWR APRM Calculator by Hotment
+
+set BUILD_METADATA=-p:Version="!APP_VER!" -p:InformationalVersion="!APP_VER!" -p:AssemblyVersion="!NUMERIC_VER!" -p:FileVersion="!NUMERIC_VER!" -p:Product="RBWR APRM Calculator" -p:AssemblyTitle="RBWR APRM Calculator" -p:Title="RBWR APRM Calculator" -p:Description="Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator Overlay" -p:Company="Hotment" -p:Authors="Hotment" -p:Copyright="Copyright (C) 2026 Hotment" -p:IncludeSourceRevisionInInformationalVersion=false
+
 if not exist "publish" mkdir "publish"
 if not exist "publish\releases" mkdir "publish\releases"
 
@@ -150,7 +179,7 @@ echo Building: Windows x64 Standalone (Single-File .exe)
 echo ==================================================
 if not exist "publish\win-x64-standalone" mkdir "publish\win-x64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o "publish\win-x64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\win-x64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Windows x64 standalone build failed.
@@ -180,7 +209,7 @@ echo Building: Windows ARM64 Standalone (Single-File .exe)
 echo ==================================================
 if not exist "publish\win-arm64-standalone" mkdir "publish\win-arm64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o "publish\win-arm64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\win-arm64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Windows ARM64 standalone build failed.
@@ -210,7 +239,7 @@ echo Building: Windows x64 Framework-Dependent
 echo ==================================================
 if not exist "publish\win-x64" mkdir "publish\win-x64"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "publish\win-x64"
+dotnet publish "%PROJECT_PATH%" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\win-x64"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Windows framework-dependent build failed.
@@ -231,7 +260,7 @@ echo Building: Linux x64 Standalone
 echo ==================================================
 if not exist "publish\linux-x64-standalone" mkdir "publish\linux-x64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o "publish\linux-x64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\linux-x64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Linux x64 standalone build failed.
@@ -255,7 +284,9 @@ if exist "icon.png" copy /y "icon.png" "publish\linux-x64-standalone\icon.png" >
 
 > "publish\linux-x64-standalone\rbwr-overlay.desktop" echo [Desktop Entry]
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Name=RBWR APRM Calculator
+>> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo GenericName=Reactor Overlay
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+>> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Version=!APP_VER!
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Exec=sh -c '"$(dirname "%%k")/run.sh"'
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Icon=icon.png
 >> "publish\linux-x64-standalone\rbwr-overlay.desktop" echo Terminal=false
@@ -281,7 +312,7 @@ echo Building: Linux ARM64 Standalone (Raspberry Pi 4/5)
 echo ==================================================
 if not exist "publish\linux-arm64-standalone" mkdir "publish\linux-arm64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o "publish\linux-arm64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\linux-arm64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Linux ARM64 standalone build failed.
@@ -304,7 +335,9 @@ if exist "icon.png" copy /y "icon.png" "publish\linux-arm64-standalone\icon.png"
 
 > "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo [Desktop Entry]
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Name=RBWR APRM Calculator
+>> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo GenericName=Reactor Overlay
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Comment=Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator
+>> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Version=!APP_VER!
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Exec=sh -c '"$(dirname "%%k")/run.sh"'
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Icon=icon.png
 >> "publish\linux-arm64-standalone\rbwr-overlay.desktop" echo Terminal=false
@@ -328,7 +361,7 @@ echo Building: Linux x64 Framework-Dependent
 echo ==================================================
 if not exist "publish\linux-x64" mkdir "publish\linux-x64"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true -o "publish\linux-x64"
+dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\linux-x64"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Linux framework-dependent build failed.
@@ -389,7 +422,7 @@ if exist "!MAC_DIR!" rmdir /s /q "!MAC_DIR!" >nul 2>&1
 mkdir "!APP_DIR!\Contents\MacOS" >nul 2>&1
 mkdir "!APP_DIR!\Contents\Resources" >nul 2>&1
 
-dotnet publish "%PROJECT_PATH%" -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -o "publish\osx-arm64-tmp"
+dotnet publish "%PROJECT_PATH%" -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\osx-arm64-tmp"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] macOS ARM64 build failed.
@@ -417,7 +450,11 @@ if exist "icon.png" copy /y "icon.png" "!APP_DIR!\Contents\Resources\icon.png" >
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleIdentifier^</key^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>com.hotment.rbwroverlay^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleVersion^</key^>
->> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>1.0.0^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>!NUMERIC_VER!^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleShortVersionString^</key^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>!APP_VER!^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>NSHumanReadableCopyright^</key^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>Copyright © 2026 Hotment^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundlePackageType^</key^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>APPL^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleExecutable^</key^>
@@ -451,7 +488,7 @@ if exist "!MAC_DIR!" rmdir /s /q "!MAC_DIR!" >nul 2>&1
 mkdir "!APP_DIR!\Contents\MacOS" >nul 2>&1
 mkdir "!APP_DIR!\Contents\Resources" >nul 2>&1
 
-dotnet publish "%PROJECT_PATH%" -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -o "publish\osx-x64-tmp"
+dotnet publish "%PROJECT_PATH%" -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\osx-x64-tmp"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] macOS Intel x64 build failed.
@@ -479,7 +516,11 @@ if exist "icon.png" copy /y "icon.png" "!APP_DIR!\Contents\Resources\icon.png" >
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleIdentifier^</key^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>com.hotment.rbwroverlay^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleVersion^</key^>
->> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>1.0.0^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>!NUMERIC_VER!^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleShortVersionString^</key^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>!APP_VER!^</string^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>NSHumanReadableCopyright^</key^>
+>> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>Copyright © 2026 Hotment^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundlePackageType^</key^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<string^>APPL^</string^>
 >> "!APP_DIR!\Contents\Info.plist" echo     ^<key^>CFBundleExecutable^</key^>
