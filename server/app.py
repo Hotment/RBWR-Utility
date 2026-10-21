@@ -7,6 +7,7 @@ import json
 import gzip
 import queue
 import traceback
+import re
 from werkzeug.exceptions import HTTPException
 orjson = None
 try:
@@ -85,6 +86,7 @@ try:
         update_ticket_channel_message,
         notify_ticket_deleted,
         report_error_to_discord,
+        report_crash_to_discord,
     )
 except Exception:
     from bot import (
@@ -99,12 +101,19 @@ except Exception:
         update_ticket_channel_message,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
         report_error_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        report_crash_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
     )
 
 try:
     report_error_to_discord  # pyright: ignore[reportUnusedExpression]
 except NameError:
     def report_error_to_discord(*args, **kwargs) -> bool:
+        return False
+
+try:
+    report_crash_to_discord  # pyright: ignore[reportUnusedExpression]
+except NameError:
+    def report_crash_to_discord(*args, **kwargs) -> bool:
         return False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1052,10 +1061,12 @@ class CrashPayload(BaseModel):
     os_info: str = Field(default="Unknown OS", max_length=100)
 
 class DeleteCrashPayload(BaseModel):
-    id: int
+    id: int | None = None
+    ids: list[int] | None = None
 
 class CrashStatusPayload(BaseModel):
-    id: int
+    id: int | None = None
+    ids: list[int] | None = None
     status: str
 
 class StatusUpdatePayload(BaseModel):
@@ -4686,6 +4697,32 @@ def submit_ticket():
         "in_guild": in_guild
     })
 
+def sanitize_crash_text(text: str) -> str:
+    if not text:
+        return ""
+
+    text = re.sub(r'(?i)[a-zA-Z]:[\\/]+Users[\\/]+[^\s\\/",\':;]+[\\/]+AppData[\\/]+Local[\\/]+Temp', '%temp%', text)
+    text = re.sub(r'(?i)[a-zA-Z]:[\\/]+Users[\\/]+[^\s\\/",\':;]+[\\/]+AppData[\\/]+Roaming', '%appdata%', text)
+    text = re.sub(r'(?i)[a-zA-Z]:[\\/]+Users[\\/]+[^\s\\/",\':;]+[\\/]+AppData[\\/]+Local', '%localappdata%', text)
+    text = re.sub(r'(?i)[a-zA-Z]:[\\/]+Users[\\/]+[^\s\\/",\':;]+', '%userprofile%', text)
+
+    text = re.sub(r'(?i)[\\/]+home[\\/]+[^\s\\/",\':;]+[\\/]+\.config', '$XDG_CONFIG_HOME', text)
+    text = re.sub(r'(?i)[\\/]+home[\\/]+[^\s\\/",\':;]+', '$HOME', text)
+
+    text = re.sub(r'(?i)[\\/]+Users[\\/]+[^\s\\/",\':;]+', '$HOME', text)
+
+    return text
+
+def normalize_traceback_signature(tb: str) -> str:
+    if not tb:
+        return ""
+
+    s = re.sub(r'(?i)=== CRASH OCCURRED:[^\n\r]*===', '', tb)
+    s = re.sub(r'\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?\b', '', s)
+    s = re.sub(r'(?i)\bExecutable:[^\n\r]*', '', s)
+    s = re.sub(r'(?i)\bBase Directory:[^\n\r]*', '', s)
+    return s.strip()
+
 @app.route("/crashes", methods=["POST"])
 def submit_crash():
     ip = request.remote_addr or "unknown"
@@ -4709,11 +4746,14 @@ def submit_crash():
     if crashes:
         new_id = max(c.get("id", 0) for c in crashes) + 1
         
+    sanitized_traceback = sanitize_crash_text(payload.traceback.strip())
+    sanitized_log = sanitize_crash_text(payload.log_data.strip())
+
     new_crash = {
         "id": new_id,
         "version": payload.version.strip(),
-        "traceback": payload.traceback.strip(),
-        "log_data": payload.log_data.strip(),
+        "traceback": sanitized_traceback,
+        "log_data": sanitized_log,
         "os_info": payload.os_info.strip(),
         "status": "OPEN",
         "ip": ip,
@@ -4722,7 +4762,20 @@ def submit_crash():
     crashes.append(new_crash)
     save_crashes(data)
     broadcast_update("dashboard")
-    return jsonify({"message": "Crash report submitted successfully.", "id": new_id})
+
+    norm_sig = normalize_traceback_signature(sanitized_traceback)
+    occurrence_count = sum(1 for c in crashes if normalize_traceback_signature(c.get("traceback", "")) == norm_sig)
+
+    try:
+        threading.Thread(
+            target=report_crash_to_discord,
+            args=(dict(new_crash), occurrence_count),
+            daemon=True
+        ).start()
+    except Exception as ex:
+        logger.warning(f"Failed to dispatch Discord crash notification: {ex}")
+
+    return jsonify({"message": "Crash report submitted successfully.", "id": new_id, "occurrences": occurrence_count})
 
 class VisibilitySuggestionPayload(BaseModel):
     id: int
@@ -4743,15 +4796,29 @@ def update_crash_status(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
+    target_ids = set()
+    if payload.ids:
+        target_ids.update(payload.ids)
+    if payload.id is not None:
+        target_ids.add(payload.id)
+
+    if not target_ids:
+        return jsonify({"detail": "No crash report IDs provided."}), 400
+
     data = load_crashes()
     crashes = data.get("crashes", [])
+    updated = 0
     for c in crashes:
-        if c.get("id") == payload.id:
+        if c.get("id") in target_ids:
             c["status"] = payload.status
-            save_crashes(data)
-            broadcast_update("dashboard")
-            return jsonify({"message": f"Crash #{payload.id} status updated to {payload.status}.", "id": payload.id, "status": payload.status})
-    return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
+            updated += 1
+
+    if updated > 0:
+        save_crashes(data)
+        broadcast_update("dashboard")
+        return jsonify({"message": f"{updated} crash report(s) updated to {payload.status}.", "status": payload.status, "count": updated})
+
+    return jsonify({"detail": "No matching crash reports found."}), 404
 
 @app.route("/admin/crashes/delete", methods=["POST"])
 @admin_required
@@ -4764,17 +4831,27 @@ def delete_crash(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
+    target_ids = set()
+    if payload.ids:
+        target_ids.update(payload.ids)
+    if payload.id is not None:
+        target_ids.add(payload.id)
+
+    if not target_ids:
+        return jsonify({"detail": "No crash report IDs provided."}), 400
+
     data = load_crashes()
     crashes = data.get("crashes", [])
     initial_len = len(crashes)
-    data["crashes"] = [c for c in crashes if c.get("id") != payload.id]
+    data["crashes"] = [c for c in crashes if c.get("id") not in target_ids]
+    deleted_count = initial_len - len(data["crashes"])
 
-    if len(data["crashes"]) < initial_len:
+    if deleted_count > 0:
         save_crashes(data)
         broadcast_update("dashboard")
-        return jsonify({"message": f"Crash report #{payload.id} deleted successfully.", "id": payload.id})
+        return jsonify({"message": f"{deleted_count} crash report(s) deleted successfully.", "count": deleted_count})
 
-    return jsonify({"detail": f"Crash report with ID {payload.id} not found."}), 404
+    return jsonify({"detail": "No matching crash reports found."}), 404
 
 @app.route("/admin/tickets/status", methods=["POST"])
 @app.route("/admin/suggestions/status", methods=["POST"])

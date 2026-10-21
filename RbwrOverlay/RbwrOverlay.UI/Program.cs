@@ -55,6 +55,9 @@ sealed class Program
             .WithInterFont()
             .LogToTrace();
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int SkVersionGetMilestoneDelegate();
+
     private static void ConfigureNativeLibraryResolvers()
     {
         try
@@ -76,12 +79,30 @@ sealed class Program
         }
     }
 
+    private static bool IsSkiaSharpCompatible(IntPtr handle)
+    {
+        try
+        {
+            if (NativeLibrary.TryGetExport(handle, "sk_version_get_milestone", out IntPtr exportPtr))
+            {
+                var getMilestone = Marshal.GetDelegateForFunctionPointer<SkVersionGetMilestoneDelegate>(exportPtr);
+                int milestone = getMilestone();
+                return milestone >= 119 && milestone < 120;
+            }
+        }
+        catch
+        {
+            // Ignore
+        }
+        return false;
+    }
+
     private static IntPtr ResolveSkiaSharpDll(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
     {
         if (libraryName.Equals("libSkiaSharp", StringComparison.OrdinalIgnoreCase) ||
             libraryName.Equals("SkiaSharp", StringComparison.OrdinalIgnoreCase))
         {
-            return TryLoadNativeBinary("libSkiaSharp");
+            return TryLoadSkiaSharpNative();
         }
         return IntPtr.Zero;
     }
@@ -91,23 +112,115 @@ sealed class Program
         if (libraryName.Equals("libHarfBuzzSharp", StringComparison.OrdinalIgnoreCase) ||
             libraryName.Equals("HarfBuzzSharp", StringComparison.OrdinalIgnoreCase))
         {
-            return TryLoadNativeBinary("libHarfBuzzSharp");
+            return TryLoadHarfBuzzSharpNative();
         }
         return IntPtr.Zero;
     }
 
-    private static IntPtr TryLoadNativeBinary(string baseName)
+    private static IntPtr TryLoadSkiaSharpNative()
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
         string ext = isWindows ? ".dll" : (isLinux ? ".so" : ".dylib");
-        string nameWithExt = baseName.EndsWith(ext, StringComparison.OrdinalIgnoreCase) ? baseName : baseName + ext;
+        string fileName = "libSkiaSharp" + ext;
+
+        string? nativeDirs = AppContext.GetData("NATIVE_DLL_SEARCH_DIRECTORIES") as string;
+        if (!string.IsNullOrEmpty(nativeDirs))
+        {
+            foreach (string dir in nativeDirs.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string path = Path.Combine(dir, fileName);
+                if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr handle))
+                {
+                    if (IsSkiaSharpCompatible(handle))
+                        return handle;
+                    NativeLibrary.Free(handle);
+                }
+            }
+        }
+
+        string rid = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.Arm64 => isWindows ? "win-arm64" : (isLinux ? "linux-arm64" : "osx-arm64"),
+            Architecture.X64 => isWindows ? "win-x64" : (isLinux ? "linux-x64" : "osx-x64"),
+            _ => isWindows ? "win-x64" : "linux-x64"
+        };
 
         string[] candidatePaths = [
-            Path.Combine(baseDir, nameWithExt),
-            Path.Combine(baseDir, "runtimes", "win-x64", "native", nameWithExt),
-            Path.Combine(baseDir, "runtimes", "linux-x64", "native", nameWithExt)
+            Path.Combine(baseDir, "runtimes", rid, "native", fileName),
+            Path.Combine(baseDir, "runtimes", "win-x64", "native", fileName),
+            Path.Combine(baseDir, "runtimes", "linux-x64", "native", fileName),
+            Path.Combine(baseDir, rid, fileName)
+        ];
+
+        foreach (var path in candidatePaths)
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr handle))
+            {
+                if (IsSkiaSharpCompatible(handle))
+                    return handle;
+                NativeLibrary.Free(handle);
+            }
+        }
+
+        string localDll = Path.Combine(baseDir, fileName);
+        if (File.Exists(localDll) && NativeLibrary.TryLoad(localDll, out IntPtr localHandle))
+        {
+            if (IsSkiaSharpCompatible(localHandle))
+            {
+                return localHandle;
+            }
+
+            NativeLibrary.Free(localHandle);
+            try
+            {
+                string quarantinePath = localDll + ".incompatible";
+                if (File.Exists(quarantinePath)) File.Delete(quarantinePath);
+                File.Move(localDll, quarantinePath);
+            }
+            catch
+            {
+                // Non-fatal if locked
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static IntPtr TryLoadHarfBuzzSharpNative()
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        string ext = isWindows ? ".dll" : (isLinux ? ".so" : ".dylib");
+        string fileName = "libHarfBuzzSharp" + ext;
+
+        string? nativeDirs = AppContext.GetData("NATIVE_DLL_SEARCH_DIRECTORIES") as string;
+        if (!string.IsNullOrEmpty(nativeDirs))
+        {
+            foreach (string dir in nativeDirs.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string path = Path.Combine(dir, fileName);
+                if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr handle))
+                {
+                    return handle;
+                }
+            }
+        }
+
+        string rid = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.Arm64 => isWindows ? "win-arm64" : (isLinux ? "linux-arm64" : "osx-arm64"),
+            Architecture.X64 => isWindows ? "win-x64" : (isLinux ? "linux-x64" : "osx-x64"),
+            _ => isWindows ? "win-x64" : "linux-x64"
+        };
+
+        string[] candidatePaths = [
+            Path.Combine(baseDir, "runtimes", rid, "native", fileName),
+            Path.Combine(baseDir, "runtimes", "win-x64", "native", fileName),
+            Path.Combine(baseDir, "runtimes", "linux-x64", "native", fileName),
+            Path.Combine(baseDir, fileName)
         ];
 
         foreach (var path in candidatePaths)
@@ -116,11 +229,6 @@ sealed class Program
             {
                 return handle;
             }
-        }
-
-        if (NativeLibrary.TryLoad(baseName, out IntPtr fallbackHandle))
-        {
-            return fallbackHandle;
         }
 
         return IntPtr.Zero;

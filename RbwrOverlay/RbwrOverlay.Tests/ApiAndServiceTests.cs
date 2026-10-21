@@ -118,4 +118,32 @@ public class ApiAndServiceTests
         Assert.Contains("OS:", content);
         Assert.Contains("Log file:", content);
     }
+
+    [Fact]
+    public void TestSanitizationMasksUsernameAndProfile()
+    {
+        var logger = LoggingService.Instance;
+        string rawPathWin = @"C:\Users\SecretUser\Downloads\RbwrOverlay.exe";
+        string sanitizedWin = logger.SanitizeString(rawPathWin);
+        Assert.DoesNotContain("SecretUser", sanitizedWin);
+        Assert.Contains("%userprofile%", sanitizedWin);
+
+        string rawPathUnix = "/home/linuxuser/app/RbwrOverlay";
+        string sanitizedUnix = logger.SanitizeString(rawPathUnix);
+        Assert.DoesNotContain("linuxuser", sanitizedUnix);
+        Assert.Contains("$HOME", sanitizedUnix);
+
+        string rawPathMac = "/Users/macuser/app/RbwrOverlay";
+        string sanitizedMac = logger.SanitizeString(rawPathMac);
+        Assert.DoesNotContain("macuser", sanitizedMac);
+        Assert.Contains("$HOME", sanitizedMac);
+
+        if (!string.IsNullOrWhiteSpace(Environment.UserName))
+        {
+            string currentPath = $@"C:\Users\{Environment.UserName}\Desktop\test.txt";
+            string sanitizedCurrent = logger.SanitizeString(currentPath);
+            Assert.DoesNotContain(Environment.UserName, sanitizedCurrent);
+            Assert.Contains("%userprofile%", sanitizedCurrent);
+        }
+    }
 }

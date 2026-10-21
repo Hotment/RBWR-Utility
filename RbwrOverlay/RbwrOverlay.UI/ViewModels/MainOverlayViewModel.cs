@@ -24,7 +24,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.1.1-dev2";
+    public const string AppVersion = "2.1.1-dev3";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";

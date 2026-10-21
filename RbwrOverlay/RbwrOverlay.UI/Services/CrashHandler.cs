@@ -74,7 +74,8 @@ public static class CrashHandler
             sb.AppendLine("2. On Windows, verify that the Microsoft Visual C++ 2015-2022 Redistributable (x64) is installed.");
         }
 
-        return sb.ToString();
+        string rawDetails = sb.ToString();
+        return LoggingService.Instance.SanitizeString(rawDetails);
     }
 
     public static string WriteCrashReportFile(string formattedDetails)

@@ -34,6 +34,7 @@ BUGS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_BUGS_DISCUSSION_CHANNEL_ID",
 
 ERROR_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_ERROR_ALERT_CHANNEL_ID", "1559242589251702895").strip())
 ERROR_ALERT_PING_USER_ID = os.getenv("DISCORD_ERROR_ALERT_PING_USER_ID", "1096176878575956119").strip()
+CRASH_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_CRASH_ALERT_CHANNEL_ID", "1562502830580048035").strip())
 
 DEFAULT_SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "https://rbwr.hotment.dev").rstrip("/")
 RBWR_API_URL = os.getenv("RBWR_API_URL", f"{DEFAULT_SERVER_BASE_URL}/api/public-servers")
@@ -488,6 +489,78 @@ def report_error_to_discord(
         )
     except Exception as ex:
         log.error(f"[Discord Alert] Unexpected error in report_error_to_discord: {ex}", exc_info=True)
+        return False
+
+def report_crash_to_discord(
+    crash: dict[str, Any],
+    occurrence_count: int = 1,
+    channel_id: int = CRASH_ALERT_CHANNEL_ID,
+    ping_user_id: str = ERROR_ALERT_PING_USER_ID,
+    token: str | None = None,
+) -> bool:
+    try:
+        crash_id = crash.get("id", "Unknown")
+        version = crash.get("version", "Unknown")
+        os_info = crash.get("os_info", "Unknown")
+        raw_tb = (crash.get("traceback") or "").strip()
+        first_line = raw_tb.splitlines()[0] if raw_tb else "Fatal Application Crash"
+
+        if _should_suppress_error("DesktopCrash", f"v{version}", first_line, cooldown_seconds=8.0):
+            log.info(f"[Discord Alert] Suppressed duplicate crash notification for v{version} within cooldown.")
+            return False
+
+        admin_url = f"{DEFAULT_SERVER_BASE_URL}/admin/crashes"
+        content = f"<@{ping_user_id}> [CRASH REPORT] Fatal Desktop Overlay Crash (v{version})"
+
+        embed = disnake.Embed(
+            title=f"Fatal Desktop Application Crash (v{version})",
+            color=0xEF4444,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        embed.add_field(name="Crash ID", value=f"#{crash_id}", inline=True)
+        embed.add_field(name="App Version", value=f"v{version}", inline=True)
+        embed.add_field(name="Operating System", value=str(os_info)[:256], inline=True)
+        embed.add_field(name="Occurrences", value=str(occurrence_count), inline=True)
+        embed.add_field(name="Admin Panel", value=f"[Open Crashes Dashboard]({admin_url})", inline=False)
+
+        file_bytes: bytes | None = None
+        if len(raw_tb) <= 3200:
+            embed.description = f"```py\n{raw_tb}\n```" if raw_tb else "```py\nNo traceback provided\n```"
+        else:
+            top_slice = raw_tb[:350]
+            bottom_slice = raw_tb[-2600:]
+            embed.description = (
+                f"```py\n{top_slice}\n\n"
+                f"... [Traceback truncated. Full stack trace attached as traceback.txt] ...\n\n"
+                f"{bottom_slice}\n```"
+            )
+            file_bytes = raw_tb.encode("utf-8")
+
+        embed.set_footer(text="RBWR Desktop Crash Monitoring")
+        embed_dict: dict = embed.to_dict()  # pyright: ignore[reportAssignmentType]
+
+        global disnake_bot, disnake_bot_loop
+        if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
+            try:
+                fut = asyncio.run_coroutine_threadsafe(
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes),
+                    disnake_bot_loop,
+                )
+                if fut.result(timeout=6):
+                    return True
+            except Exception as bot_send_err:
+                log.warning(f"[Discord Alert] Disnake loop send failed for crash alert: {bot_send_err}. Falling back to REST API.")
+
+        return _send_error_alert_http(
+            content=content,
+            embed_dict=embed_dict,
+            file_bytes=file_bytes,
+            channel_id=channel_id,
+            token=token,
+        )
+    except Exception as ex:
+        log.error(f"[Discord Alert] Unexpected error in report_crash_to_discord: {ex}", exc_info=True)
         return False
 
 class TicketBridge:

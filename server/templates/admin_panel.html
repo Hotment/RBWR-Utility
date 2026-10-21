@@ -1542,17 +1542,26 @@
             if (sugSugs) sugSugs.innerText = tickets.filter(t => (t.type || 'suggestion') === 'suggestion').length;
 
             const crashes = data.crashes || [];
+            const crashGroups = {};
+            for (const c of crashes) {
+                const k = normalizeTracebackSignature(c.traceback) || `raw_${c.id}`;
+                if (!crashGroups[k]) crashGroups[k] = [];
+                crashGroups[k].push(c);
+            }
+            const groupValues = Object.values(crashGroups);
+            const openGroups = groupValues.filter(g => g.some(c => (c.status || '').toUpperCase() !== 'FIXED')).length;
+            const fixedGroups = groupValues.filter(g => g.every(c => (c.status || '').toUpperCase() === 'FIXED')).length;
             const openCrashes = crashes.filter(c => (c.status || '').toUpperCase() !== 'FIXED').length;
             const fixedCrashes = crashes.filter(c => (c.status || '').toUpperCase() === 'FIXED').length;
 
             const crashOpenEl = document.getElementById('crash-stat-open');
-            if (crashOpenEl) crashOpenEl.innerText = openCrashes;
+            if (crashOpenEl) crashOpenEl.innerText = openGroups > 0 ? `${openGroups} (${openCrashes})` : '0';
 
             const crashFixedEl = document.getElementById('crash-stat-fixed');
-            if (crashFixedEl) crashFixedEl.innerText = fixedCrashes;
+            if (crashFixedEl) crashFixedEl.innerText = fixedGroups > 0 ? `${fixedGroups} (${fixedCrashes})` : '0';
 
             const crashTotal = document.getElementById('crash-stat-total-entries');
-            if (crashTotal) crashTotal.innerText = crashes.length;
+            if (crashTotal) crashTotal.innerText = groupValues.length > 0 ? `${groupValues.length} (${crashes.length})` : '0';
 
             const contactMsgs = data.contact_messages || [];
             const unreadCount = contactMsgs.filter(m => !m.read).length;
@@ -2067,73 +2076,163 @@
             }
         }
 
+        function normalizeTracebackSignature(tb) {
+            if (!tb) return '';
+            return tb
+                .replace(/=== CRASH OCCURRED:[^\n\r]*===/gi, '')
+                .replace(/\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?\b/gi, '')
+                .replace(/\bExecutable:[^\n\r]*/gi, '')
+                .replace(/\bBase Directory:[^\n\r]*/gi, '')
+                .trim();
+        }
+
         function renderCrashes(crashes) {
             const container = document.getElementById('crashes-container');
             if (!container) return;
-            if (crashes.length === 0) {
+            if (!crashes || crashes.length === 0) {
                 container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No crash reports submitted yet.</p>';
                 return;
             }
 
-            let html = '';
+            const groupsMap = {};
             for (const c of crashes) {
-                const timeStr = formatTimestamp(c.timestamp);
-                const isBanned = c.ip in bannedIps;
-                const isFixed = (c.status || '').toUpperCase() === 'FIXED';
+                const key = normalizeTracebackSignature(c.traceback) || `raw_${c.id}`;
+                if (!groupsMap[key]) {
+                    groupsMap[key] = {
+                        key: key,
+                        instances: []
+                    };
+                }
+                groupsMap[key].instances.push(c);
+            }
+
+            const bundles = Object.values(groupsMap).map(g => {
+                g.instances.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                g.latest = g.instances[0];
+                g.count = g.instances.length;
+                g.allIds = g.instances.map(i => i.id);
+                g.allFixed = g.instances.every(i => (i.status || '').toUpperCase() === 'FIXED');
+                g.openCount = g.instances.filter(i => (i.status || '').toUpperCase() !== 'FIXED').length;
+                g.firstSeen = g.instances[g.instances.length - 1].timestamp;
+                g.lastSeen = g.latest.timestamp;
+                g.versions = [...new Set(g.instances.map(i => i.version).filter(Boolean))];
+                g.osList = [...new Set(g.instances.map(i => i.os_info).filter(Boolean))];
+                g.ips = [...new Set(g.instances.map(i => i.ip).filter(Boolean))];
+                return g;
+            });
+
+            bundles.sort((a, b) => {
+                if (a.allFixed !== b.allFixed) {
+                    return a.allFixed ? 1 : -1;
+                }
+                return new Date(b.lastSeen || 0) - new Date(a.lastSeen || 0);
+            });
+
+            let html = '';
+            for (const g of bundles) {
+                const c = g.latest;
+                const isFixed = g.allFixed;
 
                 const statusBadge = isFixed
                     ? `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-950/50 text-emerald-400 border border-emerald-500/20 font-mono">FIXED</span>`
-                    : `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">OPEN</span>`;
+                    : (g.openCount < g.count
+                        ? `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">OPEN (${g.openCount}/${g.count})</span>`
+                        : `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">OPEN</span>`);
 
-                const osBadge = c.os_info
-                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/50 text-cyan-400 border border-cyan-500/20 font-mono" title="Operating System">${escapeHtml(c.os_info)}</span>`
-                    : '';
+                const countBadge = g.count > 1
+                    ? `<span class="px-2.5 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-600/20 text-rose-300 border border-rose-500/30 font-mono tracking-wider">${g.count} OCCURRENCES BUNDLED</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-400 border border-white/5 font-mono">1 OCCURRENCE</span>`;
 
-                const banBtn = isBanned
-                    ? `<button onclick="unbanIP('${c.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
-                    : `<button onclick="openBanModal('${c.ip}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Ban IP</button>`;
+                const timeDisplay = g.count > 1
+                    ? `<span class="text-[10px] text-slate-400 font-mono" title="First seen: ${formatTimestamp(g.firstSeen)}">Last: ${formatTimestamp(g.lastSeen)} | First: ${formatTimestamp(g.firstSeen)}</span>`
+                    : `<span class="text-[10px] text-slate-400 font-mono">${formatTimestamp(g.lastSeen)}</span>`;
+
+                const versionsHtml = g.versions.map(v =>
+                    `<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">v${escapeHtml(v)}</span>`
+                ).join(' ');
+
+                const osBadgesHtml = g.osList.map(os =>
+                    `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/50 text-cyan-400 border border-cyan-500/20 font-mono" title="Operating System">${escapeHtml(os)}</span>`
+                ).join(' ');
+
+                const idListJson = JSON.stringify(g.allIds);
 
                 const toggleFixedBtn = isFixed
-                    ? `<button onclick="updateCrashStatus(${c.id}, 'OPEN')" class="px-3 py-1 bg-amber-600/10 hover:bg-amber-600 text-amber-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-amber-500/20 transition">Reopen</button>`
-                    : `<button onclick="updateCrashStatus(${c.id}, 'FIXED')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Mark Fixed</button>`;
+                    ? `<button onclick='updateCrashBundleStatus(${idListJson}, "OPEN")' class="px-3 py-1 bg-amber-600/10 hover:bg-amber-600 text-amber-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-amber-500/20 transition cursor-pointer">Reopen All (${g.count})</button>`
+                    : `<button onclick='updateCrashBundleStatus(${idListJson}, "FIXED")' class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition cursor-pointer">Mark All Fixed (${g.count})</button>`;
 
-                const deleteBtn = `<button onclick="deleteCrash(${c.id})" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Delete</button>`;
+                const deleteBtn = `<button onclick='deleteCrashBundle(${idListJson})' class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition cursor-pointer">Delete All (${g.count})</button>`;
 
-                const bannedTag = isBanned
-                    ? '<span class="px-1.5 py-0.2 bg-rose-950/50 text-rose-400 text-[9px] rounded font-bold uppercase border border-rose-500/20">Banned</span>'
-                    : '';
+                let occurrencesHtml = '';
+                for (const inst of g.instances) {
+                    const instTime = formatTimestamp(inst.timestamp);
+                    const instBanned = inst.ip in bannedIps;
+                    const instFixed = (inst.status || '').toUpperCase() === 'FIXED';
+                    const instBanBtn = instBanned
+                        ? `<button onclick="unbanIP('${inst.ip}')" class="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded font-mono uppercase border border-zinc-700 transition cursor-pointer">Unban IP</button>`
+                        : `<button onclick="openBanModal('${inst.ip}')" class="px-2 py-0.5 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-[10px] rounded font-mono uppercase border border-rose-500/20 transition cursor-pointer">Ban IP</button>`;
+
+                    const instToggleBtn = instFixed
+                        ? `<button onclick="updateCrashStatus(${inst.id}, 'OPEN')" class="px-2 py-0.5 bg-amber-600/10 hover:bg-amber-600 text-amber-400 hover:text-white text-[10px] rounded font-mono uppercase border border-amber-500/20 transition cursor-pointer">Reopen</button>`
+                        : `<button onclick="updateCrashStatus(${inst.id}, 'FIXED')" class="px-2 py-0.5 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] rounded font-mono uppercase border border-emerald-500/20 transition cursor-pointer">Mark Fixed</button>`;
+
+                    const instDelBtn = `<button onclick="deleteCrash(${inst.id})" class="px-2 py-0.5 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-[10px] rounded font-mono uppercase border border-rose-500/20 transition cursor-pointer">Delete</button>`;
+
+                    occurrencesHtml += `
+                        <div class="p-3 rounded-lg bg-black/40 border border-white/5 flex flex-col gap-2 font-mono text-xs">
+                            <div class="flex flex-wrap justify-between items-center gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-rose-400">#${inst.id}</span>
+                                    <span class="text-slate-400">${instTime}</span>
+                                    <span class="text-slate-500">v${escapeHtml(inst.version)}</span>
+                                    <span class="text-slate-500">${escapeHtml(inst.os_info || '')}</span>
+                                    <span class="text-slate-500">IP: ${escapeHtml(inst.ip)}</span>
+                                    ${instFixed ? '<span class="text-emerald-400 font-bold">[FIXED]</span>' : '<span class="text-rose-400 font-bold">[OPEN]</span>'}
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    ${instToggleBtn}
+                                    ${instDelBtn}
+                                    ${instBanBtn}
+                                </div>
+                            </div>
+                            <details class="bg-black/30 border border-white/5 rounded p-2">
+                                <summary class="text-[10px] text-slate-400 uppercase select-none hover:text-slate-200">Show Instance Diagnostic Log</summary>
+                                <pre class="text-[11px] text-slate-300 mt-1 font-mono whitespace-pre overflow-x-auto p-2 bg-black/50 rounded border border-white/5 select-text cursor-text">${escapeHtml(inst.log_data || 'No logs captured.')}</pre>
+                            </details>
+                        </div>
+                    `;
+                }
 
                 html += `
                     <div class="premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-sm font-bold text-rose-500 font-display">[ CRASH #${c.id} ]</span>
+                                <span class="text-sm font-bold text-rose-500 font-display">[ CRASH REPORT #${c.id} ]</span>
+                                ${countBadge}
                                 ${statusBadge}
-                                <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-rose-950/50 text-rose-400 border border-rose-500/20 font-mono">v${escapeHtml(c.version)}</span>
-                                ${osBadge}
-                            </div>
-                            <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
-                                ${bannedTag}
+                                ${timeDisplay}
+                                ${versionsHtml}
+                                ${osBadgesHtml}
                             </div>
                         </div>
-                        
+
                         <div class="flex flex-col gap-3 font-mono">
-                            <details class="bg-black/20 border border-white/5 rounded-lg p-3 cursor-pointer">
-                                <summary class="text-xs font-bold text-slate-400 select-none uppercase hover:text-slate-200">Show Traceback Details</summary>
+                            <details class="bg-black/20 border border-white/5 rounded-lg p-3 cursor-pointer" open>
+                                <summary class="text-xs font-bold text-slate-400 select-none uppercase hover:text-slate-200">Shared Traceback (${g.count} occurrences)</summary>
                                 <pre class="text-xs text-rose-400 mt-2 font-mono whitespace-pre overflow-x-auto p-3 bg-rose-950/10 rounded-lg border border-rose-500/10 select-text cursor-text">${escapeHtml(c.traceback)}</pre>
                             </details>
-                            
+
                             <details class="bg-black/20 border border-white/5 rounded-lg p-3 cursor-pointer">
-                                <summary class="text-xs font-bold text-slate-400 select-none uppercase hover:text-slate-200">Show Diagnostic Log</summary>
-                                <pre class="text-xs text-slate-300 mt-2 font-mono whitespace-pre overflow-x-auto p-3 bg-black/40 rounded-lg border border-white/5 select-text cursor-text">${escapeHtml(c.log_data || 'No logs captured.')}</pre>
+                                <summary class="text-xs font-bold text-slate-400 select-none uppercase hover:text-slate-200">View All Occurrences (${g.count}) &amp; Diagnostic Logs</summary>
+                                <div class="flex flex-col gap-2 mt-3">
+                                    ${occurrencesHtml}
+                                </div>
                             </details>
                         </div>
-                        
+
                         <div class="flex flex-wrap justify-end items-center gap-2 mt-1 border-t border-white/5 pt-3 font-mono">
                             ${toggleFixedBtn}
                             ${deleteBtn}
-                            ${banBtn}
                         </div>
                     </div>
                 `;
@@ -2157,6 +2256,22 @@
             }
         }
 
+        async function updateCrashBundleStatus(ids, status) {
+            try {
+                const response = await fetch('/admin/crashes/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids, status })
+                });
+                if (!response.ok) {
+                    alert('Failed to update crash bundle status.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error updating crash bundle status.');
+            }
+        }
+
         async function deleteCrash(id) {
             if (!confirm(`Are you sure you want to delete Crash Report #${id}?`)) return;
             try {
@@ -2171,6 +2286,23 @@
             } catch (err) {
                 console.error(err);
                 alert('Network error deleting crash report.');
+            }
+        }
+
+        async function deleteCrashBundle(ids) {
+            if (!confirm(`Are you sure you want to delete ${ids.length} bundled crash report(s)?`)) return;
+            try {
+                const response = await fetch('/admin/crashes/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
+                });
+                if (!response.ok) {
+                    alert('Failed to delete crash bundle.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error deleting crash bundle.');
             }
         }
 
