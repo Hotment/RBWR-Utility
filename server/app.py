@@ -4869,26 +4869,52 @@ def update_suggestion_status(username):
     suggestions = data.get("suggestions", [])
     for s in suggestions:
         if s.get("id") == payload.id:
-            s["status"] = payload.status
+            is_bug = (s.get("type") == "bug_report")
+            ticket_type = "bug_report" if is_bug else "suggestion"
+            norm_status = (payload.status or "").strip().lower()
+
+            if is_bug:
+                if norm_status == "resolved":
+                    norm_status = "fixed"
+                elif norm_status == "closed":
+                    norm_status = "invalid"
+            else:
+                if norm_status == "accepted":
+                    norm_status = "implemented"
+
+            valid_statuses = (
+                {"open", "investigating", "confirmed", "fixed", "invalid"}
+                if is_bug
+                else {"pending", "considering", "planned", "implemented", "declined"}
+            )
+            if norm_status not in valid_statuses:
+                return jsonify({
+                    "detail": f"Invalid status '{payload.status}' for {ticket_type}. Allowed: {sorted(valid_statuses)}"
+                }), 400
+
+            prev_status = str(s.get("status") or ("open" if is_bug else "pending"))
+            s["status"] = norm_status
             save_suggestions(data)
             broadcast_update("dashboard")
             try:
                 notify_ticket_author_dm(
                     s,
                     "status",
-                    {"changed_by": username, "status": payload.status}
+                    {"changed_by": username, "status": norm_status}
                 )
             except Exception as dm_err:
                 logger.warning(f"Failed to notify author of status change via DM: {dm_err}")
             try:
-                update_discussion_thread_status(s, payload.status)
+                actor_label = f"{username} (via Website)"
+                update_discussion_thread_status(s, norm_status, changed_by=actor_label, prev_status=prev_status)
             except Exception as dt_err:
                 logger.warning(f"Failed to update discussion thread status: {dt_err}")
             try:
-                update_ticket_channel_message(s)
+                actor_label = f"{username} (via Website)"
+                update_ticket_channel_message(s, changed_by=actor_label, prev_status=prev_status)
             except Exception as tcm_err:
                 logger.warning(f"Failed to update ticket channel message: {tcm_err}")
-            return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": payload.status})
+            return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": norm_status})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
 @app.route("/admin/tickets/comment", methods=["POST"])

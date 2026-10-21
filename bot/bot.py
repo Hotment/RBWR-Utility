@@ -763,17 +763,15 @@ class TicketPanelView(disnake.ui.View):
                 disnake.SelectOption(label="Open", value="open", description="Newly reported bug", default=(self.current_status == "open")),
                 disnake.SelectOption(label="Investigating", value="investigating", description="Investigating root cause", default=(self.current_status == "investigating")),
                 disnake.SelectOption(label="Confirmed", value="confirmed", description="Bug reproduced and confirmed", default=(self.current_status == "confirmed")),
-                disnake.SelectOption(label="Fixed / Resolved", value="fixed", description="Bug resolved and deployed", default=(self.current_status in ("fixed", "resolved"))),
-                disnake.SelectOption(label="Closed", value="closed", description="Issue closed", default=(self.current_status == "closed")),
-                disnake.SelectOption(label="Invalid", value="invalid", description="Not a bug or cannot reproduce", default=(self.current_status == "invalid")),
+                disnake.SelectOption(label="Fixed", value="fixed", description="Bug resolved and deployed", default=(self.current_status in ("fixed", "resolved"))),
+                disnake.SelectOption(label="Invalid", value="invalid", description="Not a bug or cannot reproduce", default=(self.current_status in ("invalid", "closed"))),
             ]
         else:
             options = [
                 disnake.SelectOption(label="Pending", value="pending", description="Awaiting developer review", default=(self.current_status == "pending")),
                 disnake.SelectOption(label="Considering", value="considering", description="Under active consideration", default=(self.current_status == "considering")),
-                disnake.SelectOption(label="Accepted", value="accepted", description="Suggestion has been approved", default=(self.current_status == "accepted")),
                 disnake.SelectOption(label="Planned", value="planned", description="Scheduled for implementation", default=(self.current_status == "planned")),
-                disnake.SelectOption(label="Implemented", value="implemented", description="Feature is now live", default=(self.current_status == "implemented")),
+                disnake.SelectOption(label="Implemented", value="implemented", description="Feature is now live", default=(self.current_status in ("implemented", "accepted"))),
                 disnake.SelectOption(label="Declined", value="declined", description="Will not be implemented", default=(self.current_status == "declined")),
             ]
 
@@ -1334,7 +1332,12 @@ def build_ticket_panel(
     view = TicketPanelView(ticket_id=ticket_id, ticket_type=ticket_type, current_status=status_clean, has_note=has_note)
     return panel_embed, view
 
-def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> None:
+def update_discussion_thread_status(
+    ticket: dict[str, Any],
+    new_status: str,
+    changed_by: str | None = None,
+    prev_status: str | None = None
+) -> None:
     """
     Updates the embed in the discussion thread to reflect the new ticket status.
     Can be safely called from both the bot event loop and web server threads.
@@ -1405,8 +1408,10 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
 
             if status_upper in ("FIXED", "RESOLVED", "IMPLEMENTED", "ACCEPTED"):
                 new_embed.color = disnake.Color.green()
-            elif status_upper == "PLANNED":
+            elif status_upper in ("PLANNED", "CONFIRMED"):
                 new_embed.color = disnake.Color.teal()
+            elif status_upper in ("INVESTIGATING", "CONSIDERING"):
+                new_embed.color = disnake.Color.blue()
             elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
                 new_embed.color = disnake.Color.red()
 
@@ -1429,6 +1434,13 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
 
             await msg.edit(embed=new_embed)
             log.info(f"[Discussion Status Update] Updated discussion embed for ticket #{ticket.get('id')} to {status_upper}")
+
+            if prev_status and str(prev_status).strip().lower() != str(new_status).strip().lower():
+                actor_str = changed_by or "Administrator"
+                try:
+                    await ch.send(f"Ticket #{ticket.get('id')} status updated to **`{status_upper}`** by {actor_str}.")
+                except Exception as ex_post:
+                    log.warning(f"[Discussion Status Update] Failed to post status message to thread: {ex_post}")
         except Exception as e:
             log.warning(f"[Discussion Status Update] Failed to update discussion thread message: {e}")
 
@@ -1437,10 +1449,15 @@ def update_discussion_thread_status(ticket: dict[str, Any], new_status: str) -> 
     except Exception as ex:
         log.warning(f"[Discussion Status Update] Failed to dispatch update task: {ex}")
 
-def update_ticket_channel_message(ticket: dict[str, Any]) -> None:
+def update_ticket_channel_message(
+    ticket: dict[str, Any],
+    changed_by: str | None = None,
+    prev_status: str | None = None
+) -> None:
     """
     Updates the Discord ticket channel messages (overview embed and panel view)
-    to reflect changes in ticket state or admin note.
+    to reflect changes in ticket state or admin note, and sends a status update
+    notification message in the ticket channel when the state changes.
     Can be safely invoked from web server worker threads or the bot event loop.
     """
     global disnake_bot, disnake_bot_loop
@@ -1578,8 +1595,10 @@ def update_ticket_channel_message(ticket: dict[str, Any]) -> None:
 
                 if status_upper in ("FIXED", "RESOLVED", "IMPLEMENTED", "ACCEPTED"):
                     new_emb.color = disnake.Color.green()
-                elif status_upper == "PLANNED":
+                elif status_upper in ("PLANNED", "CONFIRMED"):
                     new_emb.color = disnake.Color.teal()
+                elif status_upper in ("INVESTIGATING", "CONSIDERING"):
+                    new_emb.color = disnake.Color.blue()
                 elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
                     new_emb.color = disnake.Color.red()
                 else:
@@ -1619,6 +1638,35 @@ def update_ticket_channel_message(ticket: dict[str, Any]) -> None:
                 log.info(f"[Ticket Channel Update] Created panel message for ticket #{ticket_id}")
             except Exception as e:
                 log.warning(f"[Ticket Channel Update] Failed to send new panel message: {e}")
+
+        if prev_status and str(prev_status).strip().lower() != current_status.strip().lower():
+            actor_str = changed_by or "Administrator"
+            status_color = disnake.Color.gold()
+            status_upper = current_status.upper()
+            if status_upper in ("FIXED", "RESOLVED", "IMPLEMENTED", "ACCEPTED"):
+                status_color = disnake.Color.green()
+            elif status_upper in ("PLANNED", "CONFIRMED"):
+                status_color = disnake.Color.teal()
+            elif status_upper in ("INVESTIGATING", "CONSIDERING"):
+                status_color = disnake.Color.blue()
+            elif status_upper in ("INVALID", "DECLINED", "CLOSED"):
+                status_color = disnake.Color.red()
+
+            status_embed = disnake.Embed(
+                title=f"Ticket #{ticket_id} State Updated",
+                description=f"Status was changed from `{str(prev_status).upper()}` to **`{status_upper}`** by {actor_str}.",
+                color=status_color,
+                timestamp=datetime.now(timezone.utc)
+            )
+            status_embed.set_footer(text=f"RBWR Utility • Ticket #{ticket_id}")
+            try:
+                await ch.send(
+                    content=f"Ticket #{ticket_id} status updated to **`{status_upper}`** by {actor_str}.",
+                    embed=status_embed
+                )
+                log.info(f"[Ticket Channel Update] Sent status update message in #{getattr(ch, 'name', ch.id)} for ticket #{ticket_id}")
+            except Exception as send_err:
+                log.warning(f"[Ticket Channel Update] Failed to send status message in #{getattr(ch, 'name', ch.id)}: {send_err}")
 
     try:
         asyncio.run_coroutine_threadsafe(_update_async(), disnake_bot_loop)
@@ -1857,16 +1905,22 @@ async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_
 
     update_discussion_thread_status(
         ticket=target,
-        new_status=new_status
+        new_status=new_status,
+        changed_by=inter.author.mention,
+        prev_status=prev_status
     )
 
     update_ticket_channel_message(
-        ticket=target
+        ticket=target,
+        changed_by=inter.author.mention,
+        prev_status=prev_status
     )
 
-    await inter.response.send_message(
-        f"Ticket #{ticket_id} status updated from `{prev_status}` to **`{new_status.upper()}`** by {inter.author.mention}."
-    )
+    if not inter.response.is_done():
+        await inter.response.send_message(
+            f"Ticket #{ticket_id} status updated from `{prev_status}` to **`{new_status.upper()}`**.",
+            ephemeral=True
+        )
 
 async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, ticket_id: int):
     if _check_and_mark_interaction(inter.id) or inter.response.is_done():
