@@ -436,8 +436,8 @@
 
 
 
-            <div class="flex flex-col gap-4">
-                <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <div
                         class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
                         <button onclick="filterTicketType('all')" id="ticket-type-all"
@@ -466,26 +466,27 @@
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Server
                             Checker</button>
                     </div>
-
-                    <div
-                        class="cyber-panel p-1.5 rounded-xl flex items-center border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 overflow-x-auto max-w-full w-fit">
-                        <button onclick="filterStatus('all')" id="tab-all"
-                            class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
-                            Status</button>
-                        <button onclick="filterStatus('pending')" id="tab-pending"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
-                        <button onclick="filterStatus('considering')" id="tab-considering"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
-                        <button onclick="filterStatus('planned')" id="tab-planned"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
-                        <button onclick="filterStatus('accepted')" id="tab-accepted"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Accepted</button>
-                        <button onclick="filterStatus('declined')" id="tab-declined"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
-                        <button onclick="filterStatus('invalid')" id="tab-invalid"
-                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Invalid</button>
-                    </div>
                 </div>
+
+                <div
+                    class="cyber-panel p-1.5 rounded-xl flex flex-wrap items-center border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 max-w-full w-fit">
+                    <button onclick="filterStatus('all')" id="tab-all"
+                        class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                        Status</button>
+                    <button onclick="filterStatus('pending')" id="tab-pending"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
+                    <button onclick="filterStatus('considering')" id="tab-considering"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
+                    <button onclick="filterStatus('planned')" id="tab-planned"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
+                    <button onclick="filterStatus('accepted')" id="tab-accepted"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Implemented</button>
+                    <button onclick="filterStatus('declined')" id="tab-declined"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
+                    <button onclick="filterStatus('invalid')" id="tab-invalid"
+                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Invalid</button>
+                </div>
+            </div>
 
                 <div id="feed-container" class="flex flex-col gap-4">
                     <p class="text-sm text-slate-500 italic font-mono">Loading tickets...</p>
@@ -976,10 +977,22 @@
                 }
             } else {
                 if (btnAll) btnAll.innerText = 'All Status';
-                if (btnPending) btnPending.innerText = 'Pending / Open';
-                if (btnConsidering) btnConsidering.innerText = 'Considering / Investigating';
-                if (btnPlanned) btnPlanned.innerText = 'Planned / Confirmed';
-                if (btnAccepted) btnAccepted.innerText = 'Implemented / Fixed';
+                if (btnPending) {
+                    btnPending.innerText = 'Pending';
+                    btnPending.title = 'Suggestions: Pending | Bug Reports: Open';
+                }
+                if (btnConsidering) {
+                    btnConsidering.innerText = 'Considering';
+                    btnConsidering.title = 'Suggestions: Considering | Bug Reports: Investigating';
+                }
+                if (btnPlanned) {
+                    btnPlanned.innerText = 'Planned';
+                    btnPlanned.title = 'Suggestions: Planned | Bug Reports: Confirmed';
+                }
+                if (btnAccepted) {
+                    btnAccepted.innerText = 'Implemented';
+                    btnAccepted.title = 'Suggestions: Implemented | Bug Reports: Fixed';
+                }
                 if (btnDeclined) {
                     btnDeclined.innerText = 'Declined';
                     btnDeclined.style.display = '';

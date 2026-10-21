@@ -112,15 +112,15 @@
             <span id="stat-bugs" class="text-xl font-bold font-display text-rose-400">0</span>
         </div>
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80 whitespace-nowrap">Pending / Open</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80 whitespace-nowrap">Pending</span>
             <span id="stat-pending" class="text-xl font-bold font-display text-amber-400">0</span>
         </div>
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">Considering / Investigating</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">Considering</span>
             <span id="stat-considering" class="text-xl font-bold font-display text-indigo-400">0</span>
         </div>
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80 whitespace-nowrap">Implemented / Fixed</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80 whitespace-nowrap">Implemented</span>
             <span id="stat-accepted" class="text-xl font-bold font-display text-emerald-400">0</span>
         </div>
     </div>
@@ -161,26 +161,26 @@
         </div>
     </div>
 
-    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2">
-            <div class="premium-glass p-1 rounded-xl flex items-center gap-1 overflow-x-auto max-w-full text-xs font-medium border border-white/5 shrink-0">
+            <div class="premium-glass p-1 rounded-xl flex flex-wrap items-center gap-1 max-w-full text-xs font-medium border border-white/5">
                 <button onclick="filterStatus('all')" id="tab-status-all"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All Status</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All Status</button>
                 <button onclick="filterStatus('pending')" id="tab-status-pending"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending</button>
                 <button onclick="filterStatus('considering')" id="tab-status-considering"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
                 <button onclick="filterStatus('planned')" id="tab-status-planned"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Planned</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Planned</button>
                 <button onclick="filterStatus('accepted')" id="tab-status-accepted"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted</button>
                 <button onclick="filterStatus('declined')" id="tab-status-declined"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined</button>
                 <button onclick="filterStatus('invalid')" id="tab-status-invalid"
-                    class="px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Invalid</button>
+                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Invalid</button>
             </div>
 
-            <div class="relative shrink-0 min-w-[150px]">
+            <div class="relative min-w-[140px] flex-1 sm:flex-none">
                 <select id="category-select" onchange="handleCategoryChange()"
                     class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="all">All Categories</option>
@@ -197,8 +197,8 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-2.5">
-            <div class="relative flex-1 sm:w-64 min-w-0">
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+            <div class="relative flex-1 sm:w-64 min-w-[180px]">
                 <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                     fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -209,7 +209,7 @@
                     class="premium-input pl-9 pr-4 py-1.5 rounded-xl text-xs w-full font-mono outline-none">
             </div>
 
-            <div class="relative shrink-0 min-w-[140px]">
+            <div class="relative min-w-[130px] flex-1 sm:flex-none">
                 <select id="sort-select" onchange="handleSortChange()"
                     class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="desc">Newest First</option>
@@ -679,10 +679,22 @@
             }
         } else {
             if (btnAll) btnAll.innerText = 'All Status';
-            if (btnPending) btnPending.innerText = 'Pending / Open';
-            if (btnConsidering) btnConsidering.innerText = 'Considering / Investigating';
-            if (btnPlanned) btnPlanned.innerText = 'Planned / Confirmed';
-            if (btnAccepted) btnAccepted.innerText = 'Implemented / Fixed';
+            if (btnPending) {
+                btnPending.innerText = 'Pending';
+                btnPending.title = 'Suggestions: Pending | Bug Reports: Open';
+            }
+            if (btnConsidering) {
+                btnConsidering.innerText = 'Considering';
+                btnConsidering.title = 'Suggestions: Considering | Bug Reports: Investigating';
+            }
+            if (btnPlanned) {
+                btnPlanned.innerText = 'Planned';
+                btnPlanned.title = 'Suggestions: Planned | Bug Reports: Confirmed';
+            }
+            if (btnAccepted) {
+                btnAccepted.innerText = 'Implemented';
+                btnAccepted.title = 'Suggestions: Implemented | Bug Reports: Fixed';
+            }
             if (btnDeclined) {
                 btnDeclined.innerText = 'Declined';
                 btnDeclined.style.display = '';
@@ -751,9 +763,9 @@
             const btn = document.getElementById(`tab-status-${s}`);
             if (!btn) return;
             if (s === status) {
-                btn.className = "px-3 py-1.5 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white whitespace-nowrap";
+                btn.className = "px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white whitespace-nowrap";
             } else {
-                btn.className = "px-3 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
+                btn.className = "px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
             }
         });
         renderTickets();
