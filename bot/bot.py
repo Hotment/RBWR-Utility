@@ -3163,8 +3163,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         name="embed",
         description="Force the bot to send an embed into a channel",
         default_member_permissions=disnake.Permissions(administrator=True),
-        install_types=disnake.ApplicationInstallTypes.all(),
-        contexts=disnake.InteractionContextTypes.all(),
+        install_types=guild_only_install,
+        contexts=guild_only_contexts,
     )
     async def embed_command(
         inter: disnake.ApplicationCommandInteraction,
