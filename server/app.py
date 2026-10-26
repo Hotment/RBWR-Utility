@@ -116,6 +116,11 @@ except NameError:
     def report_crash_to_discord(*args, **kwargs) -> bool:
         return False
 
+try:
+    from server.calculator import calculate_reactor_metrics
+except ImportError:
+    from calculator import calculate_reactor_metrics
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ARCHIVES_DIR = os.path.join(DATA_DIR, "archives")
@@ -1134,6 +1139,77 @@ def status_check():
 @app.route("/calculator", methods=["GET"])
 def calculator_page():
     return render_template("calculator.html")
+
+@app.route("/api/calculate", methods=["GET", "POST"])
+@app.route("/api/calc", methods=["GET", "POST"])
+def calculate_api():
+    req_data = {}
+    if request.method == "POST":
+        req_data = request.get_json(silent=True) or {}
+
+    unit_raw = req_data.get("unit") if req_data.get("unit") is not None else request.args.get("unit", 1)
+    demand_raw = req_data.get("demand") if req_data.get("demand") is not None else request.args.get("demand")
+    thermal_raw = (
+        req_data.get("thermal")
+        if req_data.get("thermal") is not None
+        else req_data.get("aprm")
+        if req_data.get("aprm") is not None
+        else req_data.get("rtp")
+        if req_data.get("rtp") is not None
+        else request.args.get("thermal") or request.args.get("aprm") or request.args.get("rtp")
+    )
+    recirc_raw = (
+        req_data.get("recirc_override")
+        if req_data.get("recirc_override") is not None
+        else req_data.get("recirc")
+        if req_data.get("recirc") is not None
+        else request.args.get("recirc_override") or request.args.get("recirc")
+    )
+
+    try:
+        unit = int(unit_raw)  # pyright: ignore[reportArgumentType]
+        if unit not in (1, 2):
+            unit = 1
+    except (ValueError, TypeError):
+        unit = 1
+
+    demand = None
+    if demand_raw is not None and str(demand_raw).strip() != "":
+        try:
+            demand = float(demand_raw)
+        except (ValueError, TypeError):
+            return jsonify({"success": False, "error": f"Invalid demand value: {demand_raw}"}), 400
+
+    thermal = None
+    if thermal_raw is not None and str(thermal_raw).strip() != "":
+        try:
+            thermal = float(thermal_raw)
+        except (ValueError, TypeError):
+            return jsonify({"success": False, "error": f"Invalid thermal/aprm value: {thermal_raw}"}), 400
+
+    recirc_override = None
+    if recirc_raw is not None and str(recirc_raw).strip() != "":
+        try:
+            recirc_override = float(recirc_raw)
+        except (ValueError, TypeError):
+            recirc_override = None
+
+    try:
+        metrics = calculate_reactor_metrics(
+            unit=unit,
+            demand=demand,
+            thermal=thermal,
+            recirc_override=recirc_override,
+        )
+        return jsonify({
+            "success": True,
+            "data": metrics
+        })
+    except ValueError as ve:
+        return jsonify({"success": False, "error": str(ve)}), 400
+    except Exception as ex:
+        logger.error(f"Error executing reactor calculations: {ex}", exc_info=True)
+        return jsonify({"success": False, "error": str(ex)}), 500
 
 @app.route("/points", methods=["GET"])
 def points_page():

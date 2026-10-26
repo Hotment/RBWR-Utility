@@ -270,6 +270,147 @@ class RBWRClient:
 
         return None
 
+    async def fetch_score_breakdown(self, server_id: str) -> dict[str, Any] | None:
+        target_jid = server_id
+        try:
+            server = await self.find_server(server_id, allow_exact_private=True)
+            if server:
+                target_jid = str(server.get("jobId", server_id))
+        except Exception:
+            pass
+
+        if self.session is None or self.session.closed:
+            self.start()
+        if not self.session:
+            return None
+
+        urls = [f"{DEFAULT_SERVER_BASE_URL}/api/servers/{target_jid}/score_breakdown"]
+        if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
+            urls.append(f"http://127.0.0.1:8400/api/servers/{target_jid}/score_breakdown")
+
+        for u in urls:
+            try:
+                async with self.session.get(u, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                    if r.status == 200:
+                        data = await r.json(content_type=None)
+                        if isinstance(data, dict) and data.get("success"):
+                            return data
+            except Exception:
+                pass
+        return None
+
+    async def calculate(
+        self,
+        unit: int = 1,
+        demand: float | None = None,
+        thermal: float | None = None,
+        recirc_override: float | None = None,
+    ) -> dict[str, Any] | None:
+        payload: dict[str, Any] = {"unit": unit}
+        if demand is not None:
+            payload["demand"] = demand
+        if thermal is not None:
+            payload["thermal"] = thermal
+        if recirc_override is not None:
+            payload["recirc_override"] = recirc_override
+
+        if self.session is None or self.session.closed:
+            self.start()
+
+        if self.session and not self.session.closed:
+            urls = [f"{DEFAULT_SERVER_BASE_URL}/api/calculate"]
+            if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
+                urls.append("http://127.0.0.1:8400/api/calculate")
+
+            for u in urls:
+                try:
+                    async with self.session.post(u, json=payload, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                        if r.status == 200:
+                            data = await r.json(content_type=None)
+                            if isinstance(data, dict) and data.get("success"):
+                                return data.get("data")
+                except Exception:
+                    pass
+
+        try:
+            from server.calculator import calculate_reactor_metrics
+            return calculate_reactor_metrics(unit=unit, demand=demand, thermal=thermal, recirc_override=recirc_override)
+        except Exception:
+            try:
+                from calculator import calculate_reactor_metrics  # pyright: ignore[reportMissingImports]
+                return calculate_reactor_metrics(unit=unit, demand=demand, thermal=thermal, recirc_override=recirc_override)
+            except Exception:
+                return None
+
+    async def fetch_latest_version(self) -> dict[str, Any] | None:
+        if self.session is None or self.session.closed:
+            self.start()
+
+        if self.session and not self.session.closed:
+            urls = [f"{DEFAULT_SERVER_BASE_URL}/api/version/latest"]
+            if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
+                urls.append("http://127.0.0.1:8400/api/version/latest")
+
+            for u in urls:
+                try:
+                    async with self.session.get(u, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                        if r.status == 200:
+                            data = await r.json(content_type=None)
+                            if isinstance(data, dict) and "version" in data:
+                                return data
+                except Exception:
+                    pass
+
+            try:
+                async with self.session.get(
+                    "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest",
+                    headers={"User-Agent": "RBWR-Discord-Bot/1.0"},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as r:
+                    if r.status == 200:
+                        rel = await r.json(content_type=None)
+                        tag_name = rel.get("tag_name", "")
+                        version = tag_name.lstrip("vV") if tag_name else "unknown"
+                        pub = rel.get("published_at", "")
+                        release_date = pub.split("T")[0] if pub else ""
+                        html_url = rel.get("html_url", "https://github.com/Hotment/RBWR-Utility/releases/latest")
+                        download_url = html_url
+                        assets = []
+                        for a in rel.get("assets", []):
+                            assets.append({"name": a.get("name"), "size": a.get("size"), "download_url": a.get("browser_download_url")})
+                            if a.get("name", "").endswith((".exe", ".zip")) and download_url == html_url:
+                                download_url = a.get("browser_download_url")
+                        return {
+                            "version": version,
+                            "tag_name": tag_name,
+                            "name": rel.get("name", f"Release {version}"),
+                            "release_date": release_date,
+                            "notes": rel.get("body", "") or "No release notes available.",
+                            "html_url": html_url,
+                            "download_url": download_url,
+                            "assets": assets,
+                        }
+            except Exception:
+                pass
+
+        return {
+            "version": "2.0.5",
+            "tag_name": "v2.0.5",
+            "name": "RBWR Utility v2.0.5",
+            "release_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "notes": "Latest verified stable build of the RBWR Utility suite.",
+            "html_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
+            "download_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
+            "assets": [
+                {
+                    "name": "RBWR_APR_Overlay_Windows_x64.zip",
+                    "size": 75000000,
+                    "download_url": "https://github.com/Hotment/RBWR-Utility/releases/latest"
+                }
+            ],
+        }
+
 disnake_bot: commands.InteractionBot | None = None
 disnake_bot_loop: asyncio.AbstractEventLoop | None = None
 
@@ -2124,6 +2265,41 @@ def get_unit_status_badge(u_state: dict[str, Any]) -> str:
         return f"Running ({aprm:.1f}% APRM)"
     return f"Offline ({aprm:.1f}% APRM)"
 
+def get_unit_output_mw(u_dict: dict[str, Any] | None) -> float:
+    if not isinstance(u_dict, dict):
+        return 0.0
+    for k in ("Output (MW)", "PradDoSieci", "Output", "Power", "megawatts", "output_mw"):
+        val = u_dict.get(k)
+        if val is not None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                continue
+    return 0.0
+
+def get_unit_demand(u_state: dict[str, Any] | None, s_state: dict[str, Any] | None = None, unit: int = 1) -> float | None:
+    if isinstance(u_state, dict):
+        for k in ("Demand", "Demand (MW)", "TargetDemand", "demand_mw"):
+            v = u_state.get(k)
+            if v is not None:
+                try:
+                    val = float(v)
+                    if val > 0:
+                        return val
+                except (ValueError, TypeError):
+                    pass
+    if isinstance(s_state, dict):
+        for k in (f"DemandU{unit}", f"NextDemandU{unit}", f"Demand{unit}", f"TargetDemand{unit}"):
+            v = s_state.get(k)
+            if v is not None:
+                try:
+                    val = float(v)
+                    if val > 0:
+                        return val
+                except (ValueError, TypeError):
+                    pass
+    return None
+
 def make_roblox_join_url(job_id: str) -> str:
     return f"https://www.roblox.com/games/start?placeId={ROBLOX_PLACE_ID}&gameInstanceId={job_id}"
 
@@ -2987,6 +3163,529 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
     ):
         await servers_command(inter, query=query, sort_by=sort_by, filter=filter)
+
+    @b.slash_command(
+        name="score",
+        description="Inspect 60-minute performance score breakdown for an RBWR server",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def score_command(
+        inter: disnake.ApplicationCommandInteraction,
+        id: str = commands.Param(description="Job ID or Server ID (e.g. 191f-49d5)"),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
+    ):
+        await inter.response.defer(ephemeral=ephemeral)
+        client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
+        server = None
+        try:
+            server = await client.find_server(id, allow_exact_private=True)
+        except Exception as ex:
+            log.warning(f"[Score Command] find_server failed: {ex}")
+
+        job_id = str(server.get("jobId", id)) if server else id
+        short = client.short_id(job_id)
+
+        score_res = None
+        try:
+            score_res = await client.fetch_score_breakdown(job_id)
+        except Exception as ex:
+            log.error(f"[Score Command] fetch_score_breakdown failed: {ex}", exc_info=True)
+
+        if not score_res or not score_res.get("success"):
+            if not server:
+                await inter.followup.send(f"Server `{id}` not found in active or archived records.", ephemeral=ephemeral)
+                return
+            await inter.followup.send(f"Score breakdown data is currently unavailable for server `{short}` (`{job_id}`).", ephemeral=ephemeral)
+            return
+
+        breakdown = score_res.get("breakdown", {})
+        final_score = float(score_res.get("score", breakdown.get("top_score", 0.0)))
+        raw_score = float(breakdown.get("raw_score", 0.0))
+        pre_penalty = float(breakdown.get("score_before_penalties", 0.0))
+        eval_count = breakdown.get("evaluated_snapshots_count", 0)
+        tot_count = breakdown.get("total_snapshots_count", 0)
+        win_mins = breakdown.get("time_window_minutes", 60.0)
+
+        point_gen = breakdown.get("point_generation", {})
+        efficiency_pct = point_gen.get("efficiency_percent", 0.0)
+        pps_weight = point_gen.get("point_generation_weight", 1.0)
+        weighted_pps = point_gen.get("weighted_avg_pps", 0.0)
+        pps_loss = point_gen.get("points_score_loss", 0.0)
+        is_sustaining = point_gen.get("is_sustaining_max", False)
+
+        synergy = breakdown.get("synergy", {})
+        dual_active = synergy.get("dual_active_count", 0)
+        single_active = synergy.get("single_active_count", 0)
+        inactive_cnt = synergy.get("inactive_count", 0)
+        avg_synergy = synergy.get("avg_synergy_multiplier", 1.0)
+
+        penalties = breakdown.get("penalties", {})
+        total_deduction = penalties.get("total_penalty_deduction", 0.0)
+        u1_scrams = penalties.get("u1_scrams", 0)
+        u2_scrams = penalties.get("u2_scrams", 0)
+        u1_trips = penalties.get("u1_trips", 0)
+        u2_trips = penalties.get("u2_trips", 0)
+
+        u1 = breakdown.get("unit1_summary", {})
+        u2 = breakdown.get("unit2_summary", {})
+
+        is_pub = is_server_public(server) if server else True
+        players = get_player_count(server) if server else "?"
+
+        if final_score >= 80.0:
+            score_color = disnake.Color.teal()
+            grade_badge = "[RATING: OPTIMAL]"
+        elif final_score >= 50.0:
+            score_color = disnake.Color.gold()
+            grade_badge = "[RATING: DEGRADED]"
+        else:
+            score_color = disnake.Color.red()
+            grade_badge = "[RATING: CRITICAL]"
+
+        embed = disnake.Embed(
+            title=f"RBWR Performance Score — {short}",
+            description=(
+                f"**Server ID:** `{short}` • **Job ID:** `{job_id}`\n"
+                f"**Window:** Rolling {win_mins:.0f} Minutes • **Half-Life:** 600s\n"
+                f"**Overall Classification:** `{grade_badge}`"
+            ),
+            color=score_color,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        embed.add_field(
+            name="Performance Rating",
+            value=(
+                f"**Top Score:** `{final_score:.1f}` / 100.0\n"
+                f"**Raw Score:** `{raw_score:.1f}` | **Pre-Penalty:** `{pre_penalty:.1f}`\n"
+                f"**Evaluated Snapshots:** `{eval_count}` of `{tot_count}` in window"
+            ),
+            inline=False,
+        )
+
+        pps_status = "[SUSTAINING MAXIMUM 2.90 PTS/S]" if is_sustaining else f"[SUB-OPTIMAL: -{pps_loss:.1f} PTS]"
+        embed.add_field(
+            name="Point Generation Weight",
+            value=(
+                f"**Efficiency:** `{efficiency_pct:.1f}%` (Multiplier: `{pps_weight:.4f}`)\n"
+                f"**Average PPS:** `{weighted_pps:.2f} pts/s` (Plant Max: `2.90 pts/s`)\n"
+                f"**Status:** `{pps_status}`"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="Multi-Unit Synergy",
+            value=(
+                f"**Dual Unit Active:** `{dual_active}` snapshots (+25%)\n"
+                f"**Single Unit Active:** `{single_active}` snapshots (1.0x)\n"
+                f"**Average Synergy:** `{avg_synergy:.2f}x` (Offline: `{inactive_cnt}`)"
+            ),
+            inline=True,
+        )
+
+        incident_summary = (
+            f"**Total Deduction:** `-{total_deduction:.1f} pts` (Cap: `-25.0 pts`)\n"
+            f"**SCRAMs:** `U1: {u1_scrams}` | `U2: {u2_scrams}`\n"
+            f"**Turbine Trips:** `U1: {u1_trips}` | `U2: {u2_trips}`"
+        )
+        embed.add_field(name="Incident Deductions", value=incident_summary, inline=False)
+
+        u1_text = (
+            f"**Score:** `{u1.get('avg_score', 0.0):.1f} pts` (Active: `{u1.get('active_pct', 0.0):.1f}%`)\n"
+            f"**Avg Output:** `{u1.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u1.get('latest_output_mw', 0.0):.1f} MW`)\n"
+            f"**Deadband Compliance:** `[OK: {u1.get('demand_tolerance_count', 0)}]` `[DEVIATION: {u1.get('demand_extreme_count', 0)}]`\n"
+            f"**Downtime / LOOP:** `[DOWNTIME: {u1.get('downtime_demand_count', 0)}]` `[LOOP: {u1.get('loop_count', 0)}]`"
+        )
+        embed.add_field(name="Unit 1 Performance", value=u1_text, inline=True)
+
+        u2_refuel_min = u2.get("refuel_minutes_latest")
+        refuel_state = f"`[REFUEL: {u2_refuel_min:.1f}m]`" if u2_refuel_min is not None else "`[ONLINE / NOMINAL]`"
+        u2_text = (
+            f"**Score:** `{u2.get('avg_score', 0.0):.1f} pts` (Active: `{u2.get('active_pct', 0.0):.1f}%`)\n"
+            f"**Avg Output:** `{u2.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u2.get('latest_output_mw', 0.0):.1f} MW`)\n"
+            f"**Deadband Compliance:** `[OK: {u2.get('demand_tolerance_count', 0)}]` `[DEVIATION: {u2.get('demand_extreme_count', 0)}]`\n"
+            f"**Refuel Status:** {refuel_state}\n"
+            f"**Downtime / LOOP:** `[DOWNTIME: {u2.get('downtime_demand_count', 0)}]` `[LOOP: {u2.get('loop_count', 0)}]`"
+        )
+        embed.add_field(name="Unit 2 Performance", value=u2_text, inline=True)
+
+        footer_text = f"Players: {players} • RBWR Performance Scoring Engine" if is_pub else "Private Server • RBWR Performance Scoring Engine"
+        embed.set_footer(text=footer_text)
+
+        view = disnake.ui.View(timeout=180)
+        if is_pub:
+            view.add_item(disnake.ui.Button(label="Join in Roblox", url=make_roblox_join_url(job_id)))
+        view.add_item(disnake.ui.Button(label="Open Score Breakdown", url=make_web_server_url(job_id)))
+
+        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+
+    @score_command.autocomplete("id")
+    async def score_id_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
+        return await server_id_autocomplete(inter, user_input)
+
+    @b.slash_command(
+        name="calc",
+        description="Calculate RBWR reactor thermal power (APRM %), steam flow, and electrical generation",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def calc_command(
+        inter: disnake.ApplicationCommandInteraction,
+        unit: int = commands.Param(default=1, description="Reactor Unit (1 or 2)", choices=[
+            disnake.OptionChoice(name="Unit 1 (1380 MWe)", value=1),
+            disnake.OptionChoice(name="Unit 2 (1720 MWe)", value=2),
+        ]),
+        demand: float | None = commands.Param(default=None, description="Target electrical generation demand in MWe (e.g. 1000)"),
+        aprm: float | None = commands.Param(default=None, description="Reactor thermal power / APRM percentage (e.g. 100)"),
+        recirc_override: float | None = commands.Param(default=None, description="Manual recirculation pump speed % (0-100)"),
+        server: str | None = commands.Param(default=None, description="Optional active server to sync current live demand from"),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
+    ):
+        await inter.response.defer(ephemeral=ephemeral)
+        client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
+
+        synced_server = None
+        synced_note = ""
+        if server:
+            try:
+                synced_server = await client.find_server(server, allow_exact_private=True)
+                if synced_server:
+                    s_jid = str(synced_server.get("jobId", server))
+                    short = client.short_id(s_jid)
+                    u_state = get_unit_state(synced_server, unit)
+                    s_state = synced_server.get("state", {})
+                    if demand is None and aprm is None:
+                        live_demand = get_unit_demand(u_state, s_state, unit)
+                        if live_demand is not None and live_demand > 0:
+                            demand = live_demand
+                            synced_note = f"Synced with live server `{short}` (Demand: `{live_demand:.0f} MWe`)."
+                        else:
+                            live_aprm = get_unit_aprm(u_state)
+                            if live_aprm > 0:
+                                aprm = live_aprm
+                                synced_note = f"Synced with live server `{short}` (APRM: `{live_aprm:.1f}%`)."
+            except Exception as ex:
+                log.warning(f"[Calc Command] Server sync error: {ex}")
+
+        if demand is None and aprm is None:
+            demand = 1000.0
+
+        try:
+            res = await client.calculate(
+                unit=unit,
+                demand=demand,
+                thermal=aprm,
+                recirc_override=recirc_override,
+            )
+        except Exception as ex:
+            log.error(f"[Calc Command] Calculation failed: {ex}", exc_info=True)
+            await inter.followup.send(f"Error calculating reactor operational parameters: `{ex}`", ephemeral=ephemeral)
+            return
+
+        if not res:
+            await inter.followup.send("Failed to retrieve calculation results from API.", ephemeral=ephemeral)
+            return
+
+        thermal = float(res.get("thermal_percent", 0.0))
+        flow = float(res.get("flow_kg_s", 0.0))
+        gen_load = float(res.get("gen_load_mwe", 0.0))
+        usage = float(res.get("station_usage_mwe", 0.0))
+        net_demand = float(res.get("demand_mwe", 0.0))
+        recirc_speed = float(res.get("recirc_pump_speed", 0.0))
+        is_override = bool(res.get("is_recirc_overridden", False))
+        scram_risk = bool(res.get("scram_risk", False))
+        scram_limit = float(res.get("scram_limit_percent", 108.0))
+
+        color = disnake.Color.red() if scram_risk else disnake.Color.teal()
+        status_label = "[ALERT: OVERPOWER SCRAM RISK]" if scram_risk else "[STATUS: SYSTEM NOMINAL]"
+
+        desc_text = f"**Status:** `{status_label}`"
+        if synced_note:
+            desc_text += f"\n{synced_note}"
+
+        embed = disnake.Embed(
+            title=f"RBWR Thermal Power Solver — Unit {unit}",
+            description=desc_text,
+            color=color,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        embed.add_field(name="Generator Demand", value=f"`{net_demand:.1f} MWe`", inline=True)
+        embed.add_field(name="Target APRM / RTP", value=f"`{thermal:.2f}%`", inline=True)
+        embed.add_field(name="Steam Flow", value=f"`{flow:.1f} kg/s`", inline=True)
+        embed.add_field(name="Gross Output", value=f"`{gen_load:.1f} MWe`", inline=True)
+        embed.add_field(name="Station Load (Usage)", value=f"`{usage:.1f} MWe`", inline=True)
+
+        recirc_tag = "[MANUAL OVERRIDE]" if is_override else "[AUTOMATIC]"
+        embed.add_field(name="Recirculation Pump", value=f"`{recirc_speed:.1f}%` `{recirc_tag}`", inline=True)
+
+        reg_params = res.get("parameters", {})
+        if reg_params:
+            if unit == 1:
+                tcv = reg_params.get("TCV")
+                crp = reg_params.get("CRP")
+                dio_in = reg_params.get("DIO Intake")
+                dio_out = reg_params.get("DIO Output")
+                lines = []
+                if crp is not None:
+                    lines.append(f"**Condenser Recirc Pump (CRP):** `{crp:.2f}%`")
+                if tcv is not None:
+                    lines.append(f"**Turbine Control Valve (TCV):** `{tcv:.2f}%`")
+                if dio_in is not None and dio_out is not None:
+                    lines.append(f"**Deaerator In / Out (DIO):** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
+                if lines:
+                    embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
+            else:
+                tcv = reg_params.get("TCV")
+                crp = reg_params.get("CRP")
+                sjae = reg_params.get("SJAE")
+                dio_in = reg_params.get("DIO Intake")
+                dio_out = reg_params.get("DIO Output")
+                mss = reg_params.get("MSS")
+                ocl = reg_params.get("OCL")
+                ocv = reg_params.get("OCV")
+                mcv = reg_params.get("MCV")
+                lines = []
+                if crp is not None and tcv is not None:
+                    lines.append(f"**Condenser Recirc (CRP):** `{crp:.2f}%` • **Turbine Valve (TCV):** `{tcv:.2f}%`")
+                if sjae is not None and mss is not None:
+                    lines.append(f"**Air Ejector (SJAE):** `{sjae:.2f}%` • **Steam Sealing (MSS):** `{mss:.2f}%`")
+                if dio_in is not None and dio_out is not None:
+                    lines.append(f"**Deaerator In / Out (DIO):** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
+                if ocv is not None and mcv is not None and ocl is not None:
+                    lines.append(f"**Oil Cooling (OCL):** `{ocl:.2f}%` • **Valves (OCV / MCV):** `{ocv:.2f}%` / `{mcv:.2f}%`")
+                if lines:
+                    embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
+
+        if scram_risk:
+            embed.add_field(
+                name="[WARNING] Overpower SCRAM Threshold Exceeded",
+                value=(
+                    f"Calculated thermal output `{thermal:.2f}%` exceeds the licensed reactor protection trip limit of `{scram_limit:.1f}%` APRM.\n"
+                    "Immediate insertion of control rod patterns or reduction in recirculation pump speed is required to maintain core stability."
+                ),
+                inline=False,
+            )
+
+        embed.set_footer(text="RBWR Reactor Physics Solver • API: /api/calculate")
+
+        view = disnake.ui.View(timeout=180)
+        view.add_item(disnake.ui.Button(label="Open Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator"))
+        if synced_server and is_server_public(synced_server):
+            s_jid = str(synced_server.get("jobId", ""))
+            view.add_item(disnake.ui.Button(label="Join Synced Server", url=make_roblox_join_url(s_jid)))
+
+        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+
+    @calc_command.autocomplete("server")
+    async def calc_server_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
+        return await server_id_autocomplete(inter, user_input)
+
+    @b.slash_command(
+        name="download",
+        description="Get download links and latest release information for RBWR APR Overlay",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def download_command(
+        inter: disnake.ApplicationCommandInteraction,
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
+    ):
+        await inter.response.defer(ephemeral=ephemeral)
+        client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
+
+        rel = None
+        try:
+            rel = await client.fetch_latest_version()
+        except Exception as ex:
+            log.warning(f"[Download Command] Failed to fetch version info: {ex}")
+
+        if not rel:
+            await inter.followup.send("Failed to retrieve latest release information from version API.", ephemeral=ephemeral)
+            return
+
+        version = rel.get("version", "unknown")
+        tag_name = rel.get("tag_name", f"v{version}")
+        name = rel.get("name", f"Release {version}")
+        rel_date = rel.get("release_date", "")
+        html_url = rel.get("html_url", "https://github.com/Hotment/RBWR-Utility/releases/latest")
+        download_url = rel.get("download_url", html_url)
+        notes = rel.get("notes", "") or "No release notes available."
+
+        if len(notes) > 850:
+            notes = notes[:850].rsplit("\n", 1)[0] + "\n..."
+
+        embed = disnake.Embed(
+            title=f"RBWR APR Overlay — {name}",
+            description=(
+                "Official real-time reactor monitoring overlay client for RBWR.\n"
+                "Engineered with Avalonia UI (.NET 8) for low-latency operational metrics and cross-platform desktop integration."
+            ),
+            color=disnake.Color.blurple(),
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        embed.add_field(name="Version", value=f"`{tag_name}`", inline=True)
+        if rel_date:
+            embed.add_field(name="Release Date", value=f"`{rel_date}`", inline=True)
+        embed.add_field(name="Supported Platforms", value="`Windows x64` / `Linux`", inline=True)
+
+        embed.add_field(name="Release Notes", value=f"```markdown\n{notes}\n```", inline=False)
+
+        assets = rel.get("assets", [])
+        if assets:
+            asset_lines = []
+            for a in assets[:5]:
+                a_name = a.get("name", "Asset")
+                a_url = a.get("download_url") or html_url
+                a_size = a.get("size")
+                size_str = f" ({a_size // 1048576} MB)" if isinstance(a_size, int) and a_size > 0 else ""
+                asset_lines.append(f"• [{a_name}]({a_url}){size_str}")
+            embed.add_field(name="Package Downloads", value="\n".join(asset_lines), inline=False)
+
+        embed.set_footer(text="RBWR APR Overlay Client • Verified Release Build")
+
+        view = disnake.ui.View(timeout=180)
+        view.add_item(disnake.ui.Button(label="Download Latest Release", url=download_url))
+        view.add_item(disnake.ui.Button(label="View on GitHub", url=html_url))
+        view.add_item(disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL))
+
+        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+
+    @b.slash_command(
+        name="fleet",
+        description="View fleet-wide power generation, active reactor units, and network stats",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def fleet_command(
+        inter: disnake.ApplicationCommandInteraction,
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
+    ):
+        await inter.response.defer(ephemeral=ephemeral)
+        client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
+
+        try:
+            payload = await client.fetch(public_only=True)
+            servers = payload.get("data", {}).get("servers", [])
+        except Exception as ex:
+            await inter.followup.send(f"Error fetching fleet operational data: `{ex}`", ephemeral=ephemeral)
+            return
+
+        total_public = len(servers)
+        if total_public == 0:
+            embed = disnake.Embed(
+                title="RBWR Reactor Fleet Overview",
+                description="No public reactor instances are currently online or reporting snapshot data.",
+                color=disnake.Color.dark_grey(),
+                timestamp=datetime.now(timezone.utc),
+            )
+            embed.set_footer(text="RBWR Fleet Network • All Cores Inactive")
+            await inter.followup.send(embed=embed, ephemeral=ephemeral)
+            return
+
+        total_mw = 0.0
+        total_pps = 0.0
+        u1_running = 0
+        u2_running = 0
+        total_players = 0
+        incident_count = 0
+
+        top_server = None
+        top_score = -1.0
+        top_mw = -1.0
+
+        for s in servers:
+            u1 = get_unit_state(s, 1)
+            u2 = get_unit_state(s, 2)
+
+            u1_mw = get_unit_output_mw(u1)
+            u2_mw = get_unit_output_mw(u2)
+            s_mw = u1_mw + u2_mw
+            total_mw += s_mw
+
+            s_pps = get_server_points_rate(s) or 0.0
+            total_pps += s_pps
+
+            if is_unit_running(u1):
+                u1_running += 1
+            if is_unit_running(u2):
+                u2_running += 1
+
+            p_cnt = get_player_count(s)
+            if isinstance(p_cnt, int):
+                total_players += p_cnt
+
+            for u in (u1, u2):
+                scram = u.get("SCRAMreason")
+                if scram and str(scram).strip() not in ("None", "", "null"):
+                    incident_count += 1
+                turb_stat = str(u.get("Turbine Status", "")).strip().lower()
+                if "trip" in turb_stat:
+                    incident_count += 1
+
+            s_score = get_server_top_score(s)
+            if s_score > top_score or (abs(s_score - top_score) < 0.1 and s_mw > top_mw):
+                top_score = s_score
+                top_mw = s_mw
+                top_server = s
+
+        total_reactors = u1_running + u2_running
+        total_possible_reactors = total_public * 2
+        capacity_pct = (total_reactors / total_possible_reactors * 100.0) if total_possible_reactors > 0 else 0.0
+
+        embed = disnake.Embed(
+            title="RBWR Reactor Fleet Overview",
+            description=(
+                f"**Active Public Instances:** `{total_public}`\n"
+                f"**Fleet Core Utilization:** `{total_reactors}/{total_possible_reactors}` Cores Online (`{capacity_pct:.1f}%`)"
+            ),
+            color=disnake.Color.teal(),
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        embed.add_field(name="Fleet Power Generation", value=f"`{total_mw:,.1f} MWe`", inline=True)
+        embed.add_field(name="Fleet Generation Rate", value=f"`{total_pps:.2f} pts/s`", inline=True)
+        embed.add_field(name="Active Operators", value=f"`{total_players}` players online", inline=True)
+
+        embed.add_field(
+            name="Operational Core Units",
+            value=f"**Unit 1 Active:** `{u1_running}`\n**Unit 2 Active:** `{u2_running}`",
+            inline=True,
+        )
+
+        incident_status = f"`{incident_count}` active alerts" if incident_count > 0 else "`[NOMINAL - NO TRIPS]`"
+        embed.add_field(
+            name="Fleet Alerts / SCRAMs",
+            value=incident_status,
+            inline=True,
+        )
+
+        if top_server:
+            top_jid = str(top_server.get("jobId", "unknown"))
+            top_short = client.short_id(top_jid)
+            top_u1 = get_unit_state(top_server, 1)
+            top_u2 = get_unit_state(top_server, 2)
+            top_pps = get_server_points_rate(top_server) or 0.0
+            top_summary = (
+                f"**Server ID:** `{top_short}` (`{top_jid}`)\n"
+                f"**Performance Rating:** Top Score `{top_score:.1f}`\n"
+                f"**Output:** `{top_mw:.1f} MWe` | **Rate:** `{top_pps:.2f} pts/s`\n"
+                f"**Cores:** `[U1: {get_unit_aprm(top_u1):.0f}% APRM]` `[U2: {get_unit_aprm(top_u2):.0f}% APRM]`"
+            )
+            embed.add_field(name="Flagship Server (Top Performance)", value=top_summary, inline=False)
+
+        embed.set_footer(text="RBWR Fleet Operations • Real-time Public Network Status")
+
+        view = disnake.ui.View(timeout=180)
+        view.add_item(disnake.ui.Button(label="Open Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"))
+        if top_server and is_server_public(top_server):
+            top_jid = str(top_server.get("jobId", ""))
+            view.add_item(disnake.ui.Button(label="Join Flagship Server", url=make_roblox_join_url(top_jid)))
+
+        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
 
     @b.listen("on_interaction")
     async def global_ticket_interaction_listener(inter: disnake.Interaction):
