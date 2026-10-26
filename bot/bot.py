@@ -957,7 +957,7 @@ class TicketPanelView(disnake.ui.View):
             context_info=ctx,
         )
         try:
-            msg = "An error occurred while handling this ticket action. An alert with the traceback has been reported."
+            msg = "An error occurred while handling this ticket action."
             if not interaction.response.is_done():
                 await interaction.response.send_message(msg, ephemeral=True)
             else:
@@ -1005,7 +1005,7 @@ class TicketNoteModal(disnake.ui.Modal):
             context_info=ctx,
         )
         try:
-            msg = "An error occurred while saving the note. An alert with the traceback has been reported."
+            msg = "An error occurred while saving the note."
             if not interaction.response.is_done():
                 await interaction.response.send_message(msg, ephemeral=True)
             else:
@@ -1232,7 +1232,7 @@ class EmbedBuilderModal(disnake.ui.Modal):
             context_info=ctx,
         )
         try:
-            msg = "An error occurred while dispatching the embed. An alert with the traceback has been reported."
+            msg = "An error occurred while dispatching the embed."
             if not interaction.response.is_done():
                 await interaction.response.send_message(msg, ephemeral=True)
             else:
@@ -2194,22 +2194,28 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
 ROBLOX_PLACE_ID = "11765852158"
 
 def get_server_points_rate(server: dict[str, Any]) -> float | None:
+    if not isinstance(server, dict):
+        return None
     if "points_rate" in server and server["points_rate"] is not None:
         try:
             return float(server["points_rate"])
         except (ValueError, TypeError):
             pass
-    misc = server.get("state", {}).get("Misc", {})
-    if isinstance(misc, dict) and "Total points/second" in misc:
-        val = misc.get("Total points/second")
-        if val is not None:
-            try:
-                return float(val)
-            except (ValueError, TypeError):
-                pass
+    st = server.get("state")
+    if isinstance(st, dict):
+        misc = st.get("Misc")
+        if isinstance(misc, dict) and "Total points/second" in misc:
+            val = misc.get("Total points/second")
+            if val is not None:
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    pass
     return None
 
 def get_server_top_score(server: dict[str, Any]) -> float:
+    if not isinstance(server, dict):
+        return 0.0
     for key in ("top_score", "topScore", "score", "TopScore"):
         val = server.get(key)
         if val is not None:
@@ -2237,9 +2243,11 @@ def get_server_top_score(server: dict[str, Any]) -> float:
     return 0.0
 
 def get_unit_state(server: dict[str, Any], unit: int) -> dict[str, Any]:
-    st = server.get("state", {})
+    if not isinstance(server, dict):
+        return {}
+    st = server.get("state")
     if isinstance(st, dict):
-        u = st.get(f"Unit{unit}", {})
+        u = st.get(f"Unit{unit}")
         if isinstance(u, dict):
             return u
     return {}
@@ -2594,7 +2602,8 @@ class ServerBrowserView(disnake.ui.View):
         embed.add_field(name=f"Unit 1 ({get_unit_status_badge(u1)})", value=unit_field(1, u1), inline=True)
         embed.add_field(name=f"Unit 2 ({get_unit_status_badge(u2)})", value=unit_field(2, u2), inline=True)
 
-        misc = server.get("state", {}).get("Misc", {})
+        st = server.get("state") if isinstance(server, dict) else None
+        misc = st.get("Misc") if isinstance(st, dict) else None
         if isinstance(misc, dict) and misc:
             misc_lines = []
             for k in ("Outside Temperature", "EDG Diesel Storage", "FSS Smoke Detected", "Evacuation Cooldown"):
@@ -2811,7 +2820,7 @@ class ServerBrowserView(disnake.ui.View):
             context_info=ctx,
         )
         try:
-            msg = "An error occurred while interacting with the server browser. An alert with the traceback has been reported."
+            msg = "An error occurred while interacting with the server browser."
             if not interaction.response.is_done():
                 await interaction.response.send_message(msg, ephemeral=True)
             else:
@@ -2854,8 +2863,12 @@ def get_player_count(server: dict[str, Any]) -> str:
     return "?"
 
 def state_for(server: dict[str, Any], unit: int) -> dict[str, Any]:
-    st = server.get("state", {}).get(f"Unit{unit}", {}) or {}
-    if isinstance(st, dict) and st.get("Output (MW)") is None:
+    if not isinstance(server, dict):
+        return {}
+    st_root = server.get("state")
+    st = st_root.get(f"Unit{unit}") if isinstance(st_root, dict) else None
+    st = st if isinstance(st, dict) else {}
+    if st.get("Output (MW)") is None:
         p_val = st.get("PradDoSieci")
         if p_val is None:
             p_val = st.get("Output") or st.get("Power") or st.get("megawatts")
@@ -2945,7 +2958,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         )
 
         try:
-            msg = "An unexpected error occurred while processing this command. An alert with the traceback has been automatically dispatched."
+            msg = "An unexpected error occurred while processing this command."
             if inter.response.is_done():
                 await inter.followup.send(msg, ephemeral=True)
             else:
@@ -3393,15 +3406,12 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         gen_load = float(res.get("gen_load_mwe", 0.0))
         usage = float(res.get("station_usage_mwe", 0.0))
         net_demand = float(res.get("demand_mwe", 0.0))
-        recirc_speed = float(res.get("recirc_pump_speed", 0.0))
-        is_override = bool(res.get("is_recirc_overridden", False))
         scram_risk = bool(res.get("scram_risk", False))
         scram_limit = float(res.get("scram_limit_percent", 108.0))
 
         color = disnake.Color.red() if scram_risk else disnake.Color.teal()
-        status_label = "[ALERT: OVERPOWER SCRAM RISK]" if scram_risk else "[STATUS: SYSTEM NOMINAL]"
 
-        desc_text = f"**Status:** `{status_label}`"
+        desc_text = f""
         if synced_note:
             desc_text += f"\n{synced_note}"
 
@@ -3417,9 +3427,6 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         embed.add_field(name="Steam Flow", value=f"`{flow:.1f} kg/s`", inline=True)
         embed.add_field(name="Gross Output", value=f"`{gen_load:.1f} MWe`", inline=True)
         embed.add_field(name="Station Load (Usage)", value=f"`{usage:.1f} MWe`", inline=True)
-
-        recirc_tag = "[MANUAL OVERRIDE]" if is_override else "[AUTOMATIC]"
-        embed.add_field(name="Recirculation Pump", value=f"`{recirc_speed:.1f}%` `{recirc_tag}`", inline=True)
 
         reg_params = res.get("parameters", {})
         if reg_params:
@@ -3469,7 +3476,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 inline=False,
             )
 
-        embed.set_footer(text="RBWR Reactor Physics Solver • API: /api/calculate")
+        embed.set_footer(text="RBWR Reactor Physics Solver")
 
         view = disnake.ui.View(timeout=180)
         view.add_item(disnake.ui.Button(label="Open Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator"))
@@ -3946,8 +3953,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         name="autorole",
         description="Manage automatic role assignment for new server members",
         default_member_permissions=disnake.Permissions(administrator=True),
-        install_types=disnake.ApplicationInstallTypes.all(),
-        contexts=disnake.InteractionContextTypes.all(),
+        install_types=guild_only_install,
+        contexts=guild_only_contexts,
     )
     async def autorole_group(inter: disnake.ApplicationCommandInteraction):
         pass
