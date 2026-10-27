@@ -3347,8 +3347,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     async def calc_command(
         inter: disnake.ApplicationCommandInteraction,
         unit: int = commands.Param(default=1, description="Reactor Unit (1 or 2)", choices=[
-            disnake.OptionChoice(name="Unit 1 (1380 MWe)", value=1),
-            disnake.OptionChoice(name="Unit 2 (1720 MWe)", value=2),
+            disnake.OptionChoice(name="Unit 1", value=1),
+            disnake.OptionChoice(name="Unit 2", value=2),
         ]),
         demand: float | None = commands.Param(default=None, description="Target electrical generation demand in MWe (e.g. 1000)"),
         aprm: float | None = commands.Param(default=None, description="Reactor thermal power / APRM percentage (e.g. 100)"),
