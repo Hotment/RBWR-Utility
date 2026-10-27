@@ -3043,19 +3043,20 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             description="Specific metric or ALL for complete inspection",
             choices=INFO_CHOICES,
         ),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
     ):
-        await inter.response.defer()
+        await inter.response.defer(ephemeral=ephemeral)
 
         client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
         try:
             server = await client.find_server(id, allow_exact_private=True)
         except Exception as e:
             log.exception("RBWR API error")
-            await inter.followup.send(f"Error fetching server data: `{e}`")
+            await inter.followup.send(f"Error fetching server data: `{e}`", ephemeral=ephemeral)
             return
 
         if not server:
-            await inter.followup.send(f"Server `{id}` not found or is offline.")
+            await inter.followup.send(f"Server `{id}` not found or is offline.", ephemeral=ephemeral)
             return
 
         job_id = str(server.get("jobId", id))
@@ -3081,7 +3082,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 all_servers=[server],
             )
             embed = browser_view._build_detail_embed(server)
-            await inter.followup.send(embed=embed, view=view)
+            await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
         else:
             players = get_player_count(server)
             vis_label = "Public" if is_pub else "Private"
@@ -3095,7 +3096,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             embed.set_footer(text=footer_text)
             add_info(embed, server, 1, info_val)
             add_info(embed, server, 2, info_val)
-            await inter.followup.send(embed=embed, view=view)
+            await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
 
     @server_command.autocomplete("id")
     async def server_id_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
@@ -3143,14 +3144,15 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
         sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
     ):
-        await inter.response.defer()
+        await inter.response.defer(ephemeral=ephemeral)
         client: RBWRClient = getattr(b, "rbwr", None) or RBWRClient()
         try:
             payload = await client.fetch(public_only=True)
             servers = payload.get("data", {}).get("servers", [])
         except Exception as e:
-            await inter.followup.send(f"Error fetching servers: `{e}`")
+            await inter.followup.send(f"Error fetching servers: `{e}`", ephemeral=ephemeral)
             return
 
         browser_view = ServerBrowserView(
@@ -3161,7 +3163,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             sort_by=sort_by,
             filter_status=filter,
         )
-        await inter.followup.send(embed=browser_view.build_embed(), view=browser_view)
+        await inter.followup.send(embed=browser_view.build_embed(), view=browser_view, ephemeral=ephemeral)
 
     @b.slash_command(
         name="serverlist",
@@ -3174,8 +3176,9 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
         sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
     ):
-        await servers_command(inter, query=query, sort_by=sort_by, filter=filter)
+        await servers_command(inter, query=query, sort_by=sort_by, filter=filter, ephemeral=ephemeral)
 
     @b.slash_command(
         name="score",
@@ -3346,7 +3349,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     )
     async def calc_command(
         inter: disnake.ApplicationCommandInteraction,
-        unit: int = commands.Param(default=1, description="Reactor Unit (1 or 2)", choices=[
+        unit: int = commands.Param(description="Reactor Unit (1 or 2)", choices=[
             disnake.OptionChoice(name="Unit 1", value=1),
             disnake.OptionChoice(name="Unit 2", value=2),
         ]),
