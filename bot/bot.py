@@ -3440,11 +3440,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 dio_out = reg_params.get("DIO Output")
                 lines = []
                 if crp is not None:
-                    lines.append(f"**Condenser Recirc Pump (CRP):** `{crp:.2f}%`")
+                    lines.append(f"**Condenser Recirc Pump:** `{crp:.2f}%`")
                 if tcv is not None:
-                    lines.append(f"**Turbine Control Valve (TCV):** `{tcv:.2f}%`")
+                    lines.append(f"**Turbine Control Valve:** `{tcv:.2f}%`")
                 if dio_in is not None and dio_out is not None:
-                    lines.append(f"**Deaerator In / Out (DIO):** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
+                    lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
                 if lines:
                     embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
             else:
@@ -3459,13 +3459,13 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 mcv = reg_params.get("MCV")
                 lines = []
                 if crp is not None and tcv is not None:
-                    lines.append(f"**Condenser Recirc (CRP):** `{crp:.2f}%` • **Turbine Valve (TCV):** `{tcv:.2f}%`")
+                    lines.append(f"**Condenser Recirc:** `{crp:.2f}%` • **Turbine Valve:** `{tcv:.2f}%`")
                 if sjae is not None and mss is not None:
-                    lines.append(f"**Air Ejector (SJAE):** `{sjae:.2f}%` • **Steam Sealing (MSS):** `{mss:.2f}%`")
+                    lines.append(f"**Air Ejector:** `{sjae:.2f}%` • **Steam Sealing:** `{mss:.2f}%`")
                 if dio_in is not None and dio_out is not None:
-                    lines.append(f"**Deaerator In / Out (DIO):** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
+                    lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
                 if ocv is not None and mcv is not None and ocl is not None:
-                    lines.append(f"**Oil Cooling (OCL):** `{ocl:.2f}%` • **Valves (OCV / MCV):** `{ocv:.2f}%` / `{mcv:.2f}%`")
+                    lines.append(f"**Oil Cooling:** `{ocl:.2f}%` • **Valves (OCV / MCV):** `{ocv:.2f}%` / `{mcv:.2f}%`")
                 if lines:
                     embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
 
@@ -3473,8 +3473,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             embed.add_field(
                 name="[WARNING] Overpower SCRAM Threshold Exceeded",
                 value=(
-                    f"Calculated thermal output `{thermal:.2f}%` exceeds the licensed reactor protection trip limit of `{scram_limit:.1f}%` APRM.\n"
-                    "Immediate insertion of control rod patterns or reduction in recirculation pump speed is required to maintain core stability."
+                    f"Calculated thermal output `{thermal:.2f}%` exceeds the reactor protection trip limit of `{scram_limit:.1f}%` APRM."
                 ),
                 inline=False,
             )
