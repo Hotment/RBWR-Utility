@@ -61,7 +61,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publish Single-File Executable
+      - name: Publish Standalone Single-File Executable
         run: |
           dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj `
             -c Release `
@@ -70,20 +70,27 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
-            -o publish/${{ matrix.rid }}
+            -o publish-standalone/${{ matrix.rid }}
 
-      - name: Prepare Windows Release Package
+          Copy-Item "publish-standalone/${{ matrix.rid }}/RbwrOverlay.exe" "RBWR_APRM_Calculator_${{ matrix.rid }}.exe"
+
+      - name: Publish & Package Windows Archive Bundle
         run: |
-          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "RBWR_APRM_Calculator_${{ matrix.rid }}.exe"
+          dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -o publish-bundle/${{ matrix.rid }}
 
           $bundleDir = "RBWR_APRM_Calculator_Windows_${{ matrix.rid }}"
           New-Item -ItemType Directory -Path $bundleDir -Force
-          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "$bundleDir/RbwrOverlay.exe"
-          Copy-Item "publish/${{ matrix.rid }}/RbwrOverlay.exe" "$bundleDir/RBWR_APRM_Calculator.exe"
+
+          Copy-Item -Path "publish-bundle/${{ matrix.rid }}/*" -Destination $bundleDir -Recurse
           if (Test-Path "icon.ico") { Copy-Item "icon.ico" "$bundleDir/" }
           if (Test-Path "icon.png") { Copy-Item "icon.png" "$bundleDir/" }
 
-          Compress-Archive -Path "$bundleDir/*" -DestinationPath "${bundleDir}.zip"
+          Compress-Archive -Path "$bundleDir" -DestinationPath "${bundleDir}.zip"
 
       - name: Upload Windows Standalone Executable
         uses: actions/upload-artifact@v4
@@ -114,24 +121,35 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publish Linux Standalone Binary
+      - name: Publish Linux Standalone Single-File Binary
         run: |
           dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
             --self-contained true \
             -p:PublishSingleFile=true \
-            -o publish/${{ matrix.rid }}
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true \
+            -o publish-standalone/${{ matrix.rid }}
 
-      - name: Package Linux Bundle (tar.gz & zip)
+          cp "publish-standalone/${{ matrix.rid }}/RbwrOverlay" "RbwrOverlay_${{ matrix.rid }}"
+          chmod +x "RbwrOverlay_${{ matrix.rid }}"
+
+      - name: Publish & Package Linux Archive Bundle
         run: |
+          dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -o publish-bundle/${{ matrix.rid }}
+
           BUNDLE_NAME="RBWR_APRM_Calculator_Linux_${{ matrix.rid }}"
           mkdir -p "${BUNDLE_NAME}"
-          cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
-          
+          cp -r publish-bundle/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
           chmod +x "${BUNDLE_NAME}/RbwrOverlay"
-          cp "${BUNDLE_NAME}/RbwrOverlay" "${BUNDLE_NAME}/RBWR_APRM_Calculator"
-          
+
           if [ -f "icon.png" ]; then cp "icon.png" "${BUNDLE_NAME}/"; fi
           if [ -f "icon.ico" ]; then cp "icon.ico" "${BUNDLE_NAME}/"; fi
 
@@ -139,7 +157,6 @@ jobs:
           #!/usr/bin/env bash
           SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
           export LD_LIBRARY_PATH="${SCRIPT_DIR}:${LD_LIBRARY_PATH}"
-          chmod +x "${SCRIPT_DIR}/RbwrOverlay" 2>/dev/null
           exec "${SCRIPT_DIR}/RbwrOverlay" "$@"
           EOF
           chmod +x "${BUNDLE_NAME}/run.sh"
@@ -159,9 +176,6 @@ jobs:
 
           tar -czvf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
           zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
-
-          cp "${BUNDLE_NAME}/RbwrOverlay" "RbwrOverlay_${{ matrix.rid }}"
-          chmod +x "RbwrOverlay_${{ matrix.rid }}"
 
       - name: Upload Linux Package (tar.gz)
         uses: actions/upload-artifact@v4
@@ -189,10 +203,12 @@ jobs:
           mkdir -p "${APPDIR}/usr/bin"
           mkdir -p "${APPDIR}/usr/lib"
 
-          cp -r publish/linux-x64/* "${APPDIR}/usr/bin/"
+          cp -r publish-bundle/linux-x64/* "${APPDIR}/usr/bin/"
+          chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
+
           APP_VER="2.1.1"
           if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
-            DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
+            DETECTED=$(sed -nE 's/.*public const string AppVersion = "([^"]+)".*/\1/p' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" | head -n 1)
             if [ -n "${DETECTED}" ]; then
               APP_VER="${DETECTED}"
             fi
@@ -274,13 +290,14 @@ jobs:
             rm -rf icon.iconset
           fi
 
-      - name: Publish macOS Standalone Binary
+      - name: Publish macOS Bundle Files
         run: |
           dotnet publish RbwrOverlay/RbwrOverlay.UI/RbwrOverlay.UI.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
             --self-contained true \
             -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
             -o publish/${{ matrix.rid }}
 
       - name: Build macOS Application Bundle (.app)
@@ -302,7 +319,7 @@ jobs:
 
           APP_VER="2.1.1"
           if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
-            DETECTED=$(grep -oP 'public const string AppVersion = "\K[^"]+' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" 2>/dev/null || true)
+            DETECTED=$(sed -nE 's/.*public const string AppVersion = "([^"]+)".*/\1/p' "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" | head -n 1)
             if [ -n "${DETECTED}" ]; then
               APP_VER="${DETECTED}"
             fi
@@ -340,20 +357,15 @@ jobs:
           </plist>
           EOF
 
-          codesign --force --deep -s - "${BUNDLE_NAME}/${APP_NAME}" || true
-
-          cp "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay" "${BUNDLE_NAME}/RbwrOverlay"
-          chmod +x "${BUNDLE_NAME}/RbwrOverlay"
-
           cat << 'EOF' > "${BUNDLE_NAME}/run.command"
           #!/usr/bin/env bash
           DIR="$(cd "$(dirname "$0")" && pwd)"
-          chmod +x "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" 2>/dev/null
-          exec "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" "$@"
+          open "${DIR}/RBWR APRM Calculator.app" --args "$@"
           EOF
           chmod +x "${BUNDLE_NAME}/run.command"
 
-          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
+          codesign --force --deep -s - "${BUNDLE_NAME}/${APP_NAME}" || true
+          ditto -c -k --sequesterRsrc --keepParent "${BUNDLE_NAME}" "${BUNDLE_NAME}.zip"
 
       - name: Upload macOS Package (zip)
         uses: actions/upload-artifact@v4
