@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Reactor Thermal Power & APRM Calculator">
 <meta property="og:description" content="Real-time thermal solver for RBWR Unit 1 and Unit 2. Computes core thermal output, MWth targets, steam flow rates, and control rod APRM targets.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Reactor Thermal Power & APRM Calculator">
 <meta name="twitter:description" content="Real-time thermal solver for RBWR Unit 1 and Unit 2. Computes core thermal output, MWth targets, steam flow rates, and control rod APRM targets.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Reactor Thermal Calculator",
+    subtitle="Core Power & APRM Solver",
+    description="Real-time thermal solver for RBWR Unit 1 and Unit 2. Computes core thermal output, MWth targets, steam flow rates, and control rod APRM targets.",
+    accent_color="#3b82f6",
+    primary_label="Open Calculator",
+    primary_url=request.url if request else url_for('calculator_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 

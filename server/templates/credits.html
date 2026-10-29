@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Utility - Credits & Acknowledgements">
 <meta property="og:description" content="Recognizing the creators, collaborators, and open-source foundations behind the RBWR Utility ecosystem.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Utility - Credits & Acknowledgements">
 <meta name="twitter:description" content="Recognizing the creators, collaborators, and open-source foundations behind the RBWR Utility ecosystem.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Utility Credits & Acknowledgements",
+    subtitle="Project Contributors & Foundations",
+    description="Recognizing the creators, collaborators, and open-source foundations behind the RBWR Utility ecosystem.",
+    accent_color="#3b82f6",
+    primary_label="View Credits",
+    primary_url=request.url if request else url_for('credits_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

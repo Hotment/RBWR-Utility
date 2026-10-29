@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Point History Graph & Local Viewer">
 <meta property="og:description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json points history with interactive charts in browser memory.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Point History Graph & Local Viewer">
 <meta name="twitter:description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json points history with interactive charts in browser memory.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Point History Graph",
+    subtitle="Client-Side Local Viewer",
+    description="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json points history with interactive charts in browser memory.",
+    accent_color="#10b981",
+    primary_label="Open Local Viewer",
+    primary_url=request.url if request else url_for('local_viewer_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block extra_head %}

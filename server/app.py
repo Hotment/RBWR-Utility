@@ -182,6 +182,18 @@ werkzeug_logger.setLevel(logging.INFO)
 logger = app.logger.getChild("main")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
 
+@app.template_filter("hex_to_int")
+def hex_to_int_filter(val, default=3900150):
+    if val is None:
+        return default
+    if isinstance(val, int):
+        return val
+    try:
+        s = str(val).strip().lstrip("#")
+        return int(s, 16)
+    except Exception:
+        return default
+
 def _global_threading_excepthook(args):
     try:
         exc_type = args.exc_type
@@ -475,7 +487,7 @@ _generated_admin_pass = secrets.token_hex(24)
 if not os.environ.get("ADMIN_USERNAME") or not os.environ.get("ADMIN_PASSWORD"):
     import logging
     app.logger.warning(
-        "[SECURITY] ADMIN_USERNAME or ADMIN_PASSWORD is not set in the environment/dotenv. "
+        "Security Warning: ADMIN_USERNAME or ADMIN_PASSWORD is not set in the environment/dotenv. "
         "A random secure credential has been dynamically generated for this server session."
     )
 
@@ -1106,6 +1118,14 @@ def root():
         latest_version=release.get("version", "2.0.5"),
         release_date=release.get("release_date", "2026-09-23"),
         release_notes=release.get("notes", "No release notes available.")
+    )
+
+@app.route("/favicon.png")
+def favicon_png():
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.png",
+        mimetype="image/png"
     )
 
 @app.route("/favicon.ico")

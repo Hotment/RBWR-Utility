@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="Contact RBWR Utility Administrators">
 <meta property="og:description" content="Send a confidential private message directly to the RBWR Utility administrator and development team.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Contact RBWR Utility Administrators">
 <meta name="twitter:description" content="Send a confidential private message directly to the RBWR Utility administrator and development team.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="Contact RBWR Utility Administrators",
+    subtitle="Direct Developer Messaging",
+    description="Send a confidential private message directly to the RBWR Utility administrator and development team.",
+    accent_color="#8b5cf6",
+    primary_label="Contact Us",
+    primary_url=request.url if request else url_for('contact_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block extra_head %}

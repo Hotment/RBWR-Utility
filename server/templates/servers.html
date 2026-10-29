@@ -9,13 +9,26 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Server Browser & Live Inventory">
-<meta property="og:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, SCRAM warnings, demand schedules, and telemetry graphs.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, demand schedules, and live performance charts.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Server Browser & Live Inventory">
-<meta name="twitter:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, SCRAM warnings, demand schedules, and telemetry graphs.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:description" content="Real-time Roblox RBWR server list with player counts, reactor diagnostics, demand schedules, and live performance charts.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Server Browser",
+    subtitle="Live Server Inventory & Performance",
+    description="Real-time Roblox RBWR server list with player counts, reactor diagnostics, demand schedules, and live performance charts.",
+    accent_color="#f59e0b",
+    primary_label="Browse Servers",
+    primary_url=request.url if request else url_for('servers_page', _external=True),
+    secondary_label="Thermal Calculator",
+    secondary_url=url_for('calculator_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block extra_head %}

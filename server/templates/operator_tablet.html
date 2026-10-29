@@ -3,19 +3,32 @@
 {% block title %}RBWR Utility - Web Tablet{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="In-browser RBWR Operator Tablet emulator. View real-time reactor diagnostics, alarms, core thermal telemetry, and systems control.">
+<meta name="description" content="In-browser RBWR Operator Tablet emulator. View reactor diagnostics and core thermal metrics.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Web Operator Tablet Emulator">
-<meta property="og:description" content="Virtual RBWR Operator Tablet interface. Real-time reactor telemetry, alarm annunciators, rod positions, and plant monitoring from any browser.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:description" content="Virtual RBWR Operator Tablet interface. Reactor metrics, and plant monitoring from any browser.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Web Operator Tablet Emulator">
-<meta name="twitter:description" content="Virtual RBWR Operator Tablet interface. Real-time reactor telemetry, alarm annunciators, rod positions, and plant monitoring from any browser.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:description" content="Virtual RBWR Operator Tablet interface. Reactor metrics, and plant monitoring from any browser.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Web Operator Tablet Emulator",
+    subtitle="Virtual Annunciator & Monitoring Panel",
+    description="Virtual RBWR Operator Tablet interface. Reactor metrics, and plant monitoring from any browser.",
+    accent_color="#3b82f6",
+    primary_label="Launch Tablet",
+    primary_url=request.url if request else url_for('operator_tablet_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block extra_head %}

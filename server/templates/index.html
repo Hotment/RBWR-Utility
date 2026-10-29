@@ -9,13 +9,26 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Utility - APRM & Thermal Solver">
-<meta property="og:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with telemetry graphs, and points calculator for Roblox RBWR.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with performance graphs, and points calculator for Roblox RBWR.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Utility - APRM & Thermal Solver">
-<meta name="twitter:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with telemetry graphs, and points calculator for Roblox RBWR.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:description" content="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with performance graphs, and points calculator for Roblox RBWR.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Utility",
+    subtitle="APRM & Thermal Solver",
+    description="Lightweight APRM calculations, real-time reactor thermal solver, live server browser with performance graphs, and points calculator for Roblox RBWR.",
+    accent_color="#3b82f6",
+    primary_label="Open Calculator",
+    primary_url=url_for('calculator_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 

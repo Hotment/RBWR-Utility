@@ -422,11 +422,11 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                     if has_scram:
                         u1_scrams += 1
                         u1_scram_reasons.append(str(scram1).strip())
-                        u1_desc += f" [SCRAM: {scram1}]"
+                        u1_desc += f" (SCRAM: {scram1})"
                     if has_trip:
                         u1_trips += 1
                         u1_trip_reasons.append(str(trip1).strip())
-                        u1_desc += f" [TRIP: {trip1}]"
+                        u1_desc += f" (Trip: {trip1})"
         elif is_loop_1:
             u1_score = 50.0
             u1_loop_count += 1
@@ -568,11 +568,11 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                     if has_scram:
                         u2_scrams += 1
                         u2_scram_reasons.append(str(scram2).strip())
-                        u2_desc += f" [SCRAM: {scram2}]"
+                        u2_desc += f" (SCRAM: {scram2})"
                     if has_trip:
                         u2_trips += 1
                         u2_trip_reasons.append(str(trip2).strip())
-                        u2_desc += f" [TRIP: {trip2}]"
+                        u2_desc += f" (Trip: {trip2})"
         else:
             u2_score = 60.0 if aprm2 >= 5.0 else 50.0
             u2_desc = "Hot Standby" if aprm2 >= 5.0 else "Zero Demand / Offline"

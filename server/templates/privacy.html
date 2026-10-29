@@ -9,13 +9,26 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Utility - Privacy Policy">
-<meta property="og:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and telemetry diagnostics.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Utility - Privacy Policy">
-<meta name="twitter:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and telemetry diagnostics.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Utility Privacy Policy",
+    subtitle="Data Handling & Privacy Safeguards",
+    description="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.",
+    accent_color="#3b82f6",
+    primary_label="View Privacy Policy",
+    primary_url=request.url if request else url_for('privacy_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

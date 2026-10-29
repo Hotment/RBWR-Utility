@@ -9,13 +9,26 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Server Archives & Historical Runs">
-<meta property="og:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, telemetry logs, and historical run data.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, operational logs, and historical run data.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Server Archives & Historical Runs">
-<meta name="twitter:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, telemetry logs, and historical run data.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:description" content="Permanent archives and daily snapshots of RBWR reactor server sessions, operational logs, and historical run data.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Server Archives",
+    subtitle="Historical Runs & Daily Snapshots",
+    description="Permanent archives and daily snapshots of RBWR reactor server sessions, operational logs, and historical run data.",
+    accent_color="#06b6d4",
+    primary_label="Browse Archives",
+    primary_url=request.url if request else url_for('archives_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

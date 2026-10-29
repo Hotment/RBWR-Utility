@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Points & Rank Progression Calculator">
 <meta property="og:description" content="Simulate active reactor point generation rates, evaluate operational penalties, and calculate the exact time to achieve your next rank in RBWR.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Points & Rank Progression Calculator">
 <meta name="twitter:description" content="Simulate active reactor point generation rates, evaluate operational penalties, and calculate the exact time to achieve your next rank in RBWR.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Points Calculator",
+    subtitle="Rank Progression & Rate Simulator",
+    description="Simulate active reactor point generation rates, evaluate operational penalties, and calculate the exact time to achieve your next rank in RBWR.",
+    accent_color="#10b981",
+    primary_label="Open Points Calculator",
+    primary_url=request.url if request else url_for('points_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 

@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Utility - 500 Internal Server Error">
 <meta property="og:description" content="An unexpected server error occurred on RBWR Utility.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Utility - 500 Internal Server Error">
 <meta name="twitter:description" content="An unexpected server error occurred on RBWR Utility.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Utility - 500 Server Error",
+    subtitle="Internal Error Encountered",
+    description="An unexpected server error occurred on RBWR Utility.",
+    accent_color="#ef4444",
+    primary_label="Return Home",
+    primary_url=url_for('root', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

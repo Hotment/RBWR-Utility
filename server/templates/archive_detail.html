@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Server Archive: {{ date_formatted }}">
 <meta property="og:description" content="Archived RBWR reactor snapshots, uptime data, and server logs for {{ date_formatted }}.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Server Archive: {{ date_formatted }}">
 <meta name="twitter:description" content="Archived RBWR reactor snapshots, uptime data, and server logs for {{ date_formatted }}.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Server Archive: " ~ date_formatted,
+    subtitle="Archived Reactor Snapshots & Logs",
+    description="Archived RBWR reactor snapshots, uptime data, and server logs for " ~ date_formatted ~ ".",
+    accent_color="#06b6d4",
+    primary_label="View Daily Archive",
+    primary_url=request.url if request else url_for('archive_detail_page', date_str=date_str, _external=True),
+    secondary_label="All Archives",
+    secondary_url=url_for('archives_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

@@ -21,12 +21,38 @@
 <meta property="og:site_name" content="RBWR Utility Server Browser">
 <meta property="og:title" content="{{ embed_title }}">
 <meta property="og:description" content="{{ embed_desc }}">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{{ embed_title }}">
 <meta name="twitter:description" content="{{ embed_desc }}">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import server_detail_component_embed %}
+{{ server_detail_component_embed(
+    job_id=job_id,
+    is_private=is_private,
+    is_archived=is_archived,
+    is_historical=is_historical,
+    server_status_text=server_status_text,
+    player_count=player_count,
+    max_players=max_players,
+    uptime_str=uptime_str,
+    top_score=top_score,
+    points_rate_str=points_rate_str,
+    demand_text=demand_text,
+    u1_running=u1_running,
+    u2_running=u2_running,
+    u1_output_mw=u1_output_mw,
+    u2_output_mw=u2_output_mw,
+    u1_aprm=u1_aprm,
+    u2_aprm=u2_aprm,
+    scram_reason_u1=scram_reason_u1,
+    scram_reason_u2=scram_reason_u2,
+    page_url=request.url if request else url_for('server_detail_page', job_id=job_id, _external=True),
+    browser_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block extra_head %}

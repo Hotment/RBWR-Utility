@@ -10,12 +10,25 @@
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Community Tickets & Feedback">
 <meta property="og:description" content="Submit suggestions and report bugs for RBWR Utility. Track feature progress, discuss proposals, and view resolution statuses.">
-<meta property="og:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Community Tickets & Feedback">
 <meta name="twitter:description" content="Submit suggestions and report bugs for RBWR Utility. Track feature progress, discuss proposals, and view resolution statuses.">
-<meta name="twitter:image" content="{{ url_for('static', filename='bot-icon.png', _external=True) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Community Tickets & Feedback",
+    subtitle="Issue Tracker & Feature Requests",
+    description="Submit suggestions and report bugs for RBWR Utility. Track feature progress, discuss proposals, and view resolution statuses.",
+    accent_color="#3b82f6",
+    primary_label="Open Tickets",
+    primary_url=request.url if request else url_for('tickets_page', _external=True),
+    secondary_label="Server Browser",
+    secondary_url=url_for('servers_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
 {% endblock %}
 
 {% block content %}

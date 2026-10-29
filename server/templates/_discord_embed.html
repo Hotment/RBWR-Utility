@@ -1,0 +1,138 @@
+{% macro standard_component_embed(title, subtitle, description, accent_color, primary_label, primary_url, secondary_label=none, secondary_url=none, icon_url=none) %}
+{% set color_int = accent_color | hex_to_int if accent_color else 3900150 %}
+{% set header_content = "## " ~ title ~ (("\n" ~ subtitle) if subtitle else "") %}
+{% set section_components = [{"type": 10, "content": header_content}] %}
+
+{% if icon_url %}
+  {% set section = {
+    "type": 9,
+    "components": section_components,
+    "accessory": {
+      "type": 11,
+      "media": {"url": icon_url},
+      "description": title
+    }
+  } %}
+{% else %}
+  {% set section = {
+    "type": 9,
+    "components": section_components
+  } %}
+{% endif %}
+
+{% set separator = {"type": 14, "divider": true, "spacing": 1} %}
+{% set desc_component = {"type": 10, "content": description} %}
+
+{% set buttons = [] %}
+{% if primary_label and primary_url %}
+  {% set _ = buttons.append({"type": 2, "style": 5, "label": primary_label, "url": primary_url}) %}
+{% endif %}
+{% if secondary_label and secondary_url %}
+  {% set _ = buttons.append({"type": 2, "style": 5, "label": secondary_label, "url": secondary_url}) %}
+{% endif %}
+
+{% set inner_components = [section, separator, desc_component] %}
+{% if buttons | length > 0 %}
+  {% set action_row = {"type": 1, "components": buttons} %}
+  {% set _ = inner_components.append(action_row) %}
+{% endif %}
+
+{% set payload = {
+  "component": {
+    "type": 17,
+    "accent_color": color_int,
+    "components": inner_components
+  }
+} %}
+<script id="discord:component-embed" type="application/json">
+{{ payload | tojson }}
+</script>
+{% endmacro %}
+
+{% macro server_detail_component_embed(
+  job_id,
+  is_private,
+  is_archived,
+  is_historical,
+  server_status_text,
+  player_count,
+  max_players,
+  uptime_str,
+  top_score,
+  points_rate_str,
+  demand_text,
+  u1_running,
+  u2_running,
+  u1_output_mw,
+  u2_output_mw,
+  u1_aprm,
+  u2_aprm,
+  scram_reason_u1,
+  scram_reason_u2,
+  page_url,
+  browser_url,
+  icon_url
+) %}
+{% set has_scram = (scram_reason_u1 and scram_reason_u1 != "N/A") or (scram_reason_u2 and scram_reason_u2 != "N/A") %}
+{% if has_scram %}
+  {% set color_int = 15680580 %} {# Red #ef4444 #}
+{% elif is_private %}
+  {% set color_int = 11032055 %} {# Purple #a855f7 #}
+{% elif is_archived %}
+  {% set color_int = 439956 %}   {# Cyan #06b6d4 #}
+{% elif is_historical %}
+  {% set color_int = 6583435 %}  {# Slate #64748b #}
+{% else %}
+  {% set color_int = 1096065 %}  {# Green #10b981 #}
+{% endif %}
+
+{% set title_text = "RBWR Server: " ~ job_id %}
+{% set header_content = "## " ~ title_text ~ "\n" ~ server_status_text %}
+{% set section = {
+  "type": 9,
+  "components": [
+    {"type": 10, "content": header_content}
+  ],
+  "accessory": {
+    "type": 11,
+    "media": {"url": icon_url},
+    "description": "RBWR Utility Logo"
+  }
+} %}
+
+{% set separator = {"type": 14, "divider": true, "spacing": 1} %}
+
+{% if is_private %}
+  {% set details_md = "**Status:** Private Server (Restricted Visibility)\n**Uptime:** " ~ uptime_str ~ "\n**Point Generation:** " ~ (points_rate_str | default("N/A")) %}
+{% else %}
+  {% set score_str = (top_score | round(1) | string) ~ " / 100.0" if top_score is not none else "N/A" %}
+  {% set u1_str = ("Running (" ~ (u1_output_mw | default(0) | round(1)) ~ " MW, " ~ (u1_aprm | default(0) | round(1)) ~ "% APRM)") if u1_running else "Offline" %}
+  {% set u2_str = ("Running (" ~ (u2_output_mw | default(0) | round(1)) ~ " MW, " ~ (u2_aprm | default(0) | round(1)) ~ "% APRM)") if u2_running else "Offline" %}
+  {% set details_md = "**Status:** " ~ server_status_text ~ " • **Players:** " ~ (player_count | default(0)) ~ "/" ~ (max_players | default(12)) ~ "\n**Uptime:** " ~ uptime_str ~ " • **Top Score:** " ~ score_str ~ "\n**Point Rate:** " ~ (points_rate_str | default("N/A")) ~ " • **Total Demand:** " ~ (demand_text | default("N/A")) ~ "\n\n**Unit 1:** " ~ u1_str ~ "\n**Unit 2:** " ~ u2_str %}
+  {% if scram_reason_u1 and scram_reason_u1 != "N/A" %}
+    {% set details_md = details_md ~ "\n**SCRAM Alert (Unit 1):** " ~ scram_reason_u1 %}
+  {% endif %}
+  {% if scram_reason_u2 and scram_reason_u2 != "N/A" %}
+    {% set details_md = details_md ~ "\n**SCRAM Alert (Unit 2):** " ~ scram_reason_u2 %}
+  {% endif %}
+{% endif %}
+
+{% set text_comp = {"type": 10, "content": details_md} %}
+
+{% set buttons = [
+  {"type": 2, "style": 5, "label": "View Server Metrics", "url": page_url},
+  {"type": 2, "style": 5, "label": "Browse Servers", "url": browser_url}
+] %}
+{% set action_row = {"type": 1, "components": buttons} %}
+
+{% set payload = {
+  "component": {
+    "type": 17,
+    "accent_color": color_int,
+    "components": [section, separator, text_comp, action_row]
+  }
+} %}
+<script id="discord:component-embed" type="application/json">
+{{ payload | tojson }}
+</script>
+{% endmacro %}

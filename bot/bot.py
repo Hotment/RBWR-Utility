@@ -444,7 +444,7 @@ def _build_alert_payload_dict(
     err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
     err_msg = str(error) if error else "Unknown error"
 
-    mention_content = f"<@{ping_user_id}> [CRITICAL] Exception Alert in {origin}"
+    mention_content = f"<@{ping_user_id}> Critical Exception Alert in {origin}"
 
     embed = disnake.Embed(
         title=f"[{origin}] {err_type}"[:256],
@@ -651,7 +651,7 @@ def report_crash_to_discord(
             return False
 
         admin_url = f"{DEFAULT_SERVER_BASE_URL}/admin/crashes"
-        content = f"<@{ping_user_id}> [CRASH REPORT] Fatal Desktop Overlay Crash (v{version})"
+        content = f"<@{ping_user_id}> Crash Report: Fatal Desktop Overlay Crash (v{version})"
 
         embed = disnake.Embed(
             title=f"Fatal Desktop Application Crash (v{version})",
@@ -1456,9 +1456,9 @@ def build_ticket_panel(
         title=f"Ticket Panel — {'Bug Report' if is_bug else 'Suggestion'} #{ticket_id}",
         description=(
             "**Admin Management Controls**\n"
-            "• Use the dropdown menu below to change ticket state.\n"
-            "• Click **Add Note** / **Edit Note** to attach an official administrator note.\n"
-            "• Click **Open Discussions** to create a community thread and ping the author."
+            "- Use the dropdown menu below to change ticket state.\n"
+            "- Click **Add Note** / **Edit Note** to attach an official administrator note.\n"
+            "- Click **Open Discussions** to create a community thread and ping the author."
         ),
         color=disnake.Color.dark_theme() if hasattr(disnake.Color, "dark_theme") else disnake.Color.blurple(),
         timestamp=datetime.now(timezone.utc)
@@ -2504,13 +2504,13 @@ class ServerBrowserView(disnake.ui.View):
         }
 
         desc_lines = [
-            f"**Filter:** `{filter_names.get(self.filter_status, self.filter_status)}` • **Sort:** `{sort_names.get(self.sort_by, self.sort_by)}`"
+            f"**Filter:** `{filter_names.get(self.filter_status, self.filter_status)}` | **Sort:** `{sort_names.get(self.sort_by, self.sort_by)}`"
         ]
         if self.query:
             desc_lines.append(f"**Search Query:** `{self.query}`")
 
         desc_lines.append(
-            f"**Matching:** `{total_matched}` • **Active Units:** `{active_reactors}` • **Total Gen:** `{total_gen:.2f} pts/s`\n"
+            f"**Matching:** `{total_matched}` | **Active Units:** `{active_reactors}` | **Total Gen:** `{total_gen:.2f} pts/s`\n"
         )
 
         if not page_servers:
@@ -2534,10 +2534,10 @@ class ServerBrowserView(disnake.ui.View):
                 join_url = make_roblox_join_url(jid)
 
                 desc_lines.append(
-                    f"**[`{short}`]({web_url})** • [`Join Game`]({join_url})\n"
+                    f"**[`{short}`]({web_url})** | [`Join Game`]({join_url})\n"
                     f"`Job ID:` `{jid}`\n"
-                    f"• **Score:** `{score_str}/100` | **Points:** `{pts_str}` | **Players:** `{p_display}`\n"
-                    f"• **U1:** {u1_badge} | **U2:** {u2_badge}\n"
+                    f"- **Score:** `{score_str}/100` | **Points:** `{pts_str}` | **Players:** `{p_display}`\n"
+                    f"- **U1:** {u1_badge} | **U2:** {u2_badge}\n"
                 )
 
         embed.description = "\n".join(desc_lines)
@@ -2692,7 +2692,7 @@ class ServerBrowserView(disnake.ui.View):
                 pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
                 top_score = get_server_top_score(s)
                 score_badge = f"Score: {top_score:.1f}" if top_score > 0 else "Score: 0.0"
-                label = f"{short} • {pts_str}"
+                label = f"{short} | {pts_str}"
                 desc = f"{score_badge} | U1: {get_unit_aprm(u1):.0f}% | U2: {get_unit_aprm(u2):.0f}%"
                 inspect_options.append(disnake.SelectOption(
                     label=label[:100],
@@ -3126,7 +3126,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             norm_short = short.lower().replace("-", "")
 
             if not clean_input or clean_input in norm_jid or clean_input in norm_short:
-                label = f"{short} • U1: {u1_aprm:.0f}% | U2: {u2_aprm:.0f}% | {pts_str}"
+                label = f"{short} | U1: {u1_aprm:.0f}% | U2: {u2_aprm:.0f}% | {pts_str}"
                 choices.append(disnake.OptionChoice(name=label[:100], value=short))
                 if len(choices) >= 25:
                     break
@@ -3251,91 +3251,71 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         if final_score >= 80.0:
             score_color = disnake.Color.teal()
-            grade_badge = "[RATING: OPTIMAL]"
+            grade_badge = "Exemplary"
         elif final_score >= 50.0:
             score_color = disnake.Color.gold()
-            grade_badge = "[RATING: DEGRADED]"
+            grade_badge = "Competent"
         else:
             score_color = disnake.Color.red()
-            grade_badge = "[RATING: CRITICAL]"
+            grade_badge = "Low"
 
-        embed = disnake.Embed(
-            title=f"RBWR Performance Score — {short}",
-            description=(
-                f"**Server ID:** `{short}` • **Job ID:** `{job_id}`\n"
-                f"**Window:** Rolling {win_mins:.0f} Minutes • **Half-Life:** 600s\n"
+        color = score_color
+
+        pps_status = "Sustaining Maximum (2.90 pts/s)" if is_sustaining else f"Sub-optimal (-{pps_loss:.1f} pts)"
+        u2_refuel_min = u2.get("refuel_minutes_latest")
+        refuel_state = f"`Refueling ({u2_refuel_min:.1f}m)`" if u2_refuel_min is not None else "`Online / Nominal`"
+        footer_text = f"Players: {players} • RBWR Performance Scoring Engine" if is_pub else "Private Server • RBWR Performance Scoring Engine"
+
+        c_items = [
+            disnake.ui.TextDisplay(
+                f"## RBWR Performance Score — {short}\n"
+                f"**Server ID:** `{short}` | **Job ID:** `{job_id}`\n"
+                f"**Window:** Rolling {win_mins:.0f} Minutes | **Half-Life:** 600s\n"
                 f"**Overall Classification:** `{grade_badge}`"
             ),
-            color=score_color,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        embed.add_field(
-            name="Performance Rating",
-            value=(
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"### Performance Rating\n"
                 f"**Top Score:** `{final_score:.1f}` / 100.0\n"
                 f"**Raw Score:** `{raw_score:.1f}` | **Pre-Penalty:** `{pre_penalty:.1f}`\n"
                 f"**Evaluated Snapshots:** `{eval_count}` of `{tot_count}` in window"
             ),
-            inline=False,
-        )
-
-        pps_status = "[SUSTAINING MAXIMUM 2.90 PTS/S]" if is_sustaining else f"[SUB-OPTIMAL: -{pps_loss:.1f} PTS]"
-        embed.add_field(
-            name="Point Generation Weight",
-            value=(
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"### Point Generation Weight (PPS)\n"
                 f"**Efficiency:** `{efficiency_pct:.1f}%` (Multiplier: `{pps_weight:.4f}`)\n"
                 f"**Average PPS:** `{weighted_pps:.2f} pts/s` (Plant Max: `2.90 pts/s`)\n"
                 f"**Status:** `{pps_status}`"
             ),
-            inline=True,
-        )
-
-        embed.add_field(
-            name="Multi-Unit Synergy",
-            value=(
-                f"**Dual Unit Active:** `{dual_active}` snapshots (+25%)\n"
-                f"**Single Unit Active:** `{single_active}` snapshots (1.0x)\n"
-                f"**Average Synergy:** `{avg_synergy:.2f}x` (Offline: `{inactive_cnt}`)"
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"### Multi-Unit Synergy & Incident Deductions\n"
+                f"**Dual Unit Active:** `{dual_active}` snapshots (+25%) | **Average Synergy:** `{avg_synergy:.2f}x`\n"
+                f"**Total Deduction:** `-{total_deduction:.1f} pts` (Cap: `-25.0 pts`)\n"
+                f"**SCRAMs:** `U1: {u1_scrams}` | `U2: {u2_scrams}` | **Trips:** `U1: {u1_trips}` | `U2: {u2_trips}`"
             ),
-            inline=True,
-        )
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"### Unit Performance\n"
+                f"**Unit 1:** Score `{u1.get('avg_score', 0.0):.1f} pts` (Active: `{u1.get('active_pct', 0.0):.1f}%`)\n"
+                f"Avg Output: `{u1.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u1.get('latest_output_mw', 0.0):.1f} MW`)\n"
+                f"Deadband: Normal `{u1.get('demand_tolerance_count', 0)}` | Deviation `{u1.get('demand_extreme_count', 0)}` | Downtime: Unexcused `{u1.get('downtime_demand_count', 0)}` | LOOP `{u1.get('loop_count', 0)}`\n\n"
+                f"**Unit 2:** Score `{u2.get('avg_score', 0.0):.1f} pts` (Active: `{u2.get('active_pct', 0.0):.1f}%`)\n"
+                f"Avg Output: `{u2.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u2.get('latest_output_mw', 0.0):.1f} MW`)\n"
+                f"Refuel: {refuel_state} | Deadband: Normal `{u2.get('demand_tolerance_count', 0)}` | Deviation `{u2.get('demand_extreme_count', 0)}`"
+            ),
+            disnake.ui.Separator(divider=False),
+            disnake.ui.TextDisplay(f"-# {footer_text}"),
+        ]
 
-        incident_summary = (
-            f"**Total Deduction:** `-{total_deduction:.1f} pts` (Cap: `-25.0 pts`)\n"
-            f"**SCRAMs:** `U1: {u1_scrams}` | `U2: {u2_scrams}`\n"
-            f"**Turbine Trips:** `U1: {u1_trips}` | `U2: {u2_trips}`"
-        )
-        embed.add_field(name="Incident Deductions", value=incident_summary, inline=False)
-
-        u1_text = (
-            f"**Score:** `{u1.get('avg_score', 0.0):.1f} pts` (Active: `{u1.get('active_pct', 0.0):.1f}%`)\n"
-            f"**Avg Output:** `{u1.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u1.get('latest_output_mw', 0.0):.1f} MW`)\n"
-            f"**Deadband Compliance:** `[OK: {u1.get('demand_tolerance_count', 0)}]` `[DEVIATION: {u1.get('demand_extreme_count', 0)}]`\n"
-            f"**Downtime / LOOP:** `[DOWNTIME: {u1.get('downtime_demand_count', 0)}]` `[LOOP: {u1.get('loop_count', 0)}]`"
-        )
-        embed.add_field(name="Unit 1 Performance", value=u1_text, inline=True)
-
-        u2_refuel_min = u2.get("refuel_minutes_latest")
-        refuel_state = f"`[REFUEL: {u2_refuel_min:.1f}m]`" if u2_refuel_min is not None else "`[ONLINE / NOMINAL]`"
-        u2_text = (
-            f"**Score:** `{u2.get('avg_score', 0.0):.1f} pts` (Active: `{u2.get('active_pct', 0.0):.1f}%`)\n"
-            f"**Avg Output:** `{u2.get('avg_output_mw', 0.0):.1f} MW` (Latest: `{u2.get('latest_output_mw', 0.0):.1f} MW`)\n"
-            f"**Deadband Compliance:** `[OK: {u2.get('demand_tolerance_count', 0)}]` `[DEVIATION: {u2.get('demand_extreme_count', 0)}]`\n"
-            f"**Refuel Status:** {refuel_state}\n"
-            f"**Downtime / LOOP:** `[DOWNTIME: {u2.get('downtime_demand_count', 0)}]` `[LOOP: {u2.get('loop_count', 0)}]`"
-        )
-        embed.add_field(name="Unit 2 Performance", value=u2_text, inline=True)
-
-        footer_text = f"Players: {players} • RBWR Performance Scoring Engine" if is_pub else "Private Server • RBWR Performance Scoring Engine"
-        embed.set_footer(text=footer_text)
-
-        view = disnake.ui.View(timeout=180)
+        buttons = []
         if is_pub:
-            view.add_item(disnake.ui.Button(label="Join in Roblox", url=make_roblox_join_url(job_id)))
-        view.add_item(disnake.ui.Button(label="Open Score Breakdown", url=make_web_server_url(job_id)))
+            buttons.append(disnake.ui.Button(label="Join in Roblox", url=make_roblox_join_url(job_id)))
+        buttons.append(disnake.ui.Button(label="Open Score Breakdown", url=make_web_server_url(job_id)))
+        c_items.append(disnake.ui.ActionRow(*buttons))
 
-        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        container = disnake.ui.Container(*c_items, accent_colour=color)
+        await inter.followup.send(components=[container], ephemeral=ephemeral)
 
     @score_command.autocomplete("id")
     async def score_id_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
@@ -3414,39 +3394,35 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         color = disnake.Color.red() if scram_risk else disnake.Color.teal()
 
-        desc_text = f""
+        c_items = []
+        header_text = f"## RBWR Thermal Power Solver — Unit {unit}"
         if synced_note:
-            desc_text += f"\n{synced_note}"
+            header_text += f"\n{synced_note}"
+        c_items.append(disnake.ui.TextDisplay(header_text))
+        c_items.append(disnake.ui.Separator(divider=True))
 
-        embed = disnake.Embed(
-            title=f"RBWR Thermal Power Solver — Unit {unit}",
-            description=desc_text,
-            color=color,
-            timestamp=datetime.now(timezone.utc),
+        metrics_text = (
+            f"**Generator Demand:** `{net_demand:.1f} MWe` | **Target APRM / RTP:** `{thermal:.2f}%`\n"
+            f"**Gross Output:** `{gen_load:.1f} MWe` | **Station Usage:** `{usage:.1f} MWe`\n"
+            f"**Steam Flow:** `{flow:.1f} kg/s`"
         )
-
-        embed.add_field(name="Generator Demand", value=f"`{net_demand:.1f} MWe`", inline=True)
-        embed.add_field(name="Target APRM / RTP", value=f"`{thermal:.2f}%`", inline=True)
-        embed.add_field(name="Steam Flow", value=f"`{flow:.1f} kg/s`", inline=True)
-        embed.add_field(name="Gross Output", value=f"`{gen_load:.1f} MWe`", inline=True)
-        embed.add_field(name="Station Load (Usage)", value=f"`{usage:.1f} MWe`", inline=True)
+        c_items.append(disnake.ui.TextDisplay(metrics_text))
 
         reg_params = res.get("parameters", {})
         if reg_params:
+            c_items.append(disnake.ui.Separator(divider=True))
+            param_lines = ["### Estimated Plant Parameters (Regression)"]
             if unit == 1:
                 tcv = reg_params.get("TCV")
                 crp = reg_params.get("CRP")
                 dio_in = reg_params.get("DIO Intake")
                 dio_out = reg_params.get("DIO Output")
-                lines = []
-                if crp is not None:
-                    lines.append(f"**Condenser Recirc Pump:** `{crp:.2f}%`")
                 if tcv is not None:
-                    lines.append(f"**Turbine Control Valve:** `{tcv:.2f}%`")
+                    param_lines.append(f"**Turbine Control Valve:** `{tcv:.2f}%`")
+                if crp is not None:
+                    param_lines.append(f"**Condenser Recirc Pump:** `{crp:.2f}%`")
                 if dio_in is not None and dio_out is not None:
-                    lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
-                if lines:
-                    embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
+                    param_lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
             else:
                 tcv = reg_params.get("TCV")
                 crp = reg_params.get("CRP")
@@ -3457,36 +3433,51 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 ocl = reg_params.get("OCL")
                 ocv = reg_params.get("OCV")
                 mcv = reg_params.get("MCV")
-                lines = []
-                if crp is not None and tcv is not None:
-                    lines.append(f"**Condenser Recirc:** `{crp:.2f}%` • **Turbine Valve:** `{tcv:.2f}%`")
-                if sjae is not None and mss is not None:
-                    lines.append(f"**Air Ejector:** `{sjae:.2f}%` • **Steam Sealing:** `{mss:.2f}%`")
+                if tcv is not None:
+                    param_lines.append(f"**Turbine Control Valve:** `{tcv:.2f}%`")
+                if crp is not None and sjae is not None:
+                    param_lines.append(f"**Condenser Recirc:** `{crp:.2f}%` | **SJAE:** `{sjae:.2f}%`")
+                elif crp is not None:
+                    param_lines.append(f"**Condenser Recirc:** `{crp:.2f}%`")
+                elif sjae is not None:
+                    param_lines.append(f"**SJAE:** `{sjae:.2f}%`")
+
                 if dio_in is not None and dio_out is not None:
-                    lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
-                if ocv is not None and mcv is not None and ocl is not None:
-                    lines.append(f"**Oil Cooling:** `{ocl:.2f}%` • **Valves (OCV / MCV):** `{ocv:.2f}%` / `{mcv:.2f}%`")
-                if lines:
-                    embed.add_field(name="Estimated Plant Parameters (Regression)", value="\n".join(lines), inline=False)
+                    param_lines.append(f"**Deaerator In / Out:** `{dio_in:.2f}%` / `{dio_out:.2f}%`")
+
+                if ocl is not None and mss is not None:
+                    param_lines.append(f"**Oil Cooling:** `{ocl:.2f}%` | **Steam Sealing:** `{mss:.2f}%`")
+                elif ocl is not None:
+                    param_lines.append(f"**Oil Cooling:** `{ocl:.2f}%`")
+                elif mss is not None:
+                    param_lines.append(f"**Steam Sealing:** `{mss:.2f}%`")
+
+                if ocv is not None and mcv is not None:
+                    param_lines.append(f"**Coolant Valves:** `{ocv:.2f}%` / `{mcv:.2f}%`")
+                elif ocv is not None:
+                    param_lines.append(f"**Oil Cooler Valve:** `{ocv:.2f}%`")
+                elif mcv is not None:
+                    param_lines.append(f"**Motor Coolant Valve:** `{mcv:.2f}%`")
+            c_items.append(disnake.ui.TextDisplay("\n".join(param_lines)))
 
         if scram_risk:
-            embed.add_field(
-                name="[WARNING] Overpower SCRAM Threshold Exceeded",
-                value=(
-                    f"Calculated thermal output `{thermal:.2f}%` exceeds the reactor protection trip limit of `{scram_limit:.1f}%` APRM."
-                ),
-                inline=False,
-            )
+            c_items.append(disnake.ui.Separator(divider=True))
+            c_items.append(disnake.ui.TextDisplay(
+                f"**Warning: Overpower SCRAM Threshold Exceeded**\n"
+                f"Calculated thermal output `{thermal:.2f}%` exceeds the reactor protection trip limit of `{scram_limit:.1f}%` APRM."
+            ))
 
-        embed.set_footer(text="RBWR Reactor Physics Solver")
+        c_items.append(disnake.ui.Separator(divider=False))
+        c_items.append(disnake.ui.TextDisplay("-# RBWR Reactor Physics Solver"))
 
-        view = disnake.ui.View(timeout=180)
-        view.add_item(disnake.ui.Button(label="Open Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator"))
+        buttons = [disnake.ui.Button(label="Open Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator")]
         if synced_server and is_server_public(synced_server):
             s_jid = str(synced_server.get("jobId", ""))
-            view.add_item(disnake.ui.Button(label="Join Synced Server", url=make_roblox_join_url(s_jid)))
+            buttons.append(disnake.ui.Button(label="Join Synced Server", url=make_roblox_join_url(s_jid)))
+        c_items.append(disnake.ui.ActionRow(*buttons))
 
-        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        container = disnake.ui.Container(*c_items, accent_colour=color)
+        await inter.followup.send(components=[container], ephemeral=ephemeral)
 
     @calc_command.autocomplete("server")
     async def calc_server_autocomplete(inter: disnake.ApplicationCommandInteraction, user_input: str):
@@ -3526,42 +3517,44 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         if len(notes) > 850:
             notes = notes[:850].rsplit("\n", 1)[0] + "\n..."
 
-        embed = disnake.Embed(
-            title=f"RBWR APR Overlay — {name}",
-            description=(
+        c_items = [
+            disnake.ui.TextDisplay(
+                f"## RBWR APR Overlay — {name}\n"
                 "Official real-time reactor monitoring overlay client for RBWR.\n"
                 "Engineered with Avalonia UI (.NET 8) for low-latency operational metrics and cross-platform desktop integration."
             ),
-            color=disnake.Color.blurple(),
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        embed.add_field(name="Version", value=f"`{tag_name}`", inline=True)
-        if rel_date:
-            embed.add_field(name="Release Date", value=f"`{rel_date}`", inline=True)
-        embed.add_field(name="Supported Platforms", value="`Windows x64` / `Linux`", inline=True)
-
-        embed.add_field(name="Release Notes", value=f"```markdown\n{notes}\n```", inline=False)
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"**Version:** `{tag_name}`" + (f" | **Release Date:** `{rel_date}`" if rel_date else "") +
+                " | **Platforms:** `Windows x64` / `Linux`"
+            ),
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(f"### Release Notes\n```markdown\n{notes}\n```"),
+        ]
 
         assets = rel.get("assets", [])
         if assets:
-            asset_lines = []
+            asset_lines = ["### Package Downloads"]
             for a in assets[:5]:
                 a_name = a.get("name", "Asset")
                 a_url = a.get("download_url") or html_url
                 a_size = a.get("size")
                 size_str = f" ({a_size // 1048576} MB)" if isinstance(a_size, int) and a_size > 0 else ""
-                asset_lines.append(f"• [{a_name}]({a_url}){size_str}")
-            embed.add_field(name="Package Downloads", value="\n".join(asset_lines), inline=False)
+                asset_lines.append(f"- [{a_name}]({a_url}){size_str}")
+            c_items.append(disnake.ui.Separator(divider=True))
+            c_items.append(disnake.ui.TextDisplay("\n".join(asset_lines)))
 
-        embed.set_footer(text="RBWR APR Overlay Client • Verified Release Build")
+        c_items.append(disnake.ui.Separator(divider=False))
+        c_items.append(disnake.ui.TextDisplay("-# RBWR APR Overlay Client • Verified Release Build"))
 
-        view = disnake.ui.View(timeout=180)
-        view.add_item(disnake.ui.Button(label="Download Latest Release", url=download_url))
-        view.add_item(disnake.ui.Button(label="View on GitHub", url=html_url))
-        view.add_item(disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL))
+        c_items.append(disnake.ui.ActionRow(
+            disnake.ui.Button(label="Download Latest Release", url=download_url),
+            disnake.ui.Button(label="View on GitHub", url=html_url),
+            disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL),
+        ))
 
-        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        container = disnake.ui.Container(*c_items, accent_colour=disnake.Color.blurple())
+        await inter.followup.send(components=[container], ephemeral=ephemeral)
 
     @b.slash_command(
         name="fleet",
@@ -3585,14 +3578,13 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
         total_public = len(servers)
         if total_public == 0:
-            embed = disnake.Embed(
-                title="RBWR Reactor Fleet Overview",
-                description="No public reactor instances are currently online or reporting snapshot data.",
-                color=disnake.Color.dark_grey(),
-                timestamp=datetime.now(timezone.utc),
+            container = disnake.ui.Container(
+                disnake.ui.TextDisplay("## RBWR Reactor Fleet Overview\nNo public reactor instances are currently online or reporting snapshot data."),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Fleet Network • All Cores Inactive"),
+                accent_colour=disnake.Color.dark_grey(),
             )
-            embed.set_footer(text="RBWR Fleet Network • All Cores Inactive")
-            await inter.followup.send(embed=embed, ephemeral=ephemeral)
+            await inter.followup.send(components=[container], ephemeral=ephemeral)
             return
 
         total_mw = 0.0
@@ -3645,56 +3637,236 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         total_possible_reactors = total_public * 2
         capacity_pct = (total_reactors / total_possible_reactors * 100.0) if total_possible_reactors > 0 else 0.0
 
-        embed = disnake.Embed(
-            title="RBWR Reactor Fleet Overview",
-            description=(
-                f"**Active Public Instances:** `{total_public}`\n"
-                f"**Fleet Core Utilization:** `{total_reactors}/{total_possible_reactors}` Cores Online (`{capacity_pct:.1f}%`)"
+        incident_status = f"`{incident_count}` active alerts" if incident_count > 0 else "`Nominal (No Trips)`"
+
+        c_items = [
+            disnake.ui.TextDisplay(
+                f"## RBWR Reactor Fleet Overview\n"
+                f"**Active Public Instances:** `{total_public}` | "
+                f"**Core Utilization:** `{total_reactors}/{total_possible_reactors}` Cores Online (`{capacity_pct:.1f}%`)"
             ),
-            color=disnake.Color.teal(),
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        embed.add_field(name="Fleet Power Generation", value=f"`{total_mw:,.1f} MWe`", inline=True)
-        embed.add_field(name="Fleet Generation Rate", value=f"`{total_pps:.2f} pts/s`", inline=True)
-        embed.add_field(name="Active Operators", value=f"`{total_players}` players online", inline=True)
-
-        embed.add_field(
-            name="Operational Core Units",
-            value=f"**Unit 1 Active:** `{u1_running}`\n**Unit 2 Active:** `{u2_running}`",
-            inline=True,
-        )
-
-        incident_status = f"`{incident_count}` active alerts" if incident_count > 0 else "`[NOMINAL - NO TRIPS]`"
-        embed.add_field(
-            name="Fleet Alerts / SCRAMs",
-            value=incident_status,
-            inline=True,
-        )
+            disnake.ui.Separator(divider=True),
+            disnake.ui.TextDisplay(
+                f"**Fleet Generation:** `{total_mw:,.1f} MWe` | **Fleet PPS Rate:** `{total_pps:.2f} pts/s`\n"
+                f"**Active Operators:** `{total_players}` players online | **Fleet Status:** {incident_status}\n"
+                f"**Operational Units:** Unit 1 Active: `{u1_running}` | Unit 2 Active: `{u2_running}`"
+            ),
+        ]
 
         if top_server:
+            c_items.append(disnake.ui.Separator(divider=True))
             top_jid = str(top_server.get("jobId", "unknown"))
             top_short = client.short_id(top_jid)
             top_u1 = get_unit_state(top_server, 1)
             top_u2 = get_unit_state(top_server, 2)
             top_pps = get_server_points_rate(top_server) or 0.0
             top_summary = (
-                f"**Server ID:** `{top_short}` (`{top_jid}`)\n"
+                f"### Flagship Server: `{top_short}`\n"
                 f"**Performance Rating:** Top Score `{top_score:.1f}`\n"
                 f"**Output:** `{top_mw:.1f} MWe` | **Rate:** `{top_pps:.2f} pts/s`\n"
-                f"**Cores:** `[U1: {get_unit_aprm(top_u1):.0f}% APRM]` `[U2: {get_unit_aprm(top_u2):.0f}% APRM]`"
+                f"**Cores:** U1: `{get_unit_aprm(top_u1):.0f}% APRM` | U2: `{get_unit_aprm(top_u2):.0f}% APRM`\n"
+                f"**Job ID:** `{top_jid}`"
             )
-            embed.add_field(name="Flagship Server (Top Performance)", value=top_summary, inline=False)
+            c_items.append(disnake.ui.TextDisplay(top_summary))
 
-        embed.set_footer(text="RBWR Fleet Operations • Real-time Public Network Status")
+        c_items.append(disnake.ui.Separator(divider=False))
+        c_items.append(disnake.ui.TextDisplay("-# RBWR Fleet Operations • Real-time Public Network Status"))
 
-        view = disnake.ui.View(timeout=180)
-        view.add_item(disnake.ui.Button(label="Open Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"))
+        buttons = [
+            disnake.ui.Button(label="Open Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+        ]
         if top_server and is_server_public(top_server):
             top_jid = str(top_server.get("jobId", ""))
-            view.add_item(disnake.ui.Button(label="Join Flagship Server", url=make_roblox_join_url(top_jid)))
+            if top_jid:
+                buttons.append(disnake.ui.Button(label="Join Flagship Server", url=make_roblox_join_url(top_jid)))
+        c_items.append(disnake.ui.ActionRow(*buttons))
 
-        await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        container = disnake.ui.Container(*c_items, accent_colour=disnake.Color.teal())
+        await inter.followup.send(components=[container], ephemeral=ephemeral)
+
+    @b.slash_command(
+        name="help",
+        description="View guidance, syntax, and operational references for all RBWR Utility commands",
+        install_types=disnake.ApplicationInstallTypes.all(),
+        contexts=disnake.InteractionContextTypes.all(),
+    )
+    async def help_command(
+        inter: disnake.ApplicationCommandInteraction,
+        command: str = commands.Param(
+            default="all",
+            description="Specific command to inspect",
+            choices=[
+                disnake.OptionChoice(name="All Commands (Reference Manual)", value="all"),
+                disnake.OptionChoice(name="/calc — Core Thermal & Parameter Solver", value="calc"),
+                disnake.OptionChoice(name="/score — Performance Scoring Engine", value="score"),
+                disnake.OptionChoice(name="/fleet — Fleet Overview & Capacity", value="fleet"),
+                disnake.OptionChoice(name="/servers — Interactive Server Browser", value="servers"),
+                disnake.OptionChoice(name="/server — Server Detail Deep-Dive", value="server"),
+                disnake.OptionChoice(name="/download — Overlay Client & Releases", value="download"),
+            ],
+        ),
+        ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
+    ):
+        await inter.response.defer(ephemeral=ephemeral)
+
+        choice = (command or "all").strip().lower()
+        c_items = []
+
+        if choice == "calc":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/calc`\nReactor Core Thermodynamic & Electrical Solver"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/calc [unit: 1|2] [demand: MWe] [aprm: %] [recirc_override: %] [server: ID]`\n\n"
+                    "**Operational Features:**\n"
+                    "- **Bidirectional Solving:** Pass `demand` (MWe) to compute required APRM % and steam flow, or pass `aprm` (%) to compute expected generator load and net output.\n"
+                    "- **Live Server Sync:** Autocomplete and specify `server` to sync target electrical demand directly from a live Roblox server.\n"
+                    "- **Recirculation Pump:** Automatically calculates pump speed from APRM or accepts manual override (0-100%).\n"
+                    "- **Empirical Regression:** Evaluates Turbine Control Valve (TCV), Condenser Recirc (CRP), Steam Jet Air Ejector (SJAE), Deaerator In/Out (DIO), Oil Cooling (OCL), Main Steam Sealing (MSS), and Coolant Valves (OCV/MCV).\n"
+                    "- **Trip Limit Warning:** Flags overpower trip danger when APRM exceeds 108.0%."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Reactor Physics Solver • API: /api/calculate"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Open Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator"),
+                    disnake.ui.Button(label="Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                ),
+            ]
+        elif choice == "score":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/score`\n60-Minute Rolling Window Server Performance Rating"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/score <id: Job ID or 4-digit Server ID>`\n\n"
+                    "**Scoring Engine Metrics:**\n"
+                    "- **Exponential Half-Life Decay:** Snapshots decay with a 600s (10-minute) half-life. Current snapshot receives a 1.50x priority multiplier, previous receives 1.25x.\n"
+                    "- **Point Generation Sustainability:** Evaluates actual points/sec sustained against maximum plant threshold of 2.90 pts/s (1.20 U1 + 1.70 U2). Sub-optimal generation proportionally scales down the score.\n"
+                    "- **Deadband Compliance:** Generation within ±40 MW of demand setpoint receives full credit. Unexcused downtime outside 60s demand grace period incurs severe penalties.\n"
+                    "- **Multi-Unit Synergy:** +25% synergy bonus when both units generate simultaneously.\n"
+                    "- **Incident Deductions:** -5.0 pts per SCRAM or Turbine Trip in the rolling window (capped at -25.0 pts max)."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Performance Engine • Rolling 60-Minute Window"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                    disnake.ui.Button(label="Points Graph", url=f"{DEFAULT_SERVER_BASE_URL}/points-graph"),
+                ),
+            ]
+        elif choice == "fleet":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/fleet`\nNetwork-Wide Generation & Reactor Core Overview"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/fleet`\n\n"
+                    "**Monitored Fleet Metrics:**\n"
+                    "- **Core Capacity:** Active operational reactor cores vs total network capacity.\n"
+                    "- **Grid Output:** Summed real-time power generation (MWe) across all public instances.\n"
+                    "- **Fleet Generation Rate:** Aggregate points generated per second across all reactors.\n"
+                    "- **Flagship Server:** Top-rated reactor server instance by Top Score and output."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Fleet Operations • Real-time Network Analytics"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Fleet Overview", url=f"{DEFAULT_SERVER_BASE_URL}/fleet"),
+                    disnake.ui.Button(label="Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                ),
+            ]
+        elif choice == "servers":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/servers`\nInteractive Real-Time Server Browser"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/servers [search: query] [sort_by: points|score|players|id] [filter: all|top|running|scram]`\n\n"
+                    "**Browser Features:**\n"
+                    "- **Search & Query:** Search by short 4-digit Server ID, Job ID, or player name.\n"
+                    "- **Sorting Modes:** Sort instances by points per second, Top Score, online players, or ID.\n"
+                    "- **Filter Options:** Narrow down to running cores, SCRAM incidents, or top performing flagship servers.\n"
+                    "- **Interactive Navigation:** Page through servers, expand detailed instance views, and launch directly into Roblox."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Server Browser • Live Grid Tracking"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Open Web Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                    disnake.ui.Button(label="Web Dashboard", url=DEFAULT_SERVER_BASE_URL),
+                ),
+            ]
+        elif choice == "server":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/server`\nSingle Server Instance Deep-Dive"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/server <id: Server ID or Job ID> [info: metric_choice]`\n\n"
+                    "**Inspection Features:**\n"
+                    "- **Direct Lookup:** Enter short ID (e.g. `1234`) or full Roblox Job ID.\n"
+                    "- **Specific Metric Query:** Query specific operational values (`APRM`, `RTP`, `Xenon`, `Reactor Temp`, `Output (MW)`, `Recirc1/2`, `Turbine RPM`, `Points / sec`, `SCRAM reason`).\n"
+                    "- **Join Action:** Includes direct launch URL to join the Roblox instance."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Reactor Inspection"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                ),
+            ]
+        elif choice == "download":
+            c_items = [
+                disnake.ui.TextDisplay("## Command Reference — `/download`\nRBWR APR Overlay Desktop Client"),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "**Syntax:** `/download`\n\n"
+                    "**Desktop Application Overview:**\n"
+                    "- **Client Technology:** Built with Avalonia UI (.NET 8) for hardware-accelerated, transparent overlay performance.\n"
+                    "- **Cross-Platform:** Binaries available for Windows x64 and Linux.\n"
+                    "- **Automated Release Tracking:** Fetches latest version and release notes directly from GitHub Releases."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Desktop Client Distribution"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="GitHub Releases", url="https://github.com/Hotment/RBWR-Utility/releases/latest"),
+                    disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL),
+                ),
+            ]
+        else:
+            c_items = [
+                disnake.ui.TextDisplay("## RBWR Utility — Command Reference Manual\nReal-time reactor monitoring, physics solving, and fleet scoring platform."),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "### Reactor Physics & Calculations\n"
+                    "- `/calc [unit] [demand] [aprm] [recirc_override] [server]`\n"
+                    "  Calculates thermal power (APRM %), steam flow, station load, and empirical plant parameters.\n\n"
+                    "- `/score <id>`\n"
+                    "  Evaluates 60-minute rolling window performance rating, point generation weight (PPS), and synergy."
+                ),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "### Fleet & Instance Monitoring\n"
+                    "- `/fleet`\n"
+                    "  Overview of network-wide public reactors, total generation (MWe), core utilization, and flagship server.\n\n"
+                    "- `/servers [search] [sort_by] [filter]`\n"
+                    "  Interactive server browser with live pagination, sorting, and direct Roblox launch links.\n\n"
+                    "- `/server <id>`\n"
+                    "  Detailed inspection of a specific reactor server instance.\n\n"
+                    "- `/serverlist [filter]`\n"
+                    "  Compact tabular view of active public servers."
+                ),
+                disnake.ui.Separator(divider=True),
+                disnake.ui.TextDisplay(
+                    "### Client & Platform\n"
+                    "- `/download`\n"
+                    "  Get latest version, installer packages (Windows/Linux), and release notes for RBWR APR Overlay.\n\n"
+                    "- `/help [command]`\n"
+                    "  Display this command reference manual or detailed parameter syntax for a specific command."
+                ),
+                disnake.ui.Separator(divider=False),
+                disnake.ui.TextDisplay("-# RBWR Utility • Nuclear Instrumentation & Grid Analytics"),
+                disnake.ui.ActionRow(
+                    disnake.ui.Button(label="Web Dashboard", url=DEFAULT_SERVER_BASE_URL),
+                    disnake.ui.Button(label="Server Browser", url=f"{DEFAULT_SERVER_BASE_URL}/servers"),
+                    disnake.ui.Button(label="Web Calculator", url=f"{DEFAULT_SERVER_BASE_URL}/calculator"),
+                ),
+            ]
+
+        container = disnake.ui.Container(*c_items, accent_colour=disnake.Color.teal())
+        await inter.followup.send(components=[container], ephemeral=ephemeral)
 
     @b.listen("on_interaction")
     async def global_ticket_interaction_listener(inter: disnake.Interaction):
@@ -4006,9 +4178,9 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         me = inter.guild.me
         if me:
             if not me.guild_permissions.manage_roles:
-                warnings.append("[WARNING] Bot lacks 'Manage Roles' permission in this server.")
+                warnings.append("Warning: Bot lacks 'Manage Roles' permission in this server.")
             if role >= me.top_role:
-                warnings.append(f"[WARNING] Role '{role.name}' is higher than or equal to bot's highest role '{me.top_role.name}'. Move the bot's role above this role in Server Settings > Roles.")
+                warnings.append(f"Warning: Role '{role.name}' is higher than or equal to bot's highest role '{me.top_role.name}'. Move the bot's role above this role in Server Settings > Roles.")
 
         embed = disnake.Embed(
             title="Autorole Configuration Updated",
@@ -4066,10 +4238,10 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             if me:
                 if not me.guild_permissions.manage_roles:
                     can_assign = False
-                    perm_msg = "[MISSING] Bot lacks 'Manage Roles' permission"
+                    perm_msg = "Bot lacks 'Manage Roles' permission"
                 if target_role >= me.top_role:
                     can_assign = False
-                    hierarchy_msg = f"[CONFLICT] Target role >= Bot top role ({me.top_role.name})"
+                    hierarchy_msg = f"Role hierarchy conflict: Target role >= Bot top role ({me.top_role.name})"
 
             embed.add_field(name="Bot Permission", value=perm_msg, inline=False)
             embed.add_field(name="Role Hierarchy", value=hierarchy_msg, inline=False)
