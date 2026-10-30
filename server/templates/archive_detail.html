@@ -26,7 +26,7 @@
     primary_label="View Daily Archive",
     primary_url=request.url if request else url_for('archive_detail_page', date_str=date_str, _external=True),
     secondary_label="All Archives",
-    secondary_url=url_for('archives_page', _external=True),
+    secondary_url=url_for('browse_archives_page', _external=True),
     icon_url=url_for('static', filename='favicon.png', _external=True)
 ) }}
 {% endblock %}
