@@ -100,7 +100,7 @@
 {% if is_private %}
   {% set details_md = "**Status:** Private Server (Restricted Visibility)\n**Uptime:** " ~ uptime_str ~ "\n**Point Generation:** " ~ (points_rate_str | default("N/A")) %}
 {% else %}
-  {% set score_str = (top_score | round(1) | string) ~ " / 100.0" if top_score is not none else "N/A" %}
+  {% set score_str = (top_score | fmt_score) ~ " / 100" if top_score is not none else "N/A" %}
   {% set u1_str = ("Running (" ~ (u1_output_mw | default(0) | round(1)) ~ " MW, " ~ (u1_aprm | default(0) | round(1)) ~ "% APRM)") if u1_running else "Offline" %}
   {% set u2_str = ("Running (" ~ (u2_output_mw | default(0) | round(1)) ~ " MW, " ~ (u2_aprm | default(0) | round(1)) ~ "% APRM)") if u2_running else "Offline" %}
   {% set details_md = "**Status:** " ~ server_status_text ~ " • **Players:** " ~ (player_count | default(0)) ~ "/" ~ (max_players | default(12)) ~ "\n**Uptime:** " ~ uptime_str ~ " • **Top Score:** " ~ score_str ~ "\n**Point Rate:** " ~ (points_rate_str | default("N/A")) ~ " • **Total Demand:** " ~ (demand_text | default("N/A")) ~ "\n\n**Unit 1:** " ~ u1_str ~ "\n**Unit 2:** " ~ u2_str %}

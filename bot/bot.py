@@ -2238,6 +2238,15 @@ def get_server_top_score(server: dict[str, Any]) -> float:
         return round(min(100.0, (pts / 2.9) * 100.0), 1)
     return 0.0
 
+def format_top_score(val: float | int | None) -> str:
+    if val is None:
+        return "0"
+    try:
+        s = f"{float(val):.1f}"
+        return s[:-2] if s.endswith(".0") else s
+    except (ValueError, TypeError):
+        return "0"
+
 def get_unit_state(server: dict[str, Any], unit: int) -> dict[str, Any]:
     if not isinstance(server, dict):
         return {}
@@ -2513,7 +2522,7 @@ class ServerBrowserView(disnake.ui.View):
                 pts = get_server_points_rate(s)
                 pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
                 top_score = get_server_top_score(s)
-                score_str = f"{top_score:.1f}" if top_score > 0 else "0.0"
+                score_str = format_top_score(top_score) if top_score > 0 else "0"
                 players = get_player_count(s)
                 p_display = f"{players}/12" if players != "?" else "?"
                 web_url = make_web_server_url(jid)
@@ -2540,7 +2549,7 @@ class ServerBrowserView(disnake.ui.View):
         pts = get_server_points_rate(server)
         pts_str = f"{pts:.4f}".rstrip("0").rstrip(".") + " pts/s" if pts is not None else "N/A"
         top_score = get_server_top_score(server)
-        score_str = f"{top_score:.1f}/100" if top_score > 0 else "0.0/100"
+        score_str = f"{format_top_score(top_score)}/100" if top_score > 0 else "0/100"
         is_pub = is_server_public(server)
         vis_label = "Public" if is_pub else "Private"
         players = get_player_count(server)
@@ -2673,7 +2682,7 @@ class ServerBrowserView(disnake.ui.View):
                 pts = get_server_points_rate(s)
                 pts_str = f"{pts:.2f} pts/s" if pts is not None else "N/A"
                 top_score = get_server_top_score(s)
-                score_badge = f"Score: {top_score:.1f}" if top_score > 0 else "Score: 0.0"
+                score_badge = f"Score: {format_top_score(top_score)}" if top_score > 0 else "Score: 0"
                 label = f"{short} | {pts_str}"
                 desc = f"{score_badge} | U1: {get_unit_aprm(u1):.0f}% | U2: {get_unit_aprm(u2):.0f}%"
                 inspect_options.append(disnake.SelectOption(
@@ -3256,8 +3265,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             disnake.ui.Separator(divider=True),
             disnake.ui.TextDisplay(
                 f"### Performance Rating\n"
-                f"**Top Score:** `{final_score:.1f}` / 100.0\n"
-                f"**Raw Score:** `{raw_score:.1f}` | **Pre-Penalty:** `{pre_penalty:.1f}`\n"
+                f"**Top Score:** `{format_top_score(final_score)}` / 100\n"
+                f"**Raw Score:** `{format_top_score(raw_score)}` | **Pre-Penalty:** `{format_top_score(pre_penalty)}`\n"
                 f"**Evaluated Snapshots:** `{eval_count}` of `{tot_count}` in window"
             ),
             disnake.ui.Separator(divider=True),
@@ -3640,7 +3649,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             top_pps = get_server_points_rate(top_server) or 0.0
             top_summary = (
                 f"### Flagship Server: `{top_short}`\n"
-                f"**Performance Rating:** Top Score `{top_score:.1f}`\n"
+                f"**Performance Rating:** Top Score `{format_top_score(top_score)}`\n"
                 f"**Output:** `{top_mw:.1f} MWe` | **Rate:** `{top_pps:.2f} pts/s`\n"
                 f"**Cores:** U1: `{get_unit_aprm(top_u1):.0f}% APRM` | U2: `{get_unit_aprm(top_u2):.0f}% APRM`\n"
                 f"**Job ID:** `{top_jid}`"

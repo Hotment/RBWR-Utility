@@ -477,8 +477,12 @@
 
     function renderScoreBreakdownUI(bd) {
         const score = bd.top_score || 0.0;
+        const fmtScore = (v) => {
+            const s = Number(v || 0).toFixed(1);
+            return s.endsWith('.0') ? s.slice(0, -2) : s;
+        };
         const finalScoreEl = document.getElementById('scoreModalFinalScore');
-        if (finalScoreEl) finalScoreEl.textContent = score.toFixed(1);
+        if (finalScoreEl) finalScoreEl.textContent = fmtScore(score);
 
         const ratingPill = document.getElementById('scoreModalRatingPill');
         if (ratingPill) {

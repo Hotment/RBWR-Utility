@@ -194,6 +194,16 @@ def hex_to_int_filter(val, default=3900150):
     except Exception:
         return default
 
+@app.template_filter("fmt_score")
+def fmt_score_filter(val):
+    if val is None:
+        return "0"
+    try:
+        s = f"{float(val):.1f}"
+        return s[:-2] if s.endswith(".0") else s
+    except Exception:
+        return str(val)
+
 def _global_threading_excepthook(args):
     try:
         exc_type = args.exc_type
