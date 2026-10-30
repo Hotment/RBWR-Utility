@@ -326,8 +326,6 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         out1 = get_unit_output_mw(u1)
         pps1 = u1.get("PointsPerSecond")
         turb1 = u1.get("TurbineHealth")
-        scram1 = u1.get("SCRAMreason")
-        trip1 = u1.get("TRIPreason")
 
         if prev_d1 is not None and d1 != prev_d1:
             last_d1_change = epoch
@@ -413,20 +411,6 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                         u1_turb_count += 1
                     except (ValueError, TypeError):
                         pass
-
-                has_scram = scram1 and str(scram1).strip().lower() not in ("none", "", "null", "false", "0")
-                has_trip = trip1 and str(trip1).strip().lower() not in ("none", "", "null", "false", "0")
-                if has_scram or has_trip:
-                    scram_trip_count += 1
-                    u1_score *= 0.4
-                    if has_scram:
-                        u1_scrams += 1
-                        u1_scram_reasons.append(str(scram1).strip())
-                        u1_desc += f" (SCRAM: {scram1})"
-                    if has_trip:
-                        u1_trips += 1
-                        u1_trip_reasons.append(str(trip1).strip())
-                        u1_desc += f" (Trip: {trip1})"
         elif is_loop_1:
             u1_score = 50.0
             u1_loop_count += 1
@@ -451,8 +435,6 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         out2 = get_unit_output_mw(u2)
         pps2 = u2.get("PointsPerSecond")
         turb2 = u2.get("TurbineHealth")
-        scram2 = u2.get("SCRAMreason")
-        trip2 = u2.get("TRIPreason")
 
         if prev_d2 is not None and d2 != prev_d2:
             last_d2_change = epoch
@@ -559,20 +541,6 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                         u2_turb_count += 1
                     except (ValueError, TypeError):
                         pass
-
-                has_scram = scram2 and str(scram2).strip().lower() not in ("none", "", "null", "false", "0")
-                has_trip = trip2 and str(trip2).strip().lower() not in ("none", "", "null", "false", "0")
-                if has_scram or has_trip:
-                    scram_trip_count += 1
-                    u2_score *= 0.4
-                    if has_scram:
-                        u2_scrams += 1
-                        u2_scram_reasons.append(str(scram2).strip())
-                        u2_desc += f" (SCRAM: {scram2})"
-                    if has_trip:
-                        u2_trips += 1
-                        u2_trip_reasons.append(str(trip2).strip())
-                        u2_desc += f" (Trip: {trip2})"
         else:
             u2_score = 60.0 if aprm2 >= 5.0 else 50.0
             u2_desc = "Hot Standby" if aprm2 >= 5.0 else "Zero Demand / Offline"
@@ -651,8 +619,8 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                     "is_loop": is_loop_1,
                     "in_grace": in_grace_1,
                     "is_downtime": u1_is_downtime,
-                    "scram_reason": str(scram1) if scram1 else None,
-                    "trip_reason": str(trip1) if trip1 else None,
+                    "scram_reason": None,
+                    "trip_reason": None,
                     "score": round(u1_score, 1),
                     "desc": u1_desc
                 },
@@ -674,8 +642,8 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
                     "refuel_minutes": round(refuel_min_2, 1) if is_refuel_2 else None,
                     "pred_points_lost": u2_pred_lost,
                     "is_downtime": u2_is_downtime,
-                    "scram_reason": str(scram2) if scram2 else None,
-                    "trip_reason": str(trip2) if trip2 else None,
+                    "scram_reason": None,
+                    "trip_reason": None,
                     "score": round(u2_score, 1),
                     "desc": u2_desc
                 }

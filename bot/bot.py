@@ -47,8 +47,7 @@ INFO_ALIASES = {
     "aprm": "APRM", "rtp": "RTP", "xenon": "Xenon",
     "reactor_temp": "Reactor Temp", "temperature": "Reactor Temp",
     "outputmw": "Output (MW)", "recirc1": "Recirc1", "recirc2": "Recirc2",
-    "rpm": "Turbine RPM", "pps": "PointsPerSecond",
-    "demandtimeleft": "Demand Time Left", "scramreason": "SCRAMreason",
+    "pps": "PointsPerSecond",
 }
 
 INFO_CHOICES = [
@@ -59,10 +58,7 @@ INFO_CHOICES = [
     disnake.OptionChoice(name="Output (MW)", value="outputmw"),
     disnake.OptionChoice(name="Recirc 1", value="recirc1"),
     disnake.OptionChoice(name="Recirc 2", value="recirc2"),
-    disnake.OptionChoice(name="Turbine RPM", value="rpm"),
     disnake.OptionChoice(name="Points / second", value="pps"),
-    disnake.OptionChoice(name="Demand Time Left", value="demandtimeleft"),
-    disnake.OptionChoice(name="SCRAM reason", value="scramreason"),
     disnake.OptionChoice(name="ALL", value="all"),
 ]
 
@@ -2266,9 +2262,6 @@ def is_unit_running(u_state: dict[str, Any]) -> bool:
 
 def get_unit_status_badge(u_state: dict[str, Any]) -> str:
     aprm = get_unit_aprm(u_state)
-    scram = u_state.get("SCRAMreason")
-    if scram and str(scram).strip() not in ("None", "", "null"):
-        return f"SCRAM: {str(scram).strip()} ({aprm:.1f}%)"
     if aprm > 5.0:
         return f"Running ({aprm:.1f}% APRM)"
     return f"Offline ({aprm:.1f}% APRM)"
@@ -2370,16 +2363,13 @@ class ServerBrowserView(disnake.ui.View):
             u1_running = is_unit_running(u1)
             u2_running = is_unit_running(u2)
             pts = get_server_points_rate(s)
-            u1_scram = str(u1.get("SCRAMreason", "None")).strip()
-            u2_scram = str(u2.get("SCRAMreason", "None")).strip()
-            has_scram = (u1_scram not in ("None", "", "null")) or (u2_scram not in ("None", "", "null"))
             top_score = get_server_top_score(s)
 
             if self.query:
                 q = self.query.replace("-", "")
                 norm_jid = jid.lower().replace("-", "")
                 norm_short = short.replace("-", "")
-                if (q not in norm_jid) and (q not in norm_short) and (q not in u1_scram.lower()) and (q not in u2_scram.lower()):
+                if (q not in norm_jid) and (q not in norm_short):
                     continue
 
             if self.filter_status == "top_server":
@@ -2407,9 +2397,6 @@ class ServerBrowserView(disnake.ui.View):
                     continue
             elif self.filter_status == "points":
                 if pts is None or pts <= 0:
-                    continue
-            elif self.filter_status == "scrammed":
-                if not has_scram:
                     continue
 
             matched.append(s)
@@ -2489,7 +2476,6 @@ class ServerBrowserView(disnake.ui.View):
             "running": "Running (≥ 1 Unit)",
             "both": "Dual Running",
             "points": "Points (> 0/s)",
-            "scrammed": "Scrammed",
         }
         sort_names = {
             "top_servers": "Top Servers",
@@ -2583,20 +2569,17 @@ class ServerBrowserView(disnake.ui.View):
         )
 
         def unit_field(u_num: int, u_data: dict[str, Any]) -> str:
-            scram = u_data.get("SCRAMreason")
-            scram_text = f"**Last SCRAM:** {scram}\n" if (scram and str(scram).strip() not in ("None", "", "null")) else ""
-            demand_left = u_data.get("Demand Time Left")
-            demand_text = f"**Demand Timer:** `{demand_left}s`\n" if demand_left is not None else ""
+            dem_key = "DemandU1" if u_num == 1 else "DemandU2"
+            dem_val = u_data.get(dem_key)
+            dem_text = f"**Demand:** `{fmt(dem_val)} MW`\n" if dem_val is not None else ""
             return (
-                f"{scram_text}"
+                f"{dem_text}"
                 f"**APRM:** `{fmt(u_data.get('APRM'))}%`\n"
                 f"**RTP:** `{fmt(u_data.get('RTP'))}%`\n"
                 f"**Reactor Temp:** `{fmt(u_data.get('Reactor Temp'))} °C`\n"
                 f"**Output:** `{fmt(u_data.get('Output (MW)'))} MW`\n"
-                f"**Turbine RPM:** `{fmt(u_data.get('Turbine RPM'))}`\n"
                 f"**Points / sec:** `{fmt(u_data.get('PointsPerSecond'))}`\n"
                 f"**Xenon:** `{fmt(u_data.get('Xenon'))}`\n"
-                f"{demand_text}"
             )
 
         embed.add_field(name=f"Unit 1 ({get_unit_status_badge(u1)})", value=unit_field(1, u1), inline=True)
@@ -2650,7 +2633,6 @@ class ServerBrowserView(disnake.ui.View):
             disnake.SelectOption(label="Running Reactors", value="running", description="At least 1 unit running (>5% APRM)", default=(self.filter_status == "running")),
             disnake.SelectOption(label="Dual Running Reactors", value="both", description="Both units actively running", default=(self.filter_status == "both")),
             disnake.SelectOption(label="Earning Points", value="points", description="Points rate > 0 pts/sec", default=(self.filter_status == "points")),
-            disnake.SelectOption(label="Scrammed Reactors", value="scrammed", description="Servers with an active reactor SCRAM", default=(self.filter_status == "scrammed")),
         ]
         filter_select = disnake.ui.StringSelect(
             custom_id="browser_filter_select",
@@ -2880,23 +2862,22 @@ def add_info(embed: disnake.Embed, server: dict[str, Any], unit: int, info: str)
     st = state_for(server, unit)
 
     if info == "all":
+        dem_key = "DemandU1" if unit == 1 else "DemandU2"
         lines = [
             f"**APRM:** {fmt(st.get('APRM'))}",
             f"**RTP:** {fmt(st.get('RTP'))}",
             f"**Xenon:** {fmt(st.get('Xenon'))}",
             f"**Reactor Temp:** {fmt(st.get('Reactor Temp'))}",
             f"**Output:** {fmt(st.get('Output (MW)'))} MW",
-            f"**Turbine RPM:** {fmt(st.get('Turbine RPM'))}",
+            f"**Demand:** {fmt(st.get(dem_key))}",
             f"**Points/s:** {fmt(st.get('PointsPerSecond'))}",
-            f"**Demand time:** {fmt(st.get('Demand Time Left'))} s",
-            f"**SCRAM:** {fmt(st.get('SCRAMreason'))}",
         ]
         embed.add_field(name=f"Unit {unit}", value="\n".join(lines), inline=True)
         return
 
     if info == "demand":
-        key = "NextDemandU1" if unit == 1 else "NextDemandU2"
-        label, value = "Next demand", st.get(key)
+        key = "DemandU1" if unit == 1 else "DemandU2"
+        label, value = "Demand", st.get(key)
     else:
         key = INFO_ALIASES.get(info, info)
         label, value = key, st.get(key)
@@ -2920,7 +2901,6 @@ FILTER_CHOICES = [
     disnake.OptionChoice(name="Running Reactors (≥ 1 Unit)", value="running"),
     disnake.OptionChoice(name="Dual Running Reactors (Both Units)", value="both"),
     disnake.OptionChoice(name="Earning Points (> 0 pts/s)", value="points"),
-    disnake.OptionChoice(name="Scrammed Reactors", value="scrammed"),
 ]
 
 def register_bot_events_and_commands(b: commands.InteractionBot):
@@ -3141,7 +3121,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     )
     async def servers_command(
         inter: disnake.ApplicationCommandInteraction,
-        query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
+        query: str = commands.Param(default="", description="Search by Job ID or short ID"),
         sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
         ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
@@ -3173,7 +3153,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     )
     async def serverlist_command(
         inter: disnake.ApplicationCommandInteraction,
-        query: str = commands.Param(default="", description="Search by Job ID, short ID, or SCRAM reason"),
+        query: str = commands.Param(default="", description="Search by Job ID or short ID"),
         sort_by: str = commands.Param(default="top_servers", description="Sorting criteria", choices=SORT_CHOICES),
         filter: str = commands.Param(default="all", description="Filter criteria", choices=FILTER_CHOICES),
         ephemeral: bool = commands.Param(default=False, description="Whether the response should be hidden from other users"),
@@ -3619,12 +3599,10 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             if isinstance(p_cnt, int):
                 total_players += p_cnt
 
-            for u in (u1, u2):
-                scram = u.get("SCRAMreason")
-                if scram and str(scram).strip() not in ("None", "", "null"):
-                    incident_count += 1
-                turb_stat = str(u.get("Turbine Status", "")).strip().lower()
-                if "trip" in turb_stat:
+            for idx, u in enumerate((u1, u2), start=1):
+                dem = u.get(f"DemandU{idx}") if u.get(f"DemandU{idx}") is not None else u.get("Demand")
+                offsite = u.get("Offsite Power")
+                if offsite is False or dem == -2:
                     incident_count += 1
 
             s_score = get_server_top_score(s)
@@ -3776,11 +3754,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 disnake.ui.TextDisplay("## Command Reference — `/servers`\nInteractive Real-Time Server Browser"),
                 disnake.ui.Separator(divider=True),
                 disnake.ui.TextDisplay(
-                    "**Syntax:** `/servers [search: query] [sort_by: points|score|players|id] [filter: all|top|running|scram]`\n\n"
+                    "**Syntax:** `/servers [search: query] [sort_by: points|score|players|id] [filter: all|top|running|both|points]`\n\n"
                     "**Browser Features:**\n"
-                    "- **Search & Query:** Search by short 4-digit Server ID, Job ID, or player name.\n"
+                    "- **Search & Query:** Search by short 4-digit Server ID or Job ID.\n"
                     "- **Sorting Modes:** Sort instances by points per second, Top Score, online players, or ID.\n"
-                    "- **Filter Options:** Narrow down to running cores, SCRAM incidents, or top performing flagship servers.\n"
+                    "- **Filter Options:** Narrow down to running cores, dual running cores, or top performing flagship servers.\n"
                     "- **Interactive Navigation:** Page through servers, expand detailed instance views, and launch directly into Roblox."
                 ),
                 disnake.ui.Separator(divider=False),
@@ -3798,7 +3776,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                     "**Syntax:** `/server <id: Server ID or Job ID> [info: metric_choice]`\n\n"
                     "**Inspection Features:**\n"
                     "- **Direct Lookup:** Enter short ID (e.g. `1234`) or full Roblox Job ID.\n"
-                    "- **Specific Metric Query:** Query specific operational values (`APRM`, `RTP`, `Xenon`, `Reactor Temp`, `Output (MW)`, `Recirc1/2`, `Turbine RPM`, `Points / sec`, `SCRAM reason`).\n"
+                    "- **Specific Metric Query:** Query specific operational values (`APRM`, `RTP`, `Xenon`, `Reactor Temp`, `Output (MW)`, `Recirc1/2`, `Points / sec`).\n"
                     "- **Join Action:** Includes direct launch URL to join the Roblox instance."
                 ),
                 disnake.ui.Separator(divider=False),

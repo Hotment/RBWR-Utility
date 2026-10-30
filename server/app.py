@@ -3679,8 +3679,8 @@ def server_detail_page(job_id):
         unit1_st = latest_st.get("Unit1", {})
         unit2_st = latest_st.get("Unit2", {})
 
-        u1_dem = unit1_st.get("NextDemandU1", 0)
-        u2_dem = unit2_st.get("NextDemandU2", 0)
+        u1_dem = unit1_st.get("DemandU1") if unit1_st.get("DemandU1") is not None else unit1_st.get("NextDemandU1", 0)
+        u2_dem = unit2_st.get("DemandU2") if unit2_st.get("DemandU2") is not None else unit2_st.get("NextDemandU2", 0)
         pts_info = calculate_server_points_rate(unit1_st, unit2_st, job_id=job_id, latest_state=latest_st)
 
         summary = {
@@ -3695,8 +3695,6 @@ def server_detail_page(job_id):
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "top_score": server_top_score,
-            "scram_reason_u1": unit1_st.get("SCRAMreason", "N/A") or "N/A",
-            "scram_reason_u2": unit2_st.get("SCRAMreason", "N/A") or "N/A",
             "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
             "next_demand": round(float(u1_dem or 0) + float(u2_dem or 0), 2),
             "next_demand_formatted": format_total_demand(u1_dem, u2_dem),
@@ -3724,11 +3722,9 @@ def server_detail_page(job_id):
     server_tot_pps = server_misc.get('Total points/second')
     pts_info = calculate_server_points_rate(unit1_state, unit2_state, job_id=job_id, total_pps=server_tot_pps, latest_state=server.get('state', {}))
 
-    scram_reasonU1 = unit1_state.get('SCRAMreason', 'N/A')
-    scram_reasonU2 = unit2_state.get('SCRAMreason', 'N/A')
     dmand_left_data = float(unit1_state.get('Demand Time Left', 0))
-    dmand_next1 = float(unit1_state.get('NextDemandU1', 0))
-    dmand_next2 = float(unit2_state.get('NextDemandU2', 0))
+    dmand_next1 = float(unit1_state.get('NextDemandU1') if unit1_state.get('NextDemandU1') is not None else (unit1_state.get('DemandU1') or 0))
+    dmand_next2 = float(unit2_state.get('NextDemandU2') if unit2_state.get('NextDemandU2') is not None else (unit2_state.get('DemandU2') or 0))
     next_demand = round(dmand_next1 + dmand_next2, 2)
 
     try:
@@ -3751,8 +3747,6 @@ def server_detail_page(job_id):
         "uptime_seconds": uptime_sec,
         "uptime_str": uptime_str,
         "top_score": server_top_score,
-        "scram_reason_u1": scram_reasonU1 or "N/A",
-        "scram_reason_u2": scram_reasonU2 or "N/A",
         "time_to_next_demand": dmand_left,
         "next_demand": next_demand,
         "next_demand_formatted": format_total_demand(dmand_next1, dmand_next2),

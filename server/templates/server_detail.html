@@ -47,8 +47,6 @@
     u2_output_mw=u2_output_mw,
     u1_aprm=u1_aprm,
     u2_aprm=u2_aprm,
-    scram_reason_u1=scram_reason_u1,
-    scram_reason_u2=scram_reason_u2,
     page_url=request.url if request else url_for('server_detail_page', job_id=job_id, _external=True),
     browser_url=url_for('servers_page', _external=True),
     icon_url=url_for('static', filename='favicon.png', _external=True)
@@ -204,7 +202,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
         <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col justify-between gap-3">
             <div class="flex items-center justify-between">
                 {% if is_private %}
@@ -251,38 +249,6 @@
                 class="text-[11px] font-mono text-center text-blue-300/90 pt-2 border-t border-white/5 flex items-center justify-center gap-1.5">
                 <span class="text-gray-400">Server Uptime:</span>
                 <span class="font-bold text-blue-300">{{ uptime_str }}</span>
-            </div>
-        </div>
-
-        <div class="premium-glass rounded-2xl p-5 shadow-xl border border-white/10 flex flex-col gap-3">
-            <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wider font-mono text-blue-400 font-semibold">SCRAM
-                    Diagnostics</span>
-                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-                    </path>
-                </svg>
-            </div>
-            <div class="space-y-2.5 pt-1 text-xs">
-                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
-                    <span class="text-gray-300 font-medium flex items-center gap-1.5">
-                        Unit 1 Reason
-                    </span>
-                    <span
-                        class="font-mono font-semibold {% if scram_reason_u1 != 'N/A' and scram_reason_u1 != '' and scram_reason_u1 != 'None' %}text-rose-400{% else %}text-emerald-400{% endif %}">
-                        {{ scram_reason_u1 }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
-                    <span class="text-gray-300 font-medium flex items-center gap-1.5">
-                        Unit 2 Reason
-                    </span>
-                    <span
-                        class="font-mono font-semibold {% if scram_reason_u2 != 'N/A' and scram_reason_u2 != '' and scram_reason_u2 != 'None' %}text-rose-400{% else %}text-emerald-400{% endif %}">
-                        {{ scram_reason_u2 }}
-                    </span>
-                </div>
             </div>
         </div>
 

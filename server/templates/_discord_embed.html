@@ -67,16 +67,11 @@
   u2_output_mw,
   u1_aprm,
   u2_aprm,
-  scram_reason_u1,
-  scram_reason_u2,
-  page_url,
-  browser_url,
-  icon_url
+  page_url="",
+  browser_url="",
+  icon_url=""
 ) %}
-{% set has_scram = (scram_reason_u1 and scram_reason_u1 != "N/A") or (scram_reason_u2 and scram_reason_u2 != "N/A") %}
-{% if has_scram %}
-  {% set color_int = 15680580 %} {# Red #ef4444 #}
-{% elif is_private %}
+{% if is_private %}
   {% set color_int = 11032055 %} {# Purple #a855f7 #}
 {% elif is_archived %}
   {% set color_int = 439956 %}   {# Cyan #06b6d4 #}
@@ -109,12 +104,6 @@
   {% set u1_str = ("Running (" ~ (u1_output_mw | default(0) | round(1)) ~ " MW, " ~ (u1_aprm | default(0) | round(1)) ~ "% APRM)") if u1_running else "Offline" %}
   {% set u2_str = ("Running (" ~ (u2_output_mw | default(0) | round(1)) ~ " MW, " ~ (u2_aprm | default(0) | round(1)) ~ "% APRM)") if u2_running else "Offline" %}
   {% set details_md = "**Status:** " ~ server_status_text ~ " • **Players:** " ~ (player_count | default(0)) ~ "/" ~ (max_players | default(12)) ~ "\n**Uptime:** " ~ uptime_str ~ " • **Top Score:** " ~ score_str ~ "\n**Point Rate:** " ~ (points_rate_str | default("N/A")) ~ " • **Total Demand:** " ~ (demand_text | default("N/A")) ~ "\n\n**Unit 1:** " ~ u1_str ~ "\n**Unit 2:** " ~ u2_str %}
-  {% if scram_reason_u1 and scram_reason_u1 != "N/A" %}
-    {% set details_md = details_md ~ "\n**SCRAM Alert (Unit 1):** " ~ scram_reason_u1 %}
-  {% endif %}
-  {% if scram_reason_u2 and scram_reason_u2 != "N/A" %}
-    {% set details_md = details_md ~ "\n**SCRAM Alert (Unit 2):** " ~ scram_reason_u2 %}
-  {% endif %}
 {% endif %}
 
 {% set text_comp = {"type": 10, "content": details_md} %}
