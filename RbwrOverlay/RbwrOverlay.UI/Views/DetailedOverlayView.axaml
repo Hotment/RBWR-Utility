@@ -173,8 +173,7 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="12,8"
-                            ToolTip.Tip="{Binding MainBannerTooltip}"
-                            ToolTip.ShowDelay="350"
+                            behaviors:TooltipBehaviors.Item="{Binding MainBannerTooltip}"
                             Margin="0,0,0,8">
 
                         <StackPanel Spacing="4">
@@ -340,8 +339,7 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
-                                ToolTip.Tip="{Binding DetailedLoadTooltip}"
-                                ToolTip.ShowDelay="350"
+                                behaviors:TooltipBehaviors.Item="{Binding DetailedLoadTooltip}"
                                 Margin="0,4,4,0">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding DetailedLoadLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
@@ -355,8 +353,7 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
-                                ToolTip.Tip="{Binding DetailedFlowTooltip}"
-                                ToolTip.ShowDelay="350"
+                                behaviors:TooltipBehaviors.Item="{Binding DetailedFlowTooltip}"
                                 Margin="4,4,0,0">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding DetailedFlowLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
@@ -384,8 +381,7 @@
 
                             <TextBlock Grid.Column="1"
                                        Text="{Binding DetailedBottomRightText}"
-                                       ToolTip.Tip="{Binding DetailedBottomRightTooltip}"
-                                       ToolTip.ShowDelay="350"
+                                       behaviors:TooltipBehaviors.Item="{Binding DetailedBottomRightTooltip}"
                                        Foreground="{DynamicResource TextMuted}"
                                        FontSize="9"
                                        VerticalAlignment="Center" />

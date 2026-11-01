@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using RbwrOverlay.Core.Models;
+using RbwrOverlay.UI.Behaviors;
 using RbwrOverlay.UI.ViewModels;
 
 namespace RbwrOverlay.UI.Views;
@@ -17,6 +18,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TooltipBehaviors.AttachWindow(this, RootHostPanel);
         AddHandler(PointerPressedEvent, OnPointerPressed, handledEventsToo: false);
     }
 

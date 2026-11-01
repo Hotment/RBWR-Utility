@@ -43,15 +43,17 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <LayoutTransformControl HorizontalAlignment="Left" VerticalAlignment="Top">
-        <LayoutTransformControl.LayoutTransform>
-            <ScaleTransform ScaleX="{Binding ActiveUiScale}" ScaleY="{Binding ActiveUiScale}" />
-        </LayoutTransformControl.LayoutTransform>
-        <Panel>
-            <views:DetailedOverlayView IsVisible="{Binding !IsCompact}" />
+    <Panel x:Name="RootHostPanel">
+        <LayoutTransformControl HorizontalAlignment="Left" VerticalAlignment="Top">
+            <LayoutTransformControl.LayoutTransform>
+                <ScaleTransform ScaleX="{Binding ActiveUiScale}" ScaleY="{Binding ActiveUiScale}" />
+            </LayoutTransformControl.LayoutTransform>
+            <Panel>
+                <views:DetailedOverlayView IsVisible="{Binding !IsCompact}" />
 
-            <views:CompactOverlayView IsVisible="{Binding IsCompact}" />
-        </Panel>
-    </LayoutTransformControl>
+                <views:CompactOverlayView IsVisible="{Binding IsCompact}" />
+            </Panel>
+        </LayoutTransformControl>
+    </Panel>
 
 </Window>

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
         x:Class="RbwrOverlay.UI.Views.CustomMessageWindow"
         Title="Notification"
         Icon="/Assets/icon.ico"
@@ -12,6 +13,7 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
 
+    <Panel x:Name="RootHostPanel">
     <Border Name="RootBorder"
             Background="{DynamicResource CyberMainBg}"
             BorderBrush="{DynamicResource NeonRed}"
@@ -41,10 +43,10 @@
 
                     <Button Grid.Column="1"
                             Classes="cyber-close-btn"
-                            Content="✕"
+                            Content="X"
                             Click="OnCloseClick"
                             Padding="6,2"
-                            ToolTip.Tip="Dismiss Alert" />
+                            behaviors:TooltipBehaviors.Key="DismissAlert" />
                 </Grid>
             </Border>
 
@@ -202,4 +204,5 @@
 
         </Grid>
     </Border>
+    </Panel>
 </Window>

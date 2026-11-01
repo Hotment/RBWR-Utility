@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using RbwrOverlay.UI.Behaviors;
 
 namespace RbwrOverlay.UI.Views;
 
@@ -18,6 +19,7 @@ public partial class CustomMessageWindow : Window
     public CustomMessageWindow()
     {
         InitializeComponent();
+        TooltipBehaviors.AttachWindow(this, RootHostPanel);
         SetupDrag();
         KeyDown += OnWindowKeyDown;
     }
