@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-22.04, macos-14]
+        os: [windows-latest, ubuntu-22.04, macos-15]
 
     steps:
       - name: Checkout repository
@@ -260,7 +260,7 @@ jobs:
   publish-macos:
     name: Publish macOS (${{ matrix.rid }})
     needs: test
-    runs-on: macos-14
+    runs-on: macos-15
     strategy:
       matrix:
         rid: [osx-arm64, osx-x64]
