@@ -82,6 +82,7 @@ try:
         start_bot_thread,
         is_user_in_guild,
         notify_ticket_author_dm,
+        send_test_notification_dm,
         update_discussion_thread_status,
         update_ticket_channel_message,
         notify_ticket_deleted,
@@ -97,12 +98,19 @@ except Exception:
         start_bot_thread,  # pyright: ignore[reportAttributeAccessIssue]
         is_user_in_guild,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_author_dm,  # pyright: ignore[reportAttributeAccessIssue]
+        send_test_notification_dm,  # pyright: ignore[reportAttributeAccessIssue]
         update_discussion_thread_status,  # pyright: ignore[reportAttributeAccessIssue]
         update_ticket_channel_message,  # pyright: ignore[reportAttributeAccessIssue]
         notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
         report_error_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
         report_crash_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
     )
+
+try:
+    send_test_notification_dm  # pyright: ignore[reportUnusedExpression]
+except NameError:
+    def send_test_notification_dm(user_id, message = None) -> tuple[bool, str]:
+        return False, "Bot notification module is not loaded."
 
 try:
     report_error_to_discord  # pyright: ignore[reportUnusedExpression]
@@ -477,6 +485,19 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax"
 )
+
+CURRENT_SESSION_VERSION = 2
+
+@app.before_request
+def enforce_session_version():
+    has_auth_session = (
+        session.get("admin_logged_in")
+        or session.get("discord_user")
+        or session.get("username")
+        or session.get("discord_id")
+    )
+    if has_auth_session and session.get("session_v") != CURRENT_SESSION_VERSION:
+        session.clear()
 
 @app.after_request
 def add_security_headers(response):
@@ -5526,7 +5547,8 @@ def discord_login():
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": "identify",
+        "scope": "identify applications.commands",
+        "integration_type": "1",
         "state": state,
         "prompt": "consent"
     }
@@ -5609,6 +5631,7 @@ def discord_callback():
             "avatar": d_avatar,
             "avatar_url": d_avatar_url
         }
+        session["session_v"] = CURRENT_SESSION_VERSION
         session["discord_user"] = discord_user_obj
 
         next_dest = session.pop("oauth_next", None) or "/tickets"
@@ -5651,11 +5674,7 @@ def discord_callback():
 
 @app.route("/auth/discord/logout", methods=["GET"])
 def discord_logout():
-    session.pop("discord_user", None)
-    session.pop("admin_logged_in", None)
-    session.pop("discord_id", None)
-    session.pop("username", None)
-    session.pop("is_root", None)
+    session.clear()
     next_url = request.args.get("next") or request.referrer or "/tickets"
     if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
         next_url = "/tickets"
@@ -5780,6 +5799,7 @@ def admin_login():
             
             session.clear()
             session.permanent = True
+            session["session_v"] = CURRENT_SESSION_VERSION
             session["admin_logged_in"] = True
             session["username"] = username
             session["is_root"] = is_root_user(username)
@@ -5881,6 +5901,27 @@ def start_console_handler():
                     os.execv(sys.executable, [sys.executable] + sys.argv)
             except Exception as e:
                 safe_print(f"Error restarting server: {e}")
+
+        @handler.command(name="test_notification", description="Sends a test notification DM to a user: test_notification <user_id> [message]")
+        @handler.command(name="test_notify", description="Alias for test_notification: test_notify <user_id> [message]")
+        @handler.command(name="notify", description="Alias for test_notification: notify <user_id> [message]")
+        def test_notification_cmd(user_id: str = "", *args):
+            user_id = user_id.strip()
+            if not user_id:
+                safe_print("Usage: test_notification <user_id> [optional message]")
+                return
+
+            custom_msg = " ".join(args).strip() if args else None
+            safe_print(f"Sending test notification to Discord user {user_id}...")
+
+            try:
+                success, info = send_test_notification_dm(user_id, custom_msg)
+                if success:
+                    safe_print(f"[SUCCESS] {info}")
+                else:
+                    safe_print(f"[ERROR] {info}")
+            except Exception as ex:
+                safe_print(f"[ERROR] Failed to execute test notification: {ex}")
 
         handler.start()
     except Exception:

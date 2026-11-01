@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -785,7 +786,9 @@ def notify_ticket_author_dm(
     details: dict[str, Any],
 ) -> None:
     """
-    Sends a direct message to the ticket author if they are in the guild (GUILD_ID).
+    Sends a direct message to the ticket author.
+    Supports members in the configured guild as well as users without mutual guilds
+    who authorized the application via Discord OAuth2 / user-installed app.
     event_type can be: 'message', 'note', or 'status'.
     """
     global disnake_bot, disnake_bot_loop
@@ -804,24 +807,37 @@ def notify_ticket_author_dm(
 
     async def _send_dm_async():
         try:
-            guild_id = int(GUILD_ID)
-            guild = bot_ref.get_guild(guild_id)
-            if not guild:
-                guild = await bot_ref.fetch_guild(guild_id)
-            if not guild:
-                return
+            recipient: disnake.Member | disnake.User | None = None
 
-            member = guild.get_member(author_id)
-            if not member:
+            if GUILD_ID and str(GUILD_ID).isdigit():
                 try:
-                    member = await guild.fetch_member(author_id)
-                except disnake.NotFound:
-                    return
-                except Exception as e:
-                    log.warning(f"[DM Notify] Could not fetch member {author_id}: {e}")
-                    return
+                    guild_id = int(GUILD_ID)
+                    guild = bot_ref.get_guild(guild_id)
+                    if not guild:
+                        guild = await bot_ref.fetch_guild(guild_id)
+                    if guild:
+                        recipient = guild.get_member(author_id)
+                        if not recipient:
+                            try:
+                                recipient = await guild.fetch_member(author_id)
+                            except (disnake.NotFound, disnake.HTTPException):
+                                recipient = None
+                except Exception as g_err:
+                    log.debug(f"[DM Notify] Guild lookup for user {author_id} skipped: {g_err}")
 
-            if not member:
+            if not recipient:
+                recipient = bot_ref.get_user(author_id)
+                if not recipient:
+                    try:
+                        recipient = await bot_ref.fetch_user(author_id)
+                    except disnake.NotFound:
+                        log.info(f"[DM Notify] User {author_id} not found on Discord.")
+                        return
+                    except Exception as u_err:
+                        log.warning(f"[DM Notify] Could not fetch user {author_id}: {u_err}")
+                        return
+
+            if not recipient:
                 return
 
             ticket_id = ticket.get("id")
@@ -872,12 +888,12 @@ def notify_ticket_author_dm(
 
             if embed:
                 try:
-                    await member.send(embed=embed)
-                    log.info(f"[DM Notify] Successfully sent {event_type} DM to user {member} (ID: {author_id}) for ticket #{ticket_id}")
+                    await recipient.send(embed=embed)
+                    log.info(f"[DM Notify] Successfully sent {event_type} DM to user {recipient} (ID: {author_id}) for ticket #{ticket_id}")
                 except disnake.Forbidden:
-                    log.info(f"[DM Notify] Could not send DM to {member}: direct messages disabled by recipient.")
+                    log.info(f"[DM Notify] Could not send DM to {recipient}: direct messages disabled by recipient or application not installed for DMs.")
                 except Exception as ex:
-                    log.warning(f"[DM Notify] Failed to send DM to {member}: {ex}")
+                    log.warning(f"[DM Notify] Failed to send DM to {recipient}: {ex}")
 
         except Exception as e:
             log.warning(f"[DM Notify] Error in _send_dm_async: {e}")
@@ -886,6 +902,88 @@ def notify_ticket_author_dm(
         asyncio.run_coroutine_threadsafe(_send_dm_async(), disnake_bot_loop)
     except Exception as ex:
         log.warning(f"[DM Notify] Failed to dispatch DM task: {ex}")
+
+def send_test_notification_dm(
+    user_id: str | int,
+    message: str | None = None,
+) -> tuple[bool, str]:
+    global disnake_bot, disnake_bot_loop
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return False, "Discord bot is not currently running or connected."
+
+    raw_id = str(user_id).strip()
+    clean_id = re.sub(r"[\"'<@!>]", "", raw_id).strip()
+    if not clean_id.isdigit():
+        return False, f"Invalid user ID '{raw_id}'. Must be a numeric Discord ID or mention."
+
+    target_uid = int(clean_id)
+    bot_ref = disnake_bot
+
+    async def _send_coro():
+        recipient: disnake.Member | disnake.User | None = None
+        in_guild = False
+
+        if GUILD_ID and str(GUILD_ID).isdigit():
+            try:
+                guild = bot_ref.get_guild(int(GUILD_ID))
+                if not guild:
+                    guild = await bot_ref.fetch_guild(int(GUILD_ID))
+                if guild:
+                    recipient = guild.get_member(target_uid)
+                    if not recipient:
+                        try:
+                            recipient = await guild.fetch_member(target_uid)
+                        except (disnake.NotFound, disnake.HTTPException):
+                            recipient = None
+                    if recipient:
+                        in_guild = True
+            except Exception as g_err:
+                log.debug(f"[Test DM] Guild lookup skipped for {target_uid}: {g_err}")
+
+        if not recipient:
+            recipient = bot_ref.get_user(target_uid)
+            if not recipient:
+                try:
+                    recipient = await bot_ref.fetch_user(target_uid)
+                except disnake.NotFound:
+                    return False, f"Discord user ID {target_uid} does not exist on Discord."
+                except Exception as ex:
+                    return False, f"Could not fetch user ID {target_uid}: {ex}"
+
+        if not recipient:
+            return False, f"Failed to resolve recipient for user ID {target_uid}."
+
+        msg_body = (message or "").strip() or "This is a test notification from the RBWR Utility system verifying that direct message delivery is working properly."
+
+        embed = disnake.Embed(
+            title="System Test Notification",
+            description=msg_body[:1500],
+            color=disnake.Color.blurple(),
+            timestamp=datetime.now(timezone.utc)
+        )
+        embed.add_field(name="Recipient", value=f"{recipient} (`{target_uid}`)", inline=True)
+        embed.add_field(name="Mutual Guild", value="Yes (Server Member)" if in_guild else "No (User-Installed App)", inline=True)
+        embed.set_footer(text="RBWR Community Portal • rbwr.hotment.dev/tickets")
+
+        try:
+            await recipient.send(embed=embed)
+            guild_note = "in guild" if in_guild else "no mutual guild (user-installed app)"
+            log.info(f"[Test DM] Successfully sent test DM to {recipient} (ID: {target_uid}) [{guild_note}]")
+            return True, f"Successfully sent test notification to {recipient} (ID: {target_uid}) [{guild_note}]."
+        except disnake.Forbidden:
+            log.info(f"[Test DM] Could not send DM to {recipient}: direct messages disabled by recipient or application not installed for DMs.")
+            return False, f"Cannot send DM to {recipient} (ID: {target_uid}): direct messages disabled by recipient or application not authorized for DMs."
+        except Exception as ex:
+            log.warning(f"[Test DM] Failed to send test DM to {recipient}: {ex}")
+            return False, f"Failed to send DM to {recipient} (ID: {target_uid}): {ex}"
+
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_send_coro(), disnake_bot_loop)
+        return fut.result(timeout=10)
+    except TimeoutError:
+        return False, f"Timed out waiting for Discord API to send DM to user ID {target_uid}."
+    except Exception as ex:
+        return False, f"Execution error while dispatching test DM: {ex}"
 
 class TicketPanelView(disnake.ui.View):
     def __init__(self, ticket_id: int, ticket_type: str, current_status: str, has_note: bool = False):
