@@ -123,16 +123,16 @@ public class ViewModelTests
         Assert.Equal(vm.GeneratorLoadText, vm.CompactSubLoadText);
         Assert.DoesNotContain("Aux", vm.CompactSubLoadText);
         Assert.EndsWith(" kg/s]", vm.CompactFlowText);
-        Assert.EndsWith("% MSS", vm.MainStatusPowerText);
-        Assert.Equal("OIL COOLING (OCL)", vm.DetailedLoadLabelText);
-        Assert.EndsWith("% OCL", vm.DetailedLoadValueText);
-        Assert.StartsWith("Gen Load: ", vm.DetailedBottomRightText);
+        Assert.Contains("% MSS / ", vm.MainStatusPowerText);
+        Assert.EndsWith("% OCL", vm.MainStatusPowerText);
+        Assert.Equal("GENERATOR LOAD", vm.DetailedLoadLabelText);
+        Assert.EndsWith(" MWe", vm.DetailedLoadValueText);
+        Assert.StartsWith("Aux Usage: ", vm.DetailedBottomRightText);
 
         vm.SetPresetDemand("0");
         Assert.StartsWith("-", vm.CompactRtpText);
         Assert.StartsWith("-", vm.CompactLoadText);
         Assert.StartsWith("-", vm.MainStatusPowerText);
-        Assert.StartsWith("-", vm.DetailedLoadValueText);
     }
 
     [Fact]
@@ -148,9 +148,9 @@ public class ViewModelTests
 
         vm.SelectUnit("3");
         Assert.NotNull(vm.MainBannerTooltip);
-        Assert.Equal("MAIN STEAM SEALING (MSS %)", vm.MainBannerTooltip.Title);
+        Assert.Equal("MAIN STEAM SEALING (MSS) & OIL COOLING (OCL)", vm.MainBannerTooltip.Title);
         Assert.NotNull(vm.DetailedLoadTooltip);
-        Assert.Equal("OIL COOLING (OCL %)", vm.DetailedLoadTooltip.Title);
+        Assert.Equal("GROSS GENERATOR LOAD", vm.DetailedLoadTooltip.Title);
 
         vm.ToggleTooltips();
         Assert.False(vm.ShowTooltips);

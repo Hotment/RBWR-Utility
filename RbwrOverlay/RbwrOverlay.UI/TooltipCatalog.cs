@@ -126,8 +126,8 @@ public static class TooltipCatalog
             Description: "Required reactor thermal power (APRM / RTP %) to satisfy net grid demand plus auxiliary station load. Turns red above 108% overpower SCRAM limit."
         ),
         ["MainBannerTcr"] = new(
-            Title: "MAIN STEAM SEALING (MSS %)",
-            Description: "Target Unit 2 Main Steam Sealing setpoint (%). Negative values indicate the required Supply Valve opening (with Leak-Off at 0%), while positive values indicate the required Leak-Off Valve opening (with Supply at 0%)."
+            Title: "MAIN STEAM SEALING (MSS) & OIL COOLING (OCL)",
+            Description: "MSS: Negative = Supply Valve %, Positive = Leak-Off Valve %. OCL: Required difference (Cold Water - Hot Water %, e.g. -40% means Hot Water open to 40% and Cold Water at 0%)."
         ),
         ["DetailedLoadReactor"] = new(
             Title: "GROSS GENERATOR LOAD",

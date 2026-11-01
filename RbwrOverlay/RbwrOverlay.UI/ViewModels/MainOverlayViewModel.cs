@@ -605,14 +605,14 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         if (isTcr)
         {
-            MainStatusPowerText = $"{mss:F2}% MSS";
+            MainStatusPowerText = $"{mss:F2}% MSS / {ocl:F2}% OCL";
             CompactRtpText = $"{mss:F1}% MSS";
             CompactLoadText = $"{ocl:F1}% OCL";
             CompactSubLoadText = $"{genLoad:F2} MWe";
-            DetailedLoadLabelText = "OIL COOLING (OCL)";
-            DetailedLoadValueText = $"{ocl:F2}% OCL";
+            DetailedLoadLabelText = "GENERATOR LOAD";
+            DetailedLoadValueText = $"{genLoad:F2} MWe";
             DetailedFlowLabelText = "STEAM FLOW";
-            DetailedBottomRightText = $"Gen Load: {genLoad:F2} MWe";
+            DetailedBottomRightText = $"Aux Usage: {_calc.Usage:F2} MWe";
         }
         else
         {
@@ -646,7 +646,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         else
         {
             IsOverpowerRisk = false;
-            MainStatusSubText = isTcr ? "MAIN STEAM SEALING STATUS" : "APRM REACTOR POWER STATUS";
+            MainStatusSubText = isTcr ? "MAIN STEAM SEALING & OIL COOLING STATUS" : "APRM REACTOR POWER STATUS";
             MainPowerBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
             PowerBarBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
         }
@@ -670,7 +670,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         CompactLoadText = "ERROR";
         CompactSubLoadText = isTcr ? "--- MWe" : "Aux ---";
         DetailedLoadValueText = "ERROR";
-        DetailedBottomRightText = isTcr ? "Gen Load: ---" : "Aux Usage: ---";
+        DetailedBottomRightText = "Aux Usage: ---";
         ThermalPowerPercent = 0;
         MainPowerBrush = new SolidColorBrush(Color.Parse("#ff003c"));
         PowerBarBrush = new SolidColorBrush(Color.Parse("#ff003c"));
@@ -1693,9 +1693,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         bool isTcr = SelectedUnit == 3;
         MainBannerTooltip = TooltipCatalog.Get(isTcr ? "MainBannerTcr" : "MainBannerReactor");
-        DetailedLoadTooltip = TooltipCatalog.Get(isTcr ? "DetailedLoadTcr" : "DetailedLoadReactor");
+        DetailedLoadTooltip = TooltipCatalog.Get("DetailedLoadReactor");
         DetailedFlowTooltip = TooltipCatalog.Get(isTcr ? "DetailedFlowTcr" : "DetailedFlowReactor");
-        DetailedBottomRightTooltip = TooltipCatalog.Get(isTcr ? "DetailedBottomTcr" : "DetailedBottomReactor");
+        DetailedBottomRightTooltip = TooltipCatalog.Get("DetailedBottomReactor");
         CompactPrimaryTooltip = TooltipCatalog.Get(isTcr ? "CompactPrimaryTcr" : "CompactPrimaryReactor");
         CompactSecondaryTooltip = TooltipCatalog.Get(isTcr ? "CompactSecondaryTcr" : "CompactSecondaryReactor");
     }
