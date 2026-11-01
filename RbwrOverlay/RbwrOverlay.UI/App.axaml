@@ -5,6 +5,25 @@
              RequestedThemeVariant="Dark">
 
     <Application.DataTemplates>
+        <DataTemplate DataType="local:TooltipItem">
+            <StackPanel Spacing="4" MaxWidth="255">
+                <TextBlock Text="{Binding Title}"
+                           Foreground="{DynamicResource NeonCyan}"
+                           FontWeight="Bold"
+                           FontSize="10"
+                           LetterSpacing="0.5"
+                           TextAlignment="Left"
+                           TextWrapping="Wrap" />
+                <Border Height="1"
+                        Background="{DynamicResource CyberBorder}" />
+                <TextBlock Text="{Binding Description}"
+                           Foreground="#dce6f5"
+                           FontSize="9.5"
+                           LineHeight="13.5"
+                           TextAlignment="Left"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
         <local:ViewLocator />
     </Application.DataTemplates>
 

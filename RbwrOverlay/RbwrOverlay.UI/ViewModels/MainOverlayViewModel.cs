@@ -24,7 +24,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.1.1";
+    public const string AppVersion = "2.2.0";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -87,6 +87,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _isUnit2Active;
 
     [ObservableProperty]
+    private bool _isTcrActive;
+
+    [ObservableProperty]
     private string _demandInput = "0";
 
     [ObservableProperty]
@@ -100,6 +103,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _auxUsageText = "61.32 MWe";
+
+    [ObservableProperty]
+    private string _mssText = "0.00% MSS";
+
+    [ObservableProperty]
+    private string _oclText = "0.00% OCL";
 
     [ObservableProperty]
     private string _mainStatusPowerText = "0.00% APRM";
@@ -121,6 +130,45 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _compactFlowText = "[0 kg/s]";
+
+    [ObservableProperty]
+    private string _compactLoadText = "0.00 MWe";
+
+    [ObservableProperty]
+    private string _compactSubLoadText = "Aux 61.32 MWe";
+
+    [ObservableProperty]
+    private string _detailedLoadLabelText = "GENERATOR LOAD";
+
+    [ObservableProperty]
+    private string _detailedLoadValueText = "0.00 MWe";
+
+    [ObservableProperty]
+    private string _detailedFlowLabelText = "FEEDWATER FLOW";
+
+    [ObservableProperty]
+    private string _detailedBottomRightText = "Aux Usage: 61.32 MWe";
+
+    [ObservableProperty]
+    private TooltipItem? _mainBannerTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _detailedLoadTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _detailedFlowTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _detailedBottomRightTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _compactPrimaryTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _compactSecondaryTooltip;
+
+    [ObservableProperty]
+    private TooltipItem? _compactCounterTooltipItem;
 
     [ObservableProperty]
     private bool _isOverpowerRisk;
@@ -314,6 +362,15 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private IBrush _turbineAlertStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
 
+    [ObservableProperty]
+    private bool _showTooltips = true;
+
+    [ObservableProperty]
+    private string _tooltipsStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _tooltipsStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+
 
     [ObservableProperty]
     private string _feedbackAuthor = string.Empty;
@@ -388,6 +445,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _demandThresholdSecondsInput = _settings.NextDemandThresholdSeconds.ToString();
         _enableTurbineHealthAlert = _settings.EnableTurbineHealthAlert;
         _turbineHealthThresholdInput = ((int)_settings.TurbineHealthThreshold).ToString();
+        _showTooltips = _settings.ShowTooltips;
+        TooltipCatalog.SetEnabled(_showTooltips);
 
         UpdatePinSymbol();
         UpdateUnitVisuals();
@@ -531,14 +590,42 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private void RenderOutputs(double thermal, double flow, double genLoad)
     {
         IsError = false;
+        bool isTcr = _calc.SelectedUnit == 3;
         UnitSuffix = _calc.SelectedUnit == 1 ? "APRM" : "RTP";
+
+        double mss = _calc.CalcMss(thermal);
+        double ocl = _calc.CalcOcl(thermal);
 
         GeneratorLoadText = $"{genLoad:F2} MWe";
         FeedwaterFlowText = $"{flow:F2} kg/s";
         AuxUsageText = $"{_calc.Usage:F2} MWe";
-        MainStatusPowerText = $"{thermal:F2}% {UnitSuffix}";
-        CompactRtpText = $"{thermal:F1}% {UnitSuffix}";
+        MssText = $"{mss:F2}% MSS";
+        OclText = $"{ocl:F2}% OCL";
         CompactFlowText = $"[{Math.Round(flow):F0} kg/s]";
+
+        if (isTcr)
+        {
+            MainStatusPowerText = $"{mss:F2}% MSS";
+            CompactRtpText = $"{mss:F1}% MSS";
+            CompactLoadText = $"{ocl:F1}% OCL";
+            CompactSubLoadText = $"{genLoad:F2} MWe";
+            DetailedLoadLabelText = "OIL COOLING (OCL)";
+            DetailedLoadValueText = $"{ocl:F2}% OCL";
+            DetailedFlowLabelText = "STEAM FLOW";
+            DetailedBottomRightText = $"Gen Load: {genLoad:F2} MWe";
+        }
+        else
+        {
+            MainStatusPowerText = $"{thermal:F2}% {UnitSuffix}";
+            CompactRtpText = $"{thermal:F1}% {UnitSuffix}";
+            CompactLoadText = $"{genLoad:F2} MWe";
+            CompactSubLoadText = $"Aux {_calc.Usage:F2} MWe";
+            DetailedLoadLabelText = "GENERATOR LOAD";
+            DetailedLoadValueText = $"{genLoad:F2} MWe";
+            DetailedFlowLabelText = "FEEDWATER FLOW";
+            DetailedBottomRightText = $"Aux Usage: {_calc.Usage:F2} MWe";
+        }
+
         ThermalPowerPercent = Math.Clamp(thermal, 0.0, 120.0);
 
         const double limit = 108.0;
@@ -559,7 +646,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         else
         {
             IsOverpowerRisk = false;
-            MainStatusSubText = "APRM REACTOR POWER STATUS";
+            MainStatusSubText = isTcr ? "MAIN STEAM SEALING STATUS" : "APRM REACTOR POWER STATUS";
             MainPowerBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
             PowerBarBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
         }
@@ -570,13 +657,20 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private void SetErrorState()
     {
         IsError = true;
+        bool isTcr = _calc.SelectedUnit == 3;
         GeneratorLoadText = "ERROR";
         FeedwaterFlowText = "ERROR";
         AuxUsageText = "---";
+        MssText = "ERROR";
+        OclText = "ERROR";
         MainStatusPowerText = "ERR";
         MainStatusSubText = "VALUE OUT OF RANGE";
         CompactRtpText = "ERR";
         CompactFlowText = "[---]";
+        CompactLoadText = "ERROR";
+        CompactSubLoadText = isTcr ? "--- MWe" : "Aux ---";
+        DetailedLoadValueText = "ERROR";
+        DetailedBottomRightText = isTcr ? "Gen Load: ---" : "Aux Usage: ---";
         ThermalPowerPercent = 0;
         MainPowerBrush = new SolidColorBrush(Color.Parse("#ff003c"));
         PowerBarBrush = new SolidColorBrush(Color.Parse("#ff003c"));
@@ -621,10 +715,14 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     {
         int unit = 1;
         if (parameter is int i) unit = i;
-        else if (parameter is string s && int.TryParse(s, out int parsed)) unit = parsed;
+        else if (parameter is string s)
+        {
+            if (s.Equals("TCR", StringComparison.OrdinalIgnoreCase)) unit = 3;
+            else if (int.TryParse(s, out int parsed)) unit = parsed;
+        }
         else if (parameter is double d) unit = (int)d;
 
-        if (unit != 1 && unit != 2) return;
+        if (unit != 1 && unit != 2 && unit != 3) return;
         SelectedUnit = unit;
         _calc.SelectedUnit = unit;
         _settings.SelectedUnit = unit;
@@ -1217,6 +1315,27 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    public void ToggleTooltips()
+    {
+        ShowTooltips = !ShowTooltips;
+        _settings.ShowTooltips = ShowTooltips;
+        TooltipCatalog.SetEnabled(ShowTooltips);
+        UpdateUnitVisuals();
+        UpdateSettingsVisuals();
+        UpdateSyncVisuals();
+        if (_activeServer != null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var hb = _heartbeatTimestamp ?? now;
+            double elapsed = (now - hb).TotalSeconds;
+            double liveDtl = Math.Max(0.0, _initialDtl - elapsed + _settings.DtlCalibrationOffset);
+            var uState = _calc.SelectedUnit == 1 ? _activeServer.Unit1 : _activeServer.Unit2;
+            UpdateCompactCounterDisplay(liveDtl, uState?.NextDemand);
+        }
+        _settingsService.SaveSettings(_settings);
+    }
+
+    [RelayCommand]
     public void ToggleTurbineAlertSetting()
     {
         EnableTurbineHealthAlert = !EnableTurbineHealthAlert;
@@ -1469,6 +1588,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 CompactCounterTooltip = string.IsNullOrWhiteSpace(SyncStatusMessage)
                     ? "Connection lost. Retrying server connection..."
                     : SyncStatusMessage;
+                CompactCounterTooltipItem = TooltipCatalog.Get("CompactCounterRetrying");
                 CompactDisplayCounterText = "...";
             }
             else if (IsSyncError)
@@ -1481,6 +1601,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 CompactCounterTooltip = string.IsNullOrWhiteSpace(SyncStatusMessage)
                     ? "Sync Error. Click to toggle target/countdown or check Server Sync tab."
                     : $"Sync Error: {SyncStatusMessage}. Click to toggle target/countdown or check Server Sync tab.";
+                CompactCounterTooltipItem = TooltipCatalog.Get("CompactCounterError");
                 CompactDisplayCounterText = ShowNextDemandInCompact ? "-- MW" : "--s";
             }
             else
@@ -1493,6 +1614,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 CompactCounterTooltip = ShowNextDemandInCompact
                     ? "Next Demand target (Not Synced). Click to switch to countdown or open Server Sync tab."
                     : "Demand Time Left countdown (Not Synced). Click to switch to Next Demand or open Server Sync tab.";
+                CompactCounterTooltipItem = TooltipCatalog.Get("CompactCounterUnsynced");
                 CompactDisplayCounterText = ShowNextDemandInCompact ? "-- MW" : "--s";
             }
         }
@@ -1532,11 +1654,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
             CompactDisplayCounterText = formattedNext;
             CompactCounterTooltip = "Next Demand Target. Click to switch to Demand Time Left (DTL) countdown.";
+            CompactCounterTooltipItem = TooltipCatalog.Get("CompactCounterNextDemand");
         }
         else
         {
             CompactDisplayCounterText = $"{Math.Round(liveDtl):F0}s";
             CompactCounterTooltip = "Demand Time Left countdown. Click to switch to Next Demand target.";
+            CompactCounterTooltipItem = TooltipCatalog.Get("CompactCounterCountdown");
         }
     }
 
@@ -1564,7 +1688,16 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     {
         IsUnit1Active = SelectedUnit == 1;
         IsUnit2Active = SelectedUnit == 2;
+        IsTcrActive = SelectedUnit == 3;
         UnitSuffix = SelectedUnit == 1 ? "APRM" : "RTP";
+
+        bool isTcr = SelectedUnit == 3;
+        MainBannerTooltip = TooltipCatalog.Get(isTcr ? "MainBannerTcr" : "MainBannerReactor");
+        DetailedLoadTooltip = TooltipCatalog.Get(isTcr ? "DetailedLoadTcr" : "DetailedLoadReactor");
+        DetailedFlowTooltip = TooltipCatalog.Get(isTcr ? "DetailedFlowTcr" : "DetailedFlowReactor");
+        DetailedBottomRightTooltip = TooltipCatalog.Get(isTcr ? "DetailedBottomTcr" : "DetailedBottomReactor");
+        CompactPrimaryTooltip = TooltipCatalog.Get(isTcr ? "CompactPrimaryTcr" : "CompactPrimaryReactor");
+        CompactSecondaryTooltip = TooltipCatalog.Get(isTcr ? "CompactSecondaryTcr" : "CompactSecondaryReactor");
     }
 
     private void UpdateSettingsVisuals()
@@ -1574,6 +1707,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
         TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
+        TooltipsStatusText = ShowTooltips ? "ENABLED" : "DISABLED";
+        TooltipsStatusBrush = ShowTooltips ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
     }
 
     public void Dispose()

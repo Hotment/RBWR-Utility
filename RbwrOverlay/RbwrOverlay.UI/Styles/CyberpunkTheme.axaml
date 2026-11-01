@@ -267,4 +267,16 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="#f5080d18" />
+        <Setter Property="BorderBrush" Value="#8800f0ff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="MaxWidth" Value="280" />
+    </Style>
+    <Style Selector="ToolTip TextBlock">
+        <Setter Property="TextAlignment" Value="Left" />
+    </Style>
+
 </Styles>

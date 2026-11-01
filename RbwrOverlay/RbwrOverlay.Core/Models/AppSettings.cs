@@ -46,5 +46,8 @@ public class AppSettings
     [JsonPropertyName("turbine_health_threshold")]
     public double TurbineHealthThreshold { get; set; } = 65.0;
 
+    [JsonPropertyName("show_tooltips")]
+    public bool ShowTooltips { get; set; } = true;
+
     public static AppSettings CreateDefault() => new();
 }

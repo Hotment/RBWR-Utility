@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+             xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
              x:Class="RbwrOverlay.UI.Views.CompactOverlayView"
              x:DataType="vm:MainOverlayViewModel">
 
@@ -12,7 +13,7 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Top">
 
-        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
               VerticalAlignment="Center">
 
             <TextBlock Grid.Column="0"
@@ -22,6 +23,7 @@
                        FontWeight="Bold"
                        VerticalAlignment="Center"
                        Cursor="SizeAll"
+                       behaviors:TooltipBehaviors.Key="DragHandle"
                        Margin="0,0,6,0" />
 
             <StackPanel Grid.Column="1"
@@ -33,57 +35,50 @@
                         Content="U1"
                         Command="{Binding SelectUnitCommand}"
                         CommandParameter="1"
+                        behaviors:TooltipBehaviors.Key="Unit1"
                         Padding="5,2" />
                 <Button Classes="cyber-preset"
                         Classes.active="{Binding IsUnit2Active}"
                         Content="U2"
                         Command="{Binding SelectUnitCommand}"
                         CommandParameter="2"
+                        behaviors:TooltipBehaviors.Key="Unit2"
+                        Padding="5,2" />
+                <Button Classes="cyber-preset"
+                        Classes.active="{Binding IsTcrActive}"
+                        Content="TCR"
+                        Command="{Binding SelectUnitCommand}"
+                        CommandParameter="3"
+                        behaviors:TooltipBehaviors.Key="Tcr"
                         Padding="5,2" />
             </StackPanel>
 
-            <Button Grid.Column="2"
-                    Classes="cyber"
-                    Content="-"
-                    Command="{Binding AdjustDemandCommand}"
-                    CommandParameter="-10"
-                    FontSize="12"
-                    FontWeight="Bold"
-                    Padding="6,2"
-                    Margin="0,0,2,0" />
-
-            <TextBox Grid.Column="3"
+            <TextBox Grid.Column="2"
                      Classes="cyber"
                      Text="{Binding DemandInput}"
+                     behaviors:TooltipBehaviors.Key="DemandInput"
                      Width="42"
                      FontSize="11"
                      Padding="2,0"
                      VerticalAlignment="Center"
                      VerticalContentAlignment="Center"
-                     Margin="0,0,2,0" />
+                     Margin="0,0,6,0" />
 
-            <Button Grid.Column="4"
-                    Classes="cyber"
-                    Content="+"
-                    Command="{Binding AdjustDemandCommand}"
-                    CommandParameter="10"
-                    FontSize="12"
-                    FontWeight="Bold"
-                    Padding="6,2"
-                    Margin="0,0,6,0" />
-
-            <Button Grid.Column="5"
+            <Button Grid.Column="3"
                     Classes="cyber-header-btn"
                     Content="OVR"
                     Foreground="{DynamicResource NeonPurple}"
                     IsVisible="{Binding IsRecircOverrideActive}"
                     Command="{Binding ResetRecircOverrideCommand}"
-                    ToolTip.Tip="Recirc override active. Click to reset."
+                    behaviors:TooltipBehaviors.Key="RecircBadge"
                     FontSize="9"
                     Padding="4,2"
                     Margin="0,0,6,0" />
 
-            <StackPanel Grid.Column="6"
+            <StackPanel Grid.Column="4"
+                        Background="Transparent"
+                        ToolTip.Tip="{Binding CompactPrimaryTooltip}"
+                        ToolTip.ShowDelay="350"
                         VerticalAlignment="Center"
                         Margin="2,0,6,0">
                 <TextBlock Text="{Binding CompactRtpText}"
@@ -97,25 +92,29 @@
                            HorizontalAlignment="Center" />
             </StackPanel>
 
-            <StackPanel Grid.Column="7"
+            <StackPanel Grid.Column="5"
+                        Background="Transparent"
+                        ToolTip.Tip="{Binding CompactSecondaryTooltip}"
+                        ToolTip.ShowDelay="350"
                         VerticalAlignment="Center"
                         Margin="2,0,6,0">
-                <TextBlock Text="{Binding GeneratorLoadText}"
+                <TextBlock Text="{Binding CompactLoadText}"
                            Foreground="{DynamicResource NeonCyan}"
                            FontWeight="Bold"
                            FontSize="10"
                            HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding AuxUsageText, StringFormat='Aux {0}'}"
+                <TextBlock Text="{Binding CompactSubLoadText}"
                            Foreground="{DynamicResource TextMuted}"
                            FontSize="8"
                            HorizontalAlignment="Center" />
             </StackPanel>
 
-            <Button Grid.Column="8"
+            <Button Grid.Column="6"
                     Classes="cyber"
                     Classes.error="{Binding HasSyncIssue}"
                     Command="{Binding ToggleCompactCounterCommand}"
-                    ToolTip.Tip="{Binding CompactCounterTooltip}"
+                    ToolTip.Tip="{Binding CompactCounterTooltipItem}"
+                    ToolTip.ShowDelay="350"
                     FontSize="10"
                     Padding="6,2"
                     HorizontalAlignment="Center"
@@ -127,20 +126,20 @@
                            VerticalAlignment="Center" />
             </Button>
 
-            <StackPanel Grid.Column="9"
+            <StackPanel Grid.Column="7"
                         Orientation="Horizontal"
                         Spacing="3">
                 <Button Classes="cyber-header-btn"
                         Content="&#x25A1;"
                         Command="{Binding ToggleCompactCommand}"
-                        ToolTip.Tip="Expand Full HUD"
+                        behaviors:TooltipBehaviors.Key="ExpandButton"
                         FontSize="11"
                         Padding="5,2" />
 
                 <Button Classes="cyber-close-btn"
                         Content="X"
                         Command="{Binding QuitCommand}"
-                        ToolTip.Tip="Exit"
+                        behaviors:TooltipBehaviors.Key="QuitButton"
                         FontSize="10"
                         Padding="6,2" />
             </StackPanel>

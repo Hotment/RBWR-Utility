@@ -71,6 +71,7 @@ public partial class MainWindow : Window
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainOverlayViewModel.IsCompact) ||
+            e.PropertyName == nameof(MainOverlayViewModel.SelectedUnit) ||
             e.PropertyName == nameof(MainOverlayViewModel.UiScale) ||
             e.PropertyName == nameof(MainOverlayViewModel.CompactUiScale) ||
             e.PropertyName == nameof(MainOverlayViewModel.ActiveUiScale) ||

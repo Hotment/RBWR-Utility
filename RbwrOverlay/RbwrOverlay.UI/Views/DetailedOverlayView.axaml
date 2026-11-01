@@ -28,13 +28,16 @@
                                FontWeight="Bold"
                                FontSize="12"
                                LetterSpacing="1"
+                               Cursor="SizeAll"
+                               behaviors:TooltipBehaviors.Key="DragHandle"
                                VerticalAlignment="Center" />
 
                     <Border Background="#101828"
                             BorderBrush="{Binding ConnectionStatusBrush}"
                             BorderThickness="1"
                             CornerRadius="10"
-                            Padding="6,2">
+                            Padding="6,2"
+                            behaviors:TooltipBehaviors.Key="SyncBadge">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="{Binding ConnectionStatusText}"
                                        Foreground="{Binding ConnectionStatusBrush}"
@@ -54,6 +57,7 @@
                             BorderThickness="1"
                             CornerRadius="3"
                             Padding="5,1"
+                            behaviors:TooltipBehaviors.Key="RecircBadge"
                             IsVisible="{Binding IsRecircOverrideActive}">
                         <TextBlock Text="{Binding RecircIndicatorText}"
                                    Foreground="{DynamicResource NeonGold}"
@@ -64,17 +68,17 @@
                     <Button Classes="cyber-header-btn"
                             Content="{Binding PinSymbol}"
                             Command="{Binding ToggleTopmostCommand}"
-                            ToolTip.Tip="Toggle Always-on-Top" />
+                            behaviors:TooltipBehaviors.Key="PinButton" />
 
                     <Button Classes="cyber-header-btn"
                             Content="—"
                             Command="{Binding ToggleCompactCommand}"
-                            ToolTip.Tip="Switch to Compact Floating HUD" />
+                            behaviors:TooltipBehaviors.Key="CompactButton" />
 
                     <Button Classes="cyber-close-btn"
                             Content="X"
                             Command="{Binding QuitCommand}"
-                            ToolTip.Tip="Exit Application" />
+                            behaviors:TooltipBehaviors.Key="QuitButton" />
                 </StackPanel>
             </Grid>
 
@@ -92,6 +96,7 @@
                             Content="MONITOR"
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Monitor"
+                            behaviors:TooltipBehaviors.Key="TabMonitor"
                             HorizontalAlignment="Stretch" />
 
                     <Button Grid.Column="1"
@@ -100,6 +105,7 @@
                             Content="SERVER SYNC"
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Sync"
+                            behaviors:TooltipBehaviors.Key="TabSync"
                             HorizontalAlignment="Stretch" />
 
                     <Button Grid.Column="2"
@@ -108,6 +114,7 @@
                             Content="CONFIG"
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Settings"
+                            behaviors:TooltipBehaviors.Key="TabSettings"
                             HorizontalAlignment="Stretch" />
 
                     <Button Grid.Column="3"
@@ -116,6 +123,7 @@
                             Content="FEEDBACK"
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Feedback"
+                            behaviors:TooltipBehaviors.Key="TabFeedback"
                             HorizontalAlignment="Stretch" />
                 </Grid>
             </Border>
@@ -126,7 +134,7 @@
                       IsVisible="{Binding IsMonitorTabActive}">
 
                     <Grid Grid.Row="0"
-                          ColumnDefinitions="*,*"
+                          ColumnDefinitions="*,*,*"
                           Margin="0,0,0,8">
                         <Button Grid.Column="0"
                                 Classes="cyber"
@@ -134,7 +142,8 @@
                                 Content="UNIT 01 (APRM)"
                                 Command="{Binding SelectUnitCommand}"
                                 CommandParameter="1"
-                                Margin="0,0,4,0"
+                                behaviors:TooltipBehaviors.Key="Unit1"
+                                Margin="0,0,3,0"
                                 HorizontalAlignment="Stretch" />
 
                         <Button Grid.Column="1"
@@ -143,7 +152,18 @@
                                 Content="UNIT 02 (RTP)"
                                 Command="{Binding SelectUnitCommand}"
                                 CommandParameter="2"
-                                Margin="4,0,0,0"
+                                behaviors:TooltipBehaviors.Key="Unit2"
+                                Margin="3,0,3,0"
+                                HorizontalAlignment="Stretch" />
+
+                        <Button Grid.Column="2"
+                                Classes="cyber"
+                                Classes.active="{Binding IsTcrActive}"
+                                Content="TCR (MSS/OCL)"
+                                Command="{Binding SelectUnitCommand}"
+                                CommandParameter="3"
+                                behaviors:TooltipBehaviors.Key="Tcr"
+                                Margin="3,0,0,0"
                                 HorizontalAlignment="Stretch" />
                     </Grid>
 
@@ -153,6 +173,8 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="12,8"
+                            ToolTip.Tip="{Binding MainBannerTooltip}"
+                            ToolTip.ShowDelay="350"
                             Margin="0,0,0,8">
 
                         <StackPanel Spacing="4">
@@ -183,6 +205,7 @@
                             BorderThickness="1"
                             CornerRadius="4"
                             Padding="8,6"
+                            behaviors:TooltipBehaviors.Key="DemandSlider"
                             Margin="0,0,0,8">
                         <StackPanel Spacing="3">
                             <Grid ColumnDefinitions="*,Auto">
@@ -208,7 +231,7 @@
                                     SmallChange="10"
                                     LargeChange="50"
                                     Value="{Binding DemandSliderValue, Mode=TwoWay}"
-                                    ToolTip.Tip="Demand setpoint slider (10 MW increments)"
+                                    behaviors:TooltipBehaviors.Key="DemandSlider"
                                     Margin="0,-2" />
 
                             <Grid ColumnDefinitions="300*,300*,350*,150*,100*"
@@ -219,7 +242,7 @@
                                         Content="0"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="0"
-                                        ToolTip.Tip="Snap to 0 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Left" />
                                 <Button Grid.Column="0"
                                         Classes="cyber-tick"
@@ -227,7 +250,7 @@
                                         Content="300"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="300"
-                                        ToolTip.Tip="Snap to 300 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Right"
                                         Margin="0,0,-12,0" />
                                 <Button Grid.Column="1"
@@ -236,7 +259,7 @@
                                         Content="600"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="600"
-                                        ToolTip.Tip="Snap to 600 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Right"
                                         Margin="0,0,-12,0" />
                                 <Button Grid.Column="2"
@@ -245,7 +268,7 @@
                                         Content="950"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="950"
-                                        ToolTip.Tip="Snap to 950 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Right"
                                         Margin="0,0,-12,0" />
                                 <Button Grid.Column="3"
@@ -254,7 +277,7 @@
                                         Content="1100"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="1100"
-                                        ToolTip.Tip="Snap to 1100 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Right"
                                         Margin="0,0,-14,0" />
                                 <Button Grid.Column="4"
@@ -263,7 +286,7 @@
                                         Content="1200"
                                         Command="{Binding SetPresetDemandCommand}"
                                         CommandParameter="1200"
-                                        ToolTip.Tip="Snap to 1200 MW"
+                                        behaviors:TooltipBehaviors.Key="DemandPresetTick"
                                         HorizontalAlignment="Right" />
                             </Grid>
                         </StackPanel>
@@ -280,15 +303,16 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
+                                behaviors:TooltipBehaviors.Key="DemandInput"
                                 Margin="0,0,4,4">
                             <StackPanel Spacing="3">
-                                <TextBlock Text="DEMAND LOAD (MWt)" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock Text="DEMAND LOAD (MWe)" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
-                                    <Button Grid.Column="0" Classes="cyber" Content="-50" Command="{Binding AdjustDemandCommand}" CommandParameter="-50" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Classes="cyber" Content="-10" Command="{Binding AdjustDemandCommand}" CommandParameter="-10" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
-                                    <TextBox Grid.Column="2" Classes="cyber" Text="{Binding DemandInput}" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
-                                    <Button Grid.Column="3" Classes="cyber" Content="+10" Command="{Binding AdjustDemandCommand}" CommandParameter="10" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
-                                    <Button Grid.Column="4" Classes="cyber" Content="+50" Command="{Binding AdjustDemandCommand}" CommandParameter="50" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="0" Classes="cyber" Content="-50" Command="{Binding AdjustDemandCommand}" CommandParameter="-50" behaviors:TooltipBehaviors.Key="DemandAdjustMinus50" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="-10" Command="{Binding AdjustDemandCommand}" CommandParameter="-10" behaviors:TooltipBehaviors.Key="DemandAdjustMinus10" FontSize="9" Padding="4,2" Margin="0,0,2,0" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Classes="cyber" Text="{Binding DemandInput}" behaviors:TooltipBehaviors.Key="DemandInput" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="3" Classes="cyber" Content="+10" Command="{Binding AdjustDemandCommand}" CommandParameter="10" behaviors:TooltipBehaviors.Key="DemandAdjustPlus10" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="4" Classes="cyber" Content="+50" Command="{Binding AdjustDemandCommand}" CommandParameter="50" behaviors:TooltipBehaviors.Key="DemandAdjustPlus50" FontSize="9" Padding="4,2" Margin="2,0,0,0" VerticalAlignment="Center" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -299,11 +323,12 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
+                                behaviors:TooltipBehaviors.Key="RtpInput"
                                 Margin="4,0,0,4">
                             <StackPanel Spacing="3">
                                 <TextBlock Text="{Binding UnitSuffix, StringFormat='CORE POWER ({0}%)'}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" VerticalAlignment="Center">
-                                    <TextBox Classes="cyber" Text="{Binding RtpInput}" Width="74" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <TextBox Classes="cyber" Text="{Binding RtpInput}" behaviors:TooltipBehaviors.Key="RtpInput" Width="74" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
                                     <TextBlock Text="%" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
                                 </StackPanel>
                             </StackPanel>
@@ -315,10 +340,12 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
+                                ToolTip.Tip="{Binding DetailedLoadTooltip}"
+                                ToolTip.ShowDelay="350"
                                 Margin="0,4,4,0">
                             <StackPanel Spacing="2">
-                                <TextBlock Text="GENERATOR LOAD" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
-                                <TextBlock Text="{Binding GeneratorLoadText}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="{Binding DetailedLoadLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock Text="{Binding DetailedLoadValueText}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
                             </StackPanel>
                         </Border>
 
@@ -328,9 +355,11 @@
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,6"
+                                ToolTip.Tip="{Binding DetailedFlowTooltip}"
+                                ToolTip.ShowDelay="350"
                                 Margin="4,4,0,0">
                             <StackPanel Spacing="2">
-                                <TextBlock Text="FEEDWATER FLOW" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock Text="{Binding DetailedFlowLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <TextBlock Text="{Binding FeedwaterFlowText}" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="13" />
                             </StackPanel>
                         </Border>
@@ -343,13 +372,20 @@
                             CornerRadius="4"
                             Padding="8,5">
                         <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0"
+                                        Background="Transparent"
+                                        behaviors:TooltipBehaviors.Key="UpcomingDemand"
+                                        Orientation="Horizontal"
+                                        Spacing="5"
+                                        VerticalAlignment="Center">
                                 <TextBlock Text="UPCOMING DEMAND:" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ServerDtlText}" Foreground="{Binding ServerDtlBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
                             </StackPanel>
 
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding AuxUsageText, StringFormat='Aux Usage: {0}'}"
+                                       Text="{Binding DetailedBottomRightText}"
+                                       ToolTip.Tip="{Binding DetailedBottomRightTooltip}"
+                                       ToolTip.ShowDelay="350"
                                        Foreground="{DynamicResource TextMuted}"
                                        FontSize="9"
                                        VerticalAlignment="Center" />
@@ -365,7 +401,8 @@
                                 BorderBrush="{DynamicResource CyberBorder}"
                                 BorderThickness="1"
                                 CornerRadius="4"
-                                Padding="10,8">
+                                Padding="10,8"
+                                behaviors:TooltipBehaviors.Key="SyncNowButton">
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Grid.Column="0" Spacing="2">
                                     <TextBlock Text="SERVER CONNECTION" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" />
@@ -375,15 +412,17 @@
                                         Classes="cyber-green"
                                         Content="Sync Now"
                                         Command="{Binding ConnectServerFromInputCommand}"
+                                        behaviors:TooltipBehaviors.Key="SyncNowButton"
                                         Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <StackPanel Spacing="4">
+                        <StackPanel Spacing="4" Background="Transparent" behaviors:TooltipBehaviors.Key="JobIdInput">
                             <TextBlock Text="Enter Roblox Job ID or Server Short ID (e.g. 77f6-4b2f):" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                             <AutoCompleteBox ItemsSource="{Binding CachedJobIds}"
                                              Text="{Binding JobIdInput}"
                                              behaviors:AutoCompleteBehaviors.JobIdFilter="True"
+                                             behaviors:TooltipBehaviors.Key="JobIdInput"
                                              FontSize="11"
                                              FontFamily="Consolas, monospace" />
                         </StackPanel>
@@ -392,7 +431,8 @@
                                 BorderBrush="{DynamicResource CyberBorder}"
                                 BorderThickness="1"
                                 CornerRadius="4"
-                                Padding="10,8">
+                                Padding="10,8"
+                                behaviors:TooltipBehaviors.Key="DtlPanel">
                             <StackPanel Spacing="8">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="DEMAND TIME LEFT (DTL)" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
@@ -403,11 +443,11 @@
 
                                 <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto">
                                     <TextBlock Grid.Column="0" Text="Calibrate:" Foreground="{DynamicResource TextMuted}" FontSize="9" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <Button Grid.Column="1" Classes="cyber" Content="-5s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-5" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
-                                    <Button Grid.Column="2" Classes="cyber" Content="-1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-1" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
-                                    <Button Grid.Column="3" Classes="cyber" Content="+1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="1" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
-                                    <TextBox Grid.Column="4" Classes="cyber" Text="{Binding CustomCalibInput}" PlaceholderText="Sec" FontSize="9" Padding="2,0" Width="42" Margin="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
-                                    <Button Grid.Column="5" Classes="cyber-green" Content="Set" Command="{Binding ApplyCustomCalibCommand}" Padding="8,2" FontSize="9" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="-5s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-5" behaviors:TooltipBehaviors.Key="CalibStepButton" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <Button Grid.Column="2" Classes="cyber" Content="-1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="-1" behaviors:TooltipBehaviors.Key="CalibStepButton" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <Button Grid.Column="3" Classes="cyber" Content="+1s" Command="{Binding CalibrateDtlCommand}" CommandParameter="1" behaviors:TooltipBehaviors.Key="CalibStepButton" Padding="5,2" Margin="0,0,2,0" FontSize="9" />
+                                    <TextBox Grid.Column="4" Classes="cyber" Text="{Binding CustomCalibInput}" PlaceholderText="Sec" behaviors:TooltipBehaviors.Key="CalibCustomInput" FontSize="9" Padding="2,0" Width="42" Margin="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="5" Classes="cyber-green" Content="Set" Command="{Binding ApplyCustomCalibCommand}" behaviors:TooltipBehaviors.Key="CalibCustomInput" Padding="8,2" FontSize="9" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -416,7 +456,8 @@
                                 BorderBrush="{DynamicResource CyberBorder}"
                                 BorderThickness="1"
                                 CornerRadius="4"
-                                Padding="10,8">
+                                Padding="10,8"
+                                behaviors:TooltipBehaviors.Key="TurbineHealthPanel">
                             <StackPanel Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="TURBINE HEALTH DIAGNOSTICS" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
@@ -437,7 +478,7 @@
                 <ScrollViewer IsVisible="{Binding IsSettingsTabActive}">
                     <StackPanel Spacing="10" Margin="0,0,6,0">
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="HudOpacity">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="HUD Opacity:" VerticalAlignment="Center" FontSize="11" />
@@ -447,7 +488,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="FullHudScale">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="UI Scale (Full HUD):" VerticalAlignment="Center" FontSize="11" />
@@ -464,7 +505,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="CompactHudScale">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="Compact Mode Scale:" VerticalAlignment="Center" FontSize="11" />
@@ -481,14 +522,21 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="HoverTooltipsToggle">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Hover Help Tooltips:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="{Binding TooltipsStatusText}" Foreground="{Binding TooltipsStatusBrush}" Command="{Binding ToggleTooltipsCommand}" Padding="10,3" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RobloxTopmostToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Topmost on Roblox (Auto-Detect):" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding TopmostStatusText}" Foreground="{Binding TopmostStatusBrush}" Command="{Binding ToggleRobloxTopmostCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RecircOverrideConfig">
                             <Grid ColumnDefinitions="*,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="Recirc Override (%):" VerticalAlignment="Center" FontSize="11" />
                                 <TextBox Grid.Column="1" Classes="cyber" Text="{Binding RecircOverrideInput}" Width="45" Padding="2,0" Margin="0,0,4,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
@@ -496,14 +544,14 @@
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="NextDemandTimerConfig">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Next Demand Switch Timer (s):" VerticalAlignment="Center" FontSize="11" />
                                 <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandThresholdSecondsInput}" Width="45" Padding="2,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="TurbineAlarmConfig">
                             <StackPanel Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="Turbine Health Alarm:" VerticalAlignment="Center" FontSize="11" />
@@ -516,10 +564,10 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="OpenLogButton">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Diagnostics &amp; Log File:" VerticalAlignment="Center" FontSize="11" />
-                                <Button Grid.Column="1" Classes="cyber" Content="Open Log" Command="{Binding OpenLogCommand}" Padding="8,3" />
+                                <Button Grid.Column="1" Classes="cyber" Content="Open Log" Command="{Binding OpenLogCommand}" behaviors:TooltipBehaviors.Key="OpenLogButton" Padding="8,3" />
                             </Grid>
                         </Border>
 
@@ -550,6 +598,7 @@
                                             Classes="cyber-blue"
                                             Content="Open Tickets Portal"
                                             Command="{Binding OpenTicketsPageCommand}"
+                                            behaviors:TooltipBehaviors.Key="OpenTicketsButton"
                                             HorizontalAlignment="Stretch"
                                             HorizontalContentAlignment="Center"
                                             Margin="0,0,4,0"
@@ -561,6 +610,7 @@
                                             Classes="cyber"
                                             Content="Join Discord Server"
                                             Command="{Binding OpenDiscordServerCommand}"
+                                            behaviors:TooltipBehaviors.Key="JoinDiscordButton"
                                             HorizontalAlignment="Stretch"
                                             HorizontalContentAlignment="Center"
                                             Margin="4,0,0,0"
@@ -584,11 +634,11 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" behaviors:TooltipBehaviors.Key="CheckUpdatesButton">
                             <StackPanel Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="SYSTEM UPDATES" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
-                                    <Button Grid.Column="1" Classes="cyber" Content="Check Now" Command="{Binding CheckUpdatesCommand}" Padding="8,2" FontSize="9" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="Check Now" Command="{Binding CheckUpdatesCommand}" behaviors:TooltipBehaviors.Key="CheckUpdatesButton" Padding="8,2" FontSize="9" />
                                 </Grid>
 
                                 <TextBlock Text="{Binding UpdateStatusText}" Foreground="{DynamicResource TextMuted}" FontSize="9" />

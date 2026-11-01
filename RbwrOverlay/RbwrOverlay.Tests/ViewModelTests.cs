@@ -83,17 +83,84 @@ public class ViewModelTests
         
         Assert.True(vm.IsUnit1Active);
         Assert.False(vm.IsUnit2Active);
+        Assert.False(vm.IsTcrActive);
         Assert.Equal("APRM", vm.UnitSuffix);
 
         vm.SelectUnit("2");
         Assert.False(vm.IsUnit1Active);
         Assert.True(vm.IsUnit2Active);
+        Assert.False(vm.IsTcrActive);
+        Assert.Equal("RTP", vm.UnitSuffix);
+
+        vm.SelectUnit("3");
+        Assert.False(vm.IsUnit1Active);
+        Assert.False(vm.IsUnit2Active);
+        Assert.True(vm.IsTcrActive);
         Assert.Equal("RTP", vm.UnitSuffix);
 
         vm.SelectUnit(1);
         Assert.True(vm.IsUnit1Active);
         Assert.False(vm.IsUnit2Active);
+        Assert.False(vm.IsTcrActive);
         Assert.Equal("APRM", vm.UnitSuffix);
+    }
+
+    [Fact]
+    public void TestTcrSectionDisplaysMssOclMweAndSteamFlow()
+    {
+        var vm = CreateTestVm();
+        vm.SetPresetDemand("1000");
+
+        Assert.EndsWith("% APRM", vm.CompactRtpText);
+        Assert.EndsWith(" MWe", vm.CompactLoadText);
+        Assert.StartsWith("Aux ", vm.CompactSubLoadText);
+        Assert.EndsWith(" kg/s]", vm.CompactFlowText);
+
+        vm.SelectUnit("3");
+        Assert.True(vm.IsTcrActive);
+        Assert.EndsWith("% MSS", vm.CompactRtpText);
+        Assert.EndsWith("% OCL", vm.CompactLoadText);
+        Assert.Equal(vm.GeneratorLoadText, vm.CompactSubLoadText);
+        Assert.DoesNotContain("Aux", vm.CompactSubLoadText);
+        Assert.EndsWith(" kg/s]", vm.CompactFlowText);
+        Assert.EndsWith("% MSS", vm.MainStatusPowerText);
+        Assert.Equal("OIL COOLING (OCL)", vm.DetailedLoadLabelText);
+        Assert.EndsWith("% OCL", vm.DetailedLoadValueText);
+        Assert.StartsWith("Gen Load: ", vm.DetailedBottomRightText);
+
+        vm.SetPresetDemand("0");
+        Assert.StartsWith("-", vm.CompactRtpText);
+        Assert.StartsWith("-", vm.CompactLoadText);
+        Assert.StartsWith("-", vm.MainStatusPowerText);
+        Assert.StartsWith("-", vm.DetailedLoadValueText);
+    }
+
+    [Fact]
+    public void TestTooltipsCatalogAndToggle()
+    {
+        var settingsService = new DummySettingsService();
+        var vm = CreateTestVm(settingsService);
+
+        Assert.True(vm.ShowTooltips);
+        Assert.Equal("ENABLED", vm.TooltipsStatusText);
+        Assert.NotNull(vm.MainBannerTooltip);
+        Assert.Equal("TARGET CORE THERMAL POWER", vm.MainBannerTooltip.Title);
+
+        vm.SelectUnit("3");
+        Assert.NotNull(vm.MainBannerTooltip);
+        Assert.Equal("MAIN STEAM SEALING (MSS %)", vm.MainBannerTooltip.Title);
+        Assert.NotNull(vm.DetailedLoadTooltip);
+        Assert.Equal("OIL COOLING (OCL %)", vm.DetailedLoadTooltip.Title);
+
+        vm.ToggleTooltips();
+        Assert.False(vm.ShowTooltips);
+        Assert.False(settingsService.Settings.ShowTooltips);
+        Assert.Equal("DISABLED", vm.TooltipsStatusText);
+        Assert.Null(vm.MainBannerTooltip);
+
+        vm.ToggleTooltips();
+        Assert.True(vm.ShowTooltips);
+        Assert.NotNull(vm.MainBannerTooltip);
     }
 
     [Fact]
