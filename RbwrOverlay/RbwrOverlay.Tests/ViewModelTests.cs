@@ -660,6 +660,21 @@ public class ViewModelTests
         vm.RemindLater();
 
         Assert.True(closeRequested);
+        Assert.False(string.IsNullOrWhiteSpace(vm.EffectiveReleaseNotes));
+        Assert.False(vm.HasDownloadStatus);
+        Assert.False(vm.IsDownloadError);
+
+        vm.DownloadStatus = "Downloading v3.0.0...";
+        Assert.True(vm.HasDownloadStatus);
+        Assert.False(vm.IsDownloadError);
+
+        vm.DownloadStatus = "Update failed: Network timeout";
+        Assert.True(vm.HasDownloadStatus);
+        Assert.True(vm.IsDownloadError);
+
+        Assert.NotNull(RbwrOverlay.UI.TooltipCatalog.Get("UpdateNow"));
+        Assert.NotNull(RbwrOverlay.UI.TooltipCatalog.Get("UpdateLater"));
+        Assert.NotNull(RbwrOverlay.UI.TooltipCatalog.Get("UpdateSkip"));
     }
 
     private class DummyApiClient : IApiClient

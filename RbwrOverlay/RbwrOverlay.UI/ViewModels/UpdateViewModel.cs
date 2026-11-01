@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Models;
@@ -8,6 +9,9 @@ namespace RbwrOverlay.UI.ViewModels;
 
 public partial class UpdateViewModel : ViewModelBase
 {
+    private static readonly IBrush CyanStatusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+    private static readonly IBrush RedStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+
     private readonly IApiClient _apiClient;
     private readonly ILoggingService _logger;
     private readonly Action<string> _onSkipVersion;
@@ -19,6 +23,7 @@ public partial class UpdateViewModel : ViewModelBase
     private string _currentVersion = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EffectiveReleaseNotes))]
     private string _releaseNotes = string.Empty;
 
     [ObservableProperty]
@@ -34,7 +39,20 @@ public partial class UpdateViewModel : ViewModelBase
     private bool _isDownloading;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDownloadStatus))]
+    [NotifyPropertyChangedFor(nameof(IsDownloadError))]
+    [NotifyPropertyChangedFor(nameof(DownloadStatusBrush))]
     private string _downloadStatus = string.Empty;
+
+    public bool HasDownloadStatus => !string.IsNullOrWhiteSpace(DownloadStatus);
+
+    public bool IsDownloadError => DownloadStatus.StartsWith("Update failed", StringComparison.OrdinalIgnoreCase);
+
+    public IBrush DownloadStatusBrush => IsDownloadError ? RedStatusBrush : CyanStatusBrush;
+
+    public string EffectiveReleaseNotes => string.IsNullOrWhiteSpace(ReleaseNotes)
+        ? "Performance improvements, stability fixes, and operational refinements."
+        : ReleaseNotes.Trim();
 
     public event EventHandler? RequestClose;
 
@@ -74,12 +92,12 @@ public partial class UpdateViewModel : ViewModelBase
             var progressReporter = new Progress<double>(p =>
             {
                 DownloadProgress = p * 100.0;
-                DownloadStatus = $"Downloading: {DownloadProgress:F0}%";
+                DownloadStatus = $"Downloading release package... {DownloadProgress:F0}%";
             });
 
             await _apiClient.DownloadUpdateAsync(DownloadUrl, tempDownloadPath, progressReporter);
 
-            DownloadStatus = "Rebooting into new version...";
+            DownloadStatus = "Download complete. Restarting into new build...";
             await Task.Delay(1000);
 
             if (OperatingSystem.IsWindows())

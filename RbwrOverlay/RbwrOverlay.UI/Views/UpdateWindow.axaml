@@ -1,219 +1,255 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
         x:Class="RbwrOverlay.UI.Views.UpdateWindow"
         x:DataType="vm:UpdateViewModel"
-        Title="System Update Available"
+        Title="Software Update Available"
         Icon="/Assets/icon.ico"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         WindowDecorations="None"
         CanResize="False"
         Topmost="True"
-        Width="440"
+        Width="450"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
 
-    <Border Name="RootBorder"
-            Background="{DynamicResource CyberMainBg}"
-            BorderBrush="{DynamicResource NeonCyan}"
-            BorderThickness="1"
-            CornerRadius="8">
+    <Panel x:Name="RootHostPanel">
+        <Border Name="RootBorder"
+                Background="#f7070a12"
+                BorderBrush="{DynamicResource NeonCyan}"
+                BorderThickness="1"
+                CornerRadius="8">
 
-        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 
-            <Border Grid.Row="0"
-                    Name="HeaderBorder"
-                    Background="Transparent"
-                    Padding="14,10,14,8">
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Grid.Column="0"
-                                Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
-                        <TextBlock Name="TitleText"
-                                   Text="SYSTEM UPDATE AVAILABLE"
-                                   Foreground="{DynamicResource NeonCyan}"
-                                   FontWeight="Bold"
-                                   FontSize="11"
-                                   LetterSpacing="0.8"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+                <Border Grid.Row="0"
+                        Name="HeaderBorder"
+                        Background="{DynamicResource CyberHeaderBg}"
+                        CornerRadius="8,8,0,0"
+                        Padding="16,11">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                            <Border Width="3"
+                                    Height="13"
+                                    CornerRadius="1.5"
+                                    Background="{DynamicResource NeonCyan}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Name="TitleText"
+                                       Text="SOFTWARE UPDATE"
+                                       Foreground="{DynamicResource NeonCyan}"
+                                       FontWeight="Bold"
+                                       FontSize="11"
+                                       LetterSpacing="1.1"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="• RBWR OVERLAY"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontSize="9"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
 
-                    <Button Grid.Column="1"
-                            Classes="cyber-close-btn"
-                            Content="✕"
-                            Command="{Binding RemindLaterCommand}"
-                            Padding="6,2"
-                            ToolTip.Tip="Remind Later" />
-                </Grid>
-            </Border>
+                        <Button Grid.Column="1"
+                                Classes="cyber-close-btn"
+                                Content="X"
+                                Command="{Binding RemindLaterCommand}"
+                                IsEnabled="{Binding !IsDownloading}"
+                                behaviors:TooltipBehaviors.Key="UpdateLater"
+                                FontSize="10"
+                                FontWeight="Bold"
+                                Padding="7,3" />
+                    </Grid>
+                </Border>
 
-            <Rectangle Grid.Row="1"
-                       Fill="{DynamicResource CyberBorder}"
-                       Height="1"
-                       Margin="14,0" />
+                <Rectangle Grid.Row="1"
+                           Fill="{DynamicResource CyberBorder}"
+                           Height="1" />
 
-            <StackPanel Grid.Row="2"
-                        Margin="14,12"
-                        Spacing="10">
+                <StackPanel Grid.Row="2"
+                            Margin="16,14"
+                            Spacing="12">
 
-                <Border Background="{DynamicResource CyberCardBg}"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        Padding="12,10">
-                    <StackPanel Spacing="8">
-                        <Grid ColumnDefinitions="*,Auto">
+                    <Border Background="#0b101d"
+                            BorderBrush="{DynamicResource CyberBorder}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="14,11">
+                        <Grid ColumnDefinitions="*,Auto,*"
+                              VerticalAlignment="Center">
+
                             <StackPanel Grid.Column="0"
-                                        Orientation="Horizontal"
-                                        Spacing="6"
+                                        Spacing="2"
                                         VerticalAlignment="Center">
-                                <TextBlock Text="UPDATE DIAGNOSTICS"
+                                <TextBlock Text="INSTALLED BUILD"
                                            Foreground="{DynamicResource TextMuted}"
-                                           FontSize="9"
+                                           FontSize="8.5"
                                            FontWeight="Bold"
-                                           LetterSpacing="0.5" />
-                                <Border Background="#141f33"
-                                        BorderBrush="{DynamicResource NeonCyan}"
-                                        BorderThickness="1"
-                                        CornerRadius="3"
-                                        Padding="5,1">
-                                    <TextBlock Text="{Binding LatestVersion, StringFormat='TARGET: v{0}'}"
-                                               Foreground="{DynamicResource NeonCyan}"
-                                               FontSize="8"
-                                               FontWeight="Bold" />
-                                </Border>
+                                           LetterSpacing="0.7" />
+                                <TextBlock Text="{Binding CurrentVersion, StringFormat='v{0}'}"
+                                           Foreground="#8e9eb8"
+                                           FontWeight="Bold"
+                                           FontSize="16" />
                             </StackPanel>
 
                             <Border Grid.Column="1"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Background="#10291d"
-                                    BorderBrush="{DynamicResource NeonGreen}"
+                                    Background="#111a2c"
+                                    BorderBrush="{DynamicResource CyberBorder}"
                                     BorderThickness="1"
-                                    CornerRadius="3"
-                                    Padding="6,2">
-                                <TextBlock Text="READY TO INSTALL"
-                                           Foreground="{DynamicResource NeonGreen}"
-                                           FontWeight="Bold"
-                                           FontSize="8" />
-                            </Border>
-                        </Grid>
-
-                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center" Margin="0,2">
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="AVAILABLE RELEASE"
-                                           Foreground="{DynamicResource TextMuted}"
-                                           FontSize="8"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding LatestVersion, StringFormat='v{0}'}"
+                                    CornerRadius="4"
+                                    Padding="8,3"
+                                    Margin="12,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="-&gt;"
                                            Foreground="{DynamicResource NeonCyan}"
+                                           FontSize="11"
                                            FontWeight="Bold"
-                                           FontSize="22"
-                                           FontFamily="Consolas, 'Segoe UI', monospace" />
-                            </StackPanel>
+                                           VerticalAlignment="Center" />
+                            </Border>
 
-                            <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="2">
-                                <Grid ColumnDefinitions="Auto,Auto">
-                                    <TextBlock Text="CURRENT VERSION: " Foreground="{DynamicResource TextMuted}" FontSize="9" />
-                                    <TextBlock Grid.Column="1" Text="{Binding CurrentVersion, StringFormat='v{0}'}" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="9" />
-                                </Grid>
-                            </StackPanel>
+                            <Border Grid.Column="2"
+                                    Background="#0f1d33"
+                                    BorderBrush="#5500f0ff"
+                                    BorderThickness="1"
+                                    CornerRadius="5"
+                                    Padding="12,6"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel Spacing="1"
+                                            HorizontalAlignment="Right">
+                                    <TextBlock Text="NEW RELEASE"
+                                               Foreground="{DynamicResource NeonCyan}"
+                                               FontSize="8.5"
+                                               FontWeight="Bold"
+                                               LetterSpacing="0.7"
+                                               HorizontalAlignment="Right" />
+                                    <TextBlock Text="{Binding LatestVersion, StringFormat='v{0}'}"
+                                               Foreground="#ffffff"
+                                               FontWeight="Bold"
+                                               FontSize="19"
+                                               HorizontalAlignment="Right" />
+                                </StackPanel>
+                            </Border>
+
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="RELEASE NOTES"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontSize="9"
+                                       FontWeight="Bold"
+                                       LetterSpacing="0.8" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding LatestVersion, StringFormat='CHANGELOG • v{0}'}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontSize="8.5" />
                         </Grid>
 
-                        <StackPanel Spacing="3" IsVisible="{Binding IsDownloading}">
+                        <Border Background="#080c15"
+                                BorderBrush="{DynamicResource CyberBorder}"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="12,10"
+                                MinHeight="78"
+                                MaxHeight="190">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding EffectiveReleaseNotes}"
+                                           Foreground="#dce6f5"
+                                           FontSize="11"
+                                           LineHeight="17"
+                                           TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+
+                    <Border Background="#0c1526"
+                            BorderBrush="#4000f0ff"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="12,8"
+                            IsVisible="{Binding HasDownloadStatus}">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding DownloadStatus}"
+                                           Foreground="{Binding DownloadStatusBrush}"
+                                           FontSize="9.5"
+                                           FontWeight="Bold"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                           Foreground="{DynamicResource TextLight}"
+                                           FontSize="9.5"
+                                           FontWeight="Bold"
+                                           Margin="8,0,0,0"
+                                           IsVisible="{Binding IsDownloading}" />
+                            </Grid>
+
                             <ProgressBar Classes="cyber-power"
-                                         Height="8"
+                                         Height="6"
                                          Minimum="0"
                                          Maximum="100"
                                          Value="{Binding DownloadProgress}"
-                                         Foreground="{DynamicResource NeonCyan}" />
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <TextBlock Text="0%" Foreground="{DynamicResource TextMuted}" FontSize="8" />
-                                <TextBlock Grid.Column="1" HorizontalAlignment="Center" Text="{Binding DownloadStatus}" Foreground="{DynamicResource NeonCyan}" FontSize="8" FontWeight="Bold" />
-                                <TextBlock Grid.Column="2" Text="100%" Foreground="{DynamicResource TextMuted}" FontSize="8" />
-                            </Grid>
+                                         Foreground="{DynamicResource NeonCyan}"
+                                         IsVisible="{Binding IsDownloading}" />
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <Border Background="#0b101c"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        Padding="12,10"
-                        MaxHeight="120">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="RELEASE NOTES &amp; CHANGELOG"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       FontSize="8"
-                                       FontWeight="Bold"
-                                       LetterSpacing="0.5"
-                                       Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding ReleaseNotes}"
-                                       Foreground="{DynamicResource TextLight}"
-                                       FontSize="11"
-                                       LineHeight="16"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </Border>
-            </StackPanel>
+                </StackPanel>
 
-            <Rectangle Grid.Row="3"
-                       Fill="{DynamicResource CyberBorder}"
-                       Height="1"
-                       Margin="14,0" />
+                <Rectangle Grid.Row="3"
+                           Fill="{DynamicResource CyberBorder}"
+                           Height="1" />
 
-            <Border Grid.Row="4"
-                    Name="FooterBorder"
-                    Background="Transparent"
-                    Padding="14,8,14,10">
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Grid.Column="0"
-                                Orientation="Horizontal"
-                                Spacing="6"
-                                VerticalAlignment="Center">
-                        <TextBlock Text="SYSTEM UPDATE"
-                                   Foreground="{DynamicResource TextMuted}"
-                                   FontSize="9"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="8"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center">
-                        <Button Classes="cyber"
-                                Content="LATER"
-                                Command="{Binding RemindLaterCommand}"
-                                IsEnabled="{Binding !IsDownloading}"
-                                Padding="12,5"
-                                FontSize="10"
-                                FontWeight="Bold" />
-
-                        <Button Classes="cyber-red"
+                <Border Grid.Row="4"
+                        Name="FooterBorder"
+                        Background="#060911"
+                        CornerRadius="0,0,8,8"
+                        Padding="16,10">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button Grid.Column="0"
+                                Classes="cyber-preset"
                                 Content="SKIP VERSION"
                                 Command="{Binding SkipVersionCommand}"
                                 IsEnabled="{Binding !IsDownloading}"
-                                Padding="12,5"
-                                FontSize="10"
-                                FontWeight="Bold" />
+                                behaviors:TooltipBehaviors.Key="UpdateSkip"
+                                Padding="10,6"
+                                FontSize="9.5"
+                                FontWeight="Bold"
+                                VerticalAlignment="Center" />
 
-                        <Button Classes="cyber-green"
-                                Content="UPDATE NOW"
-                                Command="{Binding UpdateNowCommand}"
-                                IsEnabled="{Binding !IsDownloading}"
-                                Padding="16,5"
-                                FontSize="10"
-                                FontWeight="Bold" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <Button Classes="cyber"
+                                    Content="LATER"
+                                    Command="{Binding RemindLaterCommand}"
+                                    IsEnabled="{Binding !IsDownloading}"
+                                    behaviors:TooltipBehaviors.Key="UpdateLater"
+                                    Padding="14,6"
+                                    FontSize="10"
+                                    FontWeight="Bold" />
 
-        </Grid>
-    </Border>
+                            <Button Classes="cyber-green"
+                                    Content="UPDATE NOW"
+                                    Command="{Binding UpdateNowCommand}"
+                                    IsEnabled="{Binding !IsDownloading}"
+                                    behaviors:TooltipBehaviors.Key="UpdateNow"
+                                    Padding="18,6"
+                                    FontSize="10"
+                                    FontWeight="Bold" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Border>
+    </Panel>
 </Window>

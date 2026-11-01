@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Controls;
 using Avalonia.Input;
+using RbwrOverlay.UI.Behaviors;
 using RbwrOverlay.UI.ViewModels;
 
 namespace RbwrOverlay.UI.Views;
@@ -10,6 +11,7 @@ public partial class UpdateWindow : Window
     public UpdateWindow()
     {
         InitializeComponent();
+        TooltipBehaviors.AttachWindow(this, RootHostPanel);
         SetupDrag();
         KeyDown += OnWindowKeyDown;
     }
@@ -46,6 +48,11 @@ public partial class UpdateWindow : Window
     {
         if (e.Key is Key.Escape)
         {
+            if (DataContext is UpdateViewModel { IsDownloading: true })
+            {
+                return;
+            }
+
             Close();
             e.Handled = true;
         }

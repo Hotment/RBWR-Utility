@@ -127,7 +127,7 @@ public static class TooltipCatalog
         ),
         ["MainBannerTcr"] = new(
             Title: "MAIN STEAM SEALING (MSS) & OIL COOLING (OCL)",
-            Description: "MSS: Negative = Supply Valve %, Positive = Leak-Off Valve %. OCL: Required difference (Cold Water - Hot Water %, e.g. -40% means Hot Water open to 40% and Cold Water at 0%)."
+            Description: "MSS: Negative = Supply Valve, Positive = Leak-Off Valve. OCL: Required difference (Cold Water - Hot Water %, e.g. -40% means Hot Water open to 40% and Cold Water at 0%)."
         ),
         ["DetailedLoadReactor"] = new(
             Title: "GROSS GENERATOR LOAD",
@@ -272,6 +272,24 @@ public static class TooltipCatalog
         ["CheckUpdatesButton"] = new(
             Title: "CHECK FOR UPDATES",
             Description: "Queries for the latest RBWR Overlay release and offers one-click download and installation if a newer build exists."
+        ),
+
+        // --- Update & Notification Popups ---
+        ["UpdateNow"] = new(
+            Title: "INSTALL UPDATE NOW",
+            Description: "Downloads the new release automatically and restarts RBWR Overlay into the updated build."
+        ),
+        ["UpdateLater"] = new(
+            Title: "REMIND ME LATER",
+            Description: "Dismisses this prompt for the current session. You can install the update later from the FEEDBACK tab."
+        ),
+        ["UpdateSkip"] = new(
+            Title: "SKIP THIS RELEASE",
+            Description: "Mutes automatic startup notifications for this specific version until a newer release is published."
+        ),
+        ["DismissAlert"] = new(
+            Title: "DISMISS NOTIFICATION",
+            Description: "Closes this notification window."
         ),
     };
 
