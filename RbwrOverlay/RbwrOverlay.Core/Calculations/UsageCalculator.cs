@@ -15,15 +15,15 @@ public class UsageCalculator
         if (unit == 1)
         {
             FeedwaterUsage = 0.014;
-            CondenserUsage = 0.007; // per kg
+            CondenserUsage = 0.014; // per kg
             CondenserCircUsage = 6.5;
             RecirculationUsage = 0.028;
             TowerMakeupUsage = 0.0;
         }
         else if (unit == 2)
         {
-            FeedwaterUsage = 0.013;
-            CondenserUsage = 3.1850; // per pump
+            FeedwaterUsage = 0.014;
+            CondenserUsage = 3.5; // per pump
             CondenserCircUsage = 6.5;
             RecirculationUsage = 0.01;
             TowerMakeupUsage = 0.5;

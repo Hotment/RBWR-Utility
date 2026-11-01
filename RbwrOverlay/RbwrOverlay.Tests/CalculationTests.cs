@@ -79,4 +79,75 @@ public class CalculationTests
         Assert.True(thermalOverride > 0.0);
         Assert.NotEqual(thermalDefault, thermalOverride);
     }
+
+    [Fact]
+    public void TestTcrMssAndOclCalculations()
+    {
+        var calc = new Calculator(61.32) { SelectedUnit = 3 };
+        Assert.Equal(0.0, calc.CalcMss(0.0));
+        Assert.Equal(0.0, calc.CalcOcl(0.0));
+
+        double thermal100 = 100.0;
+        double mss = calc.CalcMss(thermal100);
+        double ocl = calc.CalcOcl(thermal100);
+
+        Assert.InRange(mss, 86.0, 87.5);
+        Assert.InRange(ocl, 87.0, 88.0);
+    }
+
+    [Fact]
+    public void TestPastedPythonRegressionModelsAreParsedAndUsed()
+    {
+        Assert.True(Calculator.DefaultUnit1Models.ContainsKey("FWF"));
+        Assert.True(Calculator.DefaultUnit1Models.ContainsKey("TGL"));
+        Assert.True(Calculator.DefaultUnit2Models.ContainsKey("FWF"));
+        Assert.True(Calculator.DefaultUnit2Models.ContainsKey("TGL"));
+        Assert.True(Calculator.DefaultUnit2Models.ContainsKey("MSS"));
+        Assert.True(Calculator.DefaultUnit2Models.ContainsKey("OCL"));
+
+        const string customModels = """
+UNIT_1_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
+    "FWF": {
+        "name": "Feedwater Flow",
+        "unit": "kg/s",
+        "type": "quadratic",
+        "a": 0.0,
+        "b": 10.0,
+        "c": 100.0,
+        "equation": "y = 10x + 100",
+    },
+    "TGL": {
+        "name": "Turbine Generator Load",
+        "unit": "MWe",
+        "type": "quadratic",
+        "a": 0.0,
+        "b": 12.0,
+        "c": -100.0,
+        "equation": "y = 12x - 100",
+    },
+}
+
+UNIT_2_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
+    "MSS": {
+        "name": "Main Steam Sealing",
+        "unit": "%",
+        "type": "cubic",
+        "a": 0.0,
+        "b": 0.0,
+        "c": 0.5,
+        "d": 10.0,
+        "equation": "y = 0.5x + 10",
+    },
+}
+""";
+
+        var calc = new Calculator(61.32) { SelectedUnit = 1 };
+        calc.LoadRegressionModels(customModels);
+
+        Assert.Equal(600.0, calc.CalcFlow(50.0), 3);
+        Assert.Equal(500.0, calc.CalcGenLoad(50.0), 3);
+
+        calc.SelectedUnit = 3;
+        Assert.Equal(35.0, calc.CalcMss(50.0), 3);
+    }
 }
