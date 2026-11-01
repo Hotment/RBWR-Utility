@@ -378,14 +378,12 @@ UNIT_2_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
 
     public double CalcMss(double thermal)
     {
-        if (thermal <= 0.0) return 0.0;
-        return Math.Max(0.0, CalcParam("MSS", thermal));
+        return CalcParam("MSS", thermal);
     }
 
     public double CalcOcl(double thermal)
     {
-        if (thermal <= 0.0) return 0.0;
-        return Math.Max(0.0, CalcParam("OCL", thermal));
+        return CalcParam("OCL", thermal);
     }
 
     private double SolveThermalFromLoad(double targetGross)

@@ -81,11 +81,15 @@ public class CalculationTests
     }
 
     [Fact]
-    public void TestTcrMssAndOclCalculations()
+    public void TestTcrMssAndOclCalculationsSupportNegativeValues()
     {
         var calc = new Calculator(61.32) { SelectedUnit = 3 };
-        Assert.Equal(0.0, calc.CalcMss(0.0));
-        Assert.Equal(0.0, calc.CalcOcl(0.0));
+        double mss0 = calc.CalcMss(0.0);
+        double ocl0 = calc.CalcOcl(0.0);
+        Assert.True(mss0 < 0.0, $"Expected negative MSS at 0% thermal, got {mss0}");
+        Assert.True(ocl0 < 0.0, $"Expected negative OCL at 0% thermal, got {ocl0}");
+        Assert.InRange(mss0, -42.0, -41.0);
+        Assert.InRange(ocl0, -30.0, -29.0);
 
         double thermal100 = 100.0;
         double mss = calc.CalcMss(thermal100);
