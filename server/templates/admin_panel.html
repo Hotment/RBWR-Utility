@@ -142,12 +142,13 @@
             scrollbar-color: rgba(59, 130, 246, 0.25) #0a0a0c;
         }
     </style>
+    <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 
 <body class="min-h-screen flex flex-col md:flex-row font-sans max-w-full overflow-x-hidden"
     data-is-root="{{ is_root|lower }}">
 
-    <aside class="w-full md:w-64 bg-surface border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0">
+    <aside class="w-full md:w-64 md:sticky md:top-0 md:h-screen bg-surface border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0">
         <div class="p-6 border-b border-white/5 flex items-center gap-3">
             <div class="relative w-8 h-8 flex items-center justify-center shrink-0">
                 <div
@@ -165,7 +166,14 @@
             </div>
         </div>
 
-        <nav class="p-4 flex flex-col gap-1.5 grow">
+        <div class="px-4 pt-4 relative">
+            <svg class="w-4 h-4 absolute left-7 top-1/2 mt-2 -translate-y-1/2 text-slate-500 pointer-events-none" fill="none"
+                stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input id="adm-nav-search" type="search" autocomplete="off" placeholder="Search sections…  /"
+                aria-label="Search admin sections"
+                class="premium-input w-full pl-9 pr-3 py-2 text-xs font-mono rounded-lg outline-none">
+        </div>
+        <nav id="adm-nav" class="p-4 flex flex-col gap-1.5 grow min-h-0 overflow-y-auto">
             <a href="/admin" id="nav-overview"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'overview' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition shrink-0" fill="none"
@@ -200,6 +208,14 @@
                     </path>
                 </svg>
                 <span class="whitespace-nowrap">Crash Logs</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.errors %}
+            <a href="/admin/errors" id="nav-errors"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'errors' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                <span class="whitespace-nowrap">Error Monitor</span><span id="nav-count-errors" class="ml-auto px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold whitespace-nowrap">0</span>
             </a>
             {% endif %}
 
@@ -256,6 +272,72 @@
                 <span class="whitespace-nowrap">Accounts</span>
             </a>
             {% endif %}
+
+            {% if permissions.dms %}
+            <a href="/admin/dms" id="nav-dms"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'dms' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 8h10M7 12h6"/><path d="M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-5 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+                <span class="whitespace-nowrap">Discord Messages</span><span id="nav-count-dms" class="ml-auto px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold whitespace-nowrap">0</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.moderation %}
+            <a href="/admin/moderation" id="nav-moderation"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'moderation' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 4 6 6M4 20l8-8M11 7l6 6M9.5 5.5l4-4 9 9-4 4z"/><path d="M2 22h8"/></svg>
+                <span class="whitespace-nowrap">Moderation</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.automod %}
+            <a href="/admin/automod" id="nav-automod"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'automod' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span class="whitespace-nowrap">Automod</span><span id="nav-count-automod" class="ml-auto px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold whitespace-nowrap">–</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.embeds %}
+            <a href="/admin/embeds" id="nav-embeds"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'embeds' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 4v16M7 9h8M7 13h10M7 17h5"/></svg>
+                <span class="whitespace-nowrap">Embed Builder</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.autorole %}
+            <a href="/admin/autorole" id="nav-autorole"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'autorole' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12.5-4.3M19 14v6M16 17h6"/></svg>
+                <span class="whitespace-nowrap">Autorole</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.welcome %}
+            <a href="/admin/welcome" id="nav-welcome"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'welcome' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><path d="M5 11h14v6a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/></svg>
+                <span class="whitespace-nowrap">Welcome & Goodbye</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.faq %}
+            <a href="/admin/faq" id="nav-faq"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'faq' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+                <span class="whitespace-nowrap">FAQ</span>
+            </a>
+            {% endif %}
+
+            {% if permissions.commands %}
+            <a href="/admin/commands" id="nav-commands"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'commands' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg>
+                <span class="whitespace-nowrap">Custom Commands</span>
+            </a>
+            {% endif %}
+
+            <div id="adm-nav-empty" class="hidden px-4 py-2 text-xs font-mono text-slate-500">No matching sections.</div>
 
             <div class="h-px bg-white/5 my-2"></div>
 
@@ -360,6 +442,13 @@
                 </a>
                 {% endif %}
 
+                {% if permissions.errors %}
+                <a href="/admin/errors" data-nav="errors" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Error Monitor</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Bot failures with tracebacks. Mark them resolved once fixed or send a test alert.</p>
+                </a>
+                {% endif %}
                 {% if permissions.contact %}
                 <a href="/admin/contact" id="card-link-contact"
                     class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
@@ -403,6 +492,62 @@
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
                         View, enforce, and manage prohibited client IP addresses, durations, and prohibition reasons.
                     </p>
+                </a>
+                {% endif %}
+                {% if permissions.dms %}
+                <a href="/admin/dms" data-nav="dms" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 8h10M7 12h6"/><path d="M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-5 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Discord Messages</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Write to server members as the RBWR bot; their replies show up here.</p>
+                </a>
+                {% endif %}
+                {% if permissions.moderation %}
+                <a href="/admin/moderation" data-nav="moderation" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 4 6 6M4 20l8-8M11 7l6 6M9.5 5.5l4-4 9 9-4 4z"/><path d="M2 22h8"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Moderation</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Warn, time out, rename, kick or ban Discord members, and manage warning rules.</p>
+                </a>
+                {% endif %}
+                {% if permissions.automod %}
+                <a href="/admin/automod" data-nav="automod" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Automod</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Blocked words, invites, spam, raids and new-account protection.</p>
+                </a>
+                {% endif %}
+                {% if permissions.embeds %}
+                <a href="/admin/embeds" data-nav="embeds" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 4v16M7 9h8M7 13h10M7 17h5"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Embed Builder</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Design Discord embeds with a live preview and post them as the bot.</p>
+                </a>
+                {% endif %}
+                {% if permissions.autorole %}
+                <a href="/admin/autorole" data-nav="autorole" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12.5-4.3M19 14v6M16 17h6"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Autorole</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">The role the bot gives to everyone who joins the Discord server.</p>
+                </a>
+                {% endif %}
+                {% if permissions.welcome %}
+                <a href="/admin/welcome" data-nav="welcome" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><path d="M5 11h14v6a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Welcome & Goodbye</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Greet new Discord members and say goodbye to leaving ones.</p>
+                </a>
+                {% endif %}
+                {% if permissions.faq %}
+                <a href="/admin/faq" data-nav="faq" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">FAQ</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Ready answers that anyone can post on Discord with /faq.</p>
+                </a>
+                {% endif %}
+                {% if permissions.commands %}
+                <a href="/admin/commands" data-nav="commands" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Custom Commands</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">Prefix commands like !bug that post a saved text or embed.</p>
                 </a>
                 {% endif %}
             </div>
@@ -491,7 +636,6 @@
                 <div id="feed-container" class="flex flex-col gap-4">
                     <p class="text-sm text-slate-500 italic font-mono">Loading tickets...</p>
                 </div>
-            </div>
         </main>
 
         <main id="view-crashes"
@@ -744,6 +888,536 @@
         </main>
         {% endif %}
 
+
+        {% if permissions.dms %}
+        <main id="view-dms" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'dms' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-blue-400 font-display whitespace-nowrap">Discord Messages</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Write to server members as the RBWR bot; their replies show up here.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div class="dm-layout">
+                    <div class="card dm-side">
+                        <label class="pw-label" for="dm-search">Write to a server member</label>
+                        <input id="dm-search" class="pw-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
+                        <div id="dm-results" class="eb-list dm-results"></div>
+                        <div class="eb-card-head" style="margin-top:18px">Conversations</div>
+                        <div id="dm-list" class="eb-list dm-list"></div>
+                    </div>
+                    <div class="card dm-chat" id="dm-chat">
+                        <div class="empty">Pick a member or a conversation. Messages are sent as the RBWR bot, and members' replies to the bot show up here.</div>
+                    </div>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.moderation %}
+        <main id="view-moderation" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'moderation' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-rose-400 font-display whitespace-nowrap">Moderation</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Warn, time out, rename, kick or ban Discord members, and manage warning rules.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div class="dm-layout" style="margin-bottom:20px">
+                    <div class="card dm-side">
+                        <label class="pw-label" for="mod-search">Find a server member</label>
+                        <input id="mod-search" class="pw-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
+                        <div id="mod-results" class="eb-list dm-results"></div>
+                    </div>
+                    <div class="card dm-chat" id="mod-member">
+                        <div class="empty">Pick a member to warn them, time them out, change their nickname, kick or ban them. These are the same actions as <code>/mod</code> on Discord, done by the bot.</div>
+                    </div>
+                </div>
+                <div class="card" style="margin-bottom:20px">
+                    <h2>Warnings</h2>
+                    <p class="card-sub">Members are warned with <code>/warn</code>, the Warn button in <code>/mod</code> or above. When a member reaches exactly the number of active warnings of a rule, the bot runs its action automatically.</p>
+                    <form id="warn-form">
+                        <div id="warn-rules"></div>
+                        <div class="btn-row" style="align-items:flex-end;margin-top:12px">
+                            <button type="button" class="qbtn c-gold" id="warn-add-rule">+ Add rule</button>
+                            <div>
+                                <label class="pw-label" for="warn-expire">Warnings expire after</label>
+                                <select id="warn-expire" class="pw-select">
+                                    <option value="0">Never</option>
+                                    <option value="7">7 days</option>
+                                    <option value="30">30 days</option>
+                                    <option value="90">90 days</option>
+                                    <option value="180">180 days</option>
+                                    <option value="365">1 year</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-gold" style="padding:10px 20px">Save rules</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card table-wrap">
+                    <h2>Banned on Discord</h2>
+                    <table class="admin-table">
+                        <thead><tr><th>User</th><th>Reason</th><th></th></tr></thead>
+                        <tbody id="mod-bans-body"></tbody>
+                    </table>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.automod %}
+        <main id="view-automod" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'automod' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display whitespace-nowrap">Automod</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Blocked words, invites, spam, raids and new-account protection.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div id="am-alert"></div>
+                <div class="tickets-stats">
+                    <div class="stat"><div class="value" id="am-stat-day">–</div><div class="label">Actions (24h)</div></div>
+                    <div class="stat"><div class="value" id="am-stat-week">–</div><div class="label">Actions (7 days)</div></div>
+                    <div class="stat"><div class="value" id="am-stat-top">–</div><div class="label">Top filter (7 days)</div></div>
+                    <div class="stat"><div class="value" id="am-stat-raid">–</div><div class="label">Raid mode</div></div>
+                </div>
+                <form id="am-form">
+                    <div class="card" style="margin-bottom:20px">
+                        <h2>General</h2>
+                        <p class="card-sub">The bot checks every message (also edited ones) on the server. Each filter below has its own action: <strong>Log only</strong> records it, <strong>Delete</strong> removes the message, <strong>Warn</strong> also adds a warning (which counts towards the warning rules in Moderation) and <strong>Timeout</strong> also times the member out. During a burst the member is warned or timed out only once.</p>
+                        <div class="inline-form">
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-enabled"> <strong>Automod enabled</strong></label></div>
+                            <div>
+                                <label class="pw-label" for="am-log">Log channel</label>
+                                <select id="am-log" class="pw-select"><option value="">Loading channels…</option></select>
+                            </div>
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-notify"> Tell members why their message was removed</label></div>
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-staff"> Ignore staff (admins &amp; Manage Messages)</label></div>
+                        </div>
+                        <div class="am-exempt">
+                            <div>
+                                <label class="pw-label" for="am-ex-role">Ignored roles</label>
+                                <div class="am-chips" id="am-ex-roles"></div>
+                                <select id="am-ex-role" class="pw-select"></select>
+                            </div>
+                            <div>
+                                <label class="pw-label" for="am-ex-channel">Ignored channels <span class="pw-optional">(threads follow their channel)</span></label>
+                                <div class="am-chips" id="am-ex-channels"></div>
+                                <select id="am-ex-channel" class="pw-select"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <h2 class="adm-section-title">Message filters</h2>
+                    <div class="am-grid" id="am-filters"></div>
+                    <h2 class="adm-section-title">Join protection</h2>
+                    <div class="am-grid" id="am-join"></div>
+                    <div class="am-save">
+                        <button type="submit" class="btn-gold" style="padding:10px 24px">Save automod settings</button>
+                        <span class="pw-hint" id="am-dirty"></span>
+                    </div>
+                </form>
+                <div class="card" style="margin:20px 0">
+                    <h2>Test a message</h2>
+                    <p class="card-sub">Checks a text against the <strong>saved</strong> settings. Message spam and repeated messages need real messages, so they can't be tested here.</p>
+                    <form id="am-test-form">
+                        <label class="pw-label hidden" for="am-test">Message</label>
+                        <textarea id="am-test" class="pw-textarea" rows="3" maxlength="4000" required placeholder="Type a message the way a member would send it…"></textarea>
+                        <div class="btn-row" style="align-items:center;margin-top:10px">
+                            <button type="submit" class="mono-btn">Check</button>
+                            <div id="am-test-result"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card table-wrap">
+                    <div class="am-table-head">
+                        <h2>Recent incidents</h2>
+                        <button type="button" class="qbtn c-red" id="am-clear">Clear log</button>
+                    </div>
+                    <table class="admin-table">
+                        <thead><tr><th>When</th><th>Member</th><th>Filter</th><th>Reason &amp; message</th><th>Result</th></tr></thead>
+                        <tbody id="am-body"></tbody>
+                    </table>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.embeds %}
+        <main id="view-embeds" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'embeds' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-indigo-400 font-display whitespace-nowrap">Embed Builder</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Design Discord embeds with a live preview and post them as the bot.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div class="eb-layout">
+                    <div class="card eb-form">
+                        <div class="eb-channel-row">
+                            <div class="pw-field" style="flex:1;margin:0">
+                                <label class="pw-label" for="eb-channel">Channel</label>
+                                <select id="eb-channel" class="pw-select"><option value="">Loading channels…</option></select>
+                            </div>
+                            <button type="button" class="mono-btn" id="eb-reload-channels" title="Reload channels">&#8635;</button>
+                        </div>
+                        <div class="pw-field">
+                            <label class="pw-label" for="eb-content">Message text <span class="pw-optional">(above the embed)</span></label>
+                            <textarea id="eb-content" class="pw-textarea" maxlength="2000" rows="2" style="min-height:60px"></textarea>
+                            <div class="eb-channel-row" style="margin-top:6px">
+                                <label class="hidden" for="eb-role">Ping a role</label>
+                                <select id="eb-role" class="pw-select" style="flex:1"><option value="">Ping a role…</option></select>
+                            </div>
+                            <div class="pw-hint">You can also type <code>@RoleName</code> — it's turned into a ping when sent. Pings only notify from the message text, not from the embed.</div>
+                        </div>
+                        <label class="pw-check" style="margin-bottom:8px"><input type="checkbox" id="eb-mentions"> Allow pings (@everyone, @here, roles and users)</label>
+
+                        <h3 class="eb-section">Embed</h3>
+                        <div class="eb-grid">
+                            <div class="pw-field"><label class="pw-label" for="eb-title">Title</label><input id="eb-title" class="pw-input" maxlength="256"></div>
+                            <div class="pw-field"><label class="pw-label" for="eb-url">Title link</label><input id="eb-url" class="pw-input" maxlength="500" placeholder="https://"></div>
+                        </div>
+                        <div class="pw-field">
+                            <label class="pw-label" for="eb-description">Description <span class="pw-optional">(Markdown supported)</span></label>
+                            <textarea id="eb-description" class="pw-textarea" maxlength="4096" rows="6"></textarea>
+                            <div class="pw-hint"><span id="eb-desc-count">0</span> / 4096</div>
+                        </div>
+                        <div class="eb-grid">
+                            <div class="pw-field">
+                                <label class="pw-label" for="eb-color-hex">Color</label>
+                                <div class="eb-color">
+                                    <input type="color" id="eb-color" value="#ffcc00" aria-label="Pick color">
+                                    <input id="eb-color-hex" class="pw-input" value="#FFCC00" maxlength="7">
+                                </div>
+                            </div>
+                            <div class="pw-field" style="display:flex;align-items:flex-end">
+                                <label class="pw-check"><input type="checkbox" id="eb-timestamp"> Show current time in footer</label>
+                            </div>
+                        </div>
+
+                        <h3 class="eb-section">Author</h3>
+                        <div class="eb-grid three">
+                            <div class="pw-field"><label class="pw-label" for="eb-author-name">Name</label><input id="eb-author-name" class="pw-input" maxlength="256"></div>
+                            <div class="pw-field"><label class="pw-label" for="eb-author-url">Link</label><input id="eb-author-url" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="pw-field"><label class="pw-label" for="eb-author-icon">Icon URL</label><input id="eb-author-icon" class="pw-input" maxlength="500" placeholder="https://"></div>
+                        </div>
+
+                        <h3 class="eb-section">Images</h3>
+                        <div class="eb-grid">
+                            <div class="pw-field"><label class="pw-label" for="eb-thumbnail">Thumbnail URL <span class="pw-optional">(small, top right)</span></label><input id="eb-thumbnail" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="pw-field"><label class="pw-label" for="eb-image">Image URL <span class="pw-optional">(large, bottom)</span></label><input id="eb-image" class="pw-input" maxlength="500" placeholder="https://"></div>
+                        </div>
+
+                        <h3 class="eb-section">Footer</h3>
+                        <div class="eb-grid">
+                            <div class="pw-field"><label class="pw-label" for="eb-footer-text">Text</label><input id="eb-footer-text" class="pw-input" maxlength="2048"></div>
+                            <div class="pw-field"><label class="pw-label" for="eb-footer-icon">Icon URL</label><input id="eb-footer-icon" class="pw-input" maxlength="500" placeholder="https://"></div>
+                        </div>
+
+                        <div class="eb-fields-head">
+                            <h3 class="eb-section" style="margin:0">Fields <span class="pw-optional" id="eb-field-count">(0 / 25)</span></h3>
+                            <button type="button" class="qbtn c-gold" id="eb-add-field">+ Add field</button>
+                        </div>
+                        <div id="eb-fields"></div>
+                    </div>
+
+                    <div class="eb-side">
+                        <div class="card eb-preview-card">
+                            <div class="eb-card-head">Live preview</div>
+                            <div id="eb-preview"></div>
+                        </div>
+                        <div class="card">
+                            <div class="pw-field">
+                                <label class="pw-label" for="eb-edit-id">Edit an existing message <span class="pw-optional">(optional)</span></label>
+                                <input id="eb-edit-id" class="pw-input" inputmode="numeric" placeholder="Message ID — leave empty to send a new message">
+                                <div class="pw-hint">The bot can only edit messages it sent itself.</div>
+                            </div>
+                            <div class="btn-row">
+                                <button type="button" class="btn-gold" id="eb-send" style="padding:10px 20px">Send to Discord</button>
+                                <button type="button" class="mono-btn" id="eb-clear">Clear form</button>
+                            </div>
+                            <div id="eb-result" style="margin-top:12px"></div>
+                        </div>
+                        <div class="card">
+                            <div class="eb-card-head">Templates</div>
+                            <div class="eb-channel-row">
+                                <label class="hidden" for="eb-template-name">Template name</label>
+                                <input id="eb-template-name" class="pw-input" maxlength="64" placeholder="Template name, e.g. rules">
+                                <button type="button" class="mono-btn" id="eb-save-template">Save</button>
+                            </div>
+                            <p class="pw-hint" style="margin:6px 0 10px">Post a saved template on Discord with <code>/embed template:</code>.</p>
+                            <div id="eb-templates" class="eb-list"></div>
+                        </div>
+                        <div class="card">
+                            <div class="eb-card-head">Recently sent</div>
+                            <div id="eb-history" class="eb-list"></div>
+                        </div>
+                        <div class="card">
+                            <div class="eb-card-head">JSON</div>
+                            <label class="hidden" for="eb-json">Embed JSON</label>
+                            <textarea id="eb-json" class="pw-textarea" rows="5" style="font-family:var(--mono);font-size:0.78rem" placeholder='Paste Discord message JSON ({"content": …, "embeds": [ … ]}) to import it'></textarea>
+                            <div class="btn-row" style="margin-top:8px">
+                                <button type="button" class="mono-btn" id="eb-import">Import</button>
+                                <button type="button" class="mono-btn" id="eb-export">Export current</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.autorole %}
+        <main id="view-autorole" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'autorole' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-emerald-400 font-display whitespace-nowrap">Autorole</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">The role the bot gives to everyone who joins the Discord server.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div id="ar-alert"></div>
+                <div class="card" style="margin-bottom:20px">
+                    <h2>Role for new members</h2>
+                    <p class="card-sub">The bot gives this role to everyone who joins <strong id="ar-guild">the Discord server</strong>. These are the same settings as <code>/autorole</code> on Discord.</p>
+                    <form class="inline-form" id="ar-form">
+                        <div>
+                            <label class="pw-label" for="ar-role">Role</label>
+                            <select id="ar-role" class="pw-select"><option value="">Loading roles…</option></select>
+                        </div>
+                        <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="ar-enabled"> Enabled</label></div>
+                        <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="ar-bots"> Also give it to bots</label></div>
+                        <div><button type="submit" class="btn-gold" style="width:100%;padding:10px">Save</button></div>
+                    </form>
+                    <div class="pw-hint" id="ar-meta" style="margin-top:10px"></div>
+                </div>
+                <div class="card">
+                    <h2>Give the role to existing members</h2>
+                    <p class="card-sub">Adds the role to everyone already on the server who doesn't have it yet. It takes about 0.3 seconds per member.</p>
+                    <div class="btn-row" style="align-items:center">
+                        <label class="pw-check"><input type="checkbox" id="ar-sync-bots"> Include bots</label>
+                        <button type="button" class="mono-btn" id="ar-sync-btn">Sync members</button>
+                    </div>
+                    <div class="pw-hint" id="ar-sync" style="margin-top:10px"></div>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.welcome %}
+        <main id="view-welcome" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'welcome' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display whitespace-nowrap">Welcome & Goodbye</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Greet new Discord members and say goodbye to leaving ones.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div id="wl-alert"></div>
+                <div class="wl-grid" id="wl-forms"></div>
+                <p class="pw-hint" style="margin-top:12px">Placeholders (in the text and the template): <code>{user}</code> mention, <code>{name}</code> display name, <code>{username}</code> username, <code>{server}</code> server name, <code>{member_count}</code> number of members. Only the welcome message pings the member. Bots are never greeted.</p>
+        </main>
+        {% endif %}
+
+        {% if permissions.faq %}
+        <main id="view-faq" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'faq' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-blue-400 font-display whitespace-nowrap">FAQ</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Ready answers that anyone can post on Discord with /faq.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div class="card" style="margin-bottom:20px">
+                    <h2 id="faq-form-title">Add a FAQ entry</h2>
+                    <p class="card-sub">Anyone on the server can post an entry with <code>/faq name:</code> (optionally mentioning someone with <code>user:</code>). <code>/faq</code> alone lists them.</p>
+                    <form id="faq-form">
+                        <div class="inline-form">
+                            <div>
+                                <label class="pw-label" for="faq-name">Name <span class="pw-optional">(used in /faq)</span></label>
+                                <input id="faq-name" class="pw-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. install" title="Lowercase letters, numbers, - and _">
+                            </div>
+                            <div style="grid-column:span 2">
+                                <label class="pw-label" for="faq-title">Question</label>
+                                <input id="faq-title" class="pw-input" required maxlength="256" placeholder="e.g. How do I install RBWR?">
+                            </div>
+                        </div>
+                        <div class="pw-field" style="margin-top:12px">
+                            <label class="pw-label" for="faq-answer">Answer <span class="pw-optional">(Markdown supported)</span></label>
+                            <textarea id="faq-answer" class="pw-textarea" required maxlength="4000" rows="5"></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn-gold" id="faq-submit" style="padding:10px 20px">Add entry</button>
+                            <button type="button" class="mono-btn hidden" id="faq-cancel">Cancel editing</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>Name</th><th>Question &amp; answer</th><th>Used</th><th></th></tr></thead>
+                        <tbody id="faq-body"></tbody>
+                    </table>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.commands %}
+        <main id="view-commands" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'commands' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display whitespace-nowrap">Custom Commands</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Prefix commands like !bug that post a saved text or embed.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div id="cc-alert"></div>
+                <div class="card" style="margin-bottom:20px">
+                    <h2>Prefix</h2>
+                    <p class="card-sub">The character(s) every custom command starts with. If another bot on the server (e.g. Circle) already uses it, pick a different one so both bots don't answer.</p>
+                    <form class="btn-row" id="cc-prefix-form" style="align-items:center">
+                        <label class="pw-label hidden" for="cc-prefix">Prefix</label>
+                        <input id="cc-prefix" class="pw-input" required maxlength="5" pattern="\S+" style="width:100px;font-family:var(--mono)">
+                        <button type="submit" class="btn-gold" style="padding:10px 20px">Save prefix</button>
+                        <span class="pw-hint" style="margin:0">Quick pick:</span>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix="!">!</button>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix="pw!">pw!</button>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix="$">$</button>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix=".">.</button>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix="-">-</button>
+                    </form>
+                </div>
+                <div class="card" style="margin-bottom:20px">
+                    <h2 id="cc-form-title">Add a command</h2>
+                    <p class="card-sub">Anyone on the server types the prefix and the name (e.g. <code><span class="cc-prefix">?</span>bug</code>) and the bot answers. <code><span class="cc-prefix">?</span>commands</code> lists all of them.</p>
+                    <form id="cc-form">
+                        <div class="inline-form">
+                            <div>
+                                <label class="pw-label" for="cc-name">Name</label>
+                                <div class="cc-name-row"><span class="cc-prefix">?</span>
+                                    <input id="cc-name" class="pw-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. bug" title="Lowercase letters, numbers, - and _"></div>
+                            </div>
+                            <div>
+                                <label class="pw-label" for="cc-aliases">Aliases <span class="pw-optional">(comma separated)</span></label>
+                                <input id="cc-aliases" class="pw-input" maxlength="200" placeholder="e.g. bugs, report">
+                            </div>
+                        </div>
+                        <div class="pw-field" style="margin-top:12px">
+                            <label class="pw-label" for="cc-response">Response text <span class="pw-optional">(optional with an embed — Markdown, links and emoji work)</span></label>
+                            <textarea id="cc-response" class="pw-textarea" maxlength="2000" rows="3" placeholder="e.g. 🐞 {target}, report bugs here: {site}/tickets#bug"></textarea>
+                        </div>
+                        <label class="pw-check cc-embed-toggle"><input type="checkbox" id="cc-use-embed"> Answer with an embed <span class="pw-optional">(e.g. <code><span class="cc-prefix">?</span>soon</code> posts a card with a title, text, color and image)</span></label>
+                        <div class="cc-embed hidden" id="cc-embed">
+                            <div class="cc-embed-form">
+                                <div class="pw-field">
+                                    <label class="pw-label" for="cc-template">Embed</label>
+                                    <select id="cc-template" class="pw-select"></select>
+                                </div>
+                                <div id="cc-embed-fields">
+                                <div class="eb-grid">
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-title">Title</label>
+                                        <input id="cc-e-title" class="pw-input" maxlength="256" placeholder="e.g. Found a bug?">
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-url">Title link <span class="pw-optional">(optional)</span></label>
+                                        <input id="cc-e-url" class="pw-input" maxlength="500" placeholder="{site}/tickets#bug">
+                                    </div>
+                                </div>
+                                <div class="pw-field">
+                                    <label class="pw-label" for="cc-e-description">Description</label>
+                                    <textarea id="cc-e-description" class="pw-textarea" maxlength="4096" rows="4" placeholder="{target}, report it here and we'll take a look."></textarea>
+                                </div>
+                                <div class="eb-grid">
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-color-hex">Color</label>
+                                        <div class="eb-color">
+                                            <input type="color" id="cc-e-color" value="#ffcc00" aria-label="Pick a color">
+                                            <input id="cc-e-color-hex" class="pw-input" maxlength="7" value="#FFCC00" style="font-family:var(--mono)">
+                                        </div>
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-author">Author <span class="pw-optional">(small line above the title)</span></label>
+                                        <input id="cc-e-author" class="pw-input" maxlength="256" placeholder="e.g. RBWR Support">
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-thumbnail">Thumbnail URL</label>
+                                        <input id="cc-e-thumbnail" class="pw-input" maxlength="500" placeholder="https://…">
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-image">Image URL</label>
+                                        <input id="cc-e-image" class="pw-input" maxlength="500" placeholder="https://…">
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-label" for="cc-e-footer">Footer</label>
+                                        <input id="cc-e-footer" class="pw-input" maxlength="2048" placeholder="e.g. RBWR • Support">
+                                    </div>
+                                    <div class="pw-field">
+                                        <label class="pw-check" style="margin-top:30px"><input type="checkbox" id="cc-e-timestamp"> Show the time</label>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                            <div class="card eb-preview-card cc-embed-preview">
+                                <div class="eb-card-head">Live preview</div>
+                                <div id="cc-preview"></div>
+                            </div>
+                        </div>
+                        <div class="inline-form" style="margin-top:12px">
+                            <div>
+                                <label class="pw-label" for="cc-role">Who can use it</label>
+                                <select id="cc-role" class="pw-select"><option value="">Everyone</option></select>
+                            </div>
+                            <div>
+                                <label class="pw-label" for="cc-cooldown">Cooldown per channel</label>
+                                <select id="cc-cooldown" class="pw-select">
+                                    <option value="0">None</option>
+                                    <option value="5">5 seconds</option>
+                                    <option value="10">10 seconds</option>
+                                    <option value="30">30 seconds</option>
+                                    <option value="60">1 minute</option>
+                                    <option value="300">5 minutes</option>
+                                </select>
+                            </div>
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-reply" checked> Reply to the message</label></div>
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-delete"> Delete the command message</label></div>
+                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-enabled" checked> Enabled</label></div>
+                        </div>
+                        <div class="btn-row" style="margin-top:12px">
+                            <button type="submit" class="btn-gold" id="cc-submit" style="padding:10px 20px">Add command</button>
+                            <button type="button" class="mono-btn hidden" id="cc-cancel">Cancel editing</button>
+                        </div>
+                    </form>
+                    <p class="pw-hint" style="margin-top:12px">Placeholders (in the response and the embed, links may start with <code>{site}</code>): <code>{user}</code> mention of who used it, <code>{name}</code> their name, <code>{target}</code> the member they mentioned (or themselves — <code><span class="cc-prefix">?</span>bug @Alex</code>), <code>{target_name}</code>, <code>{channel}</code>, <code>{server}</code>, <code>{args}</code> the text after the command, <code>{site}</code> the website URL. Staff ignore the role and the cooldown.</p>
+                </div>
+                <div class="card table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>Command</th><th>Response</th><th>Used</th><th>Status</th><th></th></tr></thead>
+                        <tbody id="cc-body"></tbody>
+                    </table>
+                </div>
+        </main>
+        {% endif %}
+
+        {% if permissions.errors %}
+        <main id="view-errors" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'errors' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-rose-400 font-display whitespace-nowrap">Error Monitor</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Bot failures with tracebacks. Mark them resolved once fixed or send a test alert.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+                <div id="errors-alert"></div>
+                <div class="filters" style="justify-content:space-between">
+                    <div class="seg" id="errors-filter">
+                        <button type="button" class="active" data-value="open">Unresolved</button>
+                        <button type="button" data-value="resolved">Resolved</button>
+                        <button type="button" data-value="all">All</button>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="mono-btn" id="errors-test">Send test alert</button>
+                        <button type="button" class="mono-btn" id="errors-clear">Clear resolved</button>
+                    </div>
+                </div>
+                <div class="error-list" id="errors-list"></div>
+                </div>
+        </main>
+        {% endif %}
     </div>
 
     <div id="ban-modal"
@@ -779,8 +1453,53 @@
         </div>
     </div>
 
+    <script src="/static/js/admin/common.js"></script>
+    <script src="/static/js/admin/embeds.js"></script>
+    <script src="/static/js/admin/botconfig.js"></script>
+    <script src="/static/js/admin/automod.js"></script>
+    <script>window.ADMIN_PERMISSIONS = {{ permissions | tojson | safe }};</script>
+    <script src="/static/js/admin/admin-bot.js"></script>
     <script>
         const IS_ROOT = document.body.dataset.isRoot === 'true';
+        // sidebar search: filters the section links by name; Enter opens the first match, "/" focuses the box
+        (function () {
+            const input = document.getElementById('adm-nav-search');
+            const nav = document.getElementById('adm-nav');
+            if (!input || !nav) return;
+            const links = () => Array.from(nav.querySelectorAll('a[id^="nav-"]'));
+            function filterNav(q) {
+                const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+                let shown = 0;
+                links().forEach(a => {
+                    const match = words.every(w => a.textContent.toLowerCase().includes(w) || a.id.toLowerCase().includes(w));
+                    a.classList.toggle('hidden', !match);
+                    if (match) shown++;
+                });
+                const empty = document.getElementById('adm-nav-empty');
+                if (empty) empty.classList.toggle('hidden', !words.length || shown > 0);
+            }
+            input.addEventListener('input', () => filterNav(input.value));
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const first = links().find(a => !a.classList.contains('hidden'));
+                    if (first) first.click();
+                } else if (e.key === 'Escape') {
+                    input.value = '';
+                    filterNav('');
+                    input.blur();
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+                const el = document.activeElement;
+                if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+                e.preventDefault();
+                input.focus();
+                input.select();
+            });
+        })();
+
         const PERMISSIONS = {{ permissions | tojson | safe }};
         let latestData = null;
         let currentFilter = 'all';
@@ -796,6 +1515,10 @@
             bindNavLink('nav-contact', 'contact', '/admin/contact');
             bindNavLink('nav-bans', 'bans', '/admin/bans');
             bindNavLink('nav-servers', 'servers', '/admin/servers');
+            ['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'].forEach(v => {
+                bindNavLink('nav-' + v, v, '/admin/' + v);
+                document.querySelectorAll('[data-nav="' + v + '"]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); navigateToView(v, '/admin/' + v); }));
+            });
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
             }
@@ -837,6 +1560,7 @@
                 });
             }
 
+            if (window.AdminBot) AdminBot.show(activeView);
             updateAdminStatusTabLabels();
             connectWebSocket();
         });
@@ -868,6 +1592,8 @@
                 navigateToView('contact', path, false);
             } else if (path === '/admin/bans') {
                 navigateToView('bans', path, false);
+            } else if (['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'].some(v => path === '/admin/' + v)) {
+                navigateToView(path.split('/').pop(), path, false);
             } else if (path === '/admin/servers') {
                 navigateToView('servers', path, false);
             } else if (path === '/admin/accounts') {
@@ -909,13 +1635,14 @@
                 }
             }
 
+            if (window.AdminBot) AdminBot.show(viewName);
             if (latestData) {
                 updateStats(latestData);
             }
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -2680,6 +3407,42 @@
                                         <input type="checkbox" id="perm-servers-${dId}" ${perms.servers !== false ? 'checked' : ''} class="accent-emerald-500">
                                         <span>Servers</span>
                                     </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-dms-${dId}" ${perms.dms ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Discord Messages</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-moderation-${dId}" ${perms.moderation ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Moderation</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-automod-${dId}" ${perms.automod ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Automod</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-embeds-${dId}" ${perms.embeds ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Embed Builder</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-autorole-${dId}" ${perms.autorole ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Autorole</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-welcome-${dId}" ${perms.welcome ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Welcome</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-faq-${dId}" ${perms.faq ? 'checked' : ''} class="accent-blue-500">
+                                        <span>FAQ</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-commands-${dId}" ${perms.commands ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Commands</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                                        <input type="checkbox" id="perm-errors-${dId}" ${perms.errors ? 'checked' : ''} class="accent-blue-500">
+                                        <span>Errors</span>
+                                    </label>
                                 </div>
                                 <div class="flex justify-end mt-2.5">
                                     <button onclick="saveAdminPermissions('${dId}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg uppercase font-bold text-[11px] transition shadow-md">Save Permissions</button>
@@ -2706,6 +3469,15 @@
                         contact: contactEl ? contactEl.checked : true,
                         bans: bansEl ? bansEl.checked : true,
                         servers: serversEl ? serversEl.checked : true
+                        , dms: (document.getElementById(`perm-dms-${discordId}`) || {}).checked === true
+                        , moderation: (document.getElementById(`perm-moderation-${discordId}`) || {}).checked === true
+                        , automod: (document.getElementById(`perm-automod-${discordId}`) || {}).checked === true
+                        , embeds: (document.getElementById(`perm-embeds-${discordId}`) || {}).checked === true
+                        , autorole: (document.getElementById(`perm-autorole-${discordId}`) || {}).checked === true
+                        , welcome: (document.getElementById(`perm-welcome-${discordId}`) || {}).checked === true
+                        , faq: (document.getElementById(`perm-faq-${discordId}`) || {}).checked === true
+                        , commands: (document.getElementById(`perm-commands-${discordId}`) || {}).checked === true
+                        , errors: (document.getElementById(`perm-errors-${discordId}`) || {}).checked === true
                     }
                 };
 

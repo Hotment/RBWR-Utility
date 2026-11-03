@@ -27,18 +27,26 @@ except ImportError:
 
 load_dotenv()
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
-GUILD_ID = os.getenv("DISCORD_GUILD_ID", "1547514559097733141").strip()
-TICKETS_CATEGORY_ID = os.getenv("DISCORD_TICKETS_CATEGORY_ID", "1547529007334162432").strip()
-SUGGESTIONS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_SUGGESTIONS_DISCUSSION_CHANNEL_ID", "1555617766827098192").strip())
-BUGS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_BUGS_DISCUSSION_CHANNEL_ID", "1555618312333951066").strip())
+_server_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "server"))
+# the web server's .env (server/.env) also configures the bot when it is started from the repository
+load_dotenv(os.path.join(_server_dir, ".env"))
+if os.path.isdir(_server_dir) and _server_dir not in sys.path:
+    sys.path.append(_server_dir)
+import bot_features  # noqa: E402  (admin panel features: moderation, automod, welcome, FAQ, custom commands...)
 
-ERROR_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_ERROR_ALERT_CHANNEL_ID", "1559242589251702895").strip())
-ERROR_ALERT_PING_USER_ID = os.getenv("DISCORD_ERROR_ALERT_PING_USER_ID", "1096176878575956119").strip()
-CRASH_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_CRASH_ALERT_CHANNEL_ID", "1562502830580048035").strip())
+TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
+GUILD_ID = (os.getenv("DISCORD_GUILD_ID", "").strip() or "1547514559097733141")
+TICKETS_CATEGORY_ID = (os.getenv("DISCORD_TICKETS_CATEGORY_ID", "").strip() or "1547529007334162432")
+SUGGESTIONS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_SUGGESTIONS_DISCUSSION_CHANNEL_ID", "").strip() or "1555617766827098192")
+BUGS_DISCUSSION_CHANNEL_ID = int(os.getenv("DISCORD_BUGS_DISCUSSION_CHANNEL_ID", "").strip() or "1555618312333951066")
+
+ERROR_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_ERROR_ALERT_CHANNEL_ID", "").strip() or "1559242589251702895")
+ERROR_ALERT_PING_USER_ID = (os.getenv("DISCORD_ERROR_ALERT_PING_USER_ID", "").strip() or "1096176878575956119")
+CRASH_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_CRASH_ALERT_CHANNEL_ID", "").strip() or "1562502830580048035")
 
 DEFAULT_SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "https://rbwr.hotment.dev").rstrip("/")
 RBWR_API_URL = os.getenv("RBWR_API_URL", f"{DEFAULT_SERVER_BASE_URL}/api/public-servers")
+LOCAL_SERVER_PORT = os.getenv("SERVER_PORT", "8400").strip() or "8400"
 
 logging.basicConfig(level=logging.INFO,
                     format="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s")
@@ -283,7 +291,7 @@ class RBWRClient:
 
         urls = [f"{DEFAULT_SERVER_BASE_URL}/api/servers/{target_jid}/score_breakdown"]
         if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
-            urls.append(f"http://127.0.0.1:8400/api/servers/{target_jid}/score_breakdown")
+            urls.append(f"http://127.0.0.1:{LOCAL_SERVER_PORT}/api/servers/{target_jid}/score_breakdown")
 
         for u in urls:
             try:
@@ -317,7 +325,7 @@ class RBWRClient:
         if self.session and not self.session.closed:
             urls = [f"{DEFAULT_SERVER_BASE_URL}/api/calculate"]
             if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
-                urls.append("http://127.0.0.1:8400/api/calculate")
+                urls.append(f"http://127.0.0.1:{LOCAL_SERVER_PORT}/api/calculate")
 
             for u in urls:
                 try:
@@ -346,7 +354,7 @@ class RBWRClient:
         if self.session and not self.session.closed:
             urls = [f"{DEFAULT_SERVER_BASE_URL}/api/version/latest"]
             if "127.0.0.1" not in DEFAULT_SERVER_BASE_URL and "localhost" not in DEFAULT_SERVER_BASE_URL:
-                urls.append("http://127.0.0.1:8400/api/version/latest")
+                urls.append(f"http://127.0.0.1:{LOCAL_SERVER_PORT}/api/version/latest")
 
             for u in urls:
                 try:
@@ -437,6 +445,7 @@ def _build_alert_payload_dict(
     full_traceback: str,
     context_info: dict[str, Any] | None = None,
     ping_user_id: str = ERROR_ALERT_PING_USER_ID,
+    entry: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any], bytes | None]:
     err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
     err_msg = str(error) if error else "Unknown error"
@@ -456,6 +465,9 @@ def _build_alert_payload_dict(
 
     err_display = f"{err_type}: {err_msg}"
     embed.add_field(name="Error Details", value=err_display[:1024], inline=False)
+    if entry:
+        embed.add_field(name="Occurrences", value=str(entry.get("count", 1)), inline=True)
+        embed.add_field(name="Admin Panel", value=f"[Open error #{entry.get('id')}]({DEFAULT_SERVER_BASE_URL}/admin/errors)", inline=True)
 
     tb_clean = (full_traceback or "").strip()
     file_bytes: bytes | None = None
@@ -474,6 +486,20 @@ def _build_alert_payload_dict(
 
     embed.set_footer(text="RBWR System Fault Monitor")
     return mention_content, embed.to_dict(), file_bytes  # pyright: ignore[reportReturnType]
+
+def _record_error_entry(
+    origin: str,
+    err_type: str,
+    err_msg: str,
+    full_tb: str,
+    context_info: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Stores the error in the admin panel's error monitor (data/errors.json)."""
+    try:
+        return bot_features.record_error(origin, err_type, err_msg, full_tb, context_info)
+    except Exception as ex:
+        log.warning(f"[Error Monitor] Could not record error: {ex}")
+        return None
 
 async def _send_alert_coro(
     channel_id: int,
@@ -554,17 +580,21 @@ async def send_error_alert_async(
     try:
         err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
         err_msg = str(error) if error else "Unknown"
+        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
+        if full_tb.strip() == "NoneType: None":
+            full_tb = ""
+        entry = _record_error_entry(origin, err_type, err_msg, full_tb, context_info)
         if _should_suppress_error(origin, err_type, err_msg):
             log.info(f"[Discord Alert] Suppressed duplicate alert for {origin} ({err_type}) within cooldown.")
             return False
 
-        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
         content, embed_dict, file_bytes = _build_alert_payload_dict(
             origin=origin,
             error=error,
             full_traceback=full_tb,
             context_info=context_info,
             ping_user_id=ping_user_id,
+            entry=entry,
         )
 
         sent = await _send_alert_coro(channel_id, content, embed_dict, file_bytes)
@@ -593,17 +623,21 @@ def report_error_to_discord(
     try:
         err_type = type(error).__name__ if isinstance(error, BaseException) else "Exception"
         err_msg = str(error) if error else "Unknown"
+        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
+        if full_tb.strip() == "NoneType: None":
+            full_tb = ""
+        entry = _record_error_entry(origin, err_type, err_msg, full_tb, context_info)
         if _should_suppress_error(origin, err_type, err_msg):
             log.info(f"[Discord Alert] Suppressed duplicate alert for {origin} ({err_type}) within cooldown.")
             return False
 
-        full_tb = traceback_str or (traceback.format_exc() if isinstance(error, BaseException) else str(error))
         content, embed_dict, file_bytes = _build_alert_payload_dict(
             origin=origin,
             error=error,
             full_traceback=full_tb,
             context_info=context_info,
             ping_user_id=ping_user_id,
+            entry=entry,
         )
 
         global disnake_bot, disnake_bot_loop
@@ -1374,6 +1408,11 @@ async def handle_embed_modal_submission(inter: disnake.ModalInteraction, target_
             include_timestamp=True,
         )
         sent_msg = await target_channel.send(embed=embed)
+        bot_features.add_embed_history({
+            "message_id": str(sent_msg.id), "channel_id": str(target_channel.id),
+            "channel_name": getattr(target_channel, "name", ""), "jump_url": sent_msg.jump_url,
+            "content": "", "embed": embed.to_dict(), "sent_by": inter.author.display_name, "source": "discord",
+        })
         log.info(
             f"[Embed Modal] Dispatched embed message {sent_msg.id} to #{getattr(target_channel, 'name', target_channel.id)} "
             f"by admin {inter.author.name} (ID: {inter.author.id})"
@@ -3011,6 +3050,15 @@ FILTER_CHOICES = [
 ]
 
 def register_bot_events_and_commands(b: commands.InteractionBot):
+    # moderation, automod, DMs, welcome/goodbye, FAQ and custom commands managed in the admin panel
+    bot_features.register(
+        b,
+        guild_id=GUILD_ID,
+        autorole_load=load_autorole_config,
+        autorole_save=save_autorole_config,
+        autorole_resolve=resolve_autorole_for_guild,
+    )
+
     @b.event
     async def on_ready():
         global disnake_bot, disnake_bot_loop
@@ -4119,8 +4167,9 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.event
     async def on_member_join(member: disnake.Member):
+        # automod join checks (raid / new accounts), then the autorole, then the welcome message
         try:
-            await assign_autorole_to_member(member)
+            await bot_features.on_member_join(member, assign_autorole_to_member)
         except Exception as ex:
             log.error(f"[Disnake Bot] Error in on_member_join event for {member}: {ex}", exc_info=ex)
 
@@ -4148,6 +4197,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         fields: str | None = commands.Param(default=None, description="Custom fields ('Name: Value | Name2: Value2' or JSON array)"),
         json_data: str | None = commands.Param(default=None, description="Raw embed JSON dictionary"),
         timestamp: bool = commands.Param(default=True, description="Whether to include current timestamp on embed"),
+        template: str | None = commands.Param(default=None, description="Post a template saved in the admin panel's Embed Builder"),
     ):
         if not is_inter_admin(inter):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
@@ -4156,6 +4206,32 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         target_channel = channel or inter.channel
         if not target_channel or not hasattr(target_channel, "send") or not isinstance(target_channel, (disnake.TextChannel, disnake.Thread, disnake.VoiceChannel)):
             await inter.response.send_message("The specified or current channel does not support sending messages.", ephemeral=True)
+            return
+
+        if template:
+            saved = bot_features.template_message(template.strip())
+            if not saved:
+                await inter.response.send_message(f"There's no embed template `{template}`. Save one in the admin panel's Embed Builder.", ephemeral=True)
+                return
+            tpl_content, tpl_embed, tpl_mentions = saved
+            await inter.response.defer(ephemeral=True)
+            try:
+                sent_msg = await target_channel.send(
+                    content=tpl_content or None,
+                    embed=disnake.Embed.from_dict(tpl_embed) if tpl_embed else None,  # pyright: ignore[reportArgumentType]
+                    allowed_mentions=disnake.AllowedMentions.all() if tpl_mentions else disnake.AllowedMentions.none(),
+                )
+            except Exception as send_err:
+                log.error(f"[Embed Command] Error sending template '{template}' to {target_channel.id}: {send_err}", exc_info=send_err)
+                await inter.followup.send(f"Failed to send the template: `{send_err}`", ephemeral=True)
+                return
+            bot_features.add_embed_history({
+                "message_id": str(sent_msg.id), "channel_id": str(target_channel.id),
+                "channel_name": getattr(target_channel, "name", ""), "jump_url": sent_msg.jump_url,
+                "content": tpl_content, "embed": tpl_embed, "sent_by": inter.author.display_name,
+                "source": "discord", "template": template.strip(),
+            })
+            await inter.followup.send(f"Template `{template}` posted in {target_channel.mention}: {sent_msg.jump_url}", ephemeral=True)
             return
 
         has_any_content = any([description, title, image_url, thumbnail_url, json_data, fields, footer, author_name])
@@ -4200,6 +4276,12 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 f"[Embed Command] Sent embed message {sent_msg.id} in #{getattr(target_channel, 'name', target_channel.id)} "
                 f"by admin {inter.author.name} (ID: {inter.author.id})"
             )
+            bot_features.add_embed_history({
+                "message_id": str(sent_msg.id), "channel_id": str(target_channel.id),
+                "channel_name": getattr(target_channel, "name", ""), "jump_url": sent_msg.jump_url,
+                "content": content or "", "embed": embed.to_dict(), "sent_by": inter.author.display_name,
+                "source": "discord",
+            })
             await inter.followup.send(
                 f"Embed successfully dispatched to {target_channel.mention} (Message ID: `{sent_msg.id}`).",
                 ephemeral=True,
@@ -4207,6 +4289,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         except Exception as send_err:
             log.error(f"[Embed Command] Error sending embed to {target_channel.id}: {send_err}", exc_info=send_err)
             await inter.followup.send(f"Failed to send embed: `{send_err}`", ephemeral=True)
+
+    @embed_command.autocomplete("template")
+    async def embed_template_autocomplete(inter: disnake.ApplicationCommandInteraction, string: str):
+        q = (string or "").lower()
+        return [name for name in sorted(bot_features.embed_templates()) if q in name.lower()][:25]
 
     @b.slash_command(
         name="autorole",
@@ -4449,10 +4536,19 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
 
     @b.event
     async def on_message(message: disnake.Message):
-        if not message.guild or message.author.bot:
+        if message.author.bot:
+            return
+        if not message.guild:
+            # a DM to the bot -> shown in the admin panel's Messages view
+            try:
+                await bot_features.record_incoming_dm(message)
+            except Exception as ex:
+                log.warning(f"[Disnake Bot] Could not record incoming DM: {ex}")
             return
         if b.user and message.author.id == b.user.id:
             return
+        if await bot_features.on_guild_message(message):
+            return  # removed by automod or answered as a custom command
 
         if not ticket_bridge.is_configured():
             return
