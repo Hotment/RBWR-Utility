@@ -1,3 +1,4 @@
+from typing import Any
 from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 from collections import OrderedDict
@@ -554,6 +555,16 @@ def get_admin_credentials():
     password = os.environ.get("ADMIN_PASSWORD")
     return username or _generated_admin_user, password or _generated_admin_pass
 
+def safe_compare_digest(val_a: Any, val_b: Any) -> bool:
+    if val_a is None or val_b is None:
+        return False
+    try:
+        a_bytes = val_a.encode("utf-8") if isinstance(val_a, str) else bytes(val_a)
+        b_bytes = val_b.encode("utf-8") if isinstance(val_b, str) else bytes(val_b)
+        return secrets.compare_digest(a_bytes, b_bytes)
+    except Exception:
+        return False
+
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
@@ -565,7 +576,7 @@ def verify_password(stored_password_hash: str, password: str) -> bool:
         salt = binascii.unhexlify(salt_hex)
         key = binascii.unhexlify(key_hex)
         new_key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
-        return secrets.compare_digest(key, new_key)
+        return safe_compare_digest(key, new_key)
     except Exception:
         return False
 
@@ -592,7 +603,7 @@ def is_root_user(user_identifier: str) -> bool:
         return True
         
     root_user, _ = get_admin_credentials()
-    if root_user and secrets.compare_digest(ident_str, root_user):
+    if root_user and safe_compare_digest(ident_str, root_user):
         return True
 
     if has_request_context():
@@ -600,7 +611,7 @@ def is_root_user(user_identifier: str) -> bool:
             if session.get("admin_logged_in") and session.get("is_root"):
                 sess_user = str(session.get("username") or "")
                 sess_discord = str(session.get("discord_id") or "")
-                if (sess_user and secrets.compare_digest(sess_user, ident_str)) or (sess_discord and sess_discord == ident_str):
+                if (sess_user and safe_compare_digest(sess_user, ident_str)) or (sess_discord and sess_discord == ident_str):
                     return True
         except Exception:
             pass
@@ -759,8 +770,8 @@ def get_authenticated_user():
     auth = request.authorization if has_request_context() else None
     if auth and auth.username and auth.password:
         root_user, root_pass = get_admin_credentials()
-        is_root_username = secrets.compare_digest(auth.username, root_user)
-        is_root_password = secrets.compare_digest(auth.password, root_pass)
+        is_root_username = safe_compare_digest(auth.username, root_user)
+        is_root_password = safe_compare_digest(auth.password, root_pass)
         if is_root_username and is_root_password:
             return auth.username
             
@@ -802,8 +813,8 @@ def admin_required(f):
             auth = request.authorization
             if auth and auth.username and auth.password:
                 correct_user, correct_pass = get_admin_credentials()
-                is_correct_username = secrets.compare_digest(auth.username, correct_user)
-                is_correct_password = secrets.compare_digest(auth.password, correct_pass)
+                is_correct_username = safe_compare_digest(auth.username, correct_user)
+                is_correct_password = safe_compare_digest(auth.password, correct_pass)
                 if is_correct_username and is_correct_password:
                     is_basic_auth = True
 
@@ -4736,7 +4747,7 @@ def submit_ticket():
         
     discord_user = session.get("discord_user") or {}
     discord_id = discord_user.get("id") or None
-    discord_username = discord_user.get("global_name") or discord_user.get("username") or None
+    discord_username = discord_user.get("username") or discord_user.get("global_name") or None
     discord_avatar = discord_user.get("avatar_url") or None
     
     if not discord_id:
@@ -5643,26 +5654,28 @@ def discord_callback():
         admins_data = load_admins()
         is_admin = is_root or (d_id in admins_data.get("admins", {}))
 
+        auth_username = d_username or d_id
         if next_dest.startswith("/admin"):
             if is_admin:
                 session.permanent = True
                 session["admin_logged_in"] = True
                 session["discord_id"] = d_id
-                session["username"] = d_global_name or d_username
+                session["username"] = auth_username
                 session["is_root"] = is_root
                 if d_id in admins_data.get("admins", {}):
-                    admins_data["admins"][d_id]["username"] = d_global_name or d_username
+                    admins_data["admins"][d_id]["username"] = auth_username
+                    admins_data["admins"][d_id]["display_name"] = d_global_name or auth_username
                     admins_data["admins"][d_id]["avatar_url"] = d_avatar_url
                     save_admins(admins_data)
                 return redirect(next_dest)
             else:
-                return redirect(f"/admin/login?error={quote(f'Access Denied: Discord user {d_global_name} (ID: {d_id}) is not an authorized administrator. Please contact Root.')}")
+                return redirect(f"/admin/login?error={quote(f'Access Denied: Discord user @{auth_username} (ID: {d_id}) is not an authorized administrator. Please contact Root.')}")
 
         if is_admin:
             session.permanent = True
             session["admin_logged_in"] = True
             session["discord_id"] = d_id
-            session["username"] = d_global_name or d_username
+            session["username"] = auth_username
             session["is_root"] = is_root
 
         return redirect(next_dest)
@@ -5780,8 +5793,8 @@ def admin_login():
         password = request.form.get("password", "")
         
         root_user, root_pass = get_admin_credentials()
-        is_root_username = secrets.compare_digest(username, root_user)
-        is_root_password = secrets.compare_digest(password, root_pass)
+        is_root_username = safe_compare_digest(username, root_user)
+        is_root_password = safe_compare_digest(password, root_pass)
         
         authenticated = False
         if is_root_username and is_root_password:
