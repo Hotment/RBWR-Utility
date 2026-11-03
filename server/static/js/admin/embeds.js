@@ -335,7 +335,7 @@ window.EmbedBuilder = (() => {
         const msg = readForm();
         const out = { content: msg.content || null, embeds: [toDiscord(msg.embed)] };
         $("eb-json").value = JSON.stringify(out, null, 2);
-        navigator.clipboard?.writeText($("eb-json").value).then(() => toast("JSON copied to clipboard."), () => {});
+        navigator.clipboard?.writeText($("eb-json").value).then(() => toast("JSON copied to clipboard."), () => { });
     }
 
     function clearForm() {

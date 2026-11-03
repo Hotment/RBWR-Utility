@@ -134,6 +134,32 @@ window.AdminBot = (() => {
         }, 300);
     }
 
+    let dmPollTimer = null;
+    let dmListPollCounter = 0;
+
+    function startDmPoller() {
+        stopDmPoller();
+        dmPollTimer = setInterval(async () => {
+            if (state.view === "dms" && can("dms")) {
+                if (state.dmOpen) {
+                    await loadConversation(true);
+                }
+                dmListPollCounter++;
+                if (dmListPollCounter >= 3) {
+                    dmListPollCounter = 0;
+                    await loadDms();
+                }
+            }
+        }, 2000);
+    }
+
+    function stopDmPoller() {
+        if (dmPollTimer) {
+            clearInterval(dmPollTimer);
+            dmPollTimer = null;
+        }
+    }
+
     function openConversation(profile) {
         state.dmOpen = profile;
         $("dm-chat").innerHTML = `
@@ -147,18 +173,27 @@ window.AdminBot = (() => {
                 <div class="tk-reply-row"><button type="button" class="btn-gold" id="dm-send">Send DM</button></div>
             </div>`;
         renderDmList();
-        loadConversation();
+        loadConversation(false);
+        startDmPoller();
         $("dm-text").focus();
     }
 
-    async function loadConversation() {
+    async function loadConversation(isPoll = false) {
         const open = state.dmOpen;
+        if (!open) return;
         try {
             const { conversation } = await api(`/api/admin/dms/${encodeURIComponent(open.user_id)}`);
             if (state.dmOpen !== open || !$("dm-msgs")) return;
             const box = $("dm-msgs");
-            const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
             const messages = conversation?.messages || [];
+            const lastAt = messages.length ? messages[messages.length - 1].at : "";
+            const count = messages.length;
+
+            if (isPoll && box.dataset.loaded === open.user_id && box.dataset.lastCount === String(count) && box.dataset.lastAt === lastAt) {
+                return;
+            }
+
+            const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
             box.innerHTML = messages.length ? messages.map((m) => `
                 <div class="msg ${m.direction === "out" ? "admin mine" : "author"}">
                     ${m.direction === "out" ? AdminUtils.avatar("/static/favicon.png", "RBWR", "sm") : AdminUtils.avatar(open.avatar, open.name, "sm")}
@@ -169,10 +204,20 @@ window.AdminBot = (() => {
                         <div class="text">${esc(m.text)}</div>
                     </div>
                 </div>`).join("") : '<div class="tk-empty">No messages yet — say hi.</div>';
+
             if (atBottom || box.dataset.loaded !== open.user_id) box.scrollTop = box.scrollHeight;
             box.dataset.loaded = open.user_id;
+            box.dataset.lastCount = String(count);
+            box.dataset.lastAt = lastAt;
+
             if (conversation?.unread) loadDms();
-        } catch (err) { toast(err.message, "error"); }
+            else if (isPoll && count !== Number(box.dataset.prevRenderedCount || 0)) {
+                renderDmList();
+            }
+            box.dataset.prevRenderedCount = String(count);
+        } catch (err) {
+            if (!isPoll) toast(err.message, "error");
+        }
     }
 
     async function sendDm() {
@@ -196,7 +241,7 @@ window.AdminBot = (() => {
     // ------------------------------------------------------------ moderation
 
     const MOD_DURATIONS = [["60s", "60 seconds"], ["5m", "5 minutes"], ["10m", "10 minutes"], ["1h", "1 hour"],
-        ["1d", "1 day"], ["1w", "1 week"], ["28d", "28 days"]];
+    ["1d", "1 day"], ["1w", "1 week"], ["28d", "28 days"]];
 
     function renderModResults() {
         $("mod-results").innerHTML = state.modSearch.map((m) => `
@@ -616,7 +661,8 @@ window.AdminBot = (() => {
     /** Called by the panel whenever a section is opened. */
     function show(view) {
         state.view = view;
-        if (view === "dms" && can("dms")) { renderDmList(); loadDms(); }
+        if (view !== "dms") stopDmPoller();
+        if (view === "dms" && can("dms")) { renderDmList(); loadDms(); if (state.dmOpen) startDmPoller(); }
         if (view === "moderation" && can("moderation")) { loadModBans(); loadWarnConfig(); }
         if (view === "automod" && can("automod")) window.Automod?.open();
         if (view === "embeds" && can("embeds")) window.EmbedBuilder?.open();

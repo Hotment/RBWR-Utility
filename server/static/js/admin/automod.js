@@ -6,41 +6,63 @@ window.Automod = (() => {
     const ACTIONS = { log: "Log only", delete: "Delete", warn: "Delete + warn", timeout: "Delete + timeout" };
     const JOIN_ACTIONS = { alert: "Log only", timeout: "Timeout", kick: "Kick" };
     const DURATIONS = [["60s", "60 seconds"], ["5m", "5 minutes"], ["10m", "10 minutes"], ["1h", "1 hour"],
-        ["1d", "1 day"], ["1w", "1 week"], ["28d", "28 days"]];
+    ["1d", "1 day"], ["1w", "1 week"], ["28d", "28 days"]];
 
     // field types: check, number, list (one entry per line)
     const FILTERS = [
-        { key: "words", desc: "Messages with a blocked word. Matching ignores case, accents and look-alikes (h3ll0 = hello).",
-            fields: [{ name: "words", type: "list", label: "Blocked words — one per line, * matches any letters (spam*)" }] },
-        { key: "invites", desc: "Discord invite links (discord.gg/…) to other servers.",
-            fields: [{ name: "allow_own", type: "check", label: "Allow invites to this server" }] },
-        { key: "links", desc: "Links to any site that isn't on the list below. Subdomains are allowed too.",
-            fields: [{ name: "allowed", type: "list", label: "Allowed domains — one per line" }] },
-        { key: "mentions", desc: "Messages that mention many members or roles, or try to ping @everyone / @here without permission.",
-            fields: [{ name: "max", type: "number", label: "Max mentions per message", min: 1, max: 100 }] },
-        { key: "caps", desc: "Messages written mostly in capital letters.",
+        {
+            key: "words", native: true, desc: "Messages with a blocked word. Matching ignores case, accents and look-alikes (h3ll0 = hello).",
+            fields: [{ name: "words", type: "list", label: "Blocked words — one per line, * matches any letters (spam*)" }]
+        },
+        {
+            key: "invites", native: true, desc: "Discord invite links (discord.gg/…) to other servers.",
+            fields: [{ name: "allow_own", type: "check", label: "Allow invites to this server" }]
+        },
+        {
+            key: "links", native: true, desc: "Links to any site that isn't on the list below. Subdomains are allowed too.",
+            fields: [{ name: "allowed", type: "list", label: "Allowed domains — one per line" }]
+        },
+        {
+            key: "mentions", native: true, desc: "Messages that mention many members or roles, or try to ping @everyone / @here without permission.",
+            fields: [{ name: "max", type: "number", label: "Max mentions per message", min: 1, max: 100 }]
+        },
+        {
+            key: "caps", desc: "Messages written mostly in capital letters.",
             fields: [{ name: "percent", type: "number", label: "Capital letters (%)", min: 50, max: 100 },
-                { name: "min_length", type: "number", label: "Only from this many letters", min: 5, max: 500 }] },
-        { key: "emoji", desc: "Messages with lots of emoji (custom server emoji count too).",
-            fields: [{ name: "max", type: "number", label: "Max emoji per message", min: 1, max: 100 }] },
-        { key: "lines", desc: "Very long messages that flood the channel with lines.",
-            fields: [{ name: "max", type: "number", label: "Max lines per message", min: 3, max: 100 }] },
-        { key: "spam", desc: "Many messages in a short time. The whole burst is deleted.",
+            { name: "min_length", type: "number", label: "Only from this many letters", min: 5, max: 500 }]
+        },
+        {
+            key: "emoji", desc: "Messages with lots of emoji (custom server emoji count too).",
+            fields: [{ name: "max", type: "number", label: "Max emoji per message", min: 1, max: 100 }]
+        },
+        {
+            key: "lines", desc: "Very long messages that flood the channel with lines.",
+            fields: [{ name: "max", type: "number", label: "Max lines per message", min: 3, max: 100 }]
+        },
+        {
+            key: "spam", native: true, desc: "Many messages in a short time. The whole burst is deleted.",
             fields: [{ name: "messages", type: "number", label: "Messages", min: 2, max: 50 },
-                { name: "seconds", type: "number", label: "Within seconds", min: 2, max: 120 }] },
-        { key: "duplicates", desc: "The same message sent again and again (in any channel).",
+            { name: "seconds", type: "number", label: "Within seconds", min: 2, max: 120 }]
+        },
+        {
+            key: "duplicates", desc: "The same message sent again and again (in any channel).",
             fields: [{ name: "count", type: "number", label: "Same message", min: 2, max: 20 },
-                { name: "seconds", type: "number", label: "Within seconds", min: 5, max: 3600 }] },
+            { name: "seconds", type: "number", label: "Within seconds", min: 5, max: 3600 }]
+        },
     ];
     const JOIN = [
-        { key: "raid", title: "Raid protection", actions: JOIN_ACTIONS,
+        {
+            key: "raid", title: "Raid protection", actions: JOIN_ACTIONS,
             desc: "When many members join at once, raid mode starts and an alert is logged. Members who join during raid mode get the action below.",
             fields: [{ name: "joins", type: "number", label: "Joins", min: 3, max: 100 },
-                { name: "seconds", type: "number", label: "Within seconds", min: 5, max: 600 },
-                { name: "lockdown_minutes", type: "number", label: "Raid mode lasts (minutes)", min: 1, max: 1440 }] },
-        { key: "account_age", title: "New accounts", actions: JOIN_ACTIONS, duration: true,
+            { name: "seconds", type: "number", label: "Within seconds", min: 5, max: 600 },
+            { name: "lockdown_minutes", type: "number", label: "Raid mode lasts (minutes)", min: 1, max: 1440 }]
+        },
+        {
+            key: "account_age", title: "New accounts", actions: JOIN_ACTIONS, duration: true,
             desc: "Discord accounts younger than this get the action below when they join (kicked members are told why).",
-            fields: [{ name: "days", type: "number", label: "Minimum account age (days)", min: 1, max: 365 }] },
+            fields: [{ name: "days", type: "number", label: "Minimum account age (days)", min: 1, max: 365 }]
+        },
     ];
 
     let initialized = false;
@@ -86,6 +108,11 @@ window.Automod = (() => {
         if (d.raid_until) {
             alerts.push(`<div class="alert error am-raid"><span><strong>Raid mode is on</strong> until ${esc(AdminUtils.fmtDate(d.raid_until))}. New members get: ${esc(JOIN_ACTIONS[c.raid.action])}.</span>
                 <button type="button" class="qbtn c-red" id="am-end-raid">End raid mode</button></div>`);
+        }
+        if (d.discord_automod_error) {
+            alerts.push(`<div class="alert error">${esc(d.discord_automod_error)}</div>`);
+        } else if (d.discord_automod_synced) {
+            alerts.push('<div class="alert info">Official Discord AutoMod rules are active and synchronized with this server.</div>');
         }
         if (!c.enabled) alerts.push('<div class="alert info">Automod is <strong>off</strong>. Turn it on below and save.</div>');
         $("am-alert").innerHTML = alerts.join("");
@@ -161,8 +188,11 @@ window.Automod = (() => {
     function cardHtml(spec, rule, title, actions, withDuration) {
         return `
             <div class="card am-filter${rule.enabled ? "" : " off"}" data-am="${spec.key}">
-                <label class="adm-check am-filter-head"><input type="checkbox" data-f="enabled"${rule.enabled ? " checked" : ""}>
-                    <strong>${esc(title)}</strong></label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                    <label class="adm-check am-filter-head"><input type="checkbox" data-f="enabled"${rule.enabled ? " checked" : ""}>
+                        <strong>${esc(title)}</strong></label>
+                    ${spec.native ? '<span class="pill" style="font-size:0.65rem;color:#3b82f6;border-color:rgba(59,130,246,0.3);background:rgba(59,130,246,0.1)">Discord Official</span>' : ""}
+                </div>
                 <p class="adm-hint am-desc">${esc(spec.desc)}</p>
                 <div class="am-fields">${spec.fields.map((f) => fieldHtml(spec.key, f, rule)).join("")}</div>
                 ${actionControls(spec.key, rule, actions, withDuration)}

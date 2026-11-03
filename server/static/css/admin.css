@@ -133,6 +133,11 @@ button.btn-gold:disabled {
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 24px;
+    flex-shrink: 0;
+}
+
+.view-section > * {
+    flex-shrink: 0;
 }
 
 .card h2 {
@@ -588,15 +593,19 @@ a.qbtn {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .admin-table td {
-    padding: 12px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
-    overflow-wrap: anywhere;
+}
+
+.admin-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .admin-table tr:last-child td {
@@ -604,7 +613,29 @@ a.qbtn {
 }
 
 .table-wrap {
-    overflow-x: auto;
+    width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.card.table-wrap {
+    padding: 24px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.card.table-wrap > h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-display, 'Outfit', sans-serif);
+    letter-spacing: 0.02em;
+    margin: 0 0 18px 0;
+}
+
+.card.table-wrap > .admin-table {
+    margin: 0;
+    width: 100%;
 }
 
 .inline-form {
@@ -830,6 +861,44 @@ a.qbtn {
     color: var(--danger);
 }
 
+.adm-section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 28px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-display, 'Outfit', sans-serif);
+    letter-spacing: 0.02em;
+}
+
+.adm-section-title:first-child {
+    margin-top: 0;
+}
+
+.filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
 .am-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
@@ -913,8 +982,17 @@ a.qbtn {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.am-table-head h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-display, 'Outfit', sans-serif);
+    letter-spacing: 0.02em;
 }
 
 .am-content {
@@ -1368,6 +1446,12 @@ button.eb-item.active {
     background: rgba(0, 0, 0, 0.2);
     color: var(--text-primary);
     flex-wrap: wrap;
+}
+
+.cc-embed-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .cc-embed {

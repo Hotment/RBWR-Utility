@@ -136,12 +136,12 @@ window.BotConfig = (() => {
 
     // ------------------------------------------------------------ custom commands
 
-    const cc ={ data: null, editing: null };
+    const cc = { data: null, editing: null };
     const COOLDOWNS = ["0", "5", "10", "30", "60", "300"];
 
     async function loadCommands() {
         try {
-            await loadDiscordLists().catch(() => {});
+            await loadDiscordLists().catch(() => { });
             renderCommands(await api("/api/admin/commands"), true);
         } catch (err) { toast(err.message, "error"); }
     }

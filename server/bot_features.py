@@ -1071,6 +1071,8 @@ _am_punished: dict[int, float] = {}
 _am_notified: dict[int, float] = {}
 _am_joins: list[datetime] = []
 _raid_until: datetime | None = None
+_discord_automod_synced: bool = False
+_discord_automod_error: str | None = None
 
 
 def automod_config() -> dict:
@@ -1098,8 +1100,218 @@ def save_automod_config(config: dict) -> dict:
     ))
     with automod_store.edit() as data:
         data["config"] = config
+
+    if is_ready():
+        try:
+            _run(lambda: sync_discord_automod_rules(config), timeout=15)
+        except Exception as exc:
+            log.warning("Could not sync Discord official automod rules: %s", exc)
+
     return automod_config()
 
+
+async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, Any]:
+    global _discord_automod_synced, _discord_automod_error
+    if config is None:
+        config = automod_config()
+    try:
+        guild = _panel_guild()
+    except Exception as exc:
+        _discord_automod_synced = False
+        _discord_automod_error = str(exc)
+        return {"synced": False, "error": _discord_automod_error}
+
+    me = guild.me or (await guild.getch_member(_bot.user.id) if _bot and _bot.user else None)
+    if not me or not (me.guild_permissions.manage_guild or me.guild_permissions.administrator):
+        _discord_automod_synced = False
+        _discord_automod_error = "The bot lacks 'Manage Server' permission to configure official Discord AutoMod rules."
+        log.warning(_discord_automod_error)
+        return {"synced": False, "error": _discord_automod_error}
+
+    try:
+        existing_rules = await guild.fetch_automod_rules()
+        existing_by_name = {r.name: r for r in existing_rules}
+    except Exception as exc:
+        _discord_automod_synced = False
+        _discord_automod_error = f"Failed to fetch Discord AutoMod rules: {exc}"
+        log.warning(_discord_automod_error)
+        return {"synced": False, "error": _discord_automod_error}
+
+    is_global_enabled = bool(config.get("enabled", False))
+    log_ch_id = config.get("log_channel_id") or str(hooks.mod_log_channel_id or "")
+    log_channel_obj = disnake.Object(id=int(log_ch_id)) if log_ch_id and str(log_ch_id).isdigit() else None
+
+    exempt_roles = [disnake.Object(id=int(r)) for r in config.get("exempt_roles", []) if str(r).isdigit()][:20]
+    exempt_channels = [disnake.Object(id=int(c)) for c in config.get("exempt_channels", []) if str(c).isdigit()][:50]
+
+    def _build_actions(action_name: str, duration_str: str, allow_timeout: bool = True) -> list[disnake.AutoModAction]:
+        actions: list[disnake.AutoModAction] = []
+        if action_name != "log":
+            actions.append(disnake.AutoModBlockMessageAction(custom_message="Message blocked by RBWR AutoMod."))
+        if allow_timeout and action_name == "timeout":
+            dur = parse_duration(duration_str) or timedelta(minutes=10)
+            dur = max(timedelta(seconds=10), min(timedelta(weeks=4), dur))
+            actions.append(disnake.AutoModTimeoutAction(duration=dur))
+        if log_channel_obj:
+            actions.append(disnake.AutoModSendAlertAction(channel=log_channel_obj))
+        if not actions:
+            actions.append(disnake.AutoModBlockMessageAction(custom_message="Message blocked by RBWR AutoMod."))
+        return actions
+
+    synced_rules: list[str] = []
+
+    rule_name_words = "[RBWR] Blocked Words"
+    cfg_words = config.get("filters", {}).get("words", {})
+    words_list = [w[:60] for w in cfg_words.get("words", []) if w.strip()][:1000]
+    words_enabled = is_global_enabled and bool(cfg_words.get("enabled")) and bool(words_list)
+    words_actions = _build_actions(cfg_words.get("action", "warn"), cfg_words.get("duration", "10m"), allow_timeout=True)
+
+    try:
+        if rule_name_words in existing_by_name:
+            existing = existing_by_name[rule_name_words]
+            meta = disnake.AutoModTriggerMetadata(keyword_filter=words_list) if words_list else None
+            edit_kwargs: dict[str, Any] = {
+                "enabled": words_enabled,
+                "actions": words_actions,
+                "exempt_roles": exempt_roles,
+                "exempt_channels": exempt_channels,
+            }
+            if meta:
+                edit_kwargs["trigger_metadata"] = meta
+            await existing.edit(**edit_kwargs)
+            synced_rules.append(rule_name_words)
+        elif words_enabled:
+            meta = disnake.AutoModTriggerMetadata(keyword_filter=words_list)
+            await guild.create_automod_rule(
+                name=rule_name_words,
+                event_type=disnake.AutoModEventType.message_send,
+                trigger_type=disnake.AutoModTriggerType.keyword,
+                trigger_metadata=meta,
+                actions=words_actions,
+                enabled=True,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+                reason="RBWR Admin AutoMod sync"
+            )
+            synced_rules.append(rule_name_words)
+    except Exception as exc:
+        log.warning("Failed to sync %s: %s", rule_name_words, exc)
+
+    rule_name_links = "[RBWR] Blocked Invites & Links"
+    cfg_invites = config.get("filters", {}).get("invites", {})
+    cfg_links = config.get("filters", {}).get("links", {})
+    links_kw: list[str] = []
+    if cfg_invites.get("enabled"):
+        links_kw.extend(["*discord.gg/*", "*discord.com/invite/*", "*discord.me/*", "*discord.io/*"])
+    if cfg_links.get("enabled"):
+        links_kw.extend(["*http://*", "*https://*"])
+    links_kw = list(dict.fromkeys(links_kw))[:1000]
+
+    allow_list = [d[:60] for d in cfg_links.get("allowed", []) if d.strip()][:100] if cfg_links.get("enabled") else None
+    links_enabled = is_global_enabled and bool(links_kw) and (bool(cfg_invites.get("enabled")) or bool(cfg_links.get("enabled")))
+    links_actions = _build_actions(cfg_invites.get("action", "delete") if cfg_invites.get("enabled") else cfg_links.get("action", "delete"),
+                                   cfg_invites.get("duration", "10m"), allow_timeout=True)
+
+    try:
+        if rule_name_links in existing_by_name:
+            existing = existing_by_name[rule_name_links]
+            meta = disnake.AutoModTriggerMetadata(keyword_filter=links_kw, allow_list=allow_list) if links_kw else None
+            edit_kwargs = {
+                "enabled": links_enabled,
+                "actions": links_actions,
+                "exempt_roles": exempt_roles,
+                "exempt_channels": exempt_channels,
+            }
+            if meta:
+                edit_kwargs["trigger_metadata"] = meta
+            await existing.edit(**edit_kwargs)
+            synced_rules.append(rule_name_links)
+        elif links_enabled:
+            meta = disnake.AutoModTriggerMetadata(keyword_filter=links_kw, allow_list=allow_list)
+            await guild.create_automod_rule(
+                name=rule_name_links,
+                event_type=disnake.AutoModEventType.message_send,
+                trigger_type=disnake.AutoModTriggerType.keyword,
+                trigger_metadata=meta,
+                actions=links_actions,
+                enabled=True,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+                reason="RBWR Admin AutoMod sync"
+            )
+            synced_rules.append(rule_name_links)
+    except Exception as exc:
+        log.warning("Failed to sync %s: %s", rule_name_links, exc)
+
+    rule_name_mentions = "[RBWR] Mass Mentions"
+    cfg_mentions = config.get("filters", {}).get("mentions", {})
+    mentions_enabled = is_global_enabled and bool(cfg_mentions.get("enabled"))
+    mention_limit = max(1, min(50, int(cfg_mentions.get("max", 5))))
+    mentions_actions = _build_actions(cfg_mentions.get("action", "timeout"), cfg_mentions.get("duration", "10m"), allow_timeout=True)
+
+    try:
+        if rule_name_mentions in existing_by_name:
+            existing = existing_by_name[rule_name_mentions]
+            meta = disnake.AutoModTriggerMetadata(mention_total_limit=mention_limit)
+            await existing.edit(
+                enabled=mentions_enabled,
+                trigger_metadata=meta,
+                actions=mentions_actions,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+            )
+            synced_rules.append(rule_name_mentions)
+        elif mentions_enabled:
+            meta = disnake.AutoModTriggerMetadata(mention_total_limit=mention_limit)
+            await guild.create_automod_rule(
+                name=rule_name_mentions,
+                event_type=disnake.AutoModEventType.message_send,
+                trigger_type=disnake.AutoModTriggerType.mention_spam,
+                trigger_metadata=meta,
+                actions=mentions_actions,
+                enabled=True,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+                reason="RBWR Admin AutoMod sync"
+            )
+            synced_rules.append(rule_name_mentions)
+    except Exception as exc:
+        log.warning("Failed to sync %s: %s", rule_name_mentions, exc)
+
+    rule_name_spam = "[RBWR] Suspected Spam"
+    cfg_spam = config.get("filters", {}).get("spam", {})
+    spam_enabled = is_global_enabled and bool(cfg_spam.get("enabled"))
+    spam_actions = _build_actions(cfg_spam.get("action", "timeout"), cfg_spam.get("duration", "10m"), allow_timeout=False)
+
+    try:
+        if rule_name_spam in existing_by_name:
+            existing = existing_by_name[rule_name_spam]
+            await existing.edit(
+                enabled=spam_enabled,
+                actions=spam_actions,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+            )
+            synced_rules.append(rule_name_spam)
+        elif spam_enabled:
+            await guild.create_automod_rule(
+                name=rule_name_spam,
+                event_type=disnake.AutoModEventType.message_send,
+                trigger_type=disnake.AutoModTriggerType.spam,
+                actions=spam_actions,
+                enabled=True,
+                exempt_roles=exempt_roles,
+                exempt_channels=exempt_channels,
+                reason="RBWR Admin AutoMod sync"
+            )
+            synced_rules.append(rule_name_spam)
+    except Exception as exc:
+        log.warning("Failed to sync %s: %s", rule_name_spam, exc)
+
+    _discord_automod_synced = True
+    _discord_automod_error = None
+    log.info("Synced %d official Discord AutoMod rules with guild %s", len(synced_rules), guild.id)
+    return {"synced": True, "rules": synced_rules}
 
 def raid_active() -> bool:
     return bool(_raid_until and _raid_until > datetime.now(timezone.utc))
@@ -1213,12 +1425,19 @@ def _automod_exempt(config: dict, member: disnake.Member, channel) -> bool:
     return any(i and str(i) in channels for i in ids)
 
 
-async def _automod_record(key: str, user: disnake.Member, channel, action: str, detail: str,
+async def _automod_record(key: str, user: Any, channel: Any, action: str, detail: str,
                           content: str = "", result: str = "") -> None:
     """Saves an incident for the admin panel and posts it to the automod log channel."""
+    uid = str(getattr(user, "id", "") or "")
+    uname = getattr(user, "display_name", getattr(user, "name", f"User {uid}"))
+    avatar_obj = getattr(user, "display_avatar", getattr(user, "avatar", None))
+    avatar_url = str(avatar_obj.url) if avatar_obj and hasattr(avatar_obj, "url") else ""
+    cid = str(getattr(channel, "id", "") or "")
+    cname = getattr(channel, "name", "") or ""
+
     incident = {
-        "filter": key, "user_id": str(user.id), "user_name": user.display_name, "user_avatar": str(user.display_avatar.url),
-        "channel_id": str(channel.id) if channel else "", "channel_name": getattr(channel, "name", "") or "",
+        "filter": key, "user_id": uid, "user_name": uname, "user_avatar": avatar_url,
+        "channel_id": cid, "channel_name": cname,
         "action": action, "detail": detail[:300], "content": content[:500], "result": result[:300], "at": utc_now(),
     }
     with automod_store.edit() as data:
@@ -1370,6 +1589,8 @@ def automod_status() -> dict:
         "bot_online": is_ready(),
         "message_content_intent": bool(_bot and _bot.intents.message_content),
         "members_intent": bool(_bot and _bot.intents.members),
+        "discord_automod_synced": _discord_automod_synced,
+        "discord_automod_error": _discord_automod_error,
     }
 
 
@@ -1743,6 +1964,53 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
     @bot.listen("on_ready")
     async def _features_ready():
         attach(bot)
+        try:
+            await sync_discord_automod_rules()
+        except Exception as exc:
+            log.warning("Initial Discord AutoMod sync failed: %s", exc)
+
+    @bot.listen("on_automod_action_execution")
+    async def _features_discord_automod_exec(execution: disnake.AutoModActionExecution):
+        try:
+            guild = execution.guild
+            if not guild or (hooks.guild_id and guild.id != hooks.guild_id):
+                return
+            rule_trigger = getattr(execution, "rule_trigger_type", None)
+            matched_txt = (execution.matched_content or "").lower()
+
+            key = "words"
+            if rule_trigger == disnake.AutoModTriggerType.mention_spam:
+                key = "mentions"
+            elif rule_trigger == disnake.AutoModTriggerType.spam:
+                key = "spam"
+            elif "discord.gg" in matched_txt or "discord.com/invite" in matched_txt:
+                key = "invites"
+            elif "http://" in matched_txt or "https://" in matched_txt:
+                key = "links"
+
+            user = execution.user
+            if not user and execution.user_id:
+                try:
+                    user = await guild.getch_member(execution.user_id)
+                except Exception:
+                    pass
+
+            channel = execution.channel or (guild.get_channel(execution.channel_id) if execution.channel_id else None)
+            act_type = execution.action.type.name.lower() if execution.action else "block"
+            matched = execution.matched_keyword or execution.matched_content or "Rule pattern"
+            detail = f"Discord Official AutoMod: {matched}"
+
+            await _automod_record(
+                key=key,
+                user=user or disnake.Object(id=execution.user_id),
+                channel=channel,
+                action=act_type,
+                detail=detail,
+                content=execution.content or "",
+                result=f"Blocked natively by Discord ({act_type})"
+            )
+        except Exception as exc:
+            log.warning("Failed to record Discord official AutoMod execution: %s", exc)
 
     @bot.listen("on_message_interaction")
     async def _features_component(inter: disnake.MessageInteraction):
