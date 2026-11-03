@@ -879,8 +879,18 @@ def get_github_latest_release(force_refresh: bool = False) -> dict:
                     "download_url": a.get("browser_download_url")
                 }
                 assets.append(asset_info)
-                if a.get("name", "").endswith((".exe", ".zip")) and download_url == html_url:
-                    download_url = a.get("browser_download_url")
+
+            for a in assets:
+                aname = (a.get("name") or "").lower()
+                if "win-x64" in aname and aname.endswith(".exe"):
+                    download_url = a.get("download_url") or html_url
+                    break
+            if download_url == html_url:
+                for a in assets:
+                    aname = (a.get("name") or "").lower()
+                    if aname.endswith((".exe", ".zip")):
+                        download_url = a.get("download_url") or html_url
+                        break
 
             result = {
                 "version": version,
