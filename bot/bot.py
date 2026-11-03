@@ -32,7 +32,7 @@ _server_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__fil
 load_dotenv(os.path.join(_server_dir, ".env"))
 if os.path.isdir(_server_dir) and _server_dir not in sys.path:
     sys.path.append(_server_dir)
-import bot_features  # noqa: E402  (admin panel features: moderation, automod, welcome, FAQ, custom commands...)
+import bot_features  # noqa: E402  (admin panel features: moderation, automod, welcome, FAQ, custom commands...)  # pyright: ignore[reportMissingImports]
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
 GUILD_ID = (os.getenv("DISCORD_GUILD_ID", "").strip() or "1547514559097733141")
@@ -4459,11 +4459,14 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             tpl_content, tpl_embed, tpl_mentions = saved
             await inter.response.defer(ephemeral=True)
             try:
-                sent_msg = await target_channel.send(
-                    content=tpl_content or None,
-                    embed=disnake.Embed.from_dict(tpl_embed) if tpl_embed else None,  # pyright: ignore[reportArgumentType]
-                    allowed_mentions=disnake.AllowedMentions.all() if tpl_mentions else disnake.AllowedMentions.none(),
-                )
+                send_kwargs: dict[str, Any] = {
+                    "allowed_mentions": disnake.AllowedMentions.all() if tpl_mentions else disnake.AllowedMentions.none(),
+                }
+                if tpl_content:
+                    send_kwargs["content"] = tpl_content
+                if tpl_embed:
+                    send_kwargs["embed"] = disnake.Embed.from_dict(tpl_embed)
+                sent_msg = await target_channel.send(**send_kwargs)
             except Exception as send_err:
                 log.error(f"[Embed Command] Error sending template '{template}' to {target_channel.id}: {send_err}", exc_info=send_err)
                 await inter.followup.send(f"Failed to send the template: `{send_err}`", ephemeral=True)

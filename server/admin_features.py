@@ -1,5 +1,5 @@
 """
-Admin panel API for the Discord bot features (ported from the Piano Weave website):
+Admin panel API for the Discord bot features:
 embed builder, direct messages, moderation & warnings, automod, autorole, welcome & goodbye,
 FAQ, custom commands and the error monitor with alert pings.
 
@@ -104,14 +104,14 @@ class EmbedField(BaseModel):
 
 
 class EmbedAuthor(BaseModel):
-    name: str = Field("", max_length=256)
-    url: str = Field("", max_length=500)
-    icon_url: str = Field("", max_length=500)
+    name: str = Field(default="", max_length=256)
+    url: str = Field(default="", max_length=500)
+    icon_url: str = Field(default="", max_length=500)
 
 
 class EmbedFooter(BaseModel):
-    text: str = Field("", max_length=2048)
-    icon_url: str = Field("", max_length=500)
+    text: str = Field(default="", max_length=2048)
+    icon_url: str = Field(default="", max_length=500)
 
 
 class EmbedData(BaseModel):

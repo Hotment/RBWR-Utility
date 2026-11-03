@@ -2,7 +2,7 @@
    The embed builder, automod and welcome/FAQ/custom commands live in embeds.js, automod.js and botconfig.js.
    admin_panel.html calls AdminBot.show(view) whenever a section is opened. */
 window.AdminBot = (() => {
-    const { esc, api, toast } = PW;
+    const { esc, api, toast } = AdminUtils;
     const $ = (id) => document.getElementById(id);
     const PERMS = window.ADMIN_PERMISSIONS || {};
     const can = (section) => !!PERMS[section];
@@ -69,14 +69,14 @@ window.AdminBot = (() => {
                     </div>
                     <div class="err-msg">${esc(e.message)}</div>
                     <div class="err-meta">
-                        <span title="${esc(PW.fmtDate(e.last_seen))}">Last: ${esc(PW.timeAgo(e.last_seen))}</span>
-                        ${e.count > 1 ? `<span title="${esc(PW.fmtDate(e.first_seen))}">First: ${esc(PW.timeAgo(e.first_seen))}</span>` : ""}
+                        <span title="${esc(AdminUtils.fmtDate(e.last_seen))}">Last: ${esc(AdminUtils.timeAgo(e.last_seen))}</span>
+                        ${e.count > 1 ? `<span title="${esc(AdminUtils.fmtDate(e.first_seen))}">First: ${esc(AdminUtils.timeAgo(e.first_seen))}</span>` : ""}
                         ${ctx}
                     </div>
                     ${e.traceback ? `<details data-id="${e.id}" ${openDetails.has(String(e.id)) ? "open" : ""}><summary>Traceback</summary><pre>${esc(e.traceback)}</pre></details>` : ""}
                 </div>`;
             }).join("")
-            : `<div class="empty">${state.errorFilter === "open" ? "No unresolved errors. 🎉" : "Nothing here."}</div>`;
+            : `<div class="empty">${state.errorFilter === "open" ? "No unresolved errors." : "Nothing here."}</div>`;
     }
 
     async function sendTestAlert() {
@@ -107,7 +107,7 @@ window.AdminBot = (() => {
 
     const dmItem = (p, extra = "") => `
         <button type="button" class="eb-item${state.dmOpen?.user_id === p.user_id ? " active" : ""}" data-dm-user="${esc(p.user_id)}">
-            <div class="auth-user">${PW.avatar(p.avatar, p.name, "sm")}
+            <div class="auth-user">${AdminUtils.avatar(p.avatar, p.name, "sm")}
                 <div class="eb-item-main"><strong>${esc(p.name || p.username || p.user_id)}</strong><span class="tk-sub">${extra}</span></div>
             </div>
         </button>`;
@@ -116,8 +116,8 @@ window.AdminBot = (() => {
         $("dm-results").innerHTML = state.dmSearch.map((m) => dmItem(m, `@${esc(m.username)}`)).join("");
         $("dm-list").innerHTML = state.dms.length
             ? state.dms.map((c) => dmItem(c,
-                `${c.unread ? `<span class="badge type-suggestion">${c.unread} new</span> ` : ""}${c.last.direction === "out" ? "You: " : ""}${esc(c.last.text)} · ${esc(PW.timeAgo(c.updated_at))}`)).join("")
-            : '<div class="pw-hint">No conversations yet.</div>';
+                `${c.unread ? `<span class="badge type-suggestion">${c.unread} new</span> ` : ""}${c.last.direction === "out" ? "You: " : ""}${esc(c.last.text)} · ${esc(AdminUtils.timeAgo(c.updated_at))}`)).join("")
+            : '<div class="adm-hint">No conversations yet.</div>';
     }
 
     let dmSearchTimer = null;
@@ -128,7 +128,7 @@ window.AdminBot = (() => {
             try {
                 const { members } = await api(`/api/admin/discord/members?q=${encodeURIComponent(q.trim())}`);
                 state.dmSearch = members.map((m) => ({ ...m, user_id: m.id }));
-                if (!members.length) $("dm-results").innerHTML = '<div class="pw-hint">No members found.</div>';
+                if (!members.length) $("dm-results").innerHTML = '<div class="adm-hint">No members found.</div>';
                 else renderDmList();
             } catch (err) { $("dm-results").innerHTML = `<div class="alert error">${esc(err.message)}</div>`; }
         }, 300);
@@ -137,13 +137,13 @@ window.AdminBot = (() => {
     function openConversation(profile) {
         state.dmOpen = profile;
         $("dm-chat").innerHTML = `
-            <div class="dm-head">${PW.avatar(profile.avatar, profile.name)}
+            <div class="dm-head">${AdminUtils.avatar(profile.avatar, profile.name)}
                 <div><strong>${esc(profile.name || profile.user_id)}</strong><div class="tk-sub">${profile.username ? `@${esc(profile.username)} · ` : ""}<code>${esc(profile.user_id)}</code></div></div>
             </div>
             <div class="tk-msgs" id="dm-msgs"><div class="tk-empty">Loading…</div></div>
             <div class="tk-reply">
                 <label class="hidden" for="dm-text">Message</label>
-                <textarea id="dm-text" class="pw-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… (Enter to send, Shift+Enter for new line)"></textarea>
+                <textarea id="dm-text" class="adm-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… (Enter to send, Shift+Enter for new line)"></textarea>
                 <div class="tk-reply-row"><button type="button" class="btn-gold" id="dm-send">Send DM</button></div>
             </div>`;
         renderDmList();
@@ -161,11 +161,11 @@ window.AdminBot = (() => {
             const messages = conversation?.messages || [];
             box.innerHTML = messages.length ? messages.map((m) => `
                 <div class="msg ${m.direction === "out" ? "admin mine" : "author"}">
-                    ${m.direction === "out" ? PW.avatar("/static/favicon.png", "RBWR", "sm") : PW.avatar(open.avatar, open.name, "sm")}
+                    ${m.direction === "out" ? AdminUtils.avatar("/static/favicon.png", "RBWR", "sm") : AdminUtils.avatar(open.avatar, open.name, "sm")}
                     <div class="bubble">
                         <div class="who"><strong>${esc(m.direction === "out" ? m.sent_by || "Admin" : open.name)}</strong>
                             ${m.direction === "out" ? '<span class="role">via bot</span>' : ""}
-                            <span title="${esc(PW.fmtDate(m.at))}">${esc(PW.timeAgo(m.at))}</span></div>
+                            <span title="${esc(AdminUtils.fmtDate(m.at))}">${esc(AdminUtils.timeAgo(m.at))}</span></div>
                         <div class="text">${esc(m.text)}</div>
                     </div>
                 </div>`).join("") : '<div class="tk-empty">No messages yet — say hi.</div>';
@@ -201,7 +201,7 @@ window.AdminBot = (() => {
     function renderModResults() {
         $("mod-results").innerHTML = state.modSearch.map((m) => `
             <button type="button" class="eb-item${state.modMember?.id === m.id ? " active" : ""}" data-mod-user="${esc(m.id)}">
-                <div class="auth-user">${PW.avatar(m.avatar, m.name, "sm")}
+                <div class="auth-user">${AdminUtils.avatar(m.avatar, m.name, "sm")}
                     <div class="eb-item-main"><strong>${esc(m.name)}</strong><span class="tk-sub">@${esc(m.username)}</span></div>
                 </div>
             </button>`).join("");
@@ -215,7 +215,7 @@ window.AdminBot = (() => {
             try {
                 const { members } = await api(`/api/admin/discord/members?q=${encodeURIComponent(q.trim())}`);
                 state.modSearch = members;
-                if (!members.length) $("mod-results").innerHTML = '<div class="pw-hint">No members found.</div>';
+                if (!members.length) $("mod-results").innerHTML = '<div class="adm-hint">No members found.</div>';
                 else renderModResults();
             } catch (err) { $("mod-results").innerHTML = `<div class="alert error">${esc(err.message)}</div>`; }
         }, 300);
@@ -237,61 +237,61 @@ window.AdminBot = (() => {
         const m = state.modMember;
         const timedOut = m.timeout_until && new Date(m.timeout_until) > new Date();
         const off = m.problem ? "disabled" : "";
-        const when = (iso) => iso ? `<span title="${esc(PW.fmtDate(iso))}">${esc(PW.timeAgo(iso))}</span>` : "—";
+        const when = (iso) => iso ? `<span title="${esc(AdminUtils.fmtDate(iso))}">${esc(AdminUtils.timeAgo(iso))}</span>` : "—";
         $("mod-member").innerHTML = `
-            <div class="dm-head">${PW.avatar(m.avatar, m.name)}
+            <div class="dm-head">${AdminUtils.avatar(m.avatar, m.name)}
                 <div><strong>${esc(m.name)}</strong><div class="tk-sub">@${esc(m.username)} · <code>${esc(m.id)}</code>${m.bot ? " · bot" : ""}</div></div>
             </div>
             ${m.problem ? `<div class="alert error">${esc(m.problem)}</div>` : ""}
             <div class="mod-info">
-                <div><span class="pw-label">Nickname</span>${esc(m.nick || "—")}</div>
-                <div><span class="pw-label">Account created</span>${when(m.created_at)}</div>
-                <div><span class="pw-label">Joined server</span>${when(m.joined_at)}</div>
-                <div><span class="pw-label">Timeout</span>${timedOut ? `until ${esc(PW.fmtDate(m.timeout_until))}` : "None"}</div>
+                <div><span class="adm-label">Nickname</span>${esc(m.nick || "—")}</div>
+                <div><span class="adm-label">Account created</span>${when(m.created_at)}</div>
+                <div><span class="adm-label">Joined server</span>${when(m.joined_at)}</div>
+                <div><span class="adm-label">Timeout</span>${timedOut ? `until ${esc(AdminUtils.fmtDate(m.timeout_until))}` : "None"}</div>
             </div>
-            <div class="pw-label">Roles</div>
+            <div class="adm-label">Roles</div>
             <div class="mod-roles">${m.roles.length
                 ? m.roles.map((r) => `<span class="badge neutral"${r.color ? ` style="color:${esc(r.color)}"` : ""}>${esc(r.name)}</span>`).join("")
-                : '<span class="pw-hint">No roles</span>'}</div>
-            <div class="pw-label">Active warnings (${m.warnings.length})</div>
+                : '<span class="adm-hint">No roles</span>'}</div>
+            <div class="adm-label">Active warnings (${m.warnings.length})</div>
             <div class="mod-warnings">${m.warnings.length
                 ? m.warnings.slice().reverse().map((w) => `
                     <div class="mod-warning">
                         <div><span class="tid">#${w.id}</span> ${esc(w.reason)}
-                            <div class="pw-hint">${esc(w.moderator || "?")} · <span title="${esc(PW.fmtDate(w.at))}">${esc(PW.timeAgo(w.at))}</span></div></div>
+                            <div class="adm-hint">${esc(w.moderator || "?")} · <span title="${esc(AdminUtils.fmtDate(w.at))}">${esc(AdminUtils.timeAgo(w.at))}</span></div></div>
                         <button type="button" class="qbtn c-grey" data-warn-remove="${w.id}">Remove</button>
                     </div>`).join("")
-                : '<span class="pw-hint">No warnings</span>'}</div>
-            <div class="pw-field">
-                <label class="pw-label" for="mod-reason">Reason <span class="pw-optional">(audit log, mod log and DM to the member)</span></label>
-                <input id="mod-reason" class="pw-input" maxlength="400">
+                : '<span class="adm-hint">No warnings</span>'}</div>
+            <div class="adm-field">
+                <label class="adm-label" for="mod-reason">Reason <span class="adm-optional">(audit log, mod log and DM to the member)</span></label>
+                <input id="mod-reason" class="adm-input" maxlength="400">
             </div>
             <div class="mod-actions">
                 <div>
-                    <span class="pw-label">Warning</span>
+                    <span class="adm-label">Warning</span>
                     <div class="btn-row">
                         <button type="button" class="qbtn c-gold" data-mod-action="warn" ${off}>Warn with the reason above</button>
                     </div>
                 </div>
                 <div>
-                    <label class="pw-label" for="mod-duration">Timeout</label>
+                    <label class="adm-label" for="mod-duration">Timeout</label>
                     <div class="btn-row">
-                        <select id="mod-duration" class="pw-select">${MOD_DURATIONS.map(([v, l]) => `<option value="${v}"${v === "10m" ? " selected" : ""}>${l}</option>`).join("")}</select>
+                        <select id="mod-duration" class="adm-select">${MOD_DURATIONS.map(([v, l]) => `<option value="${v}"${v === "10m" ? " selected" : ""}>${l}</option>`).join("")}</select>
                         <button type="button" class="qbtn c-blue" data-mod-action="timeout" ${off}>Timeout</button>
                         ${timedOut ? `<button type="button" class="qbtn c-green" data-mod-action="untimeout" ${off}>Remove timeout</button>` : ""}
                     </div>
                 </div>
                 <div>
-                    <label class="pw-label" for="mod-nick">Nickname</label>
+                    <label class="adm-label" for="mod-nick">Nickname</label>
                     <div class="btn-row">
-                        <input id="mod-nick" class="pw-input" maxlength="32" value="${esc(m.nick || "")}" placeholder="Empty resets it">
+                        <input id="mod-nick" class="adm-input" maxlength="32" value="${esc(m.nick || "")}" placeholder="Empty resets it">
                         <button type="button" class="qbtn c-teal" data-mod-action="nick" ${off}>Save</button>
                     </div>
                 </div>
                 <div>
-                    <label class="pw-label" for="mod-delete">Kick / Ban</label>
+                    <label class="adm-label" for="mod-delete">Kick / Ban</label>
                     <div class="btn-row">
-                        <select id="mod-delete" class="pw-select">
+                        <select id="mod-delete" class="adm-select">
                             <option value="0">Keep their messages</option>
                             ${[1, 2, 3, 7].map((d) => `<option value="${d}">Delete last ${d} day${d > 1 ? "s" : ""} (ban)</option>`).join("")}
                         </select>
@@ -343,12 +343,12 @@ window.AdminBot = (() => {
             $("mod-bans-body").innerHTML = bans.length
                 ? bans.map((b) => `
                     <tr>
-                        <td><div class="auth-user">${PW.avatar(b.avatar, b.name, "sm")}
+                        <td><div class="auth-user">${AdminUtils.avatar(b.avatar, b.name, "sm")}
                             <div class="eb-item-main"><strong>${esc(b.name)}</strong><span class="tk-sub">@${esc(b.username)} · <code>${esc(b.id)}</code></span></div></div></td>
                         <td>${esc(b.reason || "—")}</td>
                         <td style="text-align:right"><button type="button" class="qbtn c-green" data-mod-unban="${esc(b.id)}" data-name="${esc(b.name)}">Unban</button></td>
                     </tr>`).join("")
-                : '<tr><td colspan="3" class="pw-hint">Nobody is banned.</td></tr>';
+                : '<tr><td colspan="3" class="adm-hint">Nobody is banned.</td></tr>';
         } catch (err) {
             $("mod-bans-body").innerHTML = `<tr><td colspan="3"><div class="alert error">${esc(err.message)}</div></td></tr>`;
         }
@@ -386,20 +386,20 @@ window.AdminBot = (() => {
             <div class="warn-rule" data-rule="${i}">
                 <span>At</span>
                 <label class="hidden" for="wr-count-${i}">Warnings</label>
-                <input id="wr-count-${i}" class="pw-input" type="number" min="1" max="50" value="${r.count}" data-field="count">
+                <input id="wr-count-${i}" class="adm-input" type="number" min="1" max="50" value="${r.count}" data-field="count">
                 <span>active warnings:</span>
                 <label class="hidden" for="wr-action-${i}">Action</label>
-                <select id="wr-action-${i}" class="pw-select" data-field="action">
+                <select id="wr-action-${i}" class="adm-select" data-field="action">
                     ${Object.entries(WARN_ACTIONS).map(([v, l]) => `<option value="${v}"${r.action === v ? " selected" : ""}>${l}</option>`).join("")}
                 </select>
                 <label class="hidden" for="wr-duration-${i}">Timeout duration</label>
-                <select id="wr-duration-${i}" class="pw-select${r.action === "timeout" ? "" : " hidden"}" data-field="duration">
+                <select id="wr-duration-${i}" class="adm-select${r.action === "timeout" ? "" : " hidden"}" data-field="duration">
                     ${MOD_DURATIONS.map(([v, l]) => `<option value="${v}"${r.duration === v ? " selected" : ""}>${l}</option>`).join("")}
                     ${r.duration && !MOD_DURATIONS.some(([v]) => v === r.duration) ? `<option value="${esc(r.duration)}" selected>${esc(r.duration)}</option>` : ""}
                 </select>
                 <button type="button" class="qbtn c-red" data-rule-remove="${i}">Remove</button>
             </div>`).join("")
-            : '<div class="pw-hint">No rules — warnings never trigger an automatic action.</div>';
+            : '<div class="adm-hint">No rules — warnings never trigger an automatic action.</div>';
     }
 
     // ------------------------------------------------------------ autorole
@@ -438,13 +438,13 @@ window.AdminBot = (() => {
         }
         const meta = [];
         if (d.role && d.source) meta.push(`Current role: @${d.role.name} (${d.source})`);
-        if (d.updated_at) meta.push(`Last changed ${PW.timeAgo(d.updated_at)}${d.updated_by ? ` by ${d.updated_by}` : ""}`);
+        if (d.updated_at) meta.push(`Last changed ${AdminUtils.timeAgo(d.updated_at)}${d.updated_by ? ` by ${d.updated_by}` : ""}`);
         $("ar-meta").textContent = meta.join(" · ");
 
         const s = d.last_sync;
         $("ar-sync").textContent = d.syncing
             ? "Sync in progress…"
-            : s ? `Last sync ${PW.timeAgo(s.finished_at)} by ${s.started_by}: ${s.assigned} members got @${s.role_name}${s.failed ? `, ${s.failed} failed` : ""}.` : "";
+            : s ? `Last sync ${AdminUtils.timeAgo(s.finished_at)} by ${s.started_by}: ${s.assigned} members got @${s.role_name}${s.failed ? `, ${s.failed} failed` : ""}.` : "";
         $("ar-sync-btn").disabled = d.syncing || !d.role;
         if (d.syncing && state.view === "autorole") autorolePoll = setTimeout(() => loadAutorole(), 3000);
     }

@@ -890,7 +890,7 @@
 
 
         {% if permissions.dms %}
-        <main id="view-dms" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'dms' %}hidden{% endif %}">
+        <main id="view-dms" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'dms' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-blue-400 font-display whitespace-nowrap">Discord Messages</h2>
@@ -900,8 +900,8 @@
             </header>
                 <div class="dm-layout">
                     <div class="card dm-side">
-                        <label class="pw-label" for="dm-search">Write to a server member</label>
-                        <input id="dm-search" class="pw-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
+                        <label class="adm-label" for="dm-search">Write to a server member</label>
+                        <input id="dm-search" class="adm-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
                         <div id="dm-results" class="eb-list dm-results"></div>
                         <div class="eb-card-head" style="margin-top:18px">Conversations</div>
                         <div id="dm-list" class="eb-list dm-list"></div>
@@ -914,7 +914,7 @@
         {% endif %}
 
         {% if permissions.moderation %}
-        <main id="view-moderation" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'moderation' %}hidden{% endif %}">
+        <main id="view-moderation" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'moderation' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-rose-400 font-display whitespace-nowrap">Moderation</h2>
@@ -924,8 +924,8 @@
             </header>
                 <div class="dm-layout" style="margin-bottom:20px">
                     <div class="card dm-side">
-                        <label class="pw-label" for="mod-search">Find a server member</label>
-                        <input id="mod-search" class="pw-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
+                        <label class="adm-label" for="mod-search">Find a server member</label>
+                        <input id="mod-search" class="adm-input" type="search" placeholder="Name or Discord ID…" autocomplete="off">
                         <div id="mod-results" class="eb-list dm-results"></div>
                     </div>
                     <div class="card dm-chat" id="mod-member">
@@ -940,8 +940,8 @@
                         <div class="btn-row" style="align-items:flex-end;margin-top:12px">
                             <button type="button" class="qbtn c-gold" id="warn-add-rule">+ Add rule</button>
                             <div>
-                                <label class="pw-label" for="warn-expire">Warnings expire after</label>
-                                <select id="warn-expire" class="pw-select">
+                                <label class="adm-label" for="warn-expire">Warnings expire after</label>
+                                <select id="warn-expire" class="adm-select">
                                     <option value="0">Never</option>
                                     <option value="7">7 days</option>
                                     <option value="30">30 days</option>
@@ -965,7 +965,7 @@
         {% endif %}
 
         {% if permissions.automod %}
-        <main id="view-automod" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'automod' %}hidden{% endif %}">
+        <main id="view-automod" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'automod' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display whitespace-nowrap">Automod</h2>
@@ -985,24 +985,24 @@
                         <h2>General</h2>
                         <p class="card-sub">The bot checks every message (also edited ones) on the server. Each filter below has its own action: <strong>Log only</strong> records it, <strong>Delete</strong> removes the message, <strong>Warn</strong> also adds a warning (which counts towards the warning rules in Moderation) and <strong>Timeout</strong> also times the member out. During a burst the member is warned or timed out only once.</p>
                         <div class="inline-form">
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-enabled"> <strong>Automod enabled</strong></label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="am-enabled"> <strong>Automod enabled</strong></label></div>
                             <div>
-                                <label class="pw-label" for="am-log">Log channel</label>
-                                <select id="am-log" class="pw-select"><option value="">Loading channels…</option></select>
+                                <label class="adm-label" for="am-log">Log channel</label>
+                                <select id="am-log" class="adm-select"><option value="">Loading channels…</option></select>
                             </div>
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-notify"> Tell members why their message was removed</label></div>
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="am-staff"> Ignore staff (admins &amp; Manage Messages)</label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="am-notify"> Tell members why their message was removed</label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="am-staff"> Ignore staff (admins &amp; Manage Messages)</label></div>
                         </div>
                         <div class="am-exempt">
                             <div>
-                                <label class="pw-label" for="am-ex-role">Ignored roles</label>
+                                <label class="adm-label" for="am-ex-role">Ignored roles</label>
                                 <div class="am-chips" id="am-ex-roles"></div>
-                                <select id="am-ex-role" class="pw-select"></select>
+                                <select id="am-ex-role" class="adm-select"></select>
                             </div>
                             <div>
-                                <label class="pw-label" for="am-ex-channel">Ignored channels <span class="pw-optional">(threads follow their channel)</span></label>
+                                <label class="adm-label" for="am-ex-channel">Ignored channels <span class="adm-optional">(threads follow their channel)</span></label>
                                 <div class="am-chips" id="am-ex-channels"></div>
-                                <select id="am-ex-channel" class="pw-select"></select>
+                                <select id="am-ex-channel" class="adm-select"></select>
                             </div>
                         </div>
                     </div>
@@ -1012,15 +1012,15 @@
                     <div class="am-grid" id="am-join"></div>
                     <div class="am-save">
                         <button type="submit" class="btn-gold" style="padding:10px 24px">Save automod settings</button>
-                        <span class="pw-hint" id="am-dirty"></span>
+                        <span class="adm-hint" id="am-dirty"></span>
                     </div>
                 </form>
                 <div class="card" style="margin:20px 0">
                     <h2>Test a message</h2>
                     <p class="card-sub">Checks a text against the <strong>saved</strong> settings. Message spam and repeated messages need real messages, so they can't be tested here.</p>
                     <form id="am-test-form">
-                        <label class="pw-label hidden" for="am-test">Message</label>
-                        <textarea id="am-test" class="pw-textarea" rows="3" maxlength="4000" required placeholder="Type a message the way a member would send it…"></textarea>
+                        <label class="adm-label hidden" for="am-test">Message</label>
+                        <textarea id="am-test" class="adm-textarea" rows="3" maxlength="4000" required placeholder="Type a message the way a member would send it…"></textarea>
                         <div class="btn-row" style="align-items:center;margin-top:10px">
                             <button type="submit" class="mono-btn">Check</button>
                             <div id="am-test-result"></div>
@@ -1041,7 +1041,7 @@
         {% endif %}
 
         {% if permissions.embeds %}
-        <main id="view-embeds" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'embeds' %}hidden{% endif %}">
+        <main id="view-embeds" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'embeds' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-indigo-400 font-display whitespace-nowrap">Embed Builder</h2>
@@ -1052,67 +1052,67 @@
                 <div class="eb-layout">
                     <div class="card eb-form">
                         <div class="eb-channel-row">
-                            <div class="pw-field" style="flex:1;margin:0">
-                                <label class="pw-label" for="eb-channel">Channel</label>
-                                <select id="eb-channel" class="pw-select"><option value="">Loading channels…</option></select>
+                            <div class="adm-field" style="flex:1;margin:0">
+                                <label class="adm-label" for="eb-channel">Channel</label>
+                                <select id="eb-channel" class="adm-select"><option value="">Loading channels…</option></select>
                             </div>
                             <button type="button" class="mono-btn" id="eb-reload-channels" title="Reload channels">&#8635;</button>
                         </div>
-                        <div class="pw-field">
-                            <label class="pw-label" for="eb-content">Message text <span class="pw-optional">(above the embed)</span></label>
-                            <textarea id="eb-content" class="pw-textarea" maxlength="2000" rows="2" style="min-height:60px"></textarea>
+                        <div class="adm-field">
+                            <label class="adm-label" for="eb-content">Message text <span class="adm-optional">(above the embed)</span></label>
+                            <textarea id="eb-content" class="adm-textarea" maxlength="2000" rows="2" style="min-height:60px"></textarea>
                             <div class="eb-channel-row" style="margin-top:6px">
                                 <label class="hidden" for="eb-role">Ping a role</label>
-                                <select id="eb-role" class="pw-select" style="flex:1"><option value="">Ping a role…</option></select>
+                                <select id="eb-role" class="adm-select" style="flex:1"><option value="">Ping a role…</option></select>
                             </div>
-                            <div class="pw-hint">You can also type <code>@RoleName</code> — it's turned into a ping when sent. Pings only notify from the message text, not from the embed.</div>
+                            <div class="adm-hint">You can also type <code>@RoleName</code> — it's turned into a ping when sent. Pings only notify from the message text, not from the embed.</div>
                         </div>
-                        <label class="pw-check" style="margin-bottom:8px"><input type="checkbox" id="eb-mentions"> Allow pings (@everyone, @here, roles and users)</label>
+                        <label class="adm-check" style="margin-bottom:8px"><input type="checkbox" id="eb-mentions"> Allow pings (@everyone, @here, roles and users)</label>
 
                         <h3 class="eb-section">Embed</h3>
                         <div class="eb-grid">
-                            <div class="pw-field"><label class="pw-label" for="eb-title">Title</label><input id="eb-title" class="pw-input" maxlength="256"></div>
-                            <div class="pw-field"><label class="pw-label" for="eb-url">Title link</label><input id="eb-url" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-title">Title</label><input id="eb-title" class="adm-input" maxlength="256"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-url">Title link</label><input id="eb-url" class="adm-input" maxlength="500" placeholder="https://"></div>
                         </div>
-                        <div class="pw-field">
-                            <label class="pw-label" for="eb-description">Description <span class="pw-optional">(Markdown supported)</span></label>
-                            <textarea id="eb-description" class="pw-textarea" maxlength="4096" rows="6"></textarea>
-                            <div class="pw-hint"><span id="eb-desc-count">0</span> / 4096</div>
+                        <div class="adm-field">
+                            <label class="adm-label" for="eb-description">Description <span class="adm-optional">(Markdown supported)</span></label>
+                            <textarea id="eb-description" class="adm-textarea" maxlength="4096" rows="6"></textarea>
+                            <div class="adm-hint"><span id="eb-desc-count">0</span> / 4096</div>
                         </div>
                         <div class="eb-grid">
-                            <div class="pw-field">
-                                <label class="pw-label" for="eb-color-hex">Color</label>
+                            <div class="adm-field">
+                                <label class="adm-label" for="eb-color-hex">Color</label>
                                 <div class="eb-color">
                                     <input type="color" id="eb-color" value="#ffcc00" aria-label="Pick color">
-                                    <input id="eb-color-hex" class="pw-input" value="#FFCC00" maxlength="7">
+                                    <input id="eb-color-hex" class="adm-input" value="#FFCC00" maxlength="7">
                                 </div>
                             </div>
-                            <div class="pw-field" style="display:flex;align-items:flex-end">
-                                <label class="pw-check"><input type="checkbox" id="eb-timestamp"> Show current time in footer</label>
+                            <div class="adm-field" style="display:flex;align-items:flex-end">
+                                <label class="adm-check"><input type="checkbox" id="eb-timestamp"> Show current time in footer</label>
                             </div>
                         </div>
 
                         <h3 class="eb-section">Author</h3>
                         <div class="eb-grid three">
-                            <div class="pw-field"><label class="pw-label" for="eb-author-name">Name</label><input id="eb-author-name" class="pw-input" maxlength="256"></div>
-                            <div class="pw-field"><label class="pw-label" for="eb-author-url">Link</label><input id="eb-author-url" class="pw-input" maxlength="500" placeholder="https://"></div>
-                            <div class="pw-field"><label class="pw-label" for="eb-author-icon">Icon URL</label><input id="eb-author-icon" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-author-name">Name</label><input id="eb-author-name" class="adm-input" maxlength="256"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-author-url">Link</label><input id="eb-author-url" class="adm-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-author-icon">Icon URL</label><input id="eb-author-icon" class="adm-input" maxlength="500" placeholder="https://"></div>
                         </div>
 
                         <h3 class="eb-section">Images</h3>
                         <div class="eb-grid">
-                            <div class="pw-field"><label class="pw-label" for="eb-thumbnail">Thumbnail URL <span class="pw-optional">(small, top right)</span></label><input id="eb-thumbnail" class="pw-input" maxlength="500" placeholder="https://"></div>
-                            <div class="pw-field"><label class="pw-label" for="eb-image">Image URL <span class="pw-optional">(large, bottom)</span></label><input id="eb-image" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-thumbnail">Thumbnail URL <span class="adm-optional">(small, top right)</span></label><input id="eb-thumbnail" class="adm-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-image">Image URL <span class="adm-optional">(large, bottom)</span></label><input id="eb-image" class="adm-input" maxlength="500" placeholder="https://"></div>
                         </div>
 
                         <h3 class="eb-section">Footer</h3>
                         <div class="eb-grid">
-                            <div class="pw-field"><label class="pw-label" for="eb-footer-text">Text</label><input id="eb-footer-text" class="pw-input" maxlength="2048"></div>
-                            <div class="pw-field"><label class="pw-label" for="eb-footer-icon">Icon URL</label><input id="eb-footer-icon" class="pw-input" maxlength="500" placeholder="https://"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-footer-text">Text</label><input id="eb-footer-text" class="adm-input" maxlength="2048"></div>
+                            <div class="adm-field"><label class="adm-label" for="eb-footer-icon">Icon URL</label><input id="eb-footer-icon" class="adm-input" maxlength="500" placeholder="https://"></div>
                         </div>
 
                         <div class="eb-fields-head">
-                            <h3 class="eb-section" style="margin:0">Fields <span class="pw-optional" id="eb-field-count">(0 / 25)</span></h3>
+                            <h3 class="eb-section" style="margin:0">Fields <span class="adm-optional" id="eb-field-count">(0 / 25)</span></h3>
                             <button type="button" class="qbtn c-gold" id="eb-add-field">+ Add field</button>
                         </div>
                         <div id="eb-fields"></div>
@@ -1124,10 +1124,10 @@
                             <div id="eb-preview"></div>
                         </div>
                         <div class="card">
-                            <div class="pw-field">
-                                <label class="pw-label" for="eb-edit-id">Edit an existing message <span class="pw-optional">(optional)</span></label>
-                                <input id="eb-edit-id" class="pw-input" inputmode="numeric" placeholder="Message ID — leave empty to send a new message">
-                                <div class="pw-hint">The bot can only edit messages it sent itself.</div>
+                            <div class="adm-field">
+                                <label class="adm-label" for="eb-edit-id">Edit an existing message <span class="adm-optional">(optional)</span></label>
+                                <input id="eb-edit-id" class="adm-input" inputmode="numeric" placeholder="Message ID — leave empty to send a new message">
+                                <div class="adm-hint">The bot can only edit messages it sent itself.</div>
                             </div>
                             <div class="btn-row">
                                 <button type="button" class="btn-gold" id="eb-send" style="padding:10px 20px">Send to Discord</button>
@@ -1139,10 +1139,10 @@
                             <div class="eb-card-head">Templates</div>
                             <div class="eb-channel-row">
                                 <label class="hidden" for="eb-template-name">Template name</label>
-                                <input id="eb-template-name" class="pw-input" maxlength="64" placeholder="Template name, e.g. rules">
+                                <input id="eb-template-name" class="adm-input" maxlength="64" placeholder="Template name, e.g. rules">
                                 <button type="button" class="mono-btn" id="eb-save-template">Save</button>
                             </div>
-                            <p class="pw-hint" style="margin:6px 0 10px">Post a saved template on Discord with <code>/embed template:</code>.</p>
+                            <p class="adm-hint" style="margin:6px 0 10px">Post a saved template on Discord with <code>/embed template:</code>.</p>
                             <div id="eb-templates" class="eb-list"></div>
                         </div>
                         <div class="card">
@@ -1152,7 +1152,7 @@
                         <div class="card">
                             <div class="eb-card-head">JSON</div>
                             <label class="hidden" for="eb-json">Embed JSON</label>
-                            <textarea id="eb-json" class="pw-textarea" rows="5" style="font-family:var(--mono);font-size:0.78rem" placeholder='Paste Discord message JSON ({"content": …, "embeds": [ … ]}) to import it'></textarea>
+                            <textarea id="eb-json" class="adm-textarea" rows="5" style="font-family:var(--mono);font-size:0.78rem" placeholder='Paste Discord message JSON ({"content": …, "embeds": [ … ]}) to import it'></textarea>
                             <div class="btn-row" style="margin-top:8px">
                                 <button type="button" class="mono-btn" id="eb-import">Import</button>
                                 <button type="button" class="mono-btn" id="eb-export">Export current</button>
@@ -1164,7 +1164,7 @@
         {% endif %}
 
         {% if permissions.autorole %}
-        <main id="view-autorole" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'autorole' %}hidden{% endif %}">
+        <main id="view-autorole" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'autorole' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-emerald-400 font-display whitespace-nowrap">Autorole</h2>
@@ -1178,29 +1178,29 @@
                     <p class="card-sub">The bot gives this role to everyone who joins <strong id="ar-guild">the Discord server</strong>. These are the same settings as <code>/autorole</code> on Discord.</p>
                     <form class="inline-form" id="ar-form">
                         <div>
-                            <label class="pw-label" for="ar-role">Role</label>
-                            <select id="ar-role" class="pw-select"><option value="">Loading roles…</option></select>
+                            <label class="adm-label" for="ar-role">Role</label>
+                            <select id="ar-role" class="adm-select"><option value="">Loading roles…</option></select>
                         </div>
-                        <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="ar-enabled"> Enabled</label></div>
-                        <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="ar-bots"> Also give it to bots</label></div>
+                        <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="ar-enabled"> Enabled</label></div>
+                        <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="ar-bots"> Also give it to bots</label></div>
                         <div><button type="submit" class="btn-gold" style="width:100%;padding:10px">Save</button></div>
                     </form>
-                    <div class="pw-hint" id="ar-meta" style="margin-top:10px"></div>
+                    <div class="adm-hint" id="ar-meta" style="margin-top:10px"></div>
                 </div>
                 <div class="card">
                     <h2>Give the role to existing members</h2>
                     <p class="card-sub">Adds the role to everyone already on the server who doesn't have it yet. It takes about 0.3 seconds per member.</p>
                     <div class="btn-row" style="align-items:center">
-                        <label class="pw-check"><input type="checkbox" id="ar-sync-bots"> Include bots</label>
+                        <label class="adm-check"><input type="checkbox" id="ar-sync-bots"> Include bots</label>
                         <button type="button" class="mono-btn" id="ar-sync-btn">Sync members</button>
                     </div>
-                    <div class="pw-hint" id="ar-sync" style="margin-top:10px"></div>
+                    <div class="adm-hint" id="ar-sync" style="margin-top:10px"></div>
                 </div>
         </main>
         {% endif %}
 
         {% if permissions.welcome %}
-        <main id="view-welcome" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'welcome' %}hidden{% endif %}">
+        <main id="view-welcome" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'welcome' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-amber-400 font-display whitespace-nowrap">Welcome & Goodbye</h2>
@@ -1210,12 +1210,12 @@
             </header>
                 <div id="wl-alert"></div>
                 <div class="wl-grid" id="wl-forms"></div>
-                <p class="pw-hint" style="margin-top:12px">Placeholders (in the text and the template): <code>{user}</code> mention, <code>{name}</code> display name, <code>{username}</code> username, <code>{server}</code> server name, <code>{member_count}</code> number of members. Only the welcome message pings the member. Bots are never greeted.</p>
+                <p class="adm-hint" style="margin-top:12px">Placeholders (in the text and the template): <code>{user}</code> mention, <code>{name}</code> display name, <code>{username}</code> username, <code>{server}</code> server name, <code>{member_count}</code> number of members. Only the welcome message pings the member. Bots are never greeted.</p>
         </main>
         {% endif %}
 
         {% if permissions.faq %}
-        <main id="view-faq" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'faq' %}hidden{% endif %}">
+        <main id="view-faq" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'faq' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-blue-400 font-display whitespace-nowrap">FAQ</h2>
@@ -1229,17 +1229,17 @@
                     <form id="faq-form">
                         <div class="inline-form">
                             <div>
-                                <label class="pw-label" for="faq-name">Name <span class="pw-optional">(used in /faq)</span></label>
-                                <input id="faq-name" class="pw-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. install" title="Lowercase letters, numbers, - and _">
+                                <label class="adm-label" for="faq-name">Name <span class="adm-optional">(used in /faq)</span></label>
+                                <input id="faq-name" class="adm-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. install" title="Lowercase letters, numbers, - and _">
                             </div>
                             <div style="grid-column:span 2">
-                                <label class="pw-label" for="faq-title">Question</label>
-                                <input id="faq-title" class="pw-input" required maxlength="256" placeholder="e.g. How do I install RBWR?">
+                                <label class="adm-label" for="faq-title">Question</label>
+                                <input id="faq-title" class="adm-input" required maxlength="256" placeholder="e.g. How do I install RBWR?">
                             </div>
                         </div>
-                        <div class="pw-field" style="margin-top:12px">
-                            <label class="pw-label" for="faq-answer">Answer <span class="pw-optional">(Markdown supported)</span></label>
-                            <textarea id="faq-answer" class="pw-textarea" required maxlength="4000" rows="5"></textarea>
+                        <div class="adm-field" style="margin-top:12px">
+                            <label class="adm-label" for="faq-answer">Answer <span class="adm-optional">(Markdown supported)</span></label>
+                            <textarea id="faq-answer" class="adm-textarea" required maxlength="4000" rows="5"></textarea>
                         </div>
                         <div class="btn-row">
                             <button type="submit" class="btn-gold" id="faq-submit" style="padding:10px 20px">Add entry</button>
@@ -1257,7 +1257,7 @@
         {% endif %}
 
         {% if permissions.commands %}
-        <main id="view-commands" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'commands' %}hidden{% endif %}">
+        <main id="view-commands" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'commands' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-purple-400 font-display whitespace-nowrap">Custom Commands</h2>
@@ -1270,12 +1270,12 @@
                     <h2>Prefix</h2>
                     <p class="card-sub">The character(s) every custom command starts with. If another bot on the server (e.g. Circle) already uses it, pick a different one so both bots don't answer.</p>
                     <form class="btn-row" id="cc-prefix-form" style="align-items:center">
-                        <label class="pw-label hidden" for="cc-prefix">Prefix</label>
-                        <input id="cc-prefix" class="pw-input" required maxlength="5" pattern="\S+" style="width:100px;font-family:var(--mono)">
+                        <label class="adm-label hidden" for="cc-prefix">Prefix</label>
+                        <input id="cc-prefix" class="adm-input" required maxlength="5" pattern="\S+" style="width:100px;font-family:var(--mono)">
                         <button type="submit" class="btn-gold" style="padding:10px 20px">Save prefix</button>
-                        <span class="pw-hint" style="margin:0">Quick pick:</span>
+                        <span class="adm-hint" style="margin:0">Quick pick:</span>
                         <button type="button" class="qbtn c-grey" data-cc-prefix="!">!</button>
-                        <button type="button" class="qbtn c-grey" data-cc-prefix="pw!">pw!</button>
+                        <button type="button" class="qbtn c-grey" data-cc-prefix="rb!">rb!</button>
                         <button type="button" class="qbtn c-grey" data-cc-prefix="$">$</button>
                         <button type="button" class="qbtn c-grey" data-cc-prefix=".">.</button>
                         <button type="button" class="qbtn c-grey" data-cc-prefix="-">-</button>
@@ -1287,67 +1287,67 @@
                     <form id="cc-form">
                         <div class="inline-form">
                             <div>
-                                <label class="pw-label" for="cc-name">Name</label>
+                                <label class="adm-label" for="cc-name">Name</label>
                                 <div class="cc-name-row"><span class="cc-prefix">?</span>
-                                    <input id="cc-name" class="pw-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. bug" title="Lowercase letters, numbers, - and _"></div>
+                                    <input id="cc-name" class="adm-input" required maxlength="32" pattern="[a-z0-9][a-z0-9_\-]*" placeholder="e.g. bug" title="Lowercase letters, numbers, - and _"></div>
                             </div>
                             <div>
-                                <label class="pw-label" for="cc-aliases">Aliases <span class="pw-optional">(comma separated)</span></label>
-                                <input id="cc-aliases" class="pw-input" maxlength="200" placeholder="e.g. bugs, report">
+                                <label class="adm-label" for="cc-aliases">Aliases <span class="adm-optional">(comma separated)</span></label>
+                                <input id="cc-aliases" class="adm-input" maxlength="200" placeholder="e.g. bugs, report">
                             </div>
                         </div>
-                        <div class="pw-field" style="margin-top:12px">
-                            <label class="pw-label" for="cc-response">Response text <span class="pw-optional">(optional with an embed — Markdown, links and emoji work)</span></label>
-                            <textarea id="cc-response" class="pw-textarea" maxlength="2000" rows="3" placeholder="e.g. 🐞 {target}, report bugs here: {site}/tickets#bug"></textarea>
+                        <div class="adm-field" style="margin-top:12px">
+                            <label class="adm-label" for="cc-response">Response text <span class="adm-optional">(optional with an embed — Markdown, links and emoji work)</span></label>
+                            <textarea id="cc-response" class="adm-textarea" maxlength="2000" rows="3" placeholder="e.g. {target}, report bugs here: {site}/tickets#bug"></textarea>
                         </div>
-                        <label class="pw-check cc-embed-toggle"><input type="checkbox" id="cc-use-embed"> Answer with an embed <span class="pw-optional">(e.g. <code><span class="cc-prefix">?</span>soon</code> posts a card with a title, text, color and image)</span></label>
+                        <label class="adm-check cc-embed-toggle"><input type="checkbox" id="cc-use-embed"> Answer with an embed <span class="adm-optional">(e.g. <code><span class="cc-prefix">?</span>soon</code> posts a card with a title, text, color and image)</span></label>
                         <div class="cc-embed hidden" id="cc-embed">
                             <div class="cc-embed-form">
-                                <div class="pw-field">
-                                    <label class="pw-label" for="cc-template">Embed</label>
-                                    <select id="cc-template" class="pw-select"></select>
+                                <div class="adm-field">
+                                    <label class="adm-label" for="cc-template">Embed</label>
+                                    <select id="cc-template" class="adm-select"></select>
                                 </div>
                                 <div id="cc-embed-fields">
                                 <div class="eb-grid">
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-title">Title</label>
-                                        <input id="cc-e-title" class="pw-input" maxlength="256" placeholder="e.g. Found a bug?">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-title">Title</label>
+                                        <input id="cc-e-title" class="adm-input" maxlength="256" placeholder="e.g. Found a bug?">
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-url">Title link <span class="pw-optional">(optional)</span></label>
-                                        <input id="cc-e-url" class="pw-input" maxlength="500" placeholder="{site}/tickets#bug">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-url">Title link <span class="adm-optional">(optional)</span></label>
+                                        <input id="cc-e-url" class="adm-input" maxlength="500" placeholder="{site}/tickets#bug">
                                     </div>
                                 </div>
-                                <div class="pw-field">
-                                    <label class="pw-label" for="cc-e-description">Description</label>
-                                    <textarea id="cc-e-description" class="pw-textarea" maxlength="4096" rows="4" placeholder="{target}, report it here and we'll take a look."></textarea>
+                                <div class="adm-field">
+                                    <label class="adm-label" for="cc-e-description">Description</label>
+                                    <textarea id="cc-e-description" class="adm-textarea" maxlength="4096" rows="4" placeholder="{target}, report it here and we'll take a look."></textarea>
                                 </div>
                                 <div class="eb-grid">
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-color-hex">Color</label>
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-color-hex">Color</label>
                                         <div class="eb-color">
                                             <input type="color" id="cc-e-color" value="#ffcc00" aria-label="Pick a color">
-                                            <input id="cc-e-color-hex" class="pw-input" maxlength="7" value="#FFCC00" style="font-family:var(--mono)">
+                                            <input id="cc-e-color-hex" class="adm-input" maxlength="7" value="#FFCC00" style="font-family:var(--mono)">
                                         </div>
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-author">Author <span class="pw-optional">(small line above the title)</span></label>
-                                        <input id="cc-e-author" class="pw-input" maxlength="256" placeholder="e.g. RBWR Support">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-author">Author <span class="adm-optional">(small line above the title)</span></label>
+                                        <input id="cc-e-author" class="adm-input" maxlength="256" placeholder="e.g. RBWR Support">
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-thumbnail">Thumbnail URL</label>
-                                        <input id="cc-e-thumbnail" class="pw-input" maxlength="500" placeholder="https://…">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-thumbnail">Thumbnail URL</label>
+                                        <input id="cc-e-thumbnail" class="adm-input" maxlength="500" placeholder="https://…">
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-image">Image URL</label>
-                                        <input id="cc-e-image" class="pw-input" maxlength="500" placeholder="https://…">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-image">Image URL</label>
+                                        <input id="cc-e-image" class="adm-input" maxlength="500" placeholder="https://…">
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-label" for="cc-e-footer">Footer</label>
-                                        <input id="cc-e-footer" class="pw-input" maxlength="2048" placeholder="e.g. RBWR • Support">
+                                    <div class="adm-field">
+                                        <label class="adm-label" for="cc-e-footer">Footer</label>
+                                        <input id="cc-e-footer" class="adm-input" maxlength="2048" placeholder="e.g. RBWR • Support">
                                     </div>
-                                    <div class="pw-field">
-                                        <label class="pw-check" style="margin-top:30px"><input type="checkbox" id="cc-e-timestamp"> Show the time</label>
+                                    <div class="adm-field">
+                                        <label class="adm-check" style="margin-top:30px"><input type="checkbox" id="cc-e-timestamp"> Show the time</label>
                                     </div>
                                 </div>
                                 </div>
@@ -1359,12 +1359,12 @@
                         </div>
                         <div class="inline-form" style="margin-top:12px">
                             <div>
-                                <label class="pw-label" for="cc-role">Who can use it</label>
-                                <select id="cc-role" class="pw-select"><option value="">Everyone</option></select>
+                                <label class="adm-label" for="cc-role">Who can use it</label>
+                                <select id="cc-role" class="adm-select"><option value="">Everyone</option></select>
                             </div>
                             <div>
-                                <label class="pw-label" for="cc-cooldown">Cooldown per channel</label>
-                                <select id="cc-cooldown" class="pw-select">
+                                <label class="adm-label" for="cc-cooldown">Cooldown per channel</label>
+                                <select id="cc-cooldown" class="adm-select">
                                     <option value="0">None</option>
                                     <option value="5">5 seconds</option>
                                     <option value="10">10 seconds</option>
@@ -1373,16 +1373,16 @@
                                     <option value="300">5 minutes</option>
                                 </select>
                             </div>
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-reply" checked> Reply to the message</label></div>
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-delete"> Delete the command message</label></div>
-                            <div><label class="pw-check" style="padding-bottom:10px"><input type="checkbox" id="cc-enabled" checked> Enabled</label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="cc-reply" checked> Reply to the message</label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="cc-delete"> Delete the command message</label></div>
+                            <div><label class="adm-check" style="padding-bottom:10px"><input type="checkbox" id="cc-enabled" checked> Enabled</label></div>
                         </div>
                         <div class="btn-row" style="margin-top:12px">
                             <button type="submit" class="btn-gold" id="cc-submit" style="padding:10px 20px">Add command</button>
                             <button type="button" class="mono-btn hidden" id="cc-cancel">Cancel editing</button>
                         </div>
                     </form>
-                    <p class="pw-hint" style="margin-top:12px">Placeholders (in the response and the embed, links may start with <code>{site}</code>): <code>{user}</code> mention of who used it, <code>{name}</code> their name, <code>{target}</code> the member they mentioned (or themselves — <code><span class="cc-prefix">?</span>bug @Alex</code>), <code>{target_name}</code>, <code>{channel}</code>, <code>{server}</code>, <code>{args}</code> the text after the command, <code>{site}</code> the website URL. Staff ignore the role and the cooldown.</p>
+                    <p class="adm-hint" style="margin-top:12px">Placeholders (in the response and the embed, links may start with <code>{site}</code>): <code>{user}</code> mention of who used it, <code>{name}</code> their name, <code>{target}</code> the member they mentioned (or themselves — <code><span class="cc-prefix">?</span>bug @Alex</code>), <code>{target_name}</code>, <code>{channel}</code>, <code>{server}</code>, <code>{args}</code> the text after the command, <code>{site}</code> the website URL. Staff ignore the role and the cooldown.</p>
                 </div>
                 <div class="card table-wrap">
                     <table class="admin-table">
@@ -1394,7 +1394,7 @@
         {% endif %}
 
         {% if permissions.errors %}
-        <main id="view-errors" class="pw view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'errors' %}hidden{% endif %}">
+        <main id="view-errors" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'errors' %}hidden{% endif %}">
             <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-xl font-bold tracking-wide text-rose-400 font-display whitespace-nowrap">Error Monitor</h2>
@@ -1415,7 +1415,6 @@
                     </div>
                 </div>
                 <div class="error-list" id="errors-list"></div>
-                </div>
         </main>
         {% endif %}
     </div>

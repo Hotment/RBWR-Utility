@@ -1,5 +1,5 @@
 """
-Discord bot features managed from the admin panel (ported from the Piano Weave website).
+Discord bot features managed from the admin panel.
 
 * embed builder: list channels/roles, post or edit embeds as the bot, templates and history
 * direct messages: write to server members as the bot, their replies show up in the panel
@@ -91,9 +91,9 @@ welcome_store = JsonStore("welcome.json", {"welcome": {}, "goodbye": {}})
 faq_store = JsonStore("faq.json", {"entries": {}})
 # custom prefix commands; {site} is the website URL, {target} the mentioned member (or the author)
 commands_store = JsonStore("custom_commands.json", {"prefix": "!", "commands": {
-    "bug": {"aliases": ["bugs", "report"], "response": "🐞 {target}, found a bug? Report it here: {site}/tickets",
+    "bug": {"aliases": ["bugs", "report"], "response": "{target}, found a bug? Report it here: {site}/tickets",
             "template": "", "role_id": "", "cooldown": 10, "reply": True, "delete_trigger": False, "enabled": True, "uses": 0},
-    "suggest": {"aliases": ["idea"], "response": "💡 {target}, got an idea? Suggest it here: {site}/tickets",
+    "suggest": {"aliases": ["idea"], "response": "{target}, got an idea? Suggest it here: {site}/tickets",
                 "template": "", "role_id": "", "cooldown": 10, "reply": True, "delete_trigger": False, "enabled": True, "uses": 0},
 }})
 automod_store = JsonStore("automod.json", {"config": {}, "incidents": [], "last_id": 0})
@@ -493,7 +493,7 @@ def autorole_overview() -> dict:
         role, source, enabled = _resolve_autorole(guild)
         config = _autorole_config(guild.id)
         updated_by = config.get("updated_by")
-        member = guild.get_member(int(updated_by)) if str(updated_by or "").isdigit() else None
+        member = guild.get_member(int(updated_by)) if str(updated_by or "").isdigit() else None  # pyright: ignore[reportArgumentType]
         return {
             "guild": guild.name,
             "roles": [_role_info(guild, r) for r in reversed(guild.roles) if not r.is_default() and not r.managed],
@@ -911,7 +911,7 @@ async def _escalate_warnings(member: disnake.Member, count: int) -> str | None:
         return f"{rule['action']} failed"
 
 
-def warnings_embed(user: disnake.abc.User, warnings: list[dict]) -> disnake.Embed:
+def warnings_embed(user: disnake.User, warnings: list[dict]) -> disnake.Embed:
     embed = disnake.Embed(title=f"Warnings — {user.display_name}"[:256], color=BRAND)
     embed.set_thumbnail(url=user.display_avatar.url)
     for w in warnings[-20:]:
@@ -1442,12 +1442,14 @@ async def _send_greeting(kind: str, member: disnake.Member) -> disnake.Message:
     if not isinstance(channel, disnake.TextChannel):
         raise BotActionError(f"Pick a channel for the {kind} message first.")
     content, embed = render_greeting(kind, member, config)
-    return await channel.send(
-        content=content or None,
-        embed=disnake.Embed.from_dict(embed) if embed else None,  # pyright: ignore[reportArgumentType]
-        # a welcome pings the new member; a goodbye never pings anyone
-        allowed_mentions=disnake.AllowedMentions(users=[member] if kind == "welcome" else False, roles=False, everyone=False),
-    )
+    send_kwargs: dict[str, Any] = {
+        "allowed_mentions": disnake.AllowedMentions(users=[member] if kind == "welcome" else False, roles=False, everyone=False),
+    }
+    if content:
+        send_kwargs["content"] = content
+    if embed:
+        send_kwargs["embed"] = disnake.Embed.from_dict(embed)  # pyright: ignore[reportArgumentType]
+    return await channel.send(**send_kwargs)
 
 
 async def greet_member(kind: str, member: disnake.Member) -> None:
@@ -1506,8 +1508,7 @@ def find_custom_command(cmds: dict, name: str) -> str | None:
     return next((key for key, c in cmds.items() if name in c.get("aliases", [])), None)
 
 
-def render_custom_command(cmd: dict, member: disnake.Member, channel, args: str,
-                          target: disnake.abc.User | None) -> tuple[str, dict | None]:
+def render_custom_command(cmd: dict, member: disnake.Member, channel, args: str, target: disnake.Member | disnake.User | None) -> tuple[str, dict | None]:
     """(message text, embed dict or None) with the placeholders filled in."""
     target = target or member
     values = {

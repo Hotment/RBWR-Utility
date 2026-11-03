@@ -1,6 +1,6 @@
 /* Discord embed builder for the owner admin panel. */
 window.EmbedBuilder = (() => {
-    const { esc, api, toast } = PW;
+    const { esc, api, toast } = AdminUtils;
     const $ = (id) => document.getElementById(id);
     const MAX_FIELDS = 25;
     const DEFAULT_COLOR = 0x00d1ff;
@@ -118,16 +118,16 @@ window.EmbedBuilder = (() => {
                 <div class="eb-field-top">
                     <span class="tk-sub">Field ${i + 1}</span>
                     <div class="btn-row">
-                        <label class="pw-check" style="font-size:0.8rem"><input type="checkbox" data-k="inline" ${f.inline ? "checked" : ""}> Inline</label>
+                        <label class="adm-check" style="font-size:0.8rem"><input type="checkbox" data-k="inline" ${f.inline ? "checked" : ""}> Inline</label>
                         <button type="button" class="qbtn c-grey" data-act="up" ${i === 0 ? "disabled" : ""} aria-label="Move up">&uarr;</button>
                         <button type="button" class="qbtn c-grey" data-act="down" ${i === fields.length - 1 ? "disabled" : ""} aria-label="Move down">&darr;</button>
                         <button type="button" class="qbtn c-red" data-act="remove">Remove</button>
                     </div>
                 </div>
                 <label class="hidden" for="eb-f-name-${i}">Field ${i + 1} name</label>
-                <input id="eb-f-name-${i}" class="pw-input" data-k="name" maxlength="256" placeholder="Name" value="${esc(f.name)}">
+                <input id="eb-f-name-${i}" class="adm-input" data-k="name" maxlength="256" placeholder="Name" value="${esc(f.name)}">
                 <label class="hidden" for="eb-f-value-${i}">Field ${i + 1} value</label>
-                <textarea id="eb-f-value-${i}" class="pw-textarea" data-k="value" maxlength="1024" rows="2" placeholder="Value" style="min-height:56px;margin-top:6px">${esc(f.value)}</textarea>
+                <textarea id="eb-f-value-${i}" class="adm-textarea" data-k="value" maxlength="1024" rows="2" placeholder="Value" style="min-height:56px;margin-top:6px">${esc(f.value)}</textarea>
             </div>`).join("");
     }
 
@@ -174,7 +174,7 @@ window.EmbedBuilder = (() => {
     function renderPreview(msg) {
         const e = msg.embed;
         const hasEmbed = e.title.trim() || e.description.trim() || e.author.name.trim() || e.footer.text.trim() || e.fields.length || e.image_url || e.thumbnail_url;
-        const now = new Date().toLocaleTimeString(PW.LOCALE, { hour: "2-digit", minute: "2-digit" });
+        const now = new Date().toLocaleTimeString(AdminUtils.LOCALE, { hour: "2-digit", minute: "2-digit" });
         const fieldsHtml = e.fields.length ? `<div class="dc-fields">${e.fields.map((f) =>
             `<div class="dc-field${f.inline ? " inline" : ""}"><div class="dc-field-name">${markdown(f.name)}</div><div class="dc-field-value">${markdown(f.value)}</div></div>`).join("")}</div>` : "";
         const footerBits = [e.footer.text.trim() && esc(e.footer.text.trim()), e.timestamp && `Today at ${now}`].filter(Boolean);
@@ -259,12 +259,12 @@ window.EmbedBuilder = (() => {
         }
         $("eb-templates").innerHTML = templates.length ? templates.map((t, i) => `
             <div class="eb-item">
-                <div class="eb-item-main"><strong>${esc(t.name)}</strong><span class="tk-sub">by ${esc(t.updated_by || "?")} · ${esc(PW.timeAgo(t.updated_at))}</span></div>
+                <div class="eb-item-main"><strong>${esc(t.name)}</strong><span class="tk-sub">by ${esc(t.updated_by || "?")} · ${esc(AdminUtils.timeAgo(t.updated_at))}</span></div>
                 <div class="btn-row">
                     <button type="button" class="qbtn c-gold" data-tpl="load" data-i="${i}">Load</button>
                     <button type="button" class="qbtn c-red" data-tpl="delete" data-i="${i}">Delete</button>
                 </div>
-            </div>`).join("") : '<div class="pw-hint">No templates yet.</div>';
+            </div>`).join("") : '<div class="adm-hint">No templates yet.</div>';
 
         $("eb-history").innerHTML = history.length ? history.map((h, i) => {
             const title = h.embed?.title || h.content || h.embed?.description || "(embed)";
@@ -272,7 +272,7 @@ window.EmbedBuilder = (() => {
             <div class="eb-item">
                 <div class="eb-item-main">
                     <strong>${esc(title.slice(0, 60))}</strong>
-                    <span class="tk-sub">#${esc(h.channel_name || "?")} · ${esc(h.sent_by || "?")} · ${esc(PW.timeAgo(h.sent_at))}${h.source === "discord" ? " · via /embed" : ""}${h.edited ? " · edited" : ""}</span>
+                    <span class="tk-sub">#${esc(h.channel_name || "?")} · ${esc(h.sent_by || "?")} · ${esc(AdminUtils.timeAgo(h.sent_at))}${h.source === "discord" ? " · via /embed" : ""}${h.edited ? " · edited" : ""}</span>
                 </div>
                 <div class="btn-row">
                     <button type="button" class="qbtn c-gold" data-hist="load" data-i="${i}">Load</button>
@@ -280,7 +280,7 @@ window.EmbedBuilder = (() => {
                     ${h.jump_url ? `<a class="qbtn c-grey" href="${esc(h.jump_url)}" target="_blank" rel="noopener">Open</a>` : ""}
                 </div>
             </div>`;
-        }).join("") : '<div class="pw-hint">Nothing sent yet.</div>';
+        }).join("") : '<div class="adm-hint">Nothing sent yet.</div>';
     }
 
     const savedToMessage = (s) => ({ content: s.content || "", allow_mentions: !!s.allow_mentions, embed: s.data || fromDiscord(s.embed) || fromDiscord({}) });

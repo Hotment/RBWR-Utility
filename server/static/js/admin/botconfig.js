@@ -1,6 +1,6 @@
 /* Admin panel: welcome & goodbye messages, FAQ and custom commands. */
 window.BotConfig = (() => {
-    const { esc, api, toast } = PW;
+    const { esc, api, toast } = AdminUtils;
     const $ = (id) => document.getElementById(id);
 
     let initialized = false;
@@ -65,31 +65,31 @@ window.BotConfig = (() => {
                 <form class="card" data-greeting="${kind}">
                     <div class="filters" style="justify-content:space-between;margin:0">
                         <h2 style="margin:0">${title}</h2>
-                        <label class="pw-check"><input type="checkbox" id="wl-${kind}-enabled" ${c.enabled ? "checked" : ""}> Enabled</label>
+                        <label class="adm-check"><input type="checkbox" id="wl-${kind}-enabled" ${c.enabled ? "checked" : ""}> Enabled</label>
                     </div>
                     <p class="card-sub">${sub}</p>
-                    <div class="pw-field">
-                        <label class="pw-label" for="wl-${kind}-channel">Channel</label>
-                        <select id="wl-${kind}-channel" class="pw-select">${channelOptions("Pick a channel…")}</select>
+                    <div class="adm-field">
+                        <label class="adm-label" for="wl-${kind}-channel">Channel</label>
+                        <select id="wl-${kind}-channel" class="adm-select">${channelOptions("Pick a channel…")}</select>
                     </div>
-                    <div class="pw-field">
-                        <label class="pw-label" for="wl-${kind}-message">Message text</label>
-                        <textarea id="wl-${kind}-message" class="pw-textarea" maxlength="2000" rows="3" style="min-height:70px" placeholder="${esc(d.defaults[kind])}">${esc(c.message || "")}</textarea>
-                        <div class="pw-hint">Empty = the default text above, or no text when an embed is chosen.</div>
+                    <div class="adm-field">
+                        <label class="adm-label" for="wl-${kind}-message">Message text</label>
+                        <textarea id="wl-${kind}-message" class="adm-textarea" maxlength="2000" rows="3" style="min-height:70px" placeholder="${esc(d.defaults[kind])}">${esc(c.message || "")}</textarea>
+                        <div class="adm-hint">Empty = the default text above, or no text when an embed is chosen.</div>
                     </div>
-                    <div class="pw-field">
-                        <label class="pw-label" for="wl-${kind}-template">Embed <span class="pw-optional">(template from the Embed Builder)</span></label>
-                        <select id="wl-${kind}-template" class="pw-select">
+                    <div class="adm-field">
+                        <label class="adm-label" for="wl-${kind}-template">Embed <span class="adm-optional">(template from the Embed Builder)</span></label>
+                        <select id="wl-${kind}-template" class="adm-select">
                             <option value="">— Text only —</option>
                             ${d.templates.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
                         </select>
                     </div>
-                    <label class="pw-check" style="margin-bottom:12px"><input type="checkbox" id="wl-${kind}-avatar" ${c.avatar_thumbnail ? "checked" : ""}> Show the member's avatar as the embed thumbnail</label>
+                    <label class="adm-check" style="margin-bottom:12px"><input type="checkbox" id="wl-${kind}-avatar" ${c.avatar_thumbnail ? "checked" : ""}> Show the member's avatar as the embed thumbnail</label>
                     <div class="btn-row">
                         <button type="submit" class="btn-gold" style="padding:10px 20px">Save</button>
                         <button type="button" class="mono-btn" data-greeting-test="${kind}" title="Post it now with you as the member">Send test</button>
                     </div>
-                    ${c.updated_at ? `<div class="pw-hint" style="margin-top:10px">Last changed ${esc(PW.timeAgo(c.updated_at))} by ${esc(c.updated_by || "?")}</div>` : ""}
+                    ${c.updated_at ? `<div class="adm-hint" style="margin-top:10px">Last changed ${esc(AdminUtils.timeAgo(c.updated_at))} by ${esc(c.updated_by || "?")}</div>` : ""}
                 </form>`;
         }).join("");
         for (const kind of Object.keys(GREETINGS)) {
@@ -114,13 +114,13 @@ window.BotConfig = (() => {
         $("faq-body").innerHTML = faq.entries.length ? faq.entries.map((e) => `
             <tr>
                 <td><code>${esc(e.name)}</code></td>
-                <td><strong>${esc(e.title)}</strong><div class="pw-hint faq-answer">${esc(e.answer)}</div></td>
+                <td><strong>${esc(e.title)}</strong><div class="adm-hint faq-answer">${esc(e.answer)}</div></td>
                 <td>${e.uses || 0}×</td>
                 <td style="text-align:right;white-space:nowrap">
                     <button type="button" class="qbtn c-grey" data-faq-edit="${esc(e.name)}">Edit</button>
                     <button type="button" class="qbtn c-red" data-faq-delete="${esc(e.name)}">Delete</button>
                 </td>
-            </tr>`).join("") : '<tr><td colspan="4" class="pw-hint">No FAQ entries yet. Add one above.</td></tr>';
+            </tr>`).join("") : '<tr><td colspan="4" class="adm-hint">No FAQ entries yet. Add one above.</td></tr>';
     }
 
     function editFaq(entry) {
@@ -160,17 +160,17 @@ window.BotConfig = (() => {
         }
         $("cc-body").innerHTML = d.commands.length ? d.commands.map((c) => `
             <tr>
-                <td><code>${p}${esc(c.name)}</code>${c.aliases?.length ? `<div class="pw-hint">${c.aliases.map((a) => p + esc(a)).join(", ")}</div>` : ""}
-                    ${c.role_id ? `<div class="pw-hint">Only @${esc(roleName(c.role_id) || c.role_id)}</div>` : ""}</td>
-                <td><div class="faq-answer">${esc(c.response) || '<span class="pw-hint">(embed only)</span>'}</div>
-                    ${c.template ? `<div class="pw-hint">Embed: ${esc(c.template)}</div>` : c.embed ? `<div class="pw-hint">Embed: ${esc(c.embed.title || "own embed")}</div>` : ""}</td>
+                <td><code>${p}${esc(c.name)}</code>${c.aliases?.length ? `<div class="adm-hint">${c.aliases.map((a) => p + esc(a)).join(", ")}</div>` : ""}
+                    ${c.role_id ? `<div class="adm-hint">Only @${esc(roleName(c.role_id) || c.role_id)}</div>` : ""}</td>
+                <td><div class="faq-answer">${esc(c.response) || '<span class="adm-hint">(embed only)</span>'}</div>
+                    ${c.template ? `<div class="adm-hint">Embed: ${esc(c.template)}</div>` : c.embed ? `<div class="adm-hint">Embed: ${esc(c.embed.title || "own embed")}</div>` : ""}</td>
                 <td>${c.uses || 0}×</td>
                 <td><button type="button" class="qbtn ${c.enabled ? "c-green" : "c-grey"}" data-cc-toggle="${esc(c.name)}">${c.enabled ? "On" : "Off"}</button></td>
                 <td style="text-align:right;white-space:nowrap">
                     <button type="button" class="qbtn c-grey" data-cc-edit="${esc(c.name)}">Edit</button>
                     <button type="button" class="qbtn c-red" data-cc-delete="${esc(c.name)}">Delete</button>
                 </td>
-            </tr>`).join("") : '<tr><td colspan="5" class="pw-hint">No commands yet. Add one above.</td></tr>';
+            </tr>`).join("") : '<tr><td colspan="5" class="adm-hint">No commands yet. Add one above.</td></tr>';
     }
 
     function editCommand(c) {
@@ -257,7 +257,7 @@ window.BotConfig = (() => {
         const content = $("cc-response").value.trim();
         const url = sampleText(e.url);
         const hasEmbed = e.title.trim() || e.description.trim() || e.author.name.trim() || e.footer.text.trim() || e.image_url || e.thumbnail_url;
-        const now = new Date().toLocaleTimeString(PW.LOCALE, { hour: "2-digit", minute: "2-digit" });
+        const now = new Date().toLocaleTimeString(AdminUtils.LOCALE, { hour: "2-digit", minute: "2-digit" });
         const footer = [e.footer.text.trim() && esc(sampleText(e.footer.text.trim())), e.timestamp && `Today at ${now}`].filter(Boolean);
         $("cc-preview").innerHTML = `
             <div class="dc-msg">

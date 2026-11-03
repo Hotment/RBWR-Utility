@@ -1,5 +1,5 @@
-/* Shared helpers for the admin panel's Discord bot sections (from the Piano Weave website). */
-const PW = (() => {
+/* Shared helpers for the admin panel's Discord bot sections. */
+const AdminUtils = (() => {
     function esc(value) {
         return String(value ?? "")
             .replace(/&/g, "&amp;")
@@ -72,7 +72,11 @@ const PW = (() => {
         el.className = `toast ${type}`;
         el.textContent = message;
         wrap.appendChild(el);
-        setTimeout(() => el.remove(), 4500);
+        setTimeout(() => {
+            el.style.opacity = "0";
+            el.style.transform = "translateY(6px)";
+            setTimeout(() => el.remove(), 250);
+        }, 4200);
     }
 
     return { esc, api, LOCALE, timeAgo, fmtDate, avatar, toast };
