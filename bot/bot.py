@@ -383,8 +383,18 @@ class RBWRClient:
                         assets = []
                         for a in rel.get("assets", []):
                             assets.append({"name": a.get("name"), "size": a.get("size"), "download_url": a.get("browser_download_url")})
-                            if a.get("name", "").endswith((".exe", ".zip")) and download_url == html_url:
-                                download_url = a.get("browser_download_url")
+
+                        for a in assets:
+                            aname = (a.get("name") or "").lower()
+                            if "win-x64" in aname and aname.endswith(".exe"):
+                                download_url = a.get("download_url") or html_url
+                                break
+                        if download_url == html_url:
+                            for a in assets:
+                                aname = (a.get("name") or "").lower()
+                                if aname.endswith((".exe", ".zip")):
+                                    download_url = a.get("download_url") or html_url
+                                    break
                         return {
                             "version": version,
                             "tag_name": tag_name,
@@ -500,12 +510,98 @@ def _record_error_entry(
     except Exception as ex:
         log.warning(f"[Error Monitor] Could not record error: {ex}")
         return None
+      
+def _build_alert_action_view() -> disnake.ui.View:
+    view = disnake.ui.View(timeout=None)
+    view.add_item(disnake.ui.Button(
+        label="Bug Reports & Tickets",
+        url=f"{DEFAULT_SERVER_BASE_URL}/tickets",
+        style=disnake.ButtonStyle.link,
+    ))
+    view.add_item(disnake.ui.Button(
+        label="Web Portal",
+        url=DEFAULT_SERVER_BASE_URL,
+        style=disnake.ButtonStyle.link,
+    ))
+    return view
+
+def _build_crash_action_view(admin_url: str) -> disnake.ui.View:
+    view = disnake.ui.View(timeout=None)
+    view.add_item(disnake.ui.Button(
+        label="Open Crashes Dashboard",
+        url=admin_url,
+        style=disnake.ButtonStyle.link,
+    ))
+    view.add_item(disnake.ui.Button(
+        label="Web Portal",
+        url=DEFAULT_SERVER_BASE_URL,
+        style=disnake.ButtonStyle.link,
+    ))
+    return view
+
+async def send_interaction_error(
+    inter: disnake.Interaction,
+    title: str,
+    description: str,
+    error: BaseException | None = None,
+    ephemeral: bool = True,
+) -> None:
+    c_items: list[Any] = [
+        disnake.ui.TextDisplay(f"## {title}\n{description}"),
+    ]
+    if error is not None:
+        err_type = type(error).__name__
+        err_msg = str(error).strip() or "No additional diagnostic info."
+        if len(err_msg) > 350:
+            err_msg = err_msg[:350] + "..."
+        c_items.append(disnake.ui.Separator(divider=True))
+        c_items.append(disnake.ui.TextDisplay(f"**Diagnostic Code:** `{err_type}`\n```{err_msg}```"))
+
+    c_items.append(disnake.ui.Separator(divider=False))
+    c_items.append(disnake.ui.TextDisplay("-# RBWR Fault Monitor • Automated Incident Logging"))
+    c_items.append(disnake.ui.ActionRow(
+        disnake.ui.Button(label="Submit Ticket / Report", url=f"{DEFAULT_SERVER_BASE_URL}/tickets"),
+        disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL),
+    ))
+    container = disnake.ui.Container(*c_items, accent_colour=disnake.Color.red())
+
+    embed = disnake.Embed(
+        title=title[:256],
+        description=description,
+        color=0xEF4444,
+        timestamp=datetime.now(timezone.utc),
+    )
+    if error is not None:
+        err_type = type(error).__name__
+        err_msg = str(error).strip() or "No additional diagnostic info."
+        embed.add_field(name="Diagnostic Code", value=f"`{err_type}`", inline=True)
+        embed.add_field(name="Details", value=f"```{err_msg[:500]}```", inline=False)
+    embed.set_footer(text="RBWR Fault Monitor")
+
+    view = disnake.ui.View()
+    view.add_item(disnake.ui.Button(label="Submit Ticket / Report", url=f"{DEFAULT_SERVER_BASE_URL}/tickets"))
+    view.add_item(disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL))
+
+    try:
+        if inter.response.is_done():
+            try:
+                await inter.followup.send(components=[container], ephemeral=ephemeral)
+            except Exception:
+                await inter.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        else:
+            try:
+                await inter.response.send_message(components=[container], ephemeral=ephemeral)
+            except Exception:
+                await inter.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+    except Exception as ex:
+        log.warning(f"[Discord Error Handler] Failed to send interaction error: {ex}")
 
 async def _send_alert_coro(
     channel_id: int,
     content: str,
     embed_dict: dict[str, Any],
     file_bytes: bytes | None = None,
+    view: disnake.ui.View | None = None,
 ) -> bool:
     global disnake_bot
     if not disnake_bot:
@@ -520,11 +616,13 @@ async def _send_alert_coro(
             return False
 
         embed = disnake.Embed.from_dict(embed_dict)  # pyright: ignore[reportArgumentType]
+        send_kwargs: dict[str, Any] = {"content": content, "embed": embed}
         if file_bytes:
-            file_obj = disnake.File(io.BytesIO(file_bytes), filename="traceback.txt")
-            await channel.send(content=content, embed=embed, file=file_obj)
-        else:
-            await channel.send(content=content, embed=embed)
+            send_kwargs["file"] = disnake.File(io.BytesIO(file_bytes), filename="traceback.txt")
+        if view:
+            send_kwargs["view"] = view
+
+        await channel.send(**send_kwargs)
         log.info(f"[Discord Alert] Successfully sent alert to channel {channel_id} via Disnake bot")
         return True
     except Exception as ex:
@@ -537,6 +635,7 @@ def _send_error_alert_http(
     file_bytes: bytes | None = None,
     channel_id: int = ERROR_ALERT_CHANNEL_ID,
     token: str | None = None,
+    components: list[dict[str, Any]] | None = None,
 ) -> bool:
     bot_token = token or TOKEN or os.getenv("DISCORD_BOT_TOKEN", "").strip()
     if not bot_token:
@@ -545,10 +644,32 @@ def _send_error_alert_http(
 
     url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
     headers = {"Authorization": f"Bot {bot_token}"}
-    payload_data = {
+    payload_data: dict[str, Any] = {
         "content": content,
         "embeds": [embed_dict],
     }
+    if components is not None:
+        payload_data["components"] = components
+    else:
+        payload_data["components"] = [
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 2,
+                        "style": 5,
+                        "label": "Bug Reports & Tickets",
+                        "url": f"{DEFAULT_SERVER_BASE_URL}/tickets",
+                    },
+                    {
+                        "type": 2,
+                        "style": 5,
+                        "label": "Web Portal",
+                        "url": DEFAULT_SERVER_BASE_URL,
+                    },
+                ],
+            }
+        ]
 
     try:
         if file_bytes:
@@ -597,7 +718,8 @@ async def send_error_alert_async(
             entry=entry,
         )
 
-        sent = await _send_alert_coro(channel_id, content, embed_dict, file_bytes)
+        alert_view = _build_alert_action_view()
+        sent = await _send_alert_coro(channel_id, content, embed_dict, file_bytes, view=alert_view)
         if sent:
             return True
 
@@ -640,11 +762,12 @@ def report_error_to_discord(
             entry=entry,
         )
 
+        alert_view = _build_alert_action_view()
         global disnake_bot, disnake_bot_loop
         if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
             try:
                 fut = asyncio.run_coroutine_threadsafe(
-                    _send_alert_coro(channel_id, content, embed_dict, file_bytes),
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, view=alert_view),
                     disnake_bot_loop,
                 )
                 if fut.result(timeout=6):
@@ -712,11 +835,32 @@ def report_crash_to_discord(
         embed.set_footer(text="RBWR Desktop Crash Monitoring")
         embed_dict: dict = embed.to_dict()  # pyright: ignore[reportAssignmentType]
 
+        crash_view = _build_crash_action_view(admin_url)
+        crash_components = [
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 2,
+                        "style": 5,
+                        "label": "Open Crashes Dashboard",
+                        "url": admin_url,
+                    },
+                    {
+                        "type": 2,
+                        "style": 5,
+                        "label": "Web Portal",
+                        "url": DEFAULT_SERVER_BASE_URL,
+                    },
+                ],
+            }
+        ]
+
         global disnake_bot, disnake_bot_loop
         if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
             try:
                 fut = asyncio.run_coroutine_threadsafe(
-                    _send_alert_coro(channel_id, content, embed_dict, file_bytes),
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, view=crash_view),
                     disnake_bot_loop,
                 )
                 if fut.result(timeout=6):
@@ -730,6 +874,7 @@ def report_crash_to_discord(
             file_bytes=file_bytes,
             channel_id=channel_id,
             token=token,
+            components=crash_components,
         )
     except Exception as ex:
         log.error(f"[Discord Alert] Unexpected error in report_crash_to_discord: {ex}", exc_info=True)
@@ -1084,14 +1229,13 @@ class TicketPanelView(disnake.ui.View):
             traceback_str=tb_str,
             context_info=ctx,
         )
-        try:
-            msg = "An error occurred while handling this ticket action."
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-        except Exception:
-            pass
+        await send_interaction_error(
+            interaction,
+            title="Ticket Action Fault",
+            description="An unexpected error occurred while processing this ticket panel action.",
+            error=error,
+            ephemeral=True,
+        )
 
 class TicketNoteModal(disnake.ui.Modal):
     def __init__(self, ticket_id: int, current_note: str = ""):
@@ -1132,14 +1276,13 @@ class TicketNoteModal(disnake.ui.Modal):
             traceback_str=tb_str,
             context_info=ctx,
         )
-        try:
-            msg = "An error occurred while saving the note."
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-        except Exception:
-            pass
+        await send_interaction_error(
+            interaction,
+            title=f"Ticket Note Submission Fault (#{self.ticket_id})",
+            description="An unexpected error occurred while saving the administrator note.",
+            error=error,
+            ephemeral=True,
+        )
 
 _handled_interaction_ids: set[int] = set()
 
@@ -1359,14 +1502,13 @@ class EmbedBuilderModal(disnake.ui.Modal):
             traceback_str=tb_str,
             context_info=ctx,
         )
-        try:
-            msg = "An error occurred while dispatching the embed."
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-        except Exception:
-            pass
+        await send_interaction_error(
+            interaction,
+            title="Embed Builder Fault",
+            description="An unexpected error occurred while dispatching the custom embed.",
+            error=error,
+            ephemeral=True,
+        )
 
 async def handle_embed_modal_submission(inter: disnake.ModalInteraction, target_channel_id: int):
     if _check_and_mark_interaction(inter.id) or inter.response.is_done():
@@ -2947,14 +3089,13 @@ class ServerBrowserView(disnake.ui.View):
             traceback_str=tb_str,
             context_info=ctx,
         )
-        try:
-            msg = "An error occurred while interacting with the server browser."
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-        except Exception:
-            pass
+        await send_interaction_error(
+            interaction,
+            title="Server Browser Fault",
+            description="An error occurred while interacting with the server browser view.",
+            error=error,
+            ephemeral=True,
+        )
 
 def create_bot_instance(data_supplier: Callable[[bool], dict[str, Any]] | None = None) -> commands.InteractionBot:
     global disnake_bot
@@ -3092,14 +3233,29 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             context_info=ctx,
         )
 
-        try:
-            msg = "An unexpected error occurred while processing this command."
-            if inter.response.is_done():
-                await inter.followup.send(msg, ephemeral=True)
-            else:
-                await inter.response.send_message(msg, ephemeral=True)
-        except Exception:
-            pass
+        if isinstance(orig_err, commands.CommandOnCooldown):
+            title = f"Rate Limit Active — /{cmd_name}"
+            desc = f"Command cooldown active. Please wait **{round(orig_err.retry_after, 1)}s** before executing this command again."
+            err_for_ui = None
+        elif isinstance(orig_err, (commands.MissingPermissions, commands.CheckFailure)):
+            title = f"Access Denied — /{cmd_name}"
+            desc = "You lack the necessary permissions or prerequisites to execute this command."
+            err_for_ui = None
+        elif isinstance(orig_err, commands.BotMissingPermissions):
+            title = f"Bot Permission Deficit — /{cmd_name}"
+            missing = ", ".join(orig_err.missing_permissions) if hasattr(orig_err, "missing_permissions") else "Required permissions"
+            desc = f"The bot lacks the following Discord permissions to execute this command: {missing}."
+            err_for_ui = None
+        elif isinstance(orig_err, commands.CommandNotFound):
+            title = f"Command Not Found — /{cmd_name}"
+            desc = "The requested application command could not be located in the active bot registry."
+            err_for_ui = None
+        else:
+            title = f"Command Execution Fault — /{cmd_name}"
+            desc = "An unexpected exception occurred while executing this command. An incident report has been dispatched to engineering."
+            err_for_ui = orig_err
+
+        await send_interaction_error(inter, title=title, description=desc, error=err_for_ui, ephemeral=True)
 
     @b.event
     async def on_user_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
@@ -3118,6 +3274,13 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             traceback_str=tb_str,
             context_info=ctx,
         )
+        await send_interaction_error(
+            inter,
+            title=f"User Context Command Fault — {cmd_name}",
+            description="An unexpected error occurred while executing this user context action. An incident report has been logged.",
+            error=orig_err,
+            ephemeral=True,
+        )
 
     @b.event
     async def on_message_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
@@ -3135,6 +3298,13 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             error=orig_err,
             traceback_str=tb_str,
             context_info=ctx,
+        )
+        await send_interaction_error(
+            inter,
+            title=f"Message Context Command Fault — {cmd_name}",
+            description="An unexpected error occurred while processing this message context action. An incident report has been logged.",
+            error=orig_err,
+            ephemeral=True,
         )
 
     @b.event
@@ -3187,11 +3357,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             server = await client.find_server(id, allow_exact_private=True)
         except Exception as e:
             log.exception("RBWR API error")
-            await inter.followup.send(f"Error fetching server data: `{e}`", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Server Snapshot Fault", description=f"Failed to fetch operational metrics for server `{id}` from central API.", error=e, ephemeral=ephemeral)
             return
 
         if not server:
-            await inter.followup.send(f"Server `{id}` not found or is offline.", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Server Offline / Unregistered", description=f"Server `{id}` was not found in the active registry or is currently offline.", ephemeral=ephemeral)
             return
 
         job_id = str(server.get("jobId", id))
@@ -3287,7 +3457,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             payload = await client.fetch(public_only=True)
             servers = payload.get("data", {}).get("servers", [])
         except Exception as e:
-            await inter.followup.send(f"Error fetching servers: `{e}`", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Server Registry Fault", description="Failed to retrieve active server list from central API.", error=e, ephemeral=ephemeral)
             return
 
         browser_view = ServerBrowserView(
@@ -3512,11 +3682,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             )
         except Exception as ex:
             log.error(f"[Calc Command] Calculation failed: {ex}", exc_info=True)
-            await inter.followup.send(f"Error calculating reactor operational parameters: `{ex}`", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Reactor Calculation Fault", description="Failed to compute reactor operational parameters for the requested setpoint.", error=ex, ephemeral=ephemeral)
             return
 
         if not res:
-            await inter.followup.send("Failed to retrieve calculation results from API.", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Calculation Engine Fault", description="Calculation engine returned empty results for the requested parameters.", ephemeral=ephemeral)
             return
 
         thermal = float(res.get("thermal_percent", 0.0))
@@ -3638,7 +3808,12 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             log.warning(f"[Download Command] Failed to fetch version info: {ex}")
 
         if not rel:
-            await inter.followup.send("Failed to retrieve latest release information from version API.", ephemeral=ephemeral)
+            await send_interaction_error(
+                inter,
+                title="Version Registry Fault",
+                description="Failed to retrieve latest release information from the version API service.",
+                ephemeral=ephemeral,
+            )
             return
 
         version = rel.get("version", "unknown")
@@ -3661,30 +3836,98 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             disnake.ui.Separator(divider=True),
             disnake.ui.TextDisplay(
                 f"**Version:** `{tag_name}`" + (f" | **Release Date:** `{rel_date}`" if rel_date else "") +
-                " | **Platforms:** `Windows x64` / `Linux`"
+                " | **Platforms:** `Windows x64` / `Linux x64` / `macOS`"
             ),
             disnake.ui.Separator(divider=True),
             disnake.ui.TextDisplay(f"### Release Notes\n```markdown\n{notes}\n```"),
         ]
 
+        def _release_asset_priority_key(asset: dict[str, Any]) -> tuple:
+            a_low = (asset.get("name") or "").lower()
+            if any(a_low.endswith(ext) for ext in [".sha256", ".sha512", ".md5", ".txt", ".sig"]):
+                return (99, a_low)
+
+            if "win-x64" in a_low and a_low.endswith(".exe"):
+                return (1, a_low)
+
+            if "linux-x64" in a_low and a_low.endswith(".appimage"):
+                return (2, a_low)
+
+            if "linux-x64" in a_low and not any(a_low.endswith(ext) for ext in [".zip", ".tar.gz", ".tgz", ".tar"]):
+                return (3, a_low)
+
+            if ("x64" in a_low or "amd64" in a_low or "x86_64" in a_low) and (a_low.endswith(".exe") or a_low.endswith(".appimage")):
+                return (4, a_low)
+
+            if "win-x64" in a_low and (a_low.endswith(".zip") or a_low.endswith(".tar.gz")):
+                return (5, a_low)
+
+            if "linux-x64" in a_low and (a_low.endswith(".zip") or a_low.endswith(".tar.gz")):
+                return (6, a_low)
+
+            if ("osx-x64" in a_low or "macos_osx-x64" in a_low) and (a_low.endswith(".zip") or a_low.endswith(".tar.gz")):
+                return (7, a_low)
+
+            if "x64" in a_low or "amd64" in a_low or "x86_64" in a_low:
+                return (8, a_low)
+
+            if ("arm64" in a_low or "aarch64" in a_low) and (a_low.endswith(".exe") or a_low.endswith(".appimage")):
+                return (15, a_low)
+
+            if ("arm64" in a_low or "aarch64" in a_low) and not any(a_low.endswith(ext) for ext in [".zip", ".tar.gz", ".tgz", ".tar"]):
+                return (16, a_low)
+                
+            if "arm64" in a_low or "aarch64" in a_low:
+                return (20, a_low)
+            return (50, a_low)
+
         assets = rel.get("assets", [])
-        if assets:
+        sorted_assets = sorted(assets, key=_release_asset_priority_key)
+        if sorted_assets:
+            pkg_assets = [
+                a for a in sorted_assets
+                if not any((a.get("name") or "").lower().endswith(ext) for ext in [".sha256", ".sha512", ".md5", ".txt", ".sig"])
+            ]
+
             asset_lines = ["### Package Downloads"]
-            for a in assets[:5]:
+            for a in pkg_assets[:6]:
                 a_name = a.get("name", "Asset")
                 a_url = a.get("download_url") or html_url
                 a_size = a.get("size")
                 size_str = f" ({a_size // 1048576} MB)" if isinstance(a_size, int) and a_size > 0 else ""
-                asset_lines.append(f"- [{a_name}]({a_url}){size_str}")
+
+                low_name = a_name.lower()
+                badge = ""
+                if "win-x64" in low_name and low_name.endswith(".exe"):
+                    badge = " `[Windows Standalone x64]`"
+                elif "linux-x64" in low_name and low_name.endswith(".appimage"):
+                    badge = " `[Linux AppImage x64]`"
+                elif "linux-x64" in low_name and not any(low_name.endswith(e) for e in [".zip", ".tar.gz", ".tgz"]):
+                    badge = " `[Linux Binary x64]`"
+                elif "win-x64" in low_name:
+                    badge = " `[Windows Bundle x64]`"
+                elif "linux-x64" in low_name:
+                    badge = " `[Linux Bundle x64]`"
+                elif "osx-x64" in low_name:
+                    badge = " `[macOS Bundle x64]`"
+
+                asset_lines.append(f"- [{a_name}]({a_url}){size_str}{badge}")
+
             c_items.append(disnake.ui.Separator(divider=True))
             c_items.append(disnake.ui.TextDisplay("\n".join(asset_lines)))
 
         c_items.append(disnake.ui.Separator(divider=False))
         c_items.append(disnake.ui.TextDisplay("-# RBWR APR Overlay Client • Verified Release Build"))
 
+        win_x64_asset = next(
+            (a for a in sorted_assets if "win-x64" in (a.get("name") or "").lower() and (a.get("name") or "").lower().endswith(".exe")),
+            None,
+        )
+        primary_download_url = (win_x64_asset.get("download_url") if win_x64_asset else None) or download_url
+
         c_items.append(disnake.ui.ActionRow(
-            disnake.ui.Button(label="Download Latest Release", url=download_url),
-            disnake.ui.Button(label="View on GitHub", url=html_url),
+            disnake.ui.Button(label="Download Standalone (x64)", url=primary_download_url),
+            disnake.ui.Button(label="All Releases (GitHub)", url=html_url),
             disnake.ui.Button(label="Web Portal", url=DEFAULT_SERVER_BASE_URL),
         ))
 
@@ -3708,7 +3951,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             payload = await client.fetch(public_only=True)
             servers = payload.get("data", {}).get("servers", [])
         except Exception as ex:
-            await inter.followup.send(f"Error fetching fleet operational data: `{ex}`", ephemeral=ephemeral)
+            await send_interaction_error(inter, title="Fleet Registry Fault", description="Failed to retrieve fleet operational snapshot data from the central API service.", error=ex, ephemeral=ephemeral)
             return
 
         total_public = len(servers)
