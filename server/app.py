@@ -344,13 +344,7 @@ def get_accounts_payload_data():
             "discord_id": discord_id,
             "username": info.get("username") or admin_key,
             "created_at": info.get("created_at"),
-            "permissions": info.get("permissions") or {
-                "suggestions": True,
-                "crashes": True,
-                "contact": True,
-                "bans": True,
-                "servers": True
-            },
+            "permissions": normalize_permissions(info.get("permissions")),
             "notifier": info.get("notifier") or {
                 "enabled": False,
                 "categories": ["overlay", "point_graph", "server_checker", "general"]
@@ -645,11 +639,27 @@ def is_website_admin_discord_id(discord_id: str | int) -> bool:
 
     return False
 
+# sections an admin can be given access to in Accounts. The original ones default to on,
+# the Discord bot sections added later default to off until a root admin ticks them.
+LEGACY_PERMISSION_SECTIONS = ["suggestions", "crashes", "contact", "bans", "servers"]
+BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors"]
+ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
+
+
+def default_permission(section: str) -> bool:
+    return section in LEGACY_PERMISSION_SECTIONS
+
+
+def normalize_permissions(perms: dict | None) -> dict:
+    perms = perms or {}
+    return {s: bool(perms.get(s, default_permission(s))) for s in ALL_PERMISSION_SECTIONS}
+
+
 def get_user_permissions(user_identifier: str) -> dict:
     if not user_identifier:
-        return {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
+        return {s: False for s in ALL_PERMISSION_SECTIONS}
     if is_root_user(user_identifier):
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
+        return {s: True for s in ALL_PERMISSION_SECTIONS}
     
     admins_data = load_admins()
     admins_dict = admins_data.get("admins", {})
@@ -661,18 +671,9 @@ def get_user_permissions(user_identifier: str) -> dict:
                 break
                 
     if not admin_info:
-        return {"suggestions": False, "crashes": False, "contact": False, "bans": False, "servers": False}
-        
-    perms = admin_info.get("permissions")
-    if perms is None:
-        return {"suggestions": True, "crashes": True, "contact": True, "bans": True, "servers": True}
-    return {
-        "suggestions": bool(perms.get("suggestions", True)),
-        "crashes": bool(perms.get("crashes", True)),
-        "contact": bool(perms.get("contact", True)),
-        "bans": bool(perms.get("bans", True)),
-        "servers": bool(perms.get("servers", True))
-    }
+        return {s: False for s in ALL_PERMISSION_SECTIONS}
+
+    return normalize_permissions(admin_info.get("permissions"))
 
 def has_permission(user_identifier: str, section: str) -> bool:
     if not user_identifier:
@@ -837,6 +838,22 @@ def admin_required(f):
         return f(username, *args, **kwargs)
     return decorated
 
+def admin_panel_identity(username: str) -> dict:
+    """Who is using the admin panel: shown in the panel and stored as the author of what they change."""
+    discord_id = ""
+    name = username
+    picture = None
+    if has_request_context():
+        discord_id = str(session.get("discord_id") or "")
+        discord_user = session.get("discord_user") or {}
+        name = discord_user.get("global_name") or session.get("username") or username
+        picture = discord_user.get("avatar_url")
+    if discord_id and not picture:
+        info = load_admins().get("admins", {}).get(discord_id) or {}
+        picture = info.get("avatar_url")
+        name = info.get("display_name") or name
+    return {"id": discord_id or str(username), "discord_id": discord_id or None, "name": name, "picture": picture}
+
 _github_version_cache = {
     "data": None,
     "timestamp": 0.0
@@ -977,6 +994,30 @@ try:
     )
 except Exception as e:
     logger.warning(f"[Discord Bot] Failed to initialize bot from bot.py: {e}")
+
+# ---------------------------------------------------------------- admin panel: Discord bot sections
+try:
+    import bot_features
+    import admin_features
+
+    bot_features.configure(
+        is_admin=is_website_admin_discord_id,
+        is_owner=lambda d_id: bool(d_id) and str(d_id) in get_root_discord_ids(),
+        site_url=os.environ.get("SERVER_BASE_URL", "").strip() or None,
+    )
+    admin_features.init_app(
+        app,
+        get_user=get_authenticated_user,
+        has_permission=has_permission,
+        is_root=is_root_user,
+        identity=admin_panel_identity,
+        host_url=lambda: get_host_url(request),
+        load_admins=load_admins,
+        report_error=report_error_to_discord,
+        alerts_configured=lambda: bool(os.environ.get("DISCORD_BOT_TOKEN", "").strip()),
+    )
+except Exception as e:
+    logger.error(f"[Admin Panel] Failed to load the Discord bot sections: {e}", exc_info=True)
 
 def load_contact_messages():
     if not os.path.exists(CONTACT_MESSAGES_FILE):
@@ -5245,6 +5286,7 @@ def view_suggestions_dashboard(username):
         active_view="suggestions",
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
     )
 
@@ -5262,6 +5304,7 @@ def view_crashes_dashboard(username):
         active_view="crashes",
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
     )
 
@@ -5279,6 +5322,7 @@ def view_contact_dashboard(username):
         active_view="contact",
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
     )
 
@@ -5296,6 +5340,7 @@ def view_bans_dashboard(username):
         active_view="bans",
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
     )
 
@@ -5311,7 +5356,25 @@ def admin_root(username):
         active_view="overview",
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
+    )
+
+@app.route("/admin/<any(dms, moderation, automod, embeds, autorole, welcome, faq, commands, errors):section>", methods=["GET"])
+@admin_required
+def view_bot_section_dashboard(username, section):
+    if not has_permission(username, section):
+        return redirect("/admin")
+    discord_id = session.get("discord_id") or username
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view=section,
+        is_root=is_root_user(username),
+        permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
+        notifier=get_admin_notifier_config(discord_id),
     )
 
 @app.route("/admin/servers", methods=["GET"])
@@ -5332,6 +5395,7 @@ def view_servers_dashboard(username):
         initial_server_tab=initial_tab,
         is_root=is_root_user(username),
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         servers=server_cards,
         notifier=notifier_cfg
     )
@@ -5385,6 +5449,7 @@ def view_accounts_dashboard(username):
         active_view="accounts",
         is_root=True,
         permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
         notifier=notifier_cfg
     )
 
@@ -5428,13 +5493,7 @@ def create_admin_account(username):
         "discord_id": discord_id,
         "username": admin_label,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "permissions": {
-            "suggestions": True,
-            "crashes": True,
-            "contact": True,
-            "bans": True,
-            "servers": True
-        },
+        "permissions": normalize_permissions(None),
         "notifier": {
             "enabled": False,
             "categories": ["overlay", "point_graph", "server_checker", "general"]
@@ -5469,13 +5528,7 @@ def update_admin_permissions(username):
     if not admin_entry:
         return jsonify({"detail": f"Admin account '{target_id}' not found."}), 404
 
-    admin_entry["permissions"] = {
-        "suggestions": bool(payload.permissions.get("suggestions", True)),
-        "crashes": bool(payload.permissions.get("crashes", True)),
-        "contact": bool(payload.permissions.get("contact", True)),
-        "bans": bool(payload.permissions.get("bans", True)),
-        "servers": bool(payload.permissions.get("servers", True))
-    }
+    admin_entry["permissions"] = normalize_permissions({**(admin_entry.get("permissions") or {}), **payload.permissions})
     save_admins(admins_data)
     broadcast_update("accounts")
     broadcast_update("dashboard")
