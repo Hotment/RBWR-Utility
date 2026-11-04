@@ -32,6 +32,7 @@ class _Ctx:
     load_admins: Callable[[], dict] = staticmethod(lambda: {"admins": {}})
     report_error: Callable[..., bool] = staticmethod(lambda *a, **k: False)
     alerts_configured: Callable[[], bool] = staticmethod(lambda: False)
+    log_audit: Callable[..., Any] = staticmethod(lambda *a, **k: None)
 
 
 ctx = _Ctx()
@@ -431,7 +432,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/embeds/send", ["POST"], "embeds")
     def send_embed(user):
-        payload = body(EmbedSendIn)
+        payload: EmbedSendIn = body(EmbedSendIn)
         content, embed = _embed_payload(payload)
         result = bf.send_embed(payload.channel_id, content, embed, payload.allow_mentions, payload.edit_message_id)
         bf.add_embed_history({
@@ -444,11 +445,12 @@ def init_app(app: Flask, **hooks) -> None:
             "source": "web",
             "edited": bool(payload.edit_message_id),
         })
+        ctx.log_audit(user, "bot.send_embed", "bot", f"Sent embed to channel #{payload.channel_id}" + (" (edit)" if payload.edit_message_id else ""), target=f"Channel {payload.channel_id}", details={"channel_id": payload.channel_id, "edit_id": payload.edit_message_id})
         return result
 
     @route("/api/admin/embeds/templates", ["POST"], "embeds")
     def save_embed_template(user):
-        payload = body(EmbedTemplateIn)
+        payload: EmbedTemplateIn = body(EmbedTemplateIn)
         content, embed = _embed_payload(payload)
         name = payload.name.strip()
         with bf.embeds_store.edit() as data:
@@ -460,6 +462,7 @@ def init_app(app: Flask, **hooks) -> None:
                 "updated_by": display_name(user),
                 "updated_at": bf.utc_now(),
             }
+        ctx.log_audit(user, "bot.save_embed_template", "bot", f"Saved embed template '{name}'", target=name)
         return {"name": name}
 
     @route("/api/admin/embeds/templates/<path:name>", ["DELETE"], "embeds")
@@ -467,6 +470,7 @@ def init_app(app: Flask, **hooks) -> None:
         with bf.embeds_store.edit() as data:
             if data.get("templates", {}).pop(name, None) is None:
                 raise ApiError(404, "Template not found.")
+        ctx.log_audit(user, "bot.delete_embed_template", "bot", f"Deleted embed template '{name}'", target=name)
         return {"deleted": name}
 
     # ------------------------------------------------ autorole
@@ -480,15 +484,17 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/autorole", ["POST"], "autorole")
     def set_autorole(user):
-        payload = body(AutoroleIn)
+        payload: AutoroleIn = body(AutoroleIn)
         bf.set_autorole((payload.role_id or "").strip() or None, payload.enabled, payload.include_bots,
                         ctx.identity(user).get("id") or user)
+        ctx.log_audit(user, "bot.autorole_update", "bot", f"{'Enabled' if payload.enabled else 'Disabled'} autorole (role {payload.role_id or 'none'})", target="Autorole", details={"role_id": payload.role_id, "enabled": payload.enabled, "include_bots": payload.include_bots})
         return bf.autorole_overview()
 
     @route("/api/admin/autorole/sync", ["POST"], "autorole")
     def sync_autorole(user):
-        payload = body(AutoroleSyncIn)
+        payload: AutoroleSyncIn = body(AutoroleSyncIn)
         bf.start_autorole_sync(payload.include_bots, display_name(user))
+        ctx.log_audit(user, "bot.autorole_sync", "bot", "Triggered autorole synchronization", target="Autorole")
         return bf.autorole_overview()
 
     # ------------------------------------------------ welcome & goodbye
@@ -511,7 +517,7 @@ def init_app(app: Flask, **hooks) -> None:
     def set_welcome(user, kind):
         if kind not in bf.GREETING_KINDS:
             raise ApiError(404, "Unknown message.")
-        payload = body(GreetingIn)
+        payload: GreetingIn = body(GreetingIn)
         channel_id = _check_post_channel(payload.channel_id, required=payload.enabled)
         template = payload.template.strip()
         if template and template not in bf.embed_templates():
@@ -522,6 +528,7 @@ def init_app(app: Flask, **hooks) -> None:
                 "template": template or None, "avatar_thumbnail": payload.avatar_thumbnail,
                 "updated_by": display_name(user), "updated_at": bf.utc_now(),
             }
+        ctx.log_audit(user, f"bot.{kind}_update", "bot", f"Updated {kind} settings ({'enabled' if payload.enabled else 'disabled'})", target=kind.capitalize(), details={"enabled": payload.enabled, "channel_id": channel_id})
         return _greetings()
 
     @route("/api/admin/welcome/<kind>/test", ["POST"], "welcome")
@@ -542,7 +549,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/faq", ["POST"], "faq")
     def save_faq(user):
-        payload = body(FaqIn)
+        payload: FaqIn = body(FaqIn)
         name, original = payload.name.strip().lower(), payload.original.strip().lower()
         with bf.faq_store.edit() as data:
             entries = data.setdefault("entries", {})
@@ -553,6 +560,7 @@ def init_app(app: Flask, **hooks) -> None:
                 "title": payload.title.strip(), "answer": payload.answer.strip(), "uses": previous.get("uses", 0),
                 "updated_by": display_name(user), "updated_at": bf.utc_now(),
             }
+        ctx.log_audit(user, "bot.faq_save", "bot", f"Saved FAQ entry '{name}'", target=f"FAQ: {name}", details={"title": payload.title.strip()})
         return _faq_list()
 
     @route("/api/admin/faq/<name>", ["DELETE"], "faq")
@@ -560,6 +568,7 @@ def init_app(app: Flask, **hooks) -> None:
         with bf.faq_store.edit() as data:
             if data.get("entries", {}).pop(name, None) is None:
                 raise ApiError(404, "FAQ entry not found.")
+        ctx.log_audit(user, "bot.faq_delete", "bot", f"Deleted FAQ entry '{name}'", target=f"FAQ: {name}")
         return _faq_list()
 
     # ------------------------------------------------ custom commands
@@ -590,7 +599,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/commands", ["POST"], "commands")
     def save_command(user):
-        payload = body(CustomCommandIn)
+        payload: CustomCommandIn = body(CustomCommandIn)
         name, original = payload.name.strip().lower(), payload.original.strip().lower()
         aliases = list(dict.fromkeys(a.strip().lower() for a in payload.aliases if a.strip() and a.strip().lower() != name))
         if any(not re.match(COMMAND_NAME, a) or len(a) > 32 for a in aliases):
@@ -617,13 +626,15 @@ def init_app(app: Flask, **hooks) -> None:
                 "delete_trigger": payload.delete_trigger, "enabled": payload.enabled, "uses": previous.get("uses", 0),
                 "updated_by": display_name(user), "updated_at": bf.utc_now(),
             }
+        ctx.log_audit(user, "bot.command_save", "bot", f"Saved custom command '{name}'", target=f"!{name}", details={"aliases": aliases, "enabled": payload.enabled})
         return _commands_list()
 
     @route("/api/admin/commands/prefix", ["PUT"], "commands")
     def set_command_prefix(user):
-        payload = body(CommandPrefixIn)
+        payload: CommandPrefixIn = body(CommandPrefixIn)
         with bf.commands_store.edit() as data:
             data["prefix"] = payload.prefix
+        ctx.log_audit(user, "bot.command_prefix", "bot", f"Changed command prefix to '{payload.prefix}'", target="Commands", details={"prefix": payload.prefix})
         return _commands_list()
 
     @route("/api/admin/commands/<name>", ["DELETE"], "commands")
@@ -631,6 +642,7 @@ def init_app(app: Flask, **hooks) -> None:
         with bf.commands_store.edit() as data:
             if data.get("commands", {}).pop(name, None) is None:
                 raise ApiError(404, "Command not found.")
+        ctx.log_audit(user, "bot.command_delete", "bot", f"Deleted custom command '{name}'", target=f"!{name}")
         return _commands_list()
 
     # ------------------------------------------------ direct messages
@@ -658,7 +670,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/dms/<user_id>", ["POST"], "dms")
     def send_dm(user, user_id):
-        payload = body(DmIn)
+        payload: DmIn = body(DmIn)
         text = payload.message.strip()
         if not user_id.isdigit() or not text:
             raise ApiError(400, "Pick a member and write a message.")
@@ -668,6 +680,7 @@ def init_app(app: Flask, **hooks) -> None:
             {"text": text, "discord_message_id": result["message_id"], "sent_by": display_name(user)},
             incoming=False,
         )
+        ctx.log_audit(user, "bot.send_dm", "bot", f"Sent DM to Discord member {user_id}", target=f"User {user_id}", details={"user_id": user_id})
         return {"sent": True}
 
     # ------------------------------------------------ moderation
@@ -682,10 +695,12 @@ def init_app(app: Flask, **hooks) -> None:
     def moderate_member(user, user_id):
         if not user_id.isdigit():
             raise ApiError(400, "Invalid user ID.")
-        payload = body(ModerationIn)
+        payload: ModerationIn = body(ModerationIn)
         values = {"duration": payload.duration, "nick": payload.nick, "reason": payload.reason,
                   "delete_days": str(payload.delete_days)}
-        return bf.moderate_member(user_id, payload.action, values, display_name(user))
+        res = bf.moderate_member(user_id, payload.action, values, display_name(user))
+        ctx.log_audit(user, f"bot.mod_{payload.action}", "bot", f"Executed moderation '{payload.action}' on Discord member {user_id} ({payload.reason or 'no reason'})", target=f"User {user_id}", details={"action": payload.action, "user_id": user_id, "reason": payload.reason, "duration": payload.duration})
+        return res
 
     @route("/api/admin/moderation/bans", ["GET"], "moderation")
     def list_discord_bans(user):
@@ -698,14 +713,16 @@ def init_app(app: Flask, **hooks) -> None:
     def discord_unban(user, user_id):
         if not user_id.isdigit():
             raise ApiError(400, "Invalid user ID.")
-        payload = body(UnbanIn)
+        payload: UnbanIn = body(UnbanIn)
         bf.unban_user(user_id, payload.reason.strip() or None, display_name(user))
+        ctx.log_audit(user, "bot.mod_unban", "bot", f"Unbanned Discord member {user_id} ({payload.reason.strip() or 'no reason'})", target=f"User {user_id}", details={"user_id": user_id, "reason": payload.reason.strip()})
         return {"unbanned": user_id}
 
     @route("/api/admin/moderation/warnings/<int:warning_id>", ["DELETE"], "moderation")
     def remove_warning(user, warning_id):
         if not bf.remove_warning(warning_id):
             raise ApiError(404, "Warning not found.")
+        ctx.log_audit(user, "bot.mod_remove_warning", "bot", f"Removed warning #{warning_id}", target=f"Warning #{warning_id}", details={"warning_id": warning_id})
         return {"deleted": warning_id}
 
     @route("/api/admin/moderation/warn-config", ["GET"], "moderation")
@@ -714,7 +731,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/moderation/warn-config", ["PUT"], "moderation")
     def set_warn_config(user):
-        payload = body(WarnConfigIn)
+        payload: WarnConfigIn = body(WarnConfigIn)
         rules = sorted(payload.rules, key=lambda r: r.count)
         if len({r.count for r in rules}) != len(rules):
             raise ApiError(400, "Each warning count can only have one rule.")
@@ -724,7 +741,9 @@ def init_app(app: Flask, **hooks) -> None:
         config = {"expire_days": payload.expire_days,
                   "rules": [{"count": r.count, "action": r.action, "duration": r.duration.strip() if r.action == "timeout" else ""}
                             for r in rules]}
-        return bf.save_warn_config(config)
+        res = bf.save_warn_config(config)
+        ctx.log_audit(user, "bot.mod_warn_config", "bot", "Updated moderation warning rules and thresholds", target="Warn Config")
+        return res
 
     # ------------------------------------------------ automod
 
@@ -734,7 +753,7 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/automod", ["PUT"], "automod")
     def set_automod(user):
-        payload = body(AutomodIn)
+        payload: AutomodIn = body(AutomodIn)
         ids = [payload.log_channel_id, *payload.exempt_roles, *payload.exempt_channels]
         if any(i and not i.isdigit() for i in ids):
             raise ApiError(400, "Invalid channel or role ID.")
@@ -745,11 +764,12 @@ def init_app(app: Flask, **hooks) -> None:
         if payload.account_age.action == "timeout":
             _check_timeout(payload.account_age.duration, "new accounts")
         bf.save_automod_config(config)
+        ctx.log_audit(user, "bot.automod_save", "bot", "Updated automod filter rules and configuration", target="Automod")
         return bf.automod_status()
 
     @route("/api/admin/automod/test", ["POST"], "automod")
     def test_automod(user):
-        payload = body(AutomodTestIn)
+        payload: AutomodTestIn = body(AutomodTestIn)
         try:
             return {"hit": bf.automod_test(payload.text)}
         except bf.BotActionError as exc:
@@ -758,12 +778,14 @@ def init_app(app: Flask, **hooks) -> None:
     @route("/api/admin/automod/raid/end", ["POST"], "automod")
     def end_raid(user):
         bf.end_raid()
+        ctx.log_audit(user, "bot.automod_end_raid", "bot", "Manually ended automod raid lockdown", target="Automod")
         return bf.automod_status()
 
     @route("/api/admin/automod/incidents", ["DELETE"], "automod")
     def clear_automod_incidents(user):
         with bf.automod_store.edit() as data:
             data["incidents"] = []
+        ctx.log_audit(user, "bot.automod_clear_incidents", "bot", "Cleared automod incident logs", target="Automod Incidents")
         return bf.automod_status()
 
     # ------------------------------------------------ error monitor
@@ -775,13 +797,14 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/errors/<int:error_id>/status", ["POST"], "errors")
     def set_error_status(user, error_id):
-        payload = body(ErrorStatusIn)
+        payload: ErrorStatusIn = body(ErrorStatusIn)
         with bf.errors_store.edit() as data:
             entry = next((e for e in data.get("errors", []) if e.get("id") == error_id), None)
             if entry is None:
                 raise ApiError(404, "Error not found.")
             entry["resolved"] = payload.resolved
             entry["resolved_by"] = display_name(user) if payload.resolved else None
+        ctx.log_audit(user, "bot.error_status", "bot", f"{'Resolved' if payload.resolved else 'Reopened'} bot error #{error_id}", target=f"Error #{error_id}", details={"error_id": error_id, "resolved": payload.resolved})
         return {"id": error_id, "resolved": payload.resolved}
 
     @route("/api/admin/errors/<int:error_id>", ["DELETE"], "errors")
@@ -791,12 +814,14 @@ def init_app(app: Flask, **hooks) -> None:
             data["errors"] = [e for e in data.get("errors", []) if e.get("id") != error_id]
             if len(data["errors"]) == before:
                 raise ApiError(404, "Error not found.")
+        ctx.log_audit(user, "bot.error_delete", "bot", f"Deleted bot error record #{error_id}", target=f"Error #{error_id}", details={"error_id": error_id})
         return {"deleted": error_id}
 
     @route("/api/admin/errors/clear-resolved", ["POST"], "errors")
     def clear_resolved_errors(user):
         with bf.errors_store.edit() as data:
             data["errors"] = [e for e in data.get("errors", []) if not e.get("resolved")]
+        ctx.log_audit(user, "bot.error_clear_resolved", "bot", "Cleared resolved bot error records", target="Bot Errors")
         return {"ok": True}
 
     @route("/api/admin/errors/test", ["POST"], "errors")

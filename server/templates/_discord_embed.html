@@ -1,4 +1,4 @@
-{% macro standard_component_embed(title, subtitle, description, accent_color, primary_label, primary_url, secondary_label=none, secondary_url=none, icon_url=none) %}
+{% macro standard_component_embed(title, subtitle, description, accent_color, primary_label, primary_url, secondary_label=none, secondary_url=none, icon_url=none, footer_text=none) %}
 {% set color_int = accent_color | hex_to_int if accent_color else 3900150 %}
 {% set header_content = "## " ~ title ~ (("\n" ~ subtitle) if subtitle else "") %}
 {% set section_components = [{"type": 10, "content": header_content}] %}
@@ -32,6 +32,12 @@
 {% endif %}
 
 {% set inner_components = [section, separator, desc_component] %}
+{% if footer_text %}
+  {% set footer_sep = {"type": 14, "divider": false, "spacing": 1} %}
+  {% set footer_comp = {"type": 10, "content": "-# " ~ footer_text} %}
+  {% set _ = inner_components.append(footer_sep) %}
+  {% set _ = inner_components.append(footer_comp) %}
+{% endif %}
 {% if buttons | length > 0 %}
   {% set action_row = {"type": 1, "components": buttons} %}
   {% set _ = inner_components.append(action_row) %}
@@ -69,7 +75,8 @@
   u2_aprm,
   page_url="",
   browser_url="",
-  icon_url=""
+  icon_url="",
+  refreshed_at=none
 ) %}
 {% if is_private %}
   {% set color_int = 11032055 %} {# Purple #a855f7 #}
@@ -108,6 +115,11 @@
 
 {% set text_comp = {"type": 10, "content": details_md} %}
 
+{% set refresh_val = refreshed_at if refreshed_at is not none else (last_refreshed if last_refreshed is defined else none) %}
+{% set refresh_date_str = refresh_val | fmt_refreshed_date if refresh_val else ("now" | fmt_refreshed_date) %}
+{% set footer_sep = {"type": 14, "divider": false, "spacing": 1} %}
+{% set footer_comp = {"type": 10, "content": "-# Last refreshed: " ~ refresh_date_str} %}
+
 {% set buttons = [
   {"type": 2, "style": 5, "label": "View Server Metrics", "url": page_url},
   {"type": 2, "style": 5, "label": "Browse Servers", "url": browser_url}
@@ -118,7 +130,7 @@
   "component": {
     "type": 17,
     "accent_color": color_int,
-    "components": [section, separator, text_comp, action_row]
+    "components": [section, separator, text_comp, footer_sep, footer_comp, action_row]
   }
 } %}
 <script id="discord:component-embed" type="application/json">

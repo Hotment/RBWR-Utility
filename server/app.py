@@ -130,6 +130,11 @@ try:
 except ImportError:
     from calculator import calculate_reactor_metrics
 
+try:
+    from server import audit
+except ImportError:
+    import audit
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ARCHIVES_DIR = os.path.join(DATA_DIR, "archives")
@@ -140,6 +145,12 @@ CONTACT_MESSAGES_FILE = os.path.join(BASE_DIR, "contact_messages.json")
 BANNED_FILE = os.path.join(BASE_DIR, "banned_ips.json")
 CRASHES_FILE = os.path.join(BASE_DIR, "crashes.json")
 ADMINS_FILE = os.path.join(BASE_DIR, "admins.json")
+AUDIT_LOGS_FILE = os.path.join(DATA_DIR, "audit_logs.json")
+
+def _on_audit_log_entry(entry):
+    broadcast_update("audit_logs")
+
+audit.register_audit_listener(_on_audit_log_entry)
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
@@ -212,6 +223,27 @@ def fmt_score_filter(val):
         return s[:-2] if s.endswith(".0") else s
     except Exception:
         return str(val)
+
+@app.template_filter("fmt_refreshed_date")
+def fmt_refreshed_date_filter(val):
+    if not val or val == "now":
+        dt = datetime.now(timezone.utc)
+    elif isinstance(val, (int, float)):
+        dt = datetime.fromtimestamp(val, tz=timezone.utc)
+    elif isinstance(val, datetime):
+        dt = val if val.tzinfo else val.replace(tzinfo=timezone.utc)
+    else:
+        try:
+            s = str(val).strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+            if not dt.tzinfo:
+                dt = dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            dt = datetime.now(timezone.utc)
+    dt_utc = dt.astimezone(timezone.utc)
+    unix = int(dt_utc.timestamp())
+    utc_str = dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+    return f"{utc_str} (<t:{unix}:R>)"
 
 def _global_threading_excepthook(args):
     try:
@@ -352,6 +384,9 @@ def get_accounts_payload_data():
         })
     return {"admins": admins_list}
 
+def get_audit_logs_payload_data():
+    return audit.get_audit_summary()
+
 def broadcast_update(data_type):
     for conn in list(active_connections):
         ws = conn[0] if isinstance(conn, tuple) else conn
@@ -368,6 +403,13 @@ def broadcast_update(data_type):
                 payload = {
                     "type": "accounts",
                     "data": get_accounts_payload_data()
+                }
+            elif data_type == "audit_logs":
+                if uname and not is_root_user(uname):
+                    continue
+                payload = {
+                    "type": "audit_logs",
+                    "data": get_audit_logs_payload_data()
                 }
             else:
                 continue
@@ -441,7 +483,8 @@ def admin_ws(ws):
         initial_payload = {
             "type": "all",
             "dashboard": get_dashboard_payload_data(username),
-            "accounts": get_accounts_payload_data() if is_root_user(username) else None
+            "accounts": get_accounts_payload_data() if is_root_user(username) else None,
+            "audit_logs": get_audit_logs_payload_data() if is_root_user(username) else None
         }
         ws.send(json.dumps(initial_payload))
     except Exception:
@@ -611,6 +654,63 @@ def is_root_user(user_identifier: str) -> bool:
             pass
 
     return False
+
+def get_current_audit_actor(username: str | None = None) -> dict:
+    uname = username or get_authenticated_user() or (session.get("username") if has_request_context() else None) or "System"
+    d_id = (session.get("discord_id") if has_request_context() else None) or ""
+    d_user = (session.get("discord_user") if has_request_context() else {}) or {}
+    
+    avatar_url = d_user.get("avatar_url")
+    display_name = d_user.get("global_name") or uname
+    
+    if not avatar_url and d_id:
+        try:
+            admins_data = load_admins()
+            admin_rec = admins_data.get("admins", {}).get(d_id, {})
+            avatar_url = admin_rec.get("avatar_url")
+            display_name = admin_rec.get("display_name") or admin_rec.get("username") or display_name
+        except Exception:
+            pass
+
+    is_root = is_root_user(uname) or (bool(d_id) and is_root_user(d_id))
+    return {
+        "username": uname,
+        "discord_id": d_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "is_root": is_root,
+    }
+
+def get_client_ip_address() -> str:
+    if not has_request_context():
+        return "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+def log_audit_event(
+    action: str,
+    category: str,
+    description: str,
+    target: str | None = None,
+    details: dict | None = None,
+    username: str | None = None,
+    ip: str | None = None,
+) -> dict:
+    actor = get_current_audit_actor(username)
+    client_ip = ip or get_client_ip_address()
+    ua = request.headers.get("User-Agent", "") if has_request_context() else ""
+    return audit.record_audit_log(
+        actor=actor,
+        action=action,
+        category=category,
+        description=description,
+        target=target,
+        details=details,
+        ip=client_ip,
+        user_agent=ua,
+    )
 
 def is_website_admin_discord_id(discord_id: str | int) -> bool:
     """
@@ -1015,6 +1115,9 @@ try:
         load_admins=load_admins,
         report_error=report_error_to_discord,
         alerts_configured=lambda: bool(os.environ.get("DISCORD_BOT_TOKEN", "").strip()),
+        log_audit=lambda u, act, cat, desc, target=None, details=None: log_audit_event(
+            action=act, category=cat, description=desc, target=target, details=details, username=u
+        ),
     )
 except Exception as e:
     logger.error(f"[Admin Panel] Failed to load the Discord bot sections: {e}", exc_info=True)
@@ -3806,6 +3909,7 @@ def server_detail_page(job_id):
             "u1_rate": pts_info["u1_rate"],
             "u2_rate": pts_info["u2_rate"],
             "demand_rate": pts_info["demand_rate"],
+            "last_refreshed": latest_ts or datetime.now(timezone.utc).isoformat(),
         }
         return render_template("server_detail.html", **payload, **summary)
 
@@ -3858,6 +3962,7 @@ def server_detail_page(job_id):
         "u1_rate": pts_info["u1_rate"],
         "u2_rate": pts_info["u2_rate"],
         "demand_rate": pts_info["demand_rate"],
+        "last_refreshed": server.get('lastHeartbeat') or latest_ts or datetime.now(timezone.utc).isoformat(),
     }
 
     return render_template("server_detail.html", **payload, **summary)
@@ -4551,6 +4656,7 @@ def add_ticket_message_api(ticket_id):
             "message": msg_text,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+        log_audit_event("tickets.reply", "tickets", f"Posted admin reply on ticket #{ticket_id}", target=f"Ticket #{ticket_id}", details={"ticket_id": ticket_id, "message_id": new_msg_id}, username=admin_name)
     else:
         author_name = discord_user.get("global_name") or discord_user.get("username") or "Author"
         msg_obj = {
@@ -4999,6 +5105,7 @@ def update_crash_status(username):
     if updated > 0:
         save_crashes(data)
         broadcast_update("dashboard")
+        log_audit_event("crashes.status_update", "crashes", f"Updated {updated} crash report(s) status to '{payload.status}'", target=f"{updated} Crash Reports", details={"ids": sorted(list(target_ids)), "status": payload.status}, username=username)
         return jsonify({"message": f"{updated} crash report(s) updated to {payload.status}.", "status": payload.status, "count": updated})
 
     return jsonify({"detail": "No matching crash reports found."}), 404
@@ -5032,6 +5139,7 @@ def delete_crash(username):
     if deleted_count > 0:
         save_crashes(data)
         broadcast_update("dashboard")
+        log_audit_event("crashes.delete", "crashes", f"Deleted {deleted_count} crash report(s)", target=f"{deleted_count} Crash Reports", details={"ids": sorted(list(target_ids))}, username=username)
         return jsonify({"message": f"{deleted_count} crash report(s) deleted successfully.", "count": deleted_count})
 
     return jsonify({"detail": "No matching crash reports found."}), 404
@@ -5079,6 +5187,7 @@ def update_suggestion_status(username):
             s["status"] = norm_status
             save_suggestions(data)
             broadcast_update("dashboard")
+            log_audit_event("tickets.status_update", "tickets", f"Updated status of {ticket_type} #{payload.id} to '{norm_status}'", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "prev_status": prev_status, "new_status": norm_status}, username=username)
             try:
                 notify_ticket_author_dm(
                     s,
@@ -5121,6 +5230,7 @@ def update_suggestion_comment(username):
             s["comment_timestamp"] = datetime.now(timezone.utc).isoformat()
             save_suggestions(data)
             broadcast_update("dashboard")
+            log_audit_event("tickets.comment", "tickets", f"Updated admin comment on ticket #{payload.id}", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "comment": payload.comment.strip()}, username=username)
             try:
                 notify_ticket_author_dm(
                     s,
@@ -5159,6 +5269,7 @@ def update_suggestion_visibility(username):
             s["hidden"] = payload.hidden
             save_suggestions(data)
             broadcast_update("dashboard")
+            log_audit_event("tickets.visibility", "tickets", f"Set ticket #{payload.id} visibility to {'hidden' if payload.hidden else 'public'}", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "hidden": payload.hidden}, username=username)
             return jsonify({"message": f"Ticket #{payload.id} visibility updated.", "id": payload.id, "hidden": payload.hidden})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
@@ -5209,6 +5320,7 @@ def delete_suggestion(username):
 
     save_suggestions(data)
     broadcast_update("dashboard")
+    log_audit_event("tickets.delete", "tickets", f"Deleted ticket #{payload.id} ('{target_ticket.get('title')}')", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "title": target_ticket.get("title"), "type": target_ticket.get("type")}, username=username)
 
     try:
         notify_ticket_deleted(target_ticket, deleted_by=username)
@@ -5248,6 +5360,7 @@ def ban_ip(username):
     }
     save_banned_ips(data)
     broadcast_update("dashboard")
+    log_audit_event("bans.ban_ip", "bans", f"Banned IP {ip_to_ban}: {payload.reason.strip() or 'No reason provided'}", target=f"IP {ip_to_ban}", details={"ip": ip_to_ban, "reason": payload.reason.strip(), "duration_minutes": payload.duration_minutes}, username=username)
     return jsonify({"message": f"IP {ip_to_ban} has been banned.", "ip": ip_to_ban})
 
 @app.route("/admin/tickets/unban", methods=["POST"])
@@ -5268,6 +5381,7 @@ def unban_ip(username):
         del banned[payload.ip]
         save_banned_ips(data)
         broadcast_update("dashboard")
+        log_audit_event("bans.unban_ip", "bans", f"Unbanned IP {payload.ip}", target=f"IP {payload.ip}", details={"ip": payload.ip}, username=username)
         return jsonify({"message": f"IP {payload.ip} unbanned successfully.", "ip": payload.ip})
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
 
@@ -5433,7 +5547,81 @@ def toggle_server_persistence(username):
 
     save_persistent_servers(data)
     broadcast_update("dashboard")
+    log_audit_event("servers.persist_toggle", "servers", f"{'Marked' if payload.persistent else 'Removed'} persistence for server {job_id}", target=f"Server {job_id}", details={"job_id": job_id, "persistent": payload.persistent, "note": payload.note}, username=username)
     return jsonify({"success": True, "message": msg, "job_id": job_id, "is_persistent": payload.persistent})
+
+@app.route("/admin/audit-logs", methods=["GET"])
+@app.route("/admin/auditlogs", methods=["GET"])
+@admin_required
+def view_audit_logs_dashboard(username):
+    if not is_root_user(username):
+        return redirect("/admin")
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="audit-logs",
+        is_root=True,
+        permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
+        notifier=notifier_cfg,
+    )
+
+@app.route("/api/admin/audit-logs", methods=["GET"])
+@admin_required
+def api_get_audit_logs(username):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    category = request.args.get("category")
+    action = request.args.get("action")
+    actor = request.args.get("actor")
+    q = request.args.get("q")
+    try:
+        page = int(request.args.get("page", 1))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (ValueError, TypeError):
+        limit = 50
+    data = audit.query_audit_logs(
+        category=category,
+        action=action,
+        actor=actor,
+        query=q,
+        page=page,
+        limit=limit,
+    )
+    return jsonify(data)
+
+@app.route("/api/admin/audit-logs/export", methods=["GET"])
+@admin_required
+def api_export_audit_logs(username):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    logs = audit.load_raw_audit_logs()
+    filename = f"rbwr_audit_logs_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    response = Response(
+        json.dumps({"audit_logs": logs, "exported_at": datetime.now(timezone.utc).isoformat(), "exported_by": username}, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+    log_audit_event("audit.export", "system", f"Exported {len(logs)} audit logs", target="Audit Logs", username=username)
+    return response
+
+@app.route("/api/admin/audit-logs/clear", methods=["POST"])
+@admin_required
+def api_clear_audit_logs(username):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    actor = get_current_audit_actor(username)
+    ip = get_client_ip_address()
+    ua = request.headers.get("User-Agent", "") if has_request_context() else ""
+    audit.clear_audit_logs(actor, ip=ip, user_agent=ua)
+    broadcast_update("audit_logs")
+    return jsonify({"success": True, "message": "All prior audit logs have been purged."})
 
 @app.route("/admin/accounts", methods=["GET"])
 @admin_required
@@ -5501,6 +5689,7 @@ def create_admin_account(username):
     }
     save_admins(admins_data)
     broadcast_update("accounts")
+    log_audit_event("accounts.create", "accounts", f"Authorized new administrator Discord ID: {discord_id} ('{admin_label}')", target=f"Admin {discord_id}", details={"discord_id": discord_id, "label": admin_label}, username=username)
     return jsonify({"message": f"Admin with Discord ID '{discord_id}' added successfully."})
 
 @app.route("/admin/accounts/permissions", methods=["POST"])
@@ -5532,6 +5721,7 @@ def update_admin_permissions(username):
     save_admins(admins_data)
     broadcast_update("accounts")
     broadcast_update("dashboard")
+    log_audit_event("accounts.permissions_update", "accounts", f"Updated permissions for admin '{target_id}'", target=f"Admin {target_id}", details={"target_id": target_id, "permissions": payload.permissions}, username=username)
     return jsonify({"message": f"Permissions for admin '{target_id}' updated successfully."})
 
 @app.route("/admin/accounts/delete", methods=["POST"])
@@ -5562,6 +5752,7 @@ def delete_admin_account(username):
         del admins[key_to_delete]
         save_admins(admins_data)
         broadcast_update("accounts")
+        log_audit_event("accounts.delete", "accounts", f"Removed administrator account '{target_id}'", target=f"Admin {target_id}", details={"target_id": target_id, "key": key_to_delete}, username=username)
         return jsonify({"message": f"Admin account '{target_id}' removed successfully."})
     return jsonify({"detail": f"Admin account '{target_id}' not found."}), 404
 
@@ -5590,6 +5781,7 @@ def save_notifier_api(username):
         "enabled": payload.enabled,
         "categories": payload.categories
     })
+    log_audit_event("notifier.update", "notifier", f"Updated notification preferences (enabled: {payload.enabled})", target=f"Admin {discord_id}", details={"enabled": payload.enabled, "categories": payload.categories}, username=username)
     return jsonify({"success": True, "message": "Notifier preferences saved successfully."})
 
 @app.route("/api/admin/notifier/test", methods=["POST"])
@@ -5730,8 +5922,10 @@ def discord_callback():
                     admins_data["admins"][d_id]["display_name"] = d_global_name or auth_username
                     admins_data["admins"][d_id]["avatar_url"] = d_avatar_url
                     save_admins(admins_data)
+                log_audit_event("auth.discord_login", "auth", f"Administrator logged in via Discord OAuth: @{auth_username} (ID: {d_id})", target=f"@{auth_username}", username=auth_username)
                 return redirect(next_dest)
             else:
+                log_audit_event("auth.discord_denied", "auth", f"Unauthorized Discord user attempted admin login: @{auth_username} (ID: {d_id})", target=f"@{auth_username}", username=auth_username)
                 return redirect(f"/admin/login?error={quote(f'Access Denied: Discord user @{auth_username} (ID: {d_id}) is not an authorized administrator. Please contact Root.')}")
 
         if is_admin:
@@ -5778,6 +5972,7 @@ def delete_contact_message(username, msg_id):
         return jsonify({"detail": "Message not found"}), 404
     save_contact_messages({"messages": filtered})
     broadcast_update("dashboard")
+    log_audit_event("contact.delete", "contact", f"Deleted contact message #{msg_id}", target=f"Message #{msg_id}", details={"msg_id": msg_id}, username=username)
     return jsonify({"success": True})
 
 @app.route("/admin/contact/read/<msg_id>", methods=["POST"])
@@ -5797,6 +5992,7 @@ def toggle_read_contact_message(username, msg_id):
         return jsonify({"detail": "Message not found"}), 404
     save_contact_messages({"messages": messages})
     broadcast_update("dashboard")
+    log_audit_event("contact.mark_read", "contact", f"Toggled read state for contact message #{msg_id}", target=f"Message #{msg_id}", details={"msg_id": msg_id}, username=username)
     return jsonify({"success": True})
 
 _login_attempts = {}
@@ -5879,12 +6075,14 @@ def admin_login():
             session["admin_logged_in"] = True
             session["username"] = username
             session["is_root"] = is_root_user(username)
+            log_audit_event("auth.login", "auth", f"Administrator logged in via username/password: {username}", target=username, username=username, ip=ip)
             
             if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
                 next_url = "/admin"
             return redirect(next_url)
         else:
             record_login_attempt(ip)
+            log_audit_event("auth.login_failed", "auth", f"Failed admin login attempt for user: '{username}'", target=username, username=username, ip=ip)
             error = "Invalid username or secret key credentials. Note: Admins are required to authenticate with Discord."
             
     return render_template(
@@ -5897,6 +6095,8 @@ def admin_login():
 
 @app.route("/admin/logout", methods=["GET"])
 def admin_logout():
+    uname = session.get("username") or "Administrator"
+    log_audit_event("auth.logout", "auth", f"Administrator logged out: {uname}", target=uname, username=uname)
     session.clear()
     return redirect("/admin/login")
 

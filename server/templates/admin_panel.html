@@ -271,6 +271,17 @@
                 </svg>
                 <span class="whitespace-nowrap">Accounts</span>
             </a>
+
+            <a href="/admin/audit-logs" id="nav-audit-logs"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view in ['audit-logs', 'auditlogs'] %}bg-amber-600/10 text-amber-400 border border-amber-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition shrink-0" fill="none"
+                    stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
+                </svg>
+                <span class="whitespace-nowrap">Audit Logs</span>
+            </a>
             {% endif %}
 
             {% if permissions.dms %}
@@ -548,6 +559,50 @@
                     <div class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg></div>
                     <h2 class="text-xl font-bold tracking-wide font-display text-white">Custom Commands</h2>
                     <p class="text-sm text-gray-400 leading-relaxed">Prefix commands like !bug that post a saved text or embed.</p>
+                </a>
+                {% endif %}
+
+                {% if is_root %}
+                <a href="/admin/accounts" id="card-link-accounts"
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div
+                        class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition duration-300 shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-blue-400 transition duration-300 whitespace-nowrap">
+                            Admin Accounts</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed mt-2">
+                        Manage administrator accounts, permissions, and Discord authorization IDs.
+                    </p>
+                </a>
+
+                <a href="/admin/audit-logs" id="card-link-audit-logs"
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div
+                        class="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition duration-300 shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-amber-400 transition duration-300 whitespace-nowrap">
+                            Audit Logs</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed mt-2">
+                        Inspect detailed chronological records of administrator operations, security events, and configuration modifications.
+                    </p>
                 </a>
                 {% endif %}
             </div>
@@ -882,6 +937,155 @@
                         Administrators</h3>
                     <div id="accounts-list-container" class="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
                         <p class="text-xs text-slate-500 italic font-mono">Loading accounts...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <main id="view-audit-logs"
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view not in ['audit-logs', 'auditlogs'] %}hidden{% endif %}">
+            <header
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Audit Logs</h2>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase tracking-wider">Root / Owner Access</span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono mt-1">Trace administrative activities, security interventions, configuration edits, and bot dispatches.</p>
+                </div>
+                <div class="flex items-center gap-3 font-mono text-xs flex-wrap">
+                    <button type="button" onclick="loadAuditLogs(currentAuditPage)"
+                        class="px-3.5 py-2 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span>Refresh</span>
+                    </button>
+                    <a href="/api/admin/audit-logs/export" download
+                        class="px-3.5 py-2 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 hover:text-amber-200 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 tracking-wide font-medium text-xs transition whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                        <span>Export JSON</span>
+                    </a>
+                    <button type="button" onclick="openClearAuditLogsModal()"
+                        class="px-3.5 py-2 border border-rose-500/30 hover:border-rose-500/50 text-rose-300 hover:text-rose-200 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 tracking-wide font-medium text-xs transition whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                        <span>Purge Logs</span>
+                    </button>
+                    <a href="/"
+                        class="px-3.5 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap">Home Site</a>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col gap-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Total Recorded Events</span>
+                    <span id="audit-stat-total" class="text-2xl font-bold font-display text-white">0</span>
+                    <span class="text-[10px] text-slate-500 font-mono">Retained log history</span>
+                </div>
+                <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col gap-1">
+                    <span class="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">Events Today (24h)</span>
+                    <span id="audit-stat-today" class="text-2xl font-bold font-display text-amber-400">0</span>
+                    <span class="text-[10px] text-slate-500 font-mono">Past 24 hours</span>
+                </div>
+                <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col gap-1">
+                    <span class="text-[10px] uppercase font-bold text-blue-400 font-mono tracking-wider">Recorded Actors</span>
+                    <span id="audit-stat-actors" class="text-2xl font-bold font-display text-blue-400">0</span>
+                    <span class="text-[10px] text-slate-500 font-mono">Unique administrator entities</span>
+                </div>
+                <div class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col gap-1">
+                    <span class="text-[10px] uppercase font-bold text-rose-400 font-mono tracking-wider">Security Interventions</span>
+                    <span id="audit-stat-security" class="text-2xl font-bold font-display text-rose-400">0</span>
+                    <span class="text-[10px] text-slate-500 font-mono">Auth, bans, permission changes</span>
+                </div>
+            </div>
+
+            <div class="cyber-panel p-4 sm:p-5 rounded-xl border border-white/5 flex flex-col gap-4">
+                <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                    <div class="relative grow max-w-xl">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                        </div>
+                        <input type="text" id="audit-search-input" oninput="handleAuditSearchInput(event)"
+                            placeholder="Filter by actor, action, target, keyword, IP, JSON data..."
+                            class="w-full pl-9 pr-8 py-2.5 bg-black/30 border border-white/10 rounded-lg text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition">
+                        <button type="button" id="audit-search-clear-btn" onclick="clearAuditSearch()"
+                            class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-white">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0 font-mono text-xs">
+                        <span class="text-slate-400 text-[11px]">Rows:</span>
+                        <select id="audit-limit-select" onchange="changeAuditLimit(this.value)"
+                            class="bg-black/30 border border-white/10 rounded-lg px-2.5 py-2 text-slate-300 text-xs font-mono focus:outline-none focus:border-amber-500/50 transition">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 font-mono text-xs scrollbar-none" id="audit-category-pills">
+                    <button type="button" onclick="setAuditCategory('all')" id="audit-cat-all"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-amber-500/20 text-amber-300 border-amber-500/40">All</button>
+                    <button type="button" onclick="setAuditCategory('tickets')" id="audit-cat-tickets"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Tickets</button>
+                    <button type="button" onclick="setAuditCategory('bans')" id="audit-cat-bans"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Bans</button>
+                    <button type="button" onclick="setAuditCategory('crashes')" id="audit-cat-crashes"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Crashes</button>
+                    <button type="button" onclick="setAuditCategory('contact')" id="audit-cat-contact"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Contact</button>
+                    <button type="button" onclick="setAuditCategory('servers')" id="audit-cat-servers"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Servers</button>
+                    <button type="button" onclick="setAuditCategory('accounts')" id="audit-cat-accounts"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Accounts</button>
+                    <button type="button" onclick="setAuditCategory('bot')" id="audit-cat-bot"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Bot</button>
+                    <button type="button" onclick="setAuditCategory('auth')" id="audit-cat-auth"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">Auth</button>
+                    <button type="button" onclick="setAuditCategory('system')" id="audit-cat-system"
+                        class="px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10">System</button>
+                </div>
+            </div>
+
+            <div class="cyber-panel rounded-xl border border-white/5 overflow-hidden flex flex-col">
+                <div id="audit-loading-indicator" class="hidden py-3 px-4 bg-blue-500/10 border-b border-blue-500/20 text-xs font-mono text-blue-400 flex items-center gap-2">
+                    <svg class="w-4 h-4 animate-spin text-blue-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    <span>Refreshing audit log entries...</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-black/40 border-b border-white/5 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            <tr>
+                                <th class="py-3 px-4 whitespace-nowrap">Timestamp</th>
+                                <th class="py-3 px-4 whitespace-nowrap">Administrator</th>
+                                <th class="py-3 px-4 whitespace-nowrap">Category / Action</th>
+                                <th class="py-3 px-4 whitespace-nowrap">Target</th>
+                                <th class="py-3 px-4 min-w-[280px]">Summary</th>
+                                <th class="py-3 px-4 whitespace-nowrap">Client IP</th>
+                                <th class="py-3 px-4 text-right whitespace-nowrap">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-logs-table-body" class="divide-y divide-white/5">
+                            <tr>
+                                <td colspan="7" class="py-12 text-center text-slate-500 italic">
+                                    Loading audit logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-4 border-t border-white/5 bg-black/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+                    <div class="text-slate-400 text-[11px]" id="audit-pagination-info">
+                        Showing 0 to 0 of 0 entries
+                    </div>
+                    <div class="flex items-center gap-2" id="audit-pagination-controls">
+                        <button type="button" id="audit-prev-btn" onclick="prevAuditPage()" disabled
+                            class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-400 disabled:opacity-40 disabled:cursor-not-allowed hover:text-white hover:bg-white/10 transition text-xs font-semibold">Previous</button>
+                        <div id="audit-page-numbers" class="flex items-center gap-1"></div>
+                        <button type="button" id="audit-next-btn" onclick="nextAuditPage()" disabled
+                            class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-400 disabled:opacity-40 disabled:cursor-not-allowed hover:text-white hover:bg-white/10 transition text-xs font-semibold">Next</button>
                     </div>
                 </div>
             </div>
@@ -1520,6 +1724,7 @@
             });
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
+                bindNavLink('nav-audit-logs', 'audit-logs', '/admin/audit-logs');
             }
 
             const initialServerTab = '{{ initial_server_tab | default("all") }}';
@@ -1557,6 +1762,23 @@
                     e.preventDefault();
                     navigateToView('bans', '/admin/bans');
                 });
+            }
+
+            if (IS_ROOT) {
+                const cardAcc = document.getElementById('card-link-accounts');
+                if (cardAcc) {
+                    cardAcc.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateToView('accounts', '/admin/accounts');
+                    });
+                }
+                const cardAud = document.getElementById('card-link-audit-logs');
+                if (cardAud) {
+                    cardAud.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateToView('audit-logs', '/admin/audit-logs');
+                    });
+                }
             }
 
             if (window.AdminBot) AdminBot.show(activeView);
@@ -1601,6 +1823,12 @@
                 } else {
                     navigateToView('overview', '/admin', false);
                 }
+            } else if (path === '/admin/audit-logs' || path === '/admin/auditlogs') {
+                if (IS_ROOT) {
+                    navigateToView('audit-logs', path, false);
+                } else {
+                    navigateToView('overview', '/admin', false);
+                }
             } else {
                 navigateToView('overview', path, false);
             }
@@ -1629,6 +1857,8 @@
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-amber-600/10 text-amber-400 border border-amber-500/20 transition group";
                 } else if (viewName === 'servers') {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 transition group";
+                } else if (viewName === 'audit-logs') {
+                    activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-amber-600/10 text-amber-400 border border-amber-500/20 transition group";
                 } else {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-blue-600/10 text-blue-500 border border-blue-500/20 transition group";
                 }
@@ -1638,10 +1868,13 @@
             if (latestData) {
                 updateStats(latestData);
             }
+            if (viewName === 'audit-logs' && IS_ROOT) {
+                loadAuditLogs(currentAuditPage);
+            }
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'audit-logs', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -2236,6 +2469,9 @@
                         if (IS_ROOT && message.accounts) {
                             renderAccounts(message.accounts.admins);
                         }
+                        if (IS_ROOT && message.audit_logs) {
+                            updateAuditStats(message.audit_logs);
+                        }
                     } else if (message.type === 'dashboard') {
                         latestData = message.data;
                         bannedIps = message.data.banned_ips;
@@ -2248,6 +2484,14 @@
                     } else if (message.type === 'accounts') {
                         if (IS_ROOT && message.data) {
                             renderAccounts(message.data.admins);
+                        }
+                    } else if (message.type === 'audit_logs') {
+                        if (IS_ROOT) {
+                            if (activeView === 'audit-logs' && currentAuditPage === 1 && !currentAuditQuery && currentAuditCategory === 'all') {
+                                loadAuditLogs(1, true);
+                            } else if (message.data) {
+                                updateAuditStats(message.data);
+                            }
                         }
                     }
                 } catch (err) {
@@ -3502,7 +3746,6 @@
                                 <button onclick="deleteAdmin('${dId}')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg uppercase border border-rose-500/20 font-bold transition text-[11px]">Remove Admin</button>
                             </div>
 
-                            <!-- Role Presets Row -->
                             <div class="flex items-center justify-between gap-2 flex-wrap border-t border-b border-white/5 py-2.5">
                                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Quick Presets:</span>
                                 <div class="flex items-center gap-1.5 flex-wrap">
@@ -3514,7 +3757,6 @@
                                 </div>
                             </div>
 
-                            <!-- Categorized Permission Grid -->
                             <div class="flex flex-col gap-3.5">
                                 ${PERM_GROUPS.map(group => `
                                     <div class="flex flex-col gap-2">
@@ -3659,7 +3901,404 @@
                 }
             };
         }
+        
+        let currentAuditPage = 1;
+        let currentAuditLimit = 50;
+        let currentAuditCategory = 'all';
+        let currentAuditQuery = '';
+        let auditSearchDebounceTimer = null;
+        let auditLogsCache = [];
+
+        const AUDIT_CATEGORY_COLORS = {
+            tickets: { badge: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+            bans: { badge: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
+            crashes: { badge: 'bg-red-500/15 text-red-400 border-red-500/30' },
+            contact: { badge: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+            servers: { badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+            accounts: { badge: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
+            bot: { badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+            auth: { badge: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
+            system: { badge: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+            notifier: { badge: 'bg-sky-500/15 text-sky-400 border-sky-500/30' },
+        };
+
+        function formatAuditRelativeTime(iso) {
+            const t = Date.parse(iso);
+            if (!t) return '';
+            const s = Math.max(0, (Date.now() - t) / 1000);
+            if (s < 45) return 'just now';
+            if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+            if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+            if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+            return new Date(t).toLocaleDateString('en-US');
+        }
+
+        function formatAuditFullTimestamp(iso) {
+            const t = Date.parse(iso);
+            if (!t) return '';
+            const d = new Date(t);
+            return d.toISOString().replace('T', ' ').replace('Z', ' UTC');
+        }
+
+        async function loadAuditLogs(page = 1, silent = false) {
+            if (!IS_ROOT) return;
+            currentAuditPage = page;
+            const loadingIndicator = document.getElementById('audit-loading-indicator');
+            const tbody = document.getElementById('audit-logs-table-body');
+            if (!silent && loadingIndicator) loadingIndicator.classList.remove('hidden');
+
+            try {
+                const params = new URLSearchParams({
+                    page: String(currentAuditPage),
+                    limit: String(currentAuditLimit),
+                });
+                if (currentAuditCategory && currentAuditCategory !== 'all') {
+                    params.set('category', currentAuditCategory);
+                }
+                if (currentAuditQuery) {
+                    params.set('q', currentAuditQuery);
+                }
+
+                const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+                if (!res.ok) {
+                    if (res.status === 403) return;
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                auditLogsCache = data.logs || [];
+                renderAuditLogs(data);
+                renderAuditPagination(data);
+                if (data.stats) updateAuditStats(data.stats);
+            } catch (err) {
+                console.error('Failed to load audit logs:', err);
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-rose-400 font-mono text-xs">
+                                Error connecting to audit logging subsystem. Please refresh.
+                            </td>
+                        </tr>
+                    `;
+                }
+            } finally {
+                if (loadingIndicator) loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        function updateAuditStats(stats) {
+            if (!stats) return;
+            const elTotal = document.getElementById('audit-stat-total');
+            const elToday = document.getElementById('audit-stat-today');
+            const elActors = document.getElementById('audit-stat-actors');
+            const elSec = document.getElementById('audit-stat-security');
+            if (elTotal) elTotal.textContent = Number(stats.total_stored ?? stats.total ?? 0).toLocaleString();
+            if (elToday) elToday.textContent = Number(stats.today_count ?? 0).toLocaleString();
+            if (elActors) elActors.textContent = Number(stats.unique_actors ?? 0).toLocaleString();
+            if (elSec) elSec.textContent = Number(stats.security_events ?? 0).toLocaleString();
+        }
+
+        function renderAuditLogs(data) {
+            const tbody = document.getElementById('audit-logs-table-body');
+            if (!tbody) return;
+            const logs = data.logs || [];
+
+            if (logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-12 text-center text-slate-500 italic font-mono text-xs">
+                            No audit log records match the current filter criteria.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            for (const item of logs) {
+                const id = escapeHtml(item.id || '');
+                const ts = item.timestamp || '';
+                const relTime = formatAuditRelativeTime(ts);
+                const fullTime = formatAuditFullTimestamp(ts);
+                const category = escapeHtml(item.category || 'system');
+                const action = escapeHtml(item.action || '');
+                const target = escapeHtml(item.target || '-');
+                const desc = escapeHtml(item.description || '');
+                const ip = escapeHtml(item.ip || 'unknown');
+                const actor = item.actor || {};
+                const actorName = escapeHtml(actor.display_name || actor.username || 'System');
+                const actorUser = escapeHtml(actor.username || '');
+                const isRoot = bool(actor.is_root);
+                const avatarUrl = actor.avatar_url;
+                const hasDetails = item.details && Object.keys(item.details).length > 0;
+
+                const catStyle = AUDIT_CATEGORY_COLORS[item.category] || { badge: 'bg-white/10 text-slate-300 border-white/20' };
+
+                let avatarHtml = '';
+                if (avatarUrl) {
+                    avatarHtml = `<img src="${escapeHtml(avatarUrl)}" class="w-6 h-6 rounded-full object-cover shrink-0 border border-white/10" alt="">`;
+                } else {
+                    const initial = (actorName.charAt(0) || 'S').toUpperCase();
+                    avatarHtml = `<div class="w-6 h-6 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center font-bold text-[10px] text-slate-300 shrink-0">${initial}</div>`;
+                }
+
+                html += `
+                    <tr class="hover:bg-white/[0.02] transition border-b border-white/5 group">
+                        <td class="py-3 px-4 whitespace-nowrap text-slate-400 text-[11px]" title="${fullTime}">
+                            <div class="flex flex-col">
+                                <span class="text-slate-200 font-semibold">${relTime}</span>
+                                <span class="text-[9px] text-slate-500 font-mono">${fullTime.split(' ')[1] || ''}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                ${avatarHtml}
+                                <div class="flex flex-col leading-tight">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold text-slate-200 text-xs">${actorName}</span>
+                                        ${isRoot ? '<span class="px-1.5 py-0.2 rounded text-[8px] font-bold font-mono bg-amber-500/20 text-amber-400 border border-amber-500/30">ROOT</span>' : ''}
+                                    </div>
+                                    ${actorUser && actorUser !== actorName ? `<span class="text-[10px] text-slate-500 font-mono">@${actorUser}</span>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${catStyle.badge}">${category}</span>
+                                <span class="text-[10px] text-slate-400 font-mono tracking-tight">${action}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-slate-300">
+                            ${target !== '-' ? `<span class="px-2 py-0.5 rounded bg-black/40 border border-white/10 text-amber-300/90">${target}</span>` : '<span class="text-slate-600">-</span>'}
+                        </td>
+                        <td class="py-3 px-4 text-xs text-slate-300 leading-normal">
+                            ${desc}
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-slate-400">
+                            <span class="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[10px]">${ip}</span>
+                        </td>
+                        <td class="py-3 px-4 text-right whitespace-nowrap">
+                            <button type="button" onclick="toggleAuditDetails('${id}')"
+                                class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition text-[10px] font-mono font-medium">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                    <tr id="audit-details-${id}" class="hidden bg-black/40 border-b border-white/5">
+                        <td colspan="7" class="p-4">
+                            <div class="p-4 rounded-lg bg-black/50 border border-white/10 flex flex-col gap-3 font-mono text-xs">
+                                <div class="flex items-center justify-between border-b border-white/5 pb-2 text-[10px] text-slate-400">
+                                    <div class="flex items-center gap-3">
+                                        <span>EVENT ID: <code class="text-amber-400 font-bold">${id}</code></span>
+                                        <span>TIMESTAMP: <code class="text-slate-300">${fullTime}</code></span>
+                                    </div>
+                                    <span>CLIENT UA: <code class="text-slate-400">${escapeHtml(item.user_agent || 'unknown')}</code></span>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Structured Event Payload:</span>
+                                    <pre class="p-3 bg-black/80 rounded border border-white/5 text-slate-300 text-[11px] overflow-x-auto leading-relaxed max-h-60 overflow-y-auto"><code>${escapeHtml(JSON.stringify(item.details || {}, null, 2))}</code></pre>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        function bool(val) {
+            return val === true || val === 'true';
+        }
+
+        function toggleAuditDetails(id) {
+            const row = document.getElementById(`audit-details-${id}`);
+            if (row) {
+                row.classList.toggle('hidden');
+            }
+        }
+
+        function renderAuditPagination(data) {
+            const info = document.getElementById('audit-pagination-info');
+            const prevBtn = document.getElementById('audit-prev-btn');
+            const nextBtn = document.getElementById('audit-next-btn');
+            const numbers = document.getElementById('audit-page-numbers');
+
+            const page = data.page || 1;
+            const pages = data.pages || 1;
+            const total = data.total || 0;
+            const limit = data.limit || 50;
+
+            const start = total === 0 ? 0 : (page - 1) * limit + 1;
+            const end = Math.min(total, page * limit);
+
+            if (info) {
+                info.textContent = `Showing ${start.toLocaleString()} to ${end.toLocaleString()} of ${total.toLocaleString()} entries`;
+            }
+
+            if (prevBtn) prevBtn.disabled = page <= 1;
+            if (nextBtn) nextBtn.disabled = page >= pages;
+
+            if (numbers) {
+                let html = '';
+                const maxButtons = 5;
+                let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+                let endPage = Math.min(pages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                    const isActive = i === page;
+                    html += `
+                        <button type="button" onclick="loadAuditLogs(${i})"
+                            class="px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition ${
+                                isActive
+                                    ? 'bg-amber-600 text-white border-amber-500 shadow-sm'
+                                    : 'border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
+                            }">
+                            ${i}
+                        </button>
+                    `;
+                }
+                numbers.innerHTML = html;
+            }
+        }
+
+        function prevAuditPage() {
+            if (currentAuditPage > 1) {
+                loadAuditLogs(currentAuditPage - 1);
+            }
+        }
+
+        function nextAuditPage() {
+            loadAuditLogs(currentAuditPage + 1);
+        }
+
+        function setAuditCategory(cat) {
+            currentAuditCategory = cat;
+            const pills = document.querySelectorAll('#audit-category-pills button');
+            pills.forEach((btn) => {
+                const id = btn.id.replace('audit-cat-', '');
+                if (id === cat) {
+                    btn.className = 'px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-amber-500/20 text-amber-300 border-amber-500/40';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase transition tracking-wider bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10';
+                }
+            });
+            loadAuditLogs(1);
+        }
+
+        function handleAuditSearchInput(e) {
+            clearTimeout(auditSearchDebounceTimer);
+            const val = e.target.value.trim();
+            const clearBtn = document.getElementById('audit-search-clear-btn');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+            auditSearchDebounceTimer = setTimeout(() => {
+                currentAuditQuery = val;
+                loadAuditLogs(1);
+            }, 300);
+        }
+
+        function clearAuditSearch() {
+            const input = document.getElementById('audit-search-input');
+            const clearBtn = document.getElementById('audit-search-clear-btn');
+            if (input) input.value = '';
+            if (clearBtn) clearBtn.classList.add('hidden');
+            currentAuditQuery = '';
+            loadAuditLogs(1);
+        }
+
+        function changeAuditLimit(val) {
+            currentAuditLimit = parseInt(val, 10) || 50;
+            loadAuditLogs(1);
+        }
+
+        function openClearAuditLogsModal() {
+            const modal = document.getElementById('clear-audit-modal');
+            const input = document.getElementById('clear-audit-confirm-input');
+            const btn = document.getElementById('clear-audit-confirm-btn');
+            if (input) input.value = '';
+            if (btn) btn.disabled = true;
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeClearAuditLogsModal() {
+            const modal = document.getElementById('clear-audit-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function handleClearAuditInput(e) {
+            const val = e.target.value.trim().toUpperCase();
+            const btn = document.getElementById('clear-audit-confirm-btn');
+            if (btn) {
+                btn.disabled = val !== 'PURGE';
+            }
+        }
+
+        async function executeClearAuditLogs() {
+            const btn = document.getElementById('clear-audit-confirm-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Purging...';
+            }
+
+            try {
+                const res = await fetch('/api/admin/audit-logs/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    closeClearAuditLogsModal();
+                    loadAuditLogs(1);
+                    alert(data.message || 'Audit logs cleared successfully.');
+                } else {
+                    alert(data.detail || 'Failed to clear audit logs.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error while clearing audit logs.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Purge Logs';
+                }
+            }
+        }
+    
     </script>
+    <div id="clear-audit-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="cyber-panel p-6 sm:p-8 rounded-2xl max-w-md w-full border border-rose-500/30 flex flex-col gap-5 shadow-2xl shadow-rose-950/50">
+            <div class="flex items-center gap-3 text-rose-400">
+                <div class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold font-display text-white">Purge All Audit Logs</h3>
+                    <span class="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold">Irreversible Action</span>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-300 font-mono leading-relaxed">
+                You are about to permanently purge the complete audit log history. This operation is restricted to Root and will be permanently recorded as a fresh entry in the new log sequence.
+            </p>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-[11px] font-mono text-slate-400 uppercase font-bold">Type <span class="text-rose-400 font-bold">PURGE</span> to confirm:</label>
+                <input type="text" id="clear-audit-confirm-input" placeholder="Type PURGE here"
+                    oninput="handleClearAuditInput(event)"
+                    class="p-3 bg-black/40 border border-white/10 rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-rose-500 transition">
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-2 font-mono text-xs">
+                <button type="button" onclick="closeClearAuditLogsModal()"
+                    class="px-4 py-2.5 rounded-lg border border-white/10 hover:bg-white/5 text-slate-300 font-semibold transition">Cancel</button>
+                <button type="button" id="clear-audit-confirm-btn" onclick="executeClearAuditLogs()" disabled
+                    class="px-5 py-2.5 rounded-lg bg-rose-600 text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-rose-500 transition shadow-lg shadow-rose-600/20">Purge Logs</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
