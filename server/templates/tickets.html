@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Tickets & Feedback{% endblock %}
+{% block title %}Support Tickets & Feedback | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/tickets">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Support Tickets & Feedback", "url": "https://rbwr.hotment.dev/tickets"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Submit suggestions and report bugs for RBWR Utility and the APRM Overlay. Track resolution progress, chat with admins, and follow developer status.">
+<meta name="description" content="Submit feature suggestions and report software bugs for RBWR Utility. Track developer resolution status, discussion comments, and project roadmap updates.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">

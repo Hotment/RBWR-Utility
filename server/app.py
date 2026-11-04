@@ -1332,6 +1332,97 @@ def favicon():
         mimetype="image/vnd.microsoft.icon"
     )
 
+@app.route("/robots.txt", methods=["GET"])
+def robots_txt():
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin\n"
+        "Disallow: /api/admin/\n"
+        "Disallow: /auth/\n\n"
+        "User-agent: Googlebot\n"
+        "Allow: /\n\n"
+        "Sitemap: https://rbwr.hotment.dev/sitemap.xml\n"
+    )
+    return Response(body, mimetype="text/plain; charset=utf-8")
+
+@app.route("/sitemap.xml", methods=["GET"])
+def sitemap_xml():
+    base_url = "https://rbwr.hotment.dev"
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    pages = [
+        {"loc": f"{base_url}/", "changefreq": "daily", "priority": "1.0", "lastmod": now_iso},
+        {"loc": f"{base_url}/calculator", "changefreq": "weekly", "priority": "0.9", "lastmod": now_iso},
+        {"loc": f"{base_url}/points", "changefreq": "weekly", "priority": "0.9", "lastmod": now_iso},
+        {"loc": f"{base_url}/servers", "changefreq": "always", "priority": "0.9", "lastmod": now_iso},
+        {"loc": f"{base_url}/operator-tablet", "changefreq": "weekly", "priority": "0.8", "lastmod": now_iso},
+        {"loc": f"{base_url}/points-graph", "changefreq": "daily", "priority": "0.8", "lastmod": now_iso},
+        {"loc": f"{base_url}/archives", "changefreq": "daily", "priority": "0.7", "lastmod": now_iso},
+        {"loc": f"{base_url}/tickets", "changefreq": "daily", "priority": "0.7", "lastmod": now_iso},
+        {"loc": f"{base_url}/contact", "changefreq": "monthly", "priority": "0.6", "lastmod": now_iso},
+        {"loc": f"{base_url}/privacy", "changefreq": "monthly", "priority": "0.5", "lastmod": now_iso},
+        {"loc": f"{base_url}/credits", "changefreq": "monthly", "priority": "0.5", "lastmod": now_iso},
+    ]
+
+    try:
+        servers_data = get_sc_data("servers.json") or {}
+        active_servers = servers_data.get("servers", [])
+        if not active_servers and _sc_latest_data:
+            active_servers = _sc_latest_data.get("data", {}).get("servers", [])
+        for s in active_servers:
+            jid = s.get("jobId")
+            if jid and not s.get("isPrivate", False):
+                hb = s.get("lastHeartbeat")
+                lastmod = now_iso
+                if hb:
+                    try:
+                        lastmod = hb.split("T")[0]
+                    except Exception:
+                        pass
+                pages.append({
+                    "loc": f"{base_url}/servers/{jid}",
+                    "lastmod": lastmod,
+                    "changefreq": "hourly",
+                    "priority": "0.8"
+                })
+    except Exception as e:
+        logger.warning(f"Error adding servers to sitemap: {e}")
+
+    try:
+        if os.path.exists(ARCHIVES_DIR):
+            for fname in sorted(os.listdir(ARCHIVES_DIR), reverse=True):
+                if fname.startswith("servers_") and (fname.endswith(".json") or fname.endswith(".json.gz")):
+                    d_str = fname.replace("servers_", "").replace(".json.gz", "").replace(".json", "")
+                    if re.match(r"^\d{4}-\d{2}-\d{2}$", d_str):
+                        pages.append({
+                            "loc": f"{base_url}/archives/{d_str}",
+                            "lastmod": d_str,
+                            "changefreq": "monthly",
+                            "priority": "0.6"
+                        })
+    except Exception as e:
+        logger.warning(f"Error adding archives to sitemap: {e}")
+
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    ]
+    for p in pages:
+        xml_lines.append("  <url>")
+        xml_lines.append(f"    <loc>{p['loc']}</loc>")
+        if "lastmod" in p:
+            xml_lines.append(f"    <lastmod>{p['lastmod']}</lastmod>")
+        if "changefreq" in p:
+            xml_lines.append(f"    <changefreq>{p['changefreq']}</changefreq>")
+        if "priority" in p:
+            xml_lines.append(f"    <priority>{p['priority']}</priority>")
+        xml_lines.append("  </url>")
+    xml_lines.append("</urlset>")
+
+    xml_content = "\n".join(xml_lines)
+    return Response(xml_content, mimetype="application/xml; charset=utf-8")
+
 @app.route("/api/status", methods=["GET", "HEAD"])
 def status_check():
     uptime_sec = max(0.0, round(time.time() - SERVER_START_TIME, 2))

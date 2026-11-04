@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Contact Admin{% endblock %}
+{% block title %}Contact Administrator | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/contact">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Contact Administrator", "url": "https://rbwr.hotment.dev/contact"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Send a private, confidential message directly to the administrator of RBWR Utility.">
+<meta name="description" content="Get in touch directly with the RBWR Utility development team. Send private inquiries, security reports, administrative feedback, or general questions.">
 <meta name="theme-color" content="#8b5cf6">
 
 <meta property="og:type" content="website">
@@ -32,7 +41,6 @@
 {% endblock %}
 
 {% block extra_head %}
-<meta name="description" content="Send a private, confidential message directly to the administrator of RBWR Utility.">
 <style>
     .contact-card {
         background: rgba(18, 18, 23, 0.85);

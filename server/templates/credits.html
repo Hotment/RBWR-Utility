@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Credits & Acknowledgements{% endblock %}
+{% block title %}Credits & Acknowledgements | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/credits">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Credits & Acknowledgements", "url": "https://rbwr.hotment.dev/credits"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Credits and acknowledgements for RBWR Utility and the RBWR APRM Calculator desktop application.">
+<meta name="description" content="Acknowledgements and credits for the developers, open-source libraries, contributors, and community members behind RBWR Utility and its desktop client.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">

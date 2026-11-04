@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Thermal Calculator{% endblock %}
+{% block title %}Reactor Thermal Calculator | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/calculator">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Reactor Thermal Calculator", "url": "https://rbwr.hotment.dev/calculator"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Calculate RBWR reactor thermal power (MWth), steam flow, feedwater requirements, and APRM percentage accurately in real-time.">
+<meta name="description" content="Calculate RBWR reactor thermal power in MWth, steam flow rates, core recirculation, and APRM percentage with real-time physics solver equations.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">

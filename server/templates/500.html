@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - 500 Internal Server Error{% endblock %}
+{% block title %}500 Internal Server Error | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/500">
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="500 - Internal Server Error on RBWR Utility.">
+<meta name="description" content="An unexpected server error occurred while processing your request. Please return to the homepage, check our server status, or contact support.">
 <meta name="theme-color" content="#ef4444">
 
 <meta property="og:type" content="website">

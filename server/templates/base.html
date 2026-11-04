@@ -6,8 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RBWR Utility{% endblock %}</title>
 
+    {% block canonical %}
+    <link rel="canonical" href="{{ canonical_url | default('https://rbwr.hotment.dev' ~ (request.path if request else '')) }}">
+    {% endblock %}
+
     {% block meta_tags %}
-    <meta name="description" content="RBWR Utility - Real-time APRM calculations, thermal simulator, live reactor server browser, and operator metrics for Roblox RBWR.">
+    <meta name="description" content="Real-time reactor operations, APRM calculations, thermal simulations, live server metrics, and performance tracking tools for Roblox RBWR operators.">
     <meta name="theme-color" content="#3b82f6">
 
     <meta property="og:type" content="website">
@@ -43,6 +47,7 @@
             "url": "https://rbwr.hotment.dev"
         }
     </script>
+    {% block breadcrumbs %}{% endblock %}
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -267,63 +272,57 @@
             </div>
 
             <nav id="main-nav"
-                class="hidden lg:flex items-center gap-6 text-sm font-medium text-gray-400 shrink-0 transition-[gap] duration-150 ease-out">
+                class="hidden lg:flex items-center gap-6 text-sm font-medium text-gray-400 shrink-0 transition-[gap] duration-150 ease-out"
+                aria-label="Main Navigation">
                 {% block nav %}
                 <a href="/"
                     class="{% if request.path == '/' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Home</a>
                 <a href="/calculator"
-                    class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Web
-                    Calculator</a>
+                    class="{% if request.path == '/calculator' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Reactor Simulator</a>
                 <a href="/points"
-                    class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Points
-                    Calculator</a>
-                <a href="/tablet"
-                    class="{% if request.path in ['/tablet', '/operator-tablet'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Operator
-                    Tablet</a>
+                    class="{% if request.path == '/points' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Points Calculator</a>
+                <a href="/operator-tablet"
+                    class="{% if request.path in ['/tablet', '/operator-tablet'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Operator Tablet</a>
+                <a href="/servers"
+                    class="{% if request.path.startswith('/servers') or request.path.startswith('/archives') %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Server Browser</a>
+                <a href="/points-graph"
+                    class="{% if request.path == '/points-graph' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Point History Graph</a>
                 <a href="/tickets"
-                    class="{% if request.path in ['/tickets', '/suggestions'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Tickets</a>
+                    class="{% if request.path in ['/tickets', '/suggestions'] %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Tickets & Feedback</a>
                 <a href="/contact"
                     class="{% if request.path == '/contact' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Contact</a>
-                <a href="/points-graph"
-                    class="{% if request.path == '/points-graph' %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Point
-                    History</a>
-                <a href="/servers"
-                    class="{% if request.path.startswith('/servers') or request.path.startswith('/archives') %}text-white font-semibold{% else %}hover:text-white transition-colors{% endif %} whitespace-nowrap">Server
-                    Browser</a>
-                <a href="https://github.com/Hotment/RBWR-Utility/releases/latest" target="_blank"
+                <a href="https://github.com/Hotment/RBWR-Utility/releases/latest" target="_blank" rel="noopener"
                     class="hover:text-white transition-colors whitespace-nowrap">Download App</a>
                 <a href="/admin"
                     class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all text-xs font-medium border border-white/5 whitespace-nowrap">Admin</a>
                 {% endblock %}
             </nav>
 
-            <div class="lg:hidden flex items-center gap-1.5 overflow-x-auto py-1 min-w-0 flex-1 fluid-nav-mobile">
+            <nav aria-label="Mobile Navigation" class="lg:hidden flex items-center gap-1.5 overflow-x-auto py-1 min-w-0 flex-1 fluid-nav-mobile">
                 {% block mobile_nav %}
                 <a href="/"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Home</a>
                 <a href="/calculator"
-                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Web
-                    Calc</a>
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/calculator' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Simulator</a>
                 <a href="/points"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/points' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points</a>
-                <a href="/tablet"
+                <a href="/operator-tablet"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path in ['/tablet', '/operator-tablet'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tablet</a>
+                <a href="/servers"
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path.startswith('/servers') or request.path.startswith('/archives') %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Servers</a>
+                <a href="/points-graph"
+                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/points-graph' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">History</a>
                 <a href="/tickets"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path in ['/tickets', '/suggestions'] %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Tickets</a>
                 <a href="/contact"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/contact' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Contact</a>
-                <a href="/points-graph"
-                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path == '/points-graph' %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Points
-                    Graph</a>
-                <a href="/servers"
-                    class="px-2 py-1.5 shrink-0 whitespace-nowrap {% if request.path.startswith('/servers') or request.path.startswith('/archives') %}bg-blue-600/20 text-blue-400 border border-blue-500/30{% else %}border border-white/10 text-gray-300{% endif %} rounded font-medium text-xs">Servers</a>
                 <a href="/admin"
                     class="px-2 py-1.5 shrink-0 whitespace-nowrap border border-white/10 text-gray-300 rounded font-medium text-xs">Admin</a>
                 {% endblock %}
-            </div>
+            </nav>
         </div>
 
-        <div id="mobile-dropdown-menu"
+        <nav id="mobile-dropdown-menu" aria-label="Mobile Dropdown Navigation"
             class="hidden lg:hidden absolute top-16 left-0 right-0 bg-[#0c0c10]/95 backdrop-blur-2xl border-b border-white/10 shadow-2xl z-50 p-4 transition-all duration-200">
             <div class="grid grid-cols-1 gap-1.5 font-medium text-sm">
                 <a href="/"
@@ -438,13 +437,24 @@
     <footer
         class="mt-auto border-t border-white/5 bg-background py-8 text-center text-xs text-gray-500 max-w-full overflow-x-hidden">
         <div
-            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            class="max-w-[1700px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="font-mono whitespace-nowrap">
                 © 2026 RBWR Utility
             </div>
-            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4 lg:gap-6 font-medium">
-                <a href="https://github.com/Hotment/RBWR-Utility" target="_blank"
-                    class="hover:text-gray-300 transition-colors whitespace-nowrap">Github</a>
+            <nav aria-label="Footer Navigation" class="flex flex-wrap items-center justify-center md:justify-end gap-3 sm:gap-4 lg:gap-6 font-medium">
+                <a href="/" class="hover:text-gray-300 transition-colors whitespace-nowrap">Home</a>
+                <a href="/calculator" class="hover:text-gray-300 transition-colors whitespace-nowrap">Reactor Simulator</a>
+                <a href="/points" class="hover:text-gray-300 transition-colors whitespace-nowrap">Points Calculator</a>
+                <a href="/operator-tablet" class="hover:text-gray-300 transition-colors whitespace-nowrap">Operator Tablet</a>
+                <a href="/servers" class="hover:text-gray-300 transition-colors whitespace-nowrap">Server Browser</a>
+                <a href="/archives" class="hover:text-gray-300 transition-colors whitespace-nowrap">Historical Archives</a>
+                <a href="/points-graph" class="hover:text-gray-300 transition-colors whitespace-nowrap">Point History Graph</a>
+                <a href="/tickets" class="hover:text-gray-300 transition-colors whitespace-nowrap">Support Tickets & Feedback</a>
+                <a href="/contact" class="hover:text-gray-300 transition-colors whitespace-nowrap">Contact Administrator</a>
+                <a href="/privacy" class="hover:text-gray-300 transition-colors whitespace-nowrap">Privacy Policy</a>
+                <a href="/credits" class="hover:text-gray-300 transition-colors whitespace-nowrap">Credits & Acknowledgements</a>
+                <a href="https://github.com/Hotment/RBWR-Utility" target="_blank" rel="noopener"
+                    class="hover:text-gray-300 transition-colors whitespace-nowrap">GitHub Repository</a>
                 <a href="https://discord.gg/4eUQQcuv87" target="_blank" rel="noopener"
                     class="hover:text-[#5865F2] transition-colors whitespace-nowrap inline-flex items-center gap-1.5"
                     title="Join our Discord community">
@@ -453,21 +463,13 @@
                     </svg>
                     Discord
                 </a>
-                <a href="/servers" class="hover:text-gray-300 transition-colors whitespace-nowrap">Server
-                    Checker</a>
-                <a href="/points-graph" class="hover:text-gray-300 transition-colors whitespace-nowrap">Point History
-                    Graph</a>
-                <a href="/tickets" class="hover:text-gray-300 transition-colors whitespace-nowrap">Tickets</a>
-                <a href="/contact" class="hover:text-gray-300 transition-colors whitespace-nowrap">Contact</a>
-                <a href="/privacy" class="hover:text-gray-300 transition-colors whitespace-nowrap">Privacy Policy</a>
-                <a href="/credits" class="hover:text-gray-300 transition-colors whitespace-nowrap">Credits</a>
                 <a href="https://ko-fi.com/hotment" target="_blank" rel="noopener"
                     class="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-all text-xs font-semibold border border-rose-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                     title="Support on Ko-fi">
                     Support on Ko-fi
                 </a>
                 {% block footer_links %}{% endblock %}
-            </div>
+            </nav>
         </div>
     </footer>
 

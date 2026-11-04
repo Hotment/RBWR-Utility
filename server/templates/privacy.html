@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Privacy Policy{% endblock %}
+{% block title %}Privacy Policy | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/privacy">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Privacy Policy", "url": "https://rbwr.hotment.dev/privacy"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Privacy Policy for RBWR Utility. Details on data handling, client-side privacy, user feedback, and crash diagnostics.">
+<meta name="description" content="Read the RBWR Utility Privacy Policy. Learn how we handle client-side data security, local metrics logs processing, crash reports, and user feedback.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">

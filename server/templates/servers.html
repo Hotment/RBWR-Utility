@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Server Browser{% endblock %}
+{% block title %}Live Server Browser & Status | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/servers">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Live Server Browser & Status", "url": "https://rbwr.hotment.dev/servers"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Browse active, persistent, and historical RBWR servers in real-time. View player counts, reactor status, demand timers, and live performance charts.">
+<meta name="description" content="Browse active, persistent, and historical Roblox RBWR servers. View live player counts, reactor operational states, demand timers, and top scores.">
 <meta name="theme-color" content="#f59e0b">
 
 <meta property="og:type" content="website">

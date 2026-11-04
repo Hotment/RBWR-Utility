@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Archive for {{ date_formatted }}{% endblock %}
+{% block title %}Archive {{ date_formatted }} | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/archives/{{ date_str }}">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Historical Server Archives", "url": "https://rbwr.hotment.dev/archives"}, {"name": "Archive " ~ date_formatted, "url": "https://rbwr.hotment.dev/archives/" ~ date_str}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="View archived RBWR server instances and reactor metrics recorded on {{ date_formatted }}.">
+<meta name="description" content="Review comprehensive archived RBWR reactor operational stats, multi-unit generation charts, and server snapshot histories for this recorded date.">
 <meta name="theme-color" content="#06b6d4">
 
 <meta property="og:type" content="website">

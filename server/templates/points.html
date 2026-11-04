@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Points & Rank Calculator{% endblock %}
+{% block title %}Points Calculator & Progression | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/points">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Points Calculator & Progression", "url": "https://rbwr.hotment.dev/points"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Calculate and simulate your Roblox RBWR point generation rate, evaluate active modifiers and penalties, and estimate your rank progression time.">
+<meta name="description" content="Calculate Roblox RBWR point generation rates, evaluate active demand modifiers and operational penalties, and estimate your operator rank progression.">
 <meta name="theme-color" content="#10b981">
 
 <meta property="og:type" content="website">

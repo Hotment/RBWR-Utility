@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Point History Graph & Local Viewer{% endblock %}
+{% block title %}Point History Graph & Local Viewer | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/points-graph">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Point History Graph & Local Viewer", "url": "https://rbwr.hotment.dev/points-graph"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="100% Client-Side Private RBWR Point History Graph. Parse and visualize your sar_data.json data strictly in browser memory.">
+<meta name="description" content="Client-side private RBWR point history viewer. Parse and visualize your sar_data.json reactor operational logs securely inside browser memory.">
 <meta name="theme-color" content="#10b981">
 
 <meta property="og:type" content="website">

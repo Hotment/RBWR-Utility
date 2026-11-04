@@ -1,0 +1,22 @@
+{% macro breadcrumb_schema(items) %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://rbwr.hotment.dev/"
+    }{% for item in items %},
+    {
+      "@type": "ListItem",
+      "position": {{ loop.index + 1 }},
+      "name": {{ item.name | tojson }},
+      "item": {{ item.url | tojson }}
+    }{% endfor %}
+  ]
+}
+</script>
+{% endmacro %}

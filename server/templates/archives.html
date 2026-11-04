@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}RBWR Utility - Server Archives{% endblock %}
+{% block title %}Historical Server Archives | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/archives">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Historical Server Archives", "url": "https://rbwr.hotment.dev/archives"}]) }}
+{% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Browse archived RBWR server history and snapshots. Review past reactor runs, uptime records, and thermal metrics.">
+<meta name="description" content="Browse archived Roblox RBWR reactor operational records and historical server snapshots. Review past multi-unit uptime, generation, and logs.">
 <meta name="theme-color" content="#06b6d4">
 
 <meta property="og:type" content="website">
