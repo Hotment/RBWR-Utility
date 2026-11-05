@@ -11,11 +11,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Literal
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from pydantic import BaseModel, Field, ValidationError
 
 import bot_features as bf
@@ -259,7 +260,8 @@ class CommandPrefixIn(BaseModel):
 
 
 class DmIn(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field("", max_length=2000)
+    images: list[str] = Field(default_factory=list, max_length=4)  # names from /api/admin/uploads
 
 
 class ModerationIn(BaseModel):
@@ -651,7 +653,8 @@ def init_app(app: Flask, **hooks) -> None:
         last = (conv.get("messages") or [{}])[-1]
         return {
             **{k: conv.get(k) for k in ("user_id", "name", "username", "avatar", "unread", "updated_at")},
-            "last": {"text": (last.get("text") or "")[:120], "direction": last.get("direction")},
+            "last": {"text": (last.get("text") or ("📎 GIF / image" if last.get("images") or last.get("media") else ""))[:120],
+                     "direction": last.get("direction")},
         }
 
     @route("/api/admin/dms", ["GET"], "dms")
@@ -672,16 +675,47 @@ def init_app(app: Flask, **hooks) -> None:
     def send_dm(user, user_id):
         payload: DmIn = body(DmIn)
         text = payload.message.strip()
-        if not user_id.isdigit() or not text:
-            raise ApiError(400, "Pick a member and write a message.")
-        result = bf.send_dm(user_id, text)
+        images = list(dict.fromkeys(payload.images))
+        if not user_id.isdigit() or not (text or images):
+            raise ApiError(400, "Pick a member and write a message or attach a GIF.")
+        files = []
+        for name in images:
+            path = os.path.join(bf.UPLOAD_DIR, name)
+            if not re.match(bf.UPLOAD_NAME_RE, name):
+                raise ApiError(400, "Invalid attachment.")
+            if not os.path.exists(path):
+                raise ApiError(400, "An attached image no longer exists — attach it again.")
+            files.append((path, f"image.{name.rsplit('.', 1)[1]}"))
+        result = bf.send_dm(user_id, text, files)
         bf.record_dm(
             user_id, result["profile"],
-            {"text": text, "discord_message_id": result["message_id"], "sent_by": display_name(user)},
+            {"text": text, "images": images, "discord_message_id": result["message_id"], "sent_by": display_name(user)},
             incoming=False,
         )
         ctx.log_audit(user, "bot.send_dm", "bot", f"Sent DM to Discord member {user_id}", target=f"User {user_id}", details={"user_id": user_id})
         return {"sent": True}
+
+    @route("/api/admin/uploads", ["POST"], "dms")
+    def upload_image(user):
+        if (request.content_length or 0) > bf.MAX_DM_IMAGE_BYTES:
+            raise ApiError(413, "The image is larger than 8 MB.")
+        data = request.get_data(cache=False)
+        if len(data) > bf.MAX_DM_IMAGE_BYTES:
+            raise ApiError(413, "The image is larger than 8 MB.")
+        ext = bf.image_ext(data[:16])
+        if not ext:
+            raise ApiError(400, "Only PNG, JPEG, GIF and WebP images are supported.")
+        os.makedirs(bf.UPLOAD_DIR, exist_ok=True)
+        name = f"{secrets.token_hex(16)}.{ext}"
+        with open(os.path.join(bf.UPLOAD_DIR, name), "wb") as f:
+            f.write(data)
+        return {"name": name}
+
+    @route("/api/admin/uploads/<name>", ["GET"], "dms")
+    def get_upload(user, name):
+        if not re.match(bf.UPLOAD_NAME_RE, name) or not os.path.exists(os.path.join(bf.UPLOAD_DIR, name)):
+            raise ApiError(404, "Image not found.")
+        return send_from_directory(bf.UPLOAD_DIR, name, max_age=3600)
 
     # ------------------------------------------------ moderation
 
