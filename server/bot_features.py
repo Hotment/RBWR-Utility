@@ -101,7 +101,6 @@ automod_store = JsonStore("automod.json", {"config": {}, "incidents": [], "last_
 errors_store = JsonStore("errors.json", {"errors": [], "last_id": 0})
 
 
-# GIFs and images in DMs: only these hosts are ever shown or stored, so a member can not make the panel load an arbitrary site
 MEDIA_DOMAINS = ("discordapp.com", "discordapp.net", "tenor.com", "giphy.com", "klipy.com")
 UPLOAD_NAME_RE = r"^[0-9a-f]{32}\.(png|jpg|gif|webp)$"
 UPLOAD_DIR = os.path.join(DATA_DIR, "admin_uploads")
@@ -120,7 +119,6 @@ def safe_media_url(url) -> bool:
 
 
 def image_ext(head: bytes) -> str | None:
-    """The real type from the first bytes of an image (the sender's Content-Type is not trusted; no SVG)."""
     if head.startswith(b"\x89PNG\r\n\x1a\n"):
         return "png"
     if head.startswith(b"\xff\xd8\xff"):
@@ -144,7 +142,6 @@ def _delete_dm_files(messages: list) -> None:
 
 
 def add_dm_media(discord_message_id: str, media: list) -> bool:
-    """Adds GIFs/images Discord resolved later (a link's embed arrives after the message) to a stored DM message."""
     with dms_store.edit() as data:
         for conv in data.get("conversations", {}).values():
             for m in conv.get("messages", []):
@@ -468,7 +465,7 @@ def search_members(query: str) -> list[dict]:
 
 
 def send_dm(user_id: str, text: str, files: list[tuple[str, str]] = ()) -> dict:
-    """Sends a DM (text and/or GIF/image files as (path, filename)) to a member of the server (blocking). Raises BotActionError."""
+    """Sends a DM to a member of the server (blocking). Raises BotActionError."""
     async def _send():
         member = await _get_member(user_id)
         if not member:
@@ -485,7 +482,6 @@ def send_dm(user_id: str, text: str, files: list[tuple[str, str]] = ()) -> dict:
 
 
 def _media_from_embeds(embeds: list[dict]) -> list[dict]:
-    """GIFs and images Discord resolved from a link (Tenor, Giphy, Klipy...) or an attachment, as plain dicts of the embed JSON."""
     media = []
     for e in embeds or []:
         video = (e.get("video") or {}).get("url")
@@ -501,7 +497,6 @@ def _media_from_embeds(embeds: list[dict]) -> list[dict]:
 
 
 async def _save_dm_images(message: disnake.Message) -> tuple[list[dict], list[str]]:
-    """Downloads the image attachments (Discord's links expire after a day). Returns (media, urls of the other attachments)."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     media, others = [], []
     for a in message.attachments:
@@ -2152,7 +2147,6 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
 
     @bot.listen("on_raw_message_edit")
     async def _features_dm_embeds(payload: disnake.RawMessageUpdateEvent):
-        # the embed of a link (a GIF from Discord's GIF picker) arrives after the message itself
         if payload.guild_id is None and payload.data.get("embeds"):
             media = _media_from_embeds(payload.data["embeds"])
             if media:

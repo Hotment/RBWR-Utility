@@ -227,7 +227,6 @@ window.AdminBot = (() => {
         }
     }
 
-    // GIFs and images in a message: from the stored media (Discord / Tenor / Giphy / Klipy), our own uploads, and GIF links in the text
     const MEDIA_HOSTS = ["discordapp.com", "discordapp.net", "tenor.com", "giphy.com", "klipy.com"];
     const mediaHostOk = (url) => {
         try {
@@ -250,7 +249,6 @@ window.AdminBot = (() => {
         const shown = [];
         for (const line of String(m.text || "").split("\n")) {
             const t = line.trim();
-            // an image link from a trusted host becomes the picture; a link that is only a GIF page is hidden once its GIF is shown
             if (IMAGE_URL.test(t) && mediaHostOk(t)) items.push(`<img src="${esc(t)}" alt="Image" loading="lazy" referrerpolicy="no-referrer">`);
             else if (!((m.media || []).length && /^https:\/\/\S+$/.test(t) && mediaHostOk(t))) shown.push(line);
         }
@@ -272,7 +270,7 @@ window.AdminBot = (() => {
             method: "POST", credentials: "same-origin", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
         });
         let data = null;
-        try { data = await res.json(); } catch (_) { /* empty body */ }
+        try { data = await res.json(); } catch (_) { data = null; }
         if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : `Upload failed (${res.status}).`);
         return data.name;
     }
@@ -688,7 +686,6 @@ window.AdminBot = (() => {
             e.preventDefault();
             attachDmFiles(files);
         });
-        // a picture that can not be loaded (Discord links expire) is hidden instead of showing a broken icon
         $("dm-chat").addEventListener("error", (e) => {
             if (e.target.matches?.(".dm-media img, .dm-media video")) e.target.classList.add("hidden");
         }, true);

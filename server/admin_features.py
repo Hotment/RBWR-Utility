@@ -261,7 +261,7 @@ class CommandPrefixIn(BaseModel):
 
 class DmIn(BaseModel):
     message: str = Field("", max_length=2000)
-    images: list[str] = Field(default_factory=list, max_length=4)  # names from /api/admin/uploads
+    images: list[str] = Field(default_factory=list, max_length=4)
 
 
 class ModerationIn(BaseModel):
