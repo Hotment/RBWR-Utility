@@ -8,7 +8,7 @@
 
 {% block breadcrumbs %}
 {% from "_breadcrumbs.html" import breadcrumb_schema %}
-{{ breadcrumb_schema([{"name": "Live Server Browser & Status", "url": "https://rbwr.hotment.dev/servers"}, {"name": "Server " ~ job_id, "url": "https://rbwr.hotment.dev/servers/" ~ job_id}]) }}
+{{ breadcrumb_schema([{"name": "Servers", "url": "https://rbwr.hotment.dev/servers"}, {"name": "Server " ~ job_id, "url": "https://rbwr.hotment.dev/servers/" ~ job_id}]) }}
 {% endblock %}
 
 {% block meta_tags %}
@@ -23,6 +23,7 @@
 {% set points_text = "Points: " ~ (points_rate_str | default('N/A')) %}
 {% set embed_desc = server_status_text ~ " | " ~ players_text ~ " | " ~ units_text ~ " | " ~ points_text ~ " | Uptime: " ~ uptime_str ~ " | Total Demand: " ~ demand_text %}
 
+<meta name="robots" content="noindex, follow">
 <meta name="description" content="Inspect real-time reactor metrics, multi-unit electrical generation, APRM power levels, and performance score breakdowns for this RBWR server.">
 <meta name="theme-color" content="{{ embed_theme }}">
 

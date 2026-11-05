@@ -8,10 +8,11 @@
 
 {% block breadcrumbs %}
 {% from "_breadcrumbs.html" import breadcrumb_schema %}
-{{ breadcrumb_schema([{"name": "Historical Server Archives", "url": "https://rbwr.hotment.dev/archives"}, {"name": "Archive " ~ date_formatted, "url": "https://rbwr.hotment.dev/archives/" ~ date_str}]) }}
+{{ breadcrumb_schema([{"name": "Archives", "url": "https://rbwr.hotment.dev/archives"}, {"name": "Archive " ~ date_formatted, "url": "https://rbwr.hotment.dev/archives/" ~ date_str}]) }}
 {% endblock %}
 
 {% block meta_tags %}
+<meta name="robots" content="noindex, follow">
 <meta name="description" content="Review comprehensive archived RBWR reactor operational stats, multi-unit generation charts, and server snapshot histories for this recorded date.">
 <meta name="theme-color" content="#06b6d4">
 
