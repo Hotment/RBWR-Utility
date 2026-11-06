@@ -19,7 +19,7 @@ public sealed class DiscordPresenceService : IDisposable
 {
     // Paste the Application ID from https://discord.com/developers/applications here.
     // Upload a Rich Presence art asset named "icon" for the large image.
-    public const string DefaultApplicationId = "1568350684775059528";
+    public const string DefaultApplicationId = "<YOUR_APPLICATION_ID_HERE>";
 
     private const string LargeImageKey = "icon";
     private static readonly TimeSpan MinUpdateInterval = TimeSpan.FromSeconds(5);
