@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace RbwrOverlay.Platform;
 
-/// <summary>Reads the newest Roblox client log to find which place the player last joined.</summary>
 public static class RobloxLogReader
 {
     private static readonly Regex JoinRegex = new(@"Joining game '[^']*' place (\d+)", RegexOptions.Compiled);

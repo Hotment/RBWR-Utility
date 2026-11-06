@@ -139,8 +139,6 @@ public partial class WindowsProcessMonitor : IProcessMonitor
 
     private void RefreshRobloxProcessState()
     {
-        // Only the actual game client counts. The launcher / tray client can stay running all the time,
-        // so require a RobloxPlayerBeta process that owns a visible window.
         bool running = false;
         var procs = Process.GetProcessesByName("RobloxPlayerBeta");
         foreach (var p in procs)
@@ -151,7 +149,6 @@ public partial class WindowsProcessMonitor : IProcessMonitor
             }
             catch
             {
-                // process exited or access denied; ignore
             }
             finally
             {

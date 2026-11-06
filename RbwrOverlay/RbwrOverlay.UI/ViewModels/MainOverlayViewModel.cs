@@ -1246,8 +1246,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // Roblox does not expose the game name, so "in RBWR" means: the last joined place in the Roblox log
-        // is RBWR, or the overlay is synced to an RBWR server.
         bool inRbwr = _processMonitor.CurrentPlaceId == RbwrPlaceId || _activeServer != null;
         if (!inRbwr)
         {
