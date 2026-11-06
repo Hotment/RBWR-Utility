@@ -34,7 +34,7 @@ public sealed class DiscordPresenceService : IDisposable
     private bool _disposed;
 
     public string ApplicationId { get; }
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(ApplicationId);
+    public bool IsConfigured => ApplicationId.Length > 0 && ApplicationId.All(char.IsDigit);
 
     public DiscordPresenceService(ILoggingService? logger = null)
     {
@@ -95,7 +95,7 @@ public sealed class DiscordPresenceService : IDisposable
     {
         if (!IsConfigured)
         {
-            _logger.Info("Discord Rich Presence enabled but no application id configured; skipping.");
+            _logger.Warning("Discord Rich Presence is enabled but no valid application id is set (set RBWR_DISCORD_APP_ID); skipping.");
             return;
         }
 
