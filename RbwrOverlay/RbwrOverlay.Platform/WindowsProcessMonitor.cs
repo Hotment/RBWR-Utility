@@ -13,6 +13,30 @@ public partial class WindowsProcessMonitor : IProcessMonitor
     private bool _isRobloxActive;
     private bool _isDisposed;
     private IntPtr _lastLoggedHwnd = IntPtr.Zero;
+    private volatile bool _isRobloxRunning;
+    private long _currentPlaceId;
+    private int _slowPollCounter;
+    private bool _isEditorActive;
+
+    private static readonly string[] EditorProcesses = { "code.exe", "code - insiders.exe" };
+
+    public bool IsEditorActive
+    {
+        get => _isEditorActive;
+        private set
+        {
+            if (_isEditorActive != value)
+            {
+                _isEditorActive = value;
+                EditorActiveChanged?.Invoke(this, value);
+            }
+        }
+    }
+
+    public event EventHandler<bool>? EditorActiveChanged;
+
+    public bool IsRobloxRunning => _isRobloxRunning;
+    public long? CurrentPlaceId => Interlocked.Read(ref _currentPlaceId) is var id && id > 0 ? id : null;
 
     public bool IsRobloxActive
     {
@@ -87,6 +111,14 @@ public partial class WindowsProcessMonitor : IProcessMonitor
                     }
 
                     IsRobloxActive = newRobloxActive;
+
+                    bool isEditor = Array.IndexOf(EditorProcesses, procLower) >= 0;
+                    IsEditorActive = isEditor || (isOurs && _isEditorActive);
+                }
+
+                if (_slowPollCounter++ % 10 == 0)
+                {
+                    RefreshRobloxProcessState();
                 }
             }
             catch (Exception ex)
@@ -103,6 +135,32 @@ public partial class WindowsProcessMonitor : IProcessMonitor
                 break;
             }
         }
+    }
+
+    private void RefreshRobloxProcessState()
+    {
+        // Only the actual game client counts. The launcher / tray client can stay running all the time,
+        // so require a RobloxPlayerBeta process that owns a visible window.
+        bool running = false;
+        var procs = Process.GetProcessesByName("RobloxPlayerBeta");
+        foreach (var p in procs)
+        {
+            try
+            {
+                if (!p.HasExited && p.MainWindowHandle != IntPtr.Zero) running = true;
+            }
+            catch
+            {
+                // process exited or access denied; ignore
+            }
+            finally
+            {
+                p.Dispose();
+            }
+        }
+
+        _isRobloxRunning = running;
+        Interlocked.Exchange(ref _currentPlaceId, running ? (RobloxLogReader.GetLastJoinedPlaceId() ?? 0) : 0);
     }
 
     public string GetForegroundWindowInfo()

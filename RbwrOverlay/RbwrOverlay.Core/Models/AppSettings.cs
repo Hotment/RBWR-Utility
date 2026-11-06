@@ -28,6 +28,9 @@ public class AppSettings
     [JsonPropertyName("topmost_on_roblox")]
     public bool TopmostOnRoblox { get; set; } = true;
 
+    [JsonPropertyName("topmost_on_vscode")]
+    public bool TopmostOnVsCode { get; set; } = true;
+
     [JsonPropertyName("skipped_version")]
     public string SkippedVersion { get; set; } = string.Empty;
 
@@ -48,6 +51,9 @@ public class AppSettings
 
     [JsonPropertyName("show_tooltips")]
     public bool ShowTooltips { get; set; } = true;
+
+    [JsonPropertyName("enable_discord_presence")]
+    public bool EnableDiscordPresence { get; set; } = true;
 
     public static AppSettings CreateDefault() => new();
 }

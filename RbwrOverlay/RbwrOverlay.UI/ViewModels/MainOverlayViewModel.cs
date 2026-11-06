@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Calculations;
 using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.UI.Services;
 using RbwrOverlay.Platform;
 
 namespace RbwrOverlay.UI.ViewModels;
@@ -41,6 +42,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     public int ConnectionRetryDelayMs { get; set; } = 1000;
 
     private readonly DispatcherTimer _dtlTimer;
+    private readonly DiscordPresenceService _discord;
     private bool _isUpdatingFields;
     private bool _isDisposed;
 
@@ -56,6 +58,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
+    private const long RbwrPlaceId = 11765852158;
 
 
     [ObservableProperty]
@@ -191,6 +194,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _topmostOnRoblox = true;
+    private bool _robloxForeground;
+    private bool _editorForeground;
 
     [ObservableProperty]
     private double _overlayOpacity = 0.90;
@@ -366,6 +371,24 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _showTooltips = true;
 
     [ObservableProperty]
+    private bool _topmostOnVsCode = true;
+
+    [ObservableProperty]
+    private string _vsCodeTopmostStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _vsCodeTopmostStatusBrush = Brushes.LimeGreen;
+
+    [ObservableProperty]
+    private bool _enableDiscordPresence = true;
+
+    [ObservableProperty]
+    private string _discordPresenceStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _discordPresenceStatusBrush = Brushes.LimeGreen;
+
+    [ObservableProperty]
     private string _tooltipsStatusText = "ENABLED";
 
     [ObservableProperty]
@@ -434,6 +457,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _isCompact = _settings.IsCompact;
         _isTopmost = _settings.IsTopmost;
         _topmostOnRoblox = _settings.TopmostOnRoblox;
+        _topmostOnVsCode = _settings.TopmostOnVsCode;
         _overlayOpacity = _settings.Opacity;
         _uiScale = _settings.UiScale <= 0 ? 1.0 : _settings.UiScale;
         _uiScalePreview = _uiScale;
@@ -447,6 +471,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _turbineHealthThresholdInput = ((int)_settings.TurbineHealthThreshold).ToString();
         _showTooltips = _settings.ShowTooltips;
         TooltipCatalog.SetEnabled(_showTooltips);
+        _enableDiscordPresence = _settings.EnableDiscordPresence;
+
+        _discord = new DiscordPresenceService(_logger);
+        _discord.SetEnabled(_enableDiscordPresence);
 
         UpdatePinSymbol();
         UpdateUnitVisuals();
@@ -461,6 +489,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _dtlTimer.Start();
 
         _processMonitor.RobloxActiveChanged += OnRobloxActiveChanged;
+        _processMonitor.EditorActiveChanged += OnEditorActiveChanged;
         _processMonitor.StartMonitoring();
 
         UpdateCalculationsFromDemand(0.0);
@@ -1196,6 +1225,75 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private void OnDtlTimerTick(object? sender, EventArgs e)
     {
         TickDtlCountdown();
+        UpdateDiscordPresence();
+    }
+
+    private void UpdateDiscordPresence()
+    {
+        if (!EnableDiscordPresence) return;
+
+        bool robloxRunning = _processMonitor.IsRobloxRunning;
+        string overlayMode = IsCompact ? "Compact HUD" : "Detailed HUD";
+
+        if (!robloxRunning)
+        {
+            _discord.Update(new PresenceSnapshot
+            {
+                Details = "RBWR Overlay",
+                State = "Waiting for Roblox",
+                SmallImageText = overlayMode
+            });
+            return;
+        }
+
+        // Roblox does not expose the game name, so "in RBWR" means: the last joined place in the Roblox log
+        // is RBWR, or the overlay is synced to an RBWR server.
+        bool inRbwr = _processMonitor.CurrentPlaceId == RbwrPlaceId || _activeServer != null;
+        if (!inRbwr)
+        {
+            _discord.Update(new PresenceSnapshot
+            {
+                Details = "Roblox",
+                State = string.Empty,
+                SmallImageText = overlayMode
+            });
+            return;
+        }
+
+        string unit = SelectedUnit switch { 1 => "Unit 1", 2 => "Unit 2", _ => "Unit 2 TCR" };
+        string prefix = _activeServer != null ? "Calculating" : "RBWR";
+        string details = IsError ? $"{prefix} | {unit}" : $"{prefix} | {unit} | {MainStatusPowerText}";
+
+        string state;
+        if (_activeServer != null)
+        {
+            state = IsError ? "Synced with server" : $"Synced | {GeneratorLoadText}";
+            var uState = SelectedUnit == 1 ? _activeServer.Unit1 : _activeServer.Unit2;
+            if (uState?.NextDemand is double nd && nd >= 0)
+                state = $"{state} | Next {nd:F0} MWe";
+        }
+        else
+        {
+            state = IsError ? "Operating the plant" : GeneratorLoadText;
+        }
+
+        _discord.Update(new PresenceSnapshot
+        {
+            Details = details,
+            State = state,
+            SmallImageText = overlayMode
+        });
+    }
+
+    [RelayCommand]
+    public void ToggleDiscordPresence()
+    {
+        EnableDiscordPresence = !EnableDiscordPresence;
+        _settings.EnableDiscordPresence = EnableDiscordPresence;
+        _discord.SetEnabled(EnableDiscordPresence);
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
+        if (EnableDiscordPresence) UpdateDiscordPresence();
     }
 
     internal void TickDtlCountdown()
@@ -1561,11 +1659,31 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     private void OnRobloxActiveChanged(object? sender, bool isRoblox)
     {
+        _robloxForeground = isRoblox;
         if (TopmostOnRoblox)
         {
-            IsTopmost = isRoblox;
+            IsTopmost = isRoblox || (TopmostOnVsCode && _editorForeground);
             UpdatePinSymbol();
         }
+    }
+
+    private void OnEditorActiveChanged(object? sender, bool isEditor)
+    {
+        _editorForeground = isEditor;
+        if (TopmostOnVsCode)
+        {
+            IsTopmost = isEditor || (TopmostOnRoblox && _robloxForeground);
+            UpdatePinSymbol();
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleVsCodeTopmost()
+    {
+        TopmostOnVsCode = !TopmostOnVsCode;
+        _settings.TopmostOnVsCode = TopmostOnVsCode;
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
     }
 
     private void UpdatePinSymbol()
@@ -1708,6 +1826,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
         TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
 
+        VsCodeTopmostStatusText = TopmostOnVsCode ? "ENABLED" : "DISABLED";
+        VsCodeTopmostStatusBrush = TopmostOnVsCode ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
+        DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
+        DiscordPresenceStatusBrush = EnableDiscordPresence ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
         TooltipsStatusText = ShowTooltips ? "ENABLED" : "DISABLED";
         TooltipsStatusBrush = ShowTooltips ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
     }
@@ -1718,7 +1842,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _isDisposed = true;
         _connectLock.Dispose();
         _dtlTimer.Stop();
+        _discord.Dispose();
         _processMonitor.RobloxActiveChanged -= OnRobloxActiveChanged;
+        _processMonitor.EditorActiveChanged -= OnEditorActiveChanged;
         _processMonitor.Dispose();
         GC.SuppressFinalize(this);
     }

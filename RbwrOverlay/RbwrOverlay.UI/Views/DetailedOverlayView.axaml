@@ -525,10 +525,24 @@
                             </Grid>
                         </Border>
 
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="DiscordPresenceToggle">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Discord Rich Presence:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="{Binding DiscordPresenceStatusText}" Foreground="{Binding DiscordPresenceStatusBrush}" Command="{Binding ToggleDiscordPresenceCommand}" Padding="10,3" />
+                            </Grid>
+                        </Border>
+
                         <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RobloxTopmostToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Topmost on Roblox (Auto-Detect):" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding TopmostStatusText}" Foreground="{Binding TopmostStatusBrush}" Command="{Binding ToggleRobloxTopmostCommand}" Padding="10,3" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="VsCodeTopmostToggle">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Topmost on VS Code:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="{Binding VsCodeTopmostStatusText}" Foreground="{Binding VsCodeTopmostStatusBrush}" Command="{Binding ToggleVsCodeTopmostCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
