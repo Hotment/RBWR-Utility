@@ -174,7 +174,7 @@ window.AdminBot = (() => {
                 <textarea id="dm-text" class="adm-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… Paste a Tenor, Giphy or Klipy link to send a GIF, or attach / paste an image. (Enter to send, Shift+Enter for new line)"></textarea>
                 <div class="tk-reply-row">
                     <input type="file" id="dm-file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
-                    <button type="button" class="mono-btn" id="dm-attach" title="Attach a GIF or image (max 4, 8 MB each)">GIF / image</button>
+                    <button type="button" class="mono-btn" id="dm-attach" title="Attach a GIF or image (max 10, 20 MB total)">GIF / image</button>
                     <button type="button" class="btn-gold" id="dm-send">Send DM</button>
                 </div>
             </div>`;
@@ -259,27 +259,38 @@ window.AdminBot = (() => {
     function renderDmPending() {
         const box = $("dm-pending");
         if (!box) return;
-        box.innerHTML = state.dmPending.map((name) => `
+        box.innerHTML = state.dmPending.map((item) => {
+            const name = typeof item === "string" ? item : item.name;
+            return `
             <span class="dm-pending-item"><img src="${esc(imageUrl(name))}" alt="">
-            <button type="button" data-dm-unattach="${esc(name)}" title="Remove">×</button></span>`).join("");
+            <button type="button" data-dm-unattach="${esc(name)}" title="Remove">×</button></span>`;
+        }).join("");
     }
 
+    const MAX_ATTACHMENTS = 10;
+    const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+
     async function uploadImage(file) {
-        if (file.size > 8 * 1024 * 1024) throw new Error(`${file.name || "Image"} is larger than 8 MB.`);
+        if (file.size > MAX_TOTAL_BYTES) throw new Error(`${file.name || "Image"} is larger than 20 MB.`);
         const res = await fetch("/api/admin/uploads", {
             method: "POST", credentials: "same-origin", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
         });
         let data = null;
         try { data = await res.json(); } catch (_) { data = null; }
         if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : `Upload failed (${res.status}).`);
-        return data.name;
+        return { name: data.name, size: file.size };
     }
 
     async function attachDmFiles(files) {
         for (const file of files) {
-            if (state.dmPending.length >= 4) return toast("At most 4 images per message.", "error");
+            if (state.dmPending.length >= MAX_ATTACHMENTS) return toast(`At most ${MAX_ATTACHMENTS} images per message.`, "error");
+            const currentTotal = state.dmPending.reduce((sum, item) => sum + (typeof item === "object" ? item.size || 0 : 0), 0);
+            if (currentTotal + file.size > MAX_TOTAL_BYTES) {
+                return toast("Total attachment size cannot exceed 20 MB.", "error");
+            }
             try {
-                state.dmPending.push(await uploadImage(file));
+                const item = await uploadImage(file);
+                state.dmPending.push(item);
                 renderDmPending();
             } catch (err) { toast(err.message, "error"); }
         }
@@ -291,7 +302,8 @@ window.AdminBot = (() => {
         if ((!text && !state.dmPending.length) || !state.dmOpen) return;
         input.disabled = $("dm-send").disabled = true;
         try {
-            await api(`/api/admin/dms/${encodeURIComponent(state.dmOpen.user_id)}`, { method: "POST", body: { message: text, images: state.dmPending } });
+            const images = state.dmPending.map((item) => typeof item === "string" ? item : item.name);
+            await api(`/api/admin/dms/${encodeURIComponent(state.dmOpen.user_id)}`, { method: "POST", body: { message: text, images } });
             state.dmPending = [];
             renderDmPending();
             input.value = "";
@@ -673,7 +685,7 @@ window.AdminBot = (() => {
             if (e.target.id === "dm-send") sendDm();
             if (e.target.id === "dm-attach") $("dm-file").click();
             const un = e.target.closest("button[data-dm-unattach]");
-            if (un) { state.dmPending = state.dmPending.filter((n) => n !== un.dataset.dmUnattach); renderDmPending(); }
+            if (un) { state.dmPending = state.dmPending.filter((item) => (typeof item === "string" ? item : item.name) !== un.dataset.dmUnattach); renderDmPending(); }
         });
         $("dm-chat").addEventListener("change", (e) => {
             if (e.target.id !== "dm-file") return;

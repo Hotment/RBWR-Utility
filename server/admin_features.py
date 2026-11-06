@@ -261,7 +261,7 @@ class CommandPrefixIn(BaseModel):
 
 class DmIn(BaseModel):
     message: str = Field("", max_length=2000)
-    images: list[str] = Field(default_factory=list, max_length=4)
+    images: list[str] = Field(default_factory=list, max_length=10)
 
 
 class ModerationIn(BaseModel):
@@ -678,14 +678,23 @@ def init_app(app: Flask, **hooks) -> None:
         images = list(dict.fromkeys(payload.images))
         if not user_id.isdigit() or not (text or images):
             raise ApiError(400, "Pick a member and write a message or attach a GIF.")
+        if len(images) > bf.MAX_DM_MEDIA:
+            raise ApiError(400, f"At most {bf.MAX_DM_MEDIA} images can be attached.")
         files = []
-        for name in images:
+        total_bytes = 0
+        for i, name in enumerate(images):
             path = os.path.join(bf.UPLOAD_DIR, name)
             if not re.match(bf.UPLOAD_NAME_RE, name):
                 raise ApiError(400, "Invalid attachment.")
             if not os.path.exists(path):
                 raise ApiError(400, "An attached image no longer exists — attach it again.")
-            files.append((path, f"image.{name.rsplit('.', 1)[1]}"))
+            size = os.path.getsize(path)
+            total_bytes += size
+            ext = name.rsplit(".", 1)[1]
+            filename = f"image_{i + 1}.{ext}" if len(images) > 1 else f"image.{ext}"
+            files.append((path, filename))
+        if total_bytes > bf.MAX_DM_TOTAL_BYTES:
+            raise ApiError(400, "The total size of attached images exceeds 20 MB.")
         result = bf.send_dm(user_id, text, files)
         bf.record_dm(
             user_id, result["profile"],
@@ -698,10 +707,10 @@ def init_app(app: Flask, **hooks) -> None:
     @route("/api/admin/uploads", ["POST"], "dms")
     def upload_image(user):
         if (request.content_length or 0) > bf.MAX_DM_IMAGE_BYTES:
-            raise ApiError(413, "The image is larger than 8 MB.")
+            raise ApiError(413, "The image is larger than 20 MB.")
         data = request.get_data(cache=False)
         if len(data) > bf.MAX_DM_IMAGE_BYTES:
-            raise ApiError(413, "The image is larger than 8 MB.")
+            raise ApiError(413, "The image is larger than 20 MB.")
         ext = bf.image_ext(data[:16])
         if not ext:
             raise ApiError(400, "Only PNG, JPEG, GIF and WebP images are supported.")
@@ -709,7 +718,7 @@ def init_app(app: Flask, **hooks) -> None:
         name = f"{secrets.token_hex(16)}.{ext}"
         with open(os.path.join(bf.UPLOAD_DIR, name), "wb") as f:
             f.write(data)
-        return {"name": name}
+        return {"name": name, "size": len(data)}
 
     @route("/api/admin/uploads/<name>", ["GET"], "dms")
     def get_upload(user, name):

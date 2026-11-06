@@ -104,8 +104,9 @@ errors_store = JsonStore("errors.json", {"errors": [], "last_id": 0})
 MEDIA_DOMAINS = ("discordapp.com", "discordapp.net", "tenor.com", "giphy.com", "klipy.com")
 UPLOAD_NAME_RE = r"^[0-9a-f]{32}\.(png|jpg|gif|webp)$"
 UPLOAD_DIR = os.path.join(DATA_DIR, "admin_uploads")
-MAX_DM_MEDIA = 4
-MAX_DM_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_DM_MEDIA = 10
+MAX_DM_TOTAL_BYTES = 20 * 1024 * 1024
+MAX_DM_IMAGE_BYTES = MAX_DM_TOTAL_BYTES
 
 
 def safe_media_url(url) -> bool:
@@ -499,18 +500,25 @@ def _media_from_embeds(embeds: list[dict]) -> list[dict]:
 async def _save_dm_images(message: disnake.Message) -> tuple[list[dict], list[str]]:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     media, others = [], []
+    total_size = 0
     for a in message.attachments:
-        if len(media) < MAX_DM_MEDIA and (a.content_type or "").startswith("image/") and a.size <= MAX_DM_IMAGE_BYTES:
+        if (
+            len(media) < MAX_DM_MEDIA
+            and (a.content_type or "").startswith("image/")
+            and a.size <= MAX_DM_IMAGE_BYTES
+            and (total_size + a.size) <= MAX_DM_TOTAL_BYTES
+        ):
             try:
                 data = await a.read()
             except disnake.HTTPException:
                 data = b""
             ext = image_ext(data[:16])
-            if ext:
+            if ext and len(data) <= MAX_DM_IMAGE_BYTES and (total_size + len(data)) <= MAX_DM_TOTAL_BYTES:
                 name = f"{secrets.token_hex(16)}.{ext}"
                 with open(os.path.join(UPLOAD_DIR, name), "wb") as f:
                     f.write(data)
                 media.append({"type": "image", "local": name})
+                total_size += len(data)
                 continue
         others.append(a.url)
     return media, others
@@ -522,7 +530,7 @@ async def record_incoming_dm(message: disnake.Message) -> None:
     media, others = await _save_dm_images(message)
     if others:
         text = "\n".join([text] + others).strip()
-    media = (media + _media_from_embeds([e.to_dict() for e in message.embeds]))[:MAX_DM_MEDIA]
+    media = (media + _media_from_embeds([e.to_dict() for e in message.embeds]))[:MAX_DM_MEDIA]  # pyright: ignore[reportArgumentType]
     if not text and not media:
         return
     member = await _get_member(message.author.id)
