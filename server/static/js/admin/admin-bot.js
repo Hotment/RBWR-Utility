@@ -14,6 +14,7 @@ window.AdminBot = (() => {
         dms: [],
         dmSearch: [],
         dmOpen: null,
+        dmPending: [],
         modSearch: [],
         modMember: null,
     };
@@ -169,9 +170,15 @@ window.AdminBot = (() => {
             <div class="tk-msgs" id="dm-msgs"><div class="tk-empty">Loading…</div></div>
             <div class="tk-reply">
                 <label class="hidden" for="dm-text">Message</label>
-                <textarea id="dm-text" class="adm-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… (Enter to send, Shift+Enter for new line)"></textarea>
-                <div class="tk-reply-row"><button type="button" class="btn-gold" id="dm-send">Send DM</button></div>
+                <div class="dm-pending" id="dm-pending"></div>
+                <textarea id="dm-text" class="adm-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… Paste a Tenor, Giphy or Klipy link to send a GIF, or attach / paste an image. (Enter to send, Shift+Enter for new line)"></textarea>
+                <div class="tk-reply-row">
+                    <input type="file" id="dm-file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+                    <button type="button" class="mono-btn" id="dm-attach" title="Attach a GIF or image (max 10, 20 MB total)">GIF / image</button>
+                    <button type="button" class="btn-gold" id="dm-send">Send DM</button>
+                </div>
             </div>`;
+        state.dmPending = [];
         renderDmList();
         loadConversation(false);
         startDmPoller();
@@ -201,7 +208,7 @@ window.AdminBot = (() => {
                         <div class="who"><strong>${esc(m.direction === "out" ? m.sent_by || "Admin" : open.name)}</strong>
                             ${m.direction === "out" ? '<span class="role">via bot</span>' : ""}
                             <span title="${esc(AdminUtils.fmtDate(m.at))}">${esc(AdminUtils.timeAgo(m.at))}</span></div>
-                        <div class="text">${esc(m.text)}</div>
+                        ${dmBody(m)}
                     </div>
                 </div>`).join("") : '<div class="tk-empty">No messages yet — say hi.</div>';
 
@@ -220,13 +227,85 @@ window.AdminBot = (() => {
         }
     }
 
+    const MEDIA_HOSTS = ["discordapp.com", "discordapp.net", "tenor.com", "giphy.com", "klipy.com"];
+    const mediaHostOk = (url) => {
+        try {
+            const u = new URL(url);
+            return u.protocol === "https:" && MEDIA_HOSTS.some((d) => u.hostname === d || u.hostname.endsWith(`.${d}`));
+        } catch (_) { return false; }
+    };
+    const IMAGE_URL = /^https:\/\/\S+\.(?:gif|png|jpe?g|webp)(?:\?\S*)?$/i;
+    const imageUrl = (name) => `/api/admin/uploads/${encodeURIComponent(name)}`;
+
+    function dmBody(m) {
+        const items = [];
+        for (const x of m.media || []) {
+            if (x.local) items.push(`<img src="${esc(imageUrl(x.local))}" alt="Image" loading="lazy">`);
+            else if (x.type === "video" && mediaHostOk(x.url)) {
+                items.push(`<video src="${esc(x.url)}"${x.poster && mediaHostOk(x.poster) ? ` poster="${esc(x.poster)}"` : ""} autoplay loop muted playsinline></video>`);
+            } else if (mediaHostOk(x.url)) items.push(`<img src="${esc(x.url)}" alt="GIF" loading="lazy" referrerpolicy="no-referrer">`);
+        }
+        for (const name of m.images || []) items.push(`<img src="${esc(imageUrl(name))}" alt="Image" loading="lazy">`);
+        const shown = [];
+        for (const line of String(m.text || "").split("\n")) {
+            const t = line.trim();
+            if (IMAGE_URL.test(t) && mediaHostOk(t)) items.push(`<img src="${esc(t)}" alt="Image" loading="lazy" referrerpolicy="no-referrer">`);
+            else if (!((m.media || []).length && /^https:\/\/\S+$/.test(t) && mediaHostOk(t))) shown.push(line);
+        }
+        const text = shown.join("\n").trim();
+        return `${text ? `<div class="text">${esc(text)}</div>` : ""}${items.length ? `<div class="dm-media">${items.join("")}</div>` : ""}`;
+    }
+
+    function renderDmPending() {
+        const box = $("dm-pending");
+        if (!box) return;
+        box.innerHTML = state.dmPending.map((item) => {
+            const name = typeof item === "string" ? item : item.name;
+            return `
+            <span class="dm-pending-item"><img src="${esc(imageUrl(name))}" alt="">
+            <button type="button" data-dm-unattach="${esc(name)}" title="Remove">×</button></span>`;
+        }).join("");
+    }
+
+    const MAX_ATTACHMENTS = 10;
+    const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+
+    async function uploadImage(file) {
+        if (file.size > MAX_TOTAL_BYTES) throw new Error(`${file.name || "Image"} is larger than 20 MB.`);
+        const res = await fetch("/api/admin/uploads", {
+            method: "POST", credentials: "same-origin", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) { data = null; }
+        if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : `Upload failed (${res.status}).`);
+        return { name: data.name, size: file.size };
+    }
+
+    async function attachDmFiles(files) {
+        for (const file of files) {
+            if (state.dmPending.length >= MAX_ATTACHMENTS) return toast(`At most ${MAX_ATTACHMENTS} images per message.`, "error");
+            const currentTotal = state.dmPending.reduce((sum, item) => sum + (typeof item === "object" ? item.size || 0 : 0), 0);
+            if (currentTotal + file.size > MAX_TOTAL_BYTES) {
+                return toast("Total attachment size cannot exceed 20 MB.", "error");
+            }
+            try {
+                const item = await uploadImage(file);
+                state.dmPending.push(item);
+                renderDmPending();
+            } catch (err) { toast(err.message, "error"); }
+        }
+    }
+
     async function sendDm() {
         const input = $("dm-text");
         const text = input.value.trim();
-        if (!text || !state.dmOpen) return;
+        if ((!text && !state.dmPending.length) || !state.dmOpen) return;
         input.disabled = $("dm-send").disabled = true;
         try {
-            await api(`/api/admin/dms/${encodeURIComponent(state.dmOpen.user_id)}`, { method: "POST", body: { message: text } });
+            const images = state.dmPending.map((item) => typeof item === "string" ? item : item.name);
+            await api(`/api/admin/dms/${encodeURIComponent(state.dmOpen.user_id)}`, { method: "POST", body: { message: text, images } });
+            state.dmPending = [];
+            renderDmPending();
             input.value = "";
             await loadConversation();
             loadDms();
@@ -602,7 +681,26 @@ window.AdminBot = (() => {
         };
         $("dm-results").addEventListener("click", pickDm);
         $("dm-list").addEventListener("click", pickDm);
-        $("dm-chat").addEventListener("click", (e) => { if (e.target.id === "dm-send") sendDm(); });
+        $("dm-chat").addEventListener("click", (e) => {
+            if (e.target.id === "dm-send") sendDm();
+            if (e.target.id === "dm-attach") $("dm-file").click();
+            const un = e.target.closest("button[data-dm-unattach]");
+            if (un) { state.dmPending = state.dmPending.filter((item) => (typeof item === "string" ? item : item.name) !== un.dataset.dmUnattach); renderDmPending(); }
+        });
+        $("dm-chat").addEventListener("change", (e) => {
+            if (e.target.id !== "dm-file") return;
+            attachDmFiles([...e.target.files]);
+            e.target.value = "";
+        });
+        $("dm-chat").addEventListener("paste", (e) => {
+            const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith("image/"));
+            if (!files.length) return;
+            e.preventDefault();
+            attachDmFiles(files);
+        });
+        $("dm-chat").addEventListener("error", (e) => {
+            if (e.target.matches?.(".dm-media img, .dm-media video")) e.target.classList.add("hidden");
+        }, true);
         $("dm-chat").addEventListener("keydown", (e) => {
             if (e.target.id === "dm-text" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendDm(); }
         });

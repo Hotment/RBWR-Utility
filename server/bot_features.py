@@ -23,12 +23,13 @@ import json
 import logging
 import os
 import re
+import secrets
 import threading
 import time
 import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Sequence
 
 import disnake
 from disnake.ext import commands
@@ -100,6 +101,58 @@ automod_store = JsonStore("automod.json", {"config": {}, "incidents": [], "last_
 errors_store = JsonStore("errors.json", {"errors": [], "last_id": 0})
 
 
+MEDIA_DOMAINS = ("discordapp.com", "discordapp.net", "tenor.com", "giphy.com", "klipy.com")
+UPLOAD_NAME_RE = r"^[0-9a-f]{32}\.(png|jpg|gif|webp)$"
+UPLOAD_DIR = os.path.join(DATA_DIR, "admin_uploads")
+MAX_DM_MEDIA = 10
+MAX_DM_TOTAL_BYTES = 20 * 1024 * 1024
+MAX_DM_IMAGE_BYTES = MAX_DM_TOTAL_BYTES
+
+
+def safe_media_url(url) -> bool:
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(str(url))
+    except ValueError:
+        return False
+    host = (parts.hostname or "").lower()
+    return parts.scheme == "https" and any(host == d or host.endswith("." + d) for d in MEDIA_DOMAINS)
+
+
+def image_ext(head: bytes) -> str | None:
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _delete_dm_files(messages: list) -> None:
+    for m in messages:
+        names = list(m.get("images") or []) + [x.get("local") for x in (m.get("media") or []) if x.get("local")]
+        for name in names:
+            if re.match(UPLOAD_NAME_RE, str(name)):
+                try:
+                    os.remove(os.path.join(UPLOAD_DIR, name))
+                except OSError:
+                    pass
+
+
+def add_dm_media(discord_message_id: str, media: list) -> bool:
+    with dms_store.edit() as data:
+        for conv in data.get("conversations", {}).values():
+            for m in conv.get("messages", []):
+                if m.get("discord_message_id") == str(discord_message_id):
+                    have = {x.get("url") or x.get("local") for x in m.get("media", [])}
+                    m["media"] = ((m.get("media") or []) + [x for x in media if x.get("url") not in have])[:MAX_DM_MEDIA]
+                    return True
+    return False
+
+
 def record_dm(user_id, profile: dict, message: dict, incoming: bool) -> None:
     """Adds a message to the bot's DM conversation with a member (keeps the last 500 per member)."""
     now = utc_now()
@@ -109,7 +162,9 @@ def record_dm(user_id, profile: dict, message: dict, incoming: bool) -> None:
         )
         conv.update({k: v for k, v in profile.items() if k != "id" and v})
         conv["messages"].append({**message, "at": now, "direction": "in" if incoming else "out"})
+        dropped = conv["messages"][:-500]
         del conv["messages"][:-500]
+        _delete_dm_files(dropped)
         conv["updated_at"] = now
         if incoming:
             conv["unread"] = conv.get("unread", 0) + 1
@@ -410,7 +465,7 @@ def search_members(query: str) -> list[dict]:
     return _run(_search, timeout=8)
 
 
-def send_dm(user_id: str, text: str) -> dict:
+def send_dm(user_id: str, text: str, files: Sequence[tuple[str, str]] = ()) -> dict:
     """Sends a DM to a member of the server (blocking). Raises BotActionError."""
     async def _send():
         member = await _get_member(user_id)
@@ -419,25 +474,74 @@ def send_dm(user_id: str, text: str) -> dict:
         if member.bot:
             raise BotActionError("Bots can't receive DMs.")
         try:
-            msg = await member.send(text, allowed_mentions=disnake.AllowedMentions.none())
+            kwargs: dict[str, Any] = {"allowed_mentions": disnake.AllowedMentions.none()}
+            if text:
+                kwargs["content"] = text
+            if files:
+                kwargs["files"] = [disnake.File(p, filename=n) for p, n in files]
+            msg = await member.send(**kwargs)
         except disnake.Forbidden:
             raise BotActionError(f"{member.display_name} doesn't accept DMs from the bot (DMs closed or the bot is blocked).")
         return {"message_id": str(msg.id), "profile": _member_info(member)}
     return _run(_send)
 
 
+def _media_from_embeds(embeds: list[dict]) -> list[dict]:
+    media = []
+    for e in embeds or []:
+        video = (e.get("video") or {}).get("url")
+        image = (e.get("image") or {}).get("url") or (e.get("thumbnail") or {}).get("url")
+        if video and safe_media_url(video):
+            item = {"type": "video", "url": video}
+            if image and safe_media_url(image):
+                item["poster"] = image
+            media.append(item)
+        elif image and safe_media_url(image) and e.get("type") in ("gifv", "image", "rich", "link", None):
+            media.append({"type": "image", "url": image})
+    return media[:MAX_DM_MEDIA]
+
+
+async def _save_dm_images(message: disnake.Message) -> tuple[list[dict], list[str]]:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    media, others = [], []
+    total_size = 0
+    for a in message.attachments:
+        if (
+            len(media) < MAX_DM_MEDIA
+            and (a.content_type or "").startswith("image/")
+            and a.size <= MAX_DM_IMAGE_BYTES
+            and (total_size + a.size) <= MAX_DM_TOTAL_BYTES
+        ):
+            try:
+                data = await a.read()
+            except disnake.HTTPException:
+                data = b""
+            ext = image_ext(data[:16])
+            if ext and len(data) <= MAX_DM_IMAGE_BYTES and (total_size + len(data)) <= MAX_DM_TOTAL_BYTES:
+                name = f"{secrets.token_hex(16)}.{ext}"
+                with open(os.path.join(UPLOAD_DIR, name), "wb") as f:
+                    f.write(data)
+                media.append({"type": "image", "local": name})
+                total_size += len(data)
+                continue
+        others.append(a.url)
+    return media, others
+
+
 async def record_incoming_dm(message: disnake.Message) -> None:
     """A DM sent to the bot -> shown in the admin panel's Messages view."""
     text = (message.content or "").strip()
-    if message.attachments:
-        text = "\n".join([text] + [a.url for a in message.attachments]).strip()
-    if not text:
+    media, others = await _save_dm_images(message)
+    if others:
+        text = "\n".join([text] + others).strip()
+    media = (media + _media_from_embeds([e.to_dict() for e in message.embeds]))[:MAX_DM_MEDIA]  # pyright: ignore[reportArgumentType]
+    if not text and not media:
         return
     member = await _get_member(message.author.id)
     record_dm(
         message.author.id,
         _member_info(member or message.author),
-        {"text": text[:4000], "discord_message_id": str(message.id)},
+        {"text": text[:4000], "discord_message_id": str(message.id), **({"media": media} if media else {})},
         incoming=True,
     )
 
@@ -2052,6 +2156,13 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
             await automod_message(after, edited=True)
         except Exception:
             log.exception("Automod failed on an edited message in #%s", after.channel)
+
+    @bot.listen("on_raw_message_edit")
+    async def _features_dm_embeds(payload: disnake.RawMessageUpdateEvent):
+        if payload.guild_id is None and payload.data.get("embeds"):
+            media = _media_from_embeds(payload.data["embeds"])  # pyright: ignore[reportArgumentType]
+            if media:
+                add_dm_media(str(payload.message_id), media)
 
     @bot.listen("on_member_remove")
     async def _features_member_remove(member: disnake.Member):

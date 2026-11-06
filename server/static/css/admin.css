@@ -396,6 +396,16 @@ button.btn-gold:disabled {
     margin-top: 8px;
 }
 
+.dm-media { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dm-media img, .dm-media video { display: block; max-width: min(320px, 100%); max-height: 260px; border-radius: 10px; background: var(--surface-2); }
+.dm-pending { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.dm-pending:empty { display: none; }
+.dm-pending-item { position: relative; display: inline-block; }
+.dm-pending-item img { display: block; height: 64px; max-width: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); }
+.dm-pending-item button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--danger); color: #fff; font-size: 0.85rem; line-height: 1; }
+#dm-chat .tk-reply-row { align-items: center; justify-content: space-between; gap: 10px; }
+
 .msg {
     display: flex;
     gap: 10px;
