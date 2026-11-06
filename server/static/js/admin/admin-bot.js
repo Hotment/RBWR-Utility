@@ -174,7 +174,7 @@ window.AdminBot = (() => {
                 <textarea id="dm-text" class="adm-textarea" maxlength="2000" placeholder="Write a message as the RBWR bot… Paste a Tenor, Giphy or Klipy link to send a GIF, or attach / paste an image. (Enter to send, Shift+Enter for new line)"></textarea>
                 <div class="tk-reply-row">
                     <input type="file" id="dm-file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
-                    <button type="button" class="mono-btn" id="dm-attach" title="Attach a GIF or image (max 4, 8 MB each)">📎 GIF / image</button>
+                    <button type="button" class="mono-btn" id="dm-attach" title="Attach a GIF or image (max 4, 8 MB each)">GIF / image</button>
                     <button type="button" class="btn-gold" id="dm-send">Send DM</button>
                 </div>
             </div>`;

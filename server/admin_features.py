@@ -653,7 +653,7 @@ def init_app(app: Flask, **hooks) -> None:
         last = (conv.get("messages") or [{}])[-1]
         return {
             **{k: conv.get(k) for k in ("user_id", "name", "username", "avatar", "unread", "updated_at")},
-            "last": {"text": (last.get("text") or ("📎 GIF / image" if last.get("images") or last.get("media") else ""))[:120],
+            "last": {"text": (last.get("text") or ("GIF / image" if last.get("images") or last.get("media") else ""))[:120],
                      "direction": last.get("direction")},
         }
 
