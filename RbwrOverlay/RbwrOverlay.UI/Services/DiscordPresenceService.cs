@@ -11,15 +11,9 @@ public sealed class PresenceSnapshot
     public string SmallImageText { get; init; } = string.Empty;
 }
 
-/// <summary>
-/// Thin wrapper around DiscordRichPresence. Does nothing when no application id is configured.
-/// The application id comes from the RBWR_DISCORD_APP_ID environment variable, falling back to <see cref="DefaultApplicationId"/>.
-/// </summary>
 public sealed class DiscordPresenceService : IDisposable
 {
-    // Paste the Application ID from https://discord.com/developers/applications here.
-    // Upload a Rich Presence art asset named "icon" for the large image.
-    public const string DefaultApplicationId = "<YOUR_APPLICATION_ID_HERE>";
+    public const string DefaultApplicationId = "1568350684775059528";
 
     private const string LargeImageKey = "icon";
     private const string ReleasesUrl = "https://github.com/Hotment/RBWR-Utility/releases/latest";
@@ -129,7 +123,6 @@ public sealed class DiscordPresenceService : IDisposable
         _lastSentAt = DateTime.MinValue;
     }
 
-    // Discord rejects strings over 128 bytes.
     private static string? Truncate(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Length <= 120 ? s : s[..120];
 
     public void Dispose()
