@@ -29,7 +29,7 @@ import time
 import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Sequence
 
 import disnake
 from disnake.ext import commands
@@ -465,7 +465,7 @@ def search_members(query: str) -> list[dict]:
     return _run(_search, timeout=8)
 
 
-def send_dm(user_id: str, text: str, files: list[tuple[str, str]] = ()) -> dict:
+def send_dm(user_id: str, text: str, files: Sequence[tuple[str, str]] = ()) -> dict:
     """Sends a DM to a member of the server (blocking). Raises BotActionError."""
     async def _send():
         member = await _get_member(user_id)
@@ -474,8 +474,12 @@ def send_dm(user_id: str, text: str, files: list[tuple[str, str]] = ()) -> dict:
         if member.bot:
             raise BotActionError("Bots can't receive DMs.")
         try:
-            msg = await member.send(text or None, files=[disnake.File(p, filename=n) for p, n in files] or None,
-                                    allowed_mentions=disnake.AllowedMentions.none())
+            kwargs: dict[str, Any] = {"allowed_mentions": disnake.AllowedMentions.none()}
+            if text:
+                kwargs["content"] = text
+            if files:
+                kwargs["files"] = [disnake.File(p, filename=n) for p, n in files]
+            msg = await member.send(**kwargs)
         except disnake.Forbidden:
             raise BotActionError(f"{member.display_name} doesn't accept DMs from the bot (DMs closed or the bot is blocked).")
         return {"message_id": str(msg.id), "profile": _member_info(member)}
@@ -2156,7 +2160,7 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
     @bot.listen("on_raw_message_edit")
     async def _features_dm_embeds(payload: disnake.RawMessageUpdateEvent):
         if payload.guild_id is None and payload.data.get("embeds"):
-            media = _media_from_embeds(payload.data["embeds"])
+            media = _media_from_embeds(payload.data["embeds"])  # pyright: ignore[reportArgumentType]
             if media:
                 add_dm_media(str(payload.message_id), media)
 
