@@ -22,6 +22,7 @@ public sealed class DiscordPresenceService : IDisposable
     public const string DefaultApplicationId = "<YOUR_APPLICATION_ID_HERE>";
 
     private const string LargeImageKey = "icon";
+    private const string ReleasesUrl = "https://github.com/Hotment/RBWR-Utility/releases/latest";
     private static readonly TimeSpan MinUpdateInterval = TimeSpan.FromSeconds(5);
 
     private readonly ILoggingService _logger;
@@ -78,7 +79,7 @@ public sealed class DiscordPresenceService : IDisposable
                 },
                 Buttons = new[]
                 {
-                    new Button { Label = "Get RBWR Overlay", Url = "https://github.com/Hotment/RBWR-Utility" }
+                    new Button { Label = "Get RBWR Overlay", Url = ReleasesUrl }
                 }
             });
             _lastSent = snapshot;
