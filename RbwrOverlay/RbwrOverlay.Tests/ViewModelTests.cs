@@ -24,7 +24,10 @@ public class ViewModelTests
 
     private class DummyProcessMonitor : IProcessMonitor
     {
-        public bool IsRobloxActive => false;
+        public bool IsRobloxActive { get; set; } = false;
+        public bool IsRobloxRunning { get; set; } = false;
+        public long? CurrentPlaceId { get; set; } = null;
+        public string? CurrentJobId { get; set; } = null;
 #pragma warning disable CS0067
         public event EventHandler<bool>? RobloxActiveChanged;
 #pragma warning restore CS0067
@@ -34,10 +37,10 @@ public class ViewModelTests
         public void Dispose() { }
     }
 
-    private static MainOverlayViewModel CreateTestVm(DummySettingsService? settings = null)
+    private static MainOverlayViewModel CreateTestVm(DummySettingsService? settings = null, DummyProcessMonitor? processMonitor = null)
     {
         settings ??= new DummySettingsService();
-        var processMonitor = new DummyProcessMonitor();
+        processMonitor ??= new DummyProcessMonitor();
         var logger = LoggingService.Instance;
         return new MainOverlayViewModel(settings, null, processMonitor, logger);
     }
@@ -226,6 +229,84 @@ public class ViewModelTests
         Assert.False(vm.IsTopmost);
         Assert.Equal("PIN", vm.PinSymbol);
         Assert.False(settingsService.Settings.IsTopmost);
+    }
+
+    [Fact]
+    public void TestAutoSyncOnJoinToggle()
+    {
+        var settingsService = new DummySettingsService();
+        settingsService.Settings.AutoSyncOnJoin = true;
+        var vm = CreateTestVm(settingsService);
+
+        Assert.True(vm.AutoSyncOnJoin);
+        Assert.Equal("ENABLED", vm.AutoSyncOnJoinStatusText);
+
+        vm.ToggleAutoSyncOnJoin();
+        Assert.False(vm.AutoSyncOnJoin);
+        Assert.Equal("DISABLED", vm.AutoSyncOnJoinStatusText);
+        Assert.False(settingsService.Settings.AutoSyncOnJoin);
+
+        vm.ToggleAutoSyncOnJoin();
+        Assert.True(vm.AutoSyncOnJoin);
+        Assert.Equal("ENABLED", vm.AutoSyncOnJoinStatusText);
+        Assert.True(settingsService.Settings.AutoSyncOnJoin);
+    }
+
+    [Fact]
+    public async Task TestAutoSyncOnJoinOverridesCurrentJobId()
+    {
+        var proc = new DummyProcessMonitor
+        {
+            IsRobloxRunning = true,
+            CurrentPlaceId = 11765852158,
+            CurrentJobId = "new-joined-job-12345"
+        };
+        var vm = CreateTestVm(processMonitor: proc);
+        vm.CurrentJobId = "old-prior-job-99999";
+        vm.JobIdInput = "old-prior-job-99999";
+
+        await vm.CheckAutoSyncOnJoinAsync();
+
+        Assert.Equal("new-joined-job-12345", vm.CurrentJobId);
+        Assert.Equal("new-joined-job-12345", vm.JobIdInput);
+    }
+
+    [Fact]
+    public async Task TestAutoSyncOnJoinDoesNotApplyJobId_WhenDifferentPlaceId()
+    {
+        var proc = new DummyProcessMonitor
+        {
+            IsRobloxRunning = true,
+            CurrentPlaceId = 987654321,
+            CurrentJobId = null
+        };
+        var vm = CreateTestVm(processMonitor: proc);
+        vm.CurrentJobId = "old-prior-job-99999";
+        vm.JobIdInput = "old-prior-job-99999";
+
+        await vm.CheckAutoSyncOnJoinAsync();
+
+        Assert.Equal("old-prior-job-99999", vm.CurrentJobId);
+        Assert.Equal("old-prior-job-99999", vm.JobIdInput);
+    }
+
+    [Fact]
+    public async Task TestAutoSyncOnJoinDoesNotApplyJobId_WhenUserLeftGame()
+    {
+        var proc = new DummyProcessMonitor
+        {
+            IsRobloxRunning = true,
+            CurrentPlaceId = null,
+            CurrentJobId = null
+        };
+        var vm = CreateTestVm(processMonitor: proc);
+        vm.CurrentJobId = "old-prior-job-99999";
+        vm.JobIdInput = "old-prior-job-99999";
+
+        await vm.CheckAutoSyncOnJoinAsync();
+
+        Assert.Equal("old-prior-job-99999", vm.CurrentJobId);
+        Assert.Equal("old-prior-job-99999", vm.JobIdInput);
     }
 
     [Fact]

@@ -239,9 +239,17 @@ public static class TooltipCatalog
             Title: "HOVER HELP TOOLTIPS",
             Description: "Click to enable or disable popup help notes when hovering over controls and readouts."
         ),
+        ["DiscordPresenceToggle"] = new(
+            Title: "DISCORD RICH PRESENCE",
+            Description: "Shows your current unit, power level and sync status on your Discord profile while the overlay is running. Requires the Discord desktop app."
+        ),
         ["RobloxTopmostToggle"] = new(
             Title: "AUTO-TOPMOST ON ROBLOX",
             Description: "When enabled, automatically keeps the overlay on top while Roblox is in the foreground and lets other windows cover it when you tab out. (May be a bit buggy)"
+        ),
+        ["AutoSyncOnJoinToggle"] = new(
+            Title: "AUTO-SYNC ON ROBLOX JOIN",
+            Description: "When enabled, automatically detects the server Job ID when you join an RBWR server and synchronizes the overlay."
         ),
         ["RecircOverrideConfig"] = new(
             Title: "MANUAL RECIRCULATION OVERRIDE",

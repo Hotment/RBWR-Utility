@@ -13,6 +13,14 @@ public partial class WindowsProcessMonitor : IProcessMonitor
     private bool _isRobloxActive;
     private bool _isDisposed;
     private IntPtr _lastLoggedHwnd = IntPtr.Zero;
+    private volatile bool _isRobloxRunning;
+    private long _currentPlaceId;
+    private string? _currentJobId;
+    private int _slowPollCounter;
+
+    public bool IsRobloxRunning => _isRobloxRunning;
+    public long? CurrentPlaceId => Interlocked.Read(ref _currentPlaceId) is var id && id > 0 ? id : null;
+    public string? CurrentJobId => _currentJobId;
 
     public bool IsRobloxActive
     {
@@ -88,6 +96,11 @@ public partial class WindowsProcessMonitor : IProcessMonitor
 
                     IsRobloxActive = newRobloxActive;
                 }
+
+                if (_slowPollCounter++ % 10 == 0)
+                {
+                    RefreshRobloxProcessState();
+                }
             }
             catch (Exception ex)
             {
@@ -102,6 +115,42 @@ public partial class WindowsProcessMonitor : IProcessMonitor
             {
                 break;
             }
+        }
+    }
+
+    private void RefreshRobloxProcessState()
+    {
+        bool running = false;
+        var procs = Process.GetProcessesByName("RobloxPlayerBeta");
+        foreach (var p in procs)
+        {
+            try
+            {
+                if (!p.HasExited && p.MainWindowHandle != IntPtr.Zero) running = true;
+            }
+            catch
+            {
+            }
+            finally
+            {
+                p.Dispose();
+            }
+        }
+
+        _isRobloxRunning = running;
+        if (running)
+        {
+            var joinInfo = RobloxLogReader.GetLastJoinedGame();
+            long placeId = joinInfo?.PlaceId ?? 0;
+            Interlocked.Exchange(ref _currentPlaceId, placeId);
+            _currentJobId = (placeId == RobloxLogReader.RbwrPlaceId && !string.IsNullOrEmpty(joinInfo?.JobId))
+                ? joinInfo.Value.JobId
+                : null;
+        }
+        else
+        {
+            Interlocked.Exchange(ref _currentPlaceId, 0);
+            _currentJobId = null;
         }
     }
 

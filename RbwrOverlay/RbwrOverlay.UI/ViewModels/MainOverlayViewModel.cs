@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Calculations;
 using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.UI.Services;
 using RbwrOverlay.Platform;
 
 namespace RbwrOverlay.UI.ViewModels;
@@ -41,6 +42,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     public int ConnectionRetryDelayMs { get; set; } = 1000;
 
     private readonly DispatcherTimer _dtlTimer;
+    private readonly DiscordPresenceService _discord;
     private bool _isUpdatingFields;
     private bool _isDisposed;
 
@@ -56,6 +58,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
+    private const long RbwrPlaceId = RobloxLogReader.RbwrPlaceId;
 
 
     [ObservableProperty]
@@ -366,10 +369,28 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _showTooltips = true;
 
     [ObservableProperty]
+    private bool _enableDiscordPresence = true;
+
+    [ObservableProperty]
+    private string _discordPresenceStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _discordPresenceStatusBrush = Brushes.LimeGreen;
+
+    [ObservableProperty]
     private string _tooltipsStatusText = "ENABLED";
 
     [ObservableProperty]
     private IBrush _tooltipsStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+
+    [ObservableProperty]
+    private bool _autoSyncOnJoin = true;
+
+    [ObservableProperty]
+    private string _autoSyncOnJoinStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _autoSyncOnJoinStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
 
 
     [ObservableProperty]
@@ -447,6 +468,11 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _turbineHealthThresholdInput = ((int)_settings.TurbineHealthThreshold).ToString();
         _showTooltips = _settings.ShowTooltips;
         TooltipCatalog.SetEnabled(_showTooltips);
+        _enableDiscordPresence = _settings.EnableDiscordPresence;
+        _autoSyncOnJoin = _settings.AutoSyncOnJoin;
+
+        _discord = new DiscordPresenceService(_logger);
+        _discord.SetEnabled(_enableDiscordPresence);
 
         UpdatePinSymbol();
         UpdateUnitVisuals();
@@ -1196,6 +1222,167 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private void OnDtlTimerTick(object? sender, EventArgs e)
     {
         TickDtlCountdown();
+        UpdateDiscordPresence();
+        CheckAutoSyncOnJoin();
+    }
+
+    private string? _targetAutoSyncJobId;
+    private string? _lastAutoSyncedJobId;
+    private DateTime _lastAutoSyncAttemptTime = DateTime.MinValue;
+    private bool _isAutoSyncInProgress;
+
+    private void CheckAutoSyncOnJoin()
+    {
+        _ = CheckAutoSyncOnJoinAsync();
+    }
+
+    internal async Task CheckAutoSyncOnJoinAsync()
+    {
+        if (!AutoSyncOnJoin || !_processMonitor.IsRobloxRunning)
+        {
+            if (!_processMonitor.IsRobloxRunning)
+            {
+                _targetAutoSyncJobId = null;
+                _lastAutoSyncedJobId = null;
+            }
+            return;
+        }
+
+        if (_processMonitor.CurrentPlaceId != RbwrPlaceId)
+        {
+            _targetAutoSyncJobId = null;
+            _lastAutoSyncedJobId = null;
+            return;
+        }
+
+        string? detectedJobId = _processMonitor.CurrentJobId;
+        if (string.IsNullOrWhiteSpace(detectedJobId)) return;
+
+        if (_activeServer != null && string.Equals(_activeServer.JobId, detectedJobId, StringComparison.OrdinalIgnoreCase))
+        {
+            _targetAutoSyncJobId = detectedJobId;
+            _lastAutoSyncedJobId = detectedJobId;
+            return;
+        }
+
+        if (_isAutoSyncInProgress) return;
+
+        bool isNewJob = !string.Equals(detectedJobId, _targetAutoSyncJobId, StringComparison.OrdinalIgnoreCase);
+        double secondsSinceLastAttempt = (DateTime.UtcNow - _lastAutoSyncAttemptTime).TotalSeconds;
+
+        if (!isNewJob && secondsSinceLastAttempt < 3.0)
+        {
+            return;
+        }
+
+        _targetAutoSyncJobId = detectedJobId;
+        _lastAutoSyncAttemptTime = DateTime.UtcNow;
+        _isAutoSyncInProgress = true;
+
+        try
+        {
+            _logger.Info($"[AutoSync] {(isNewJob ? "Detected" : "Retrying")} RBWR server join with Job ID: {detectedJobId}. Synchronizing overlay (overriding existing sync)...");
+
+            CurrentJobId = detectedJobId;
+            JobIdInput = detectedJobId;
+
+            await ConnectServerAsync(detectedJobId, isUserInitiated: true);
+
+            if (_activeServer != null && string.Equals(_activeServer.JobId, detectedJobId, StringComparison.OrdinalIgnoreCase))
+            {
+                _lastAutoSyncedJobId = detectedJobId;
+                _logger.Info($"[AutoSync] Successfully synced and overridden to Job ID: {detectedJobId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"[AutoSync] Error during auto-sync to {detectedJobId}: {ex.Message}");
+        }
+        finally
+        {
+            _isAutoSyncInProgress = false;
+        }
+    }
+
+    private void UpdateDiscordPresence()
+    {
+        if (!EnableDiscordPresence) return;
+
+        bool robloxRunning = _processMonitor.IsRobloxRunning;
+        string overlayMode = IsCompact ? "Compact HUD" : "Detailed HUD";
+
+        if (!robloxRunning)
+        {
+            _discord.Update(new PresenceSnapshot
+            {
+                Details = "RBWR Overlay",
+                State = "Waiting for Roblox",
+                SmallImageText = overlayMode
+            });
+            return;
+        }
+
+        bool inRbwr = _processMonitor.CurrentPlaceId == RbwrPlaceId;
+        if (!inRbwr)
+        {
+            _discord.Update(new PresenceSnapshot
+            {
+                Details = "Roblox",
+                State = string.Empty,
+                SmallImageText = overlayMode
+            });
+            return;
+        }
+
+        string unit = SelectedUnit switch { 1 => "Unit 1", 2 => "Unit 2", _ => "Unit 2 TCR" };
+        string prefix = _activeServer != null ? "Calculating" : "RBWR";
+        string details = IsError ? $"{prefix} | {unit}" : $"{prefix} | {unit} | {MainStatusPowerText}";
+
+        string state;
+        if (_activeServer != null)
+        {
+            state = IsError ? "Synced with server" : $"Synced | {GeneratorLoadText}";
+            var uState = SelectedUnit == 1 ? _activeServer.Unit1 : _activeServer.Unit2;
+            if (uState?.NextDemand is double nd && nd >= 0)
+                state = $"{state} | Next {nd:F0} MWe";
+        }
+        else
+        {
+            state = IsError ? "Operating the plant" : GeneratorLoadText;
+        }
+
+        _discord.Update(new PresenceSnapshot
+        {
+            Details = details,
+            State = state,
+            SmallImageText = overlayMode
+        });
+    }
+
+    [RelayCommand]
+    public void ToggleDiscordPresence()
+    {
+        EnableDiscordPresence = !EnableDiscordPresence;
+        _settings.EnableDiscordPresence = EnableDiscordPresence;
+        _discord.SetEnabled(EnableDiscordPresence);
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
+        if (EnableDiscordPresence) UpdateDiscordPresence();
+    }
+
+    [RelayCommand]
+    public void ToggleAutoSyncOnJoin()
+    {
+        AutoSyncOnJoin = !AutoSyncOnJoin;
+        _settings.AutoSyncOnJoin = AutoSyncOnJoin;
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
+        if (AutoSyncOnJoin)
+        {
+            _targetAutoSyncJobId = null;
+            _lastAutoSyncedJobId = null;
+            CheckAutoSyncOnJoin();
+        }
     }
 
     internal void TickDtlCountdown()
@@ -1708,6 +1895,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
         TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
 
+        DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
+        DiscordPresenceStatusBrush = EnableDiscordPresence ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
+        AutoSyncOnJoinStatusText = AutoSyncOnJoin ? "ENABLED" : "DISABLED";
+        AutoSyncOnJoinStatusBrush = AutoSyncOnJoin ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
         TooltipsStatusText = ShowTooltips ? "ENABLED" : "DISABLED";
         TooltipsStatusBrush = ShowTooltips ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
     }
@@ -1718,6 +1911,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _isDisposed = true;
         _connectLock.Dispose();
         _dtlTimer.Stop();
+        _discord.Dispose();
         _processMonitor.RobloxActiveChanged -= OnRobloxActiveChanged;
         _processMonitor.Dispose();
         GC.SuppressFinalize(this);
