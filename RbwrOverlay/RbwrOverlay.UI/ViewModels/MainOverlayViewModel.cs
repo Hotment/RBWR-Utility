@@ -194,8 +194,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _topmostOnRoblox = true;
-    private bool _robloxForeground;
-    private bool _editorForeground;
 
     [ObservableProperty]
     private double _overlayOpacity = 0.90;
@@ -371,15 +369,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _showTooltips = true;
 
     [ObservableProperty]
-    private bool _topmostOnVsCode = true;
-
-    [ObservableProperty]
-    private string _vsCodeTopmostStatusText = "ENABLED";
-
-    [ObservableProperty]
-    private IBrush _vsCodeTopmostStatusBrush = Brushes.LimeGreen;
-
-    [ObservableProperty]
     private bool _enableDiscordPresence = true;
 
     [ObservableProperty]
@@ -457,7 +446,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _isCompact = _settings.IsCompact;
         _isTopmost = _settings.IsTopmost;
         _topmostOnRoblox = _settings.TopmostOnRoblox;
-        _topmostOnVsCode = _settings.TopmostOnVsCode;
         _overlayOpacity = _settings.Opacity;
         _uiScale = _settings.UiScale <= 0 ? 1.0 : _settings.UiScale;
         _uiScalePreview = _uiScale;
@@ -489,7 +477,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _dtlTimer.Start();
 
         _processMonitor.RobloxActiveChanged += OnRobloxActiveChanged;
-        _processMonitor.EditorActiveChanged += OnEditorActiveChanged;
         _processMonitor.StartMonitoring();
 
         UpdateCalculationsFromDemand(0.0);
@@ -1657,31 +1644,11 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     private void OnRobloxActiveChanged(object? sender, bool isRoblox)
     {
-        _robloxForeground = isRoblox;
         if (TopmostOnRoblox)
         {
-            IsTopmost = isRoblox || (TopmostOnVsCode && _editorForeground);
+            IsTopmost = isRoblox;
             UpdatePinSymbol();
         }
-    }
-
-    private void OnEditorActiveChanged(object? sender, bool isEditor)
-    {
-        _editorForeground = isEditor;
-        if (TopmostOnVsCode)
-        {
-            IsTopmost = isEditor || (TopmostOnRoblox && _robloxForeground);
-            UpdatePinSymbol();
-        }
-    }
-
-    [RelayCommand]
-    public void ToggleVsCodeTopmost()
-    {
-        TopmostOnVsCode = !TopmostOnVsCode;
-        _settings.TopmostOnVsCode = TopmostOnVsCode;
-        UpdateSettingsVisuals();
-        _settingsService.SaveSettings(_settings);
     }
 
     private void UpdatePinSymbol()
@@ -1824,9 +1791,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
         TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
 
-        VsCodeTopmostStatusText = TopmostOnVsCode ? "ENABLED" : "DISABLED";
-        VsCodeTopmostStatusBrush = TopmostOnVsCode ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
-
         DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
         DiscordPresenceStatusBrush = EnableDiscordPresence ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
 
@@ -1842,7 +1806,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _dtlTimer.Stop();
         _discord.Dispose();
         _processMonitor.RobloxActiveChanged -= OnRobloxActiveChanged;
-        _processMonitor.EditorActiveChanged -= OnEditorActiveChanged;
         _processMonitor.Dispose();
         GC.SuppressFinalize(this);
     }

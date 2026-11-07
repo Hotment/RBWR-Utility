@@ -539,13 +539,6 @@
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="VsCodeTopmostToggle">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Grid.Column="0" Text="Topmost on VS Code:" VerticalAlignment="Center" FontSize="11" />
-                                <Button Grid.Column="1" Classes="cyber" Content="{Binding VsCodeTopmostStatusText}" Foreground="{Binding VsCodeTopmostStatusBrush}" Command="{Binding ToggleVsCodeTopmostCommand}" Padding="10,3" />
-                            </Grid>
-                        </Border>
-
                         <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RecircOverrideConfig">
                             <Grid ColumnDefinitions="*,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="Recirc Override (%):" VerticalAlignment="Center" FontSize="11" />

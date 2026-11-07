@@ -243,10 +243,6 @@ public static class TooltipCatalog
             Title: "DISCORD RICH PRESENCE",
             Description: "Shows your current unit, power level and sync status on your Discord profile while the overlay is running. Requires the Discord desktop app."
         ),
-        ["VsCodeTopmostToggle"] = new(
-            Title: "TOPMOST ON VS CODE",
-            Description: "When enabled, keeps the overlay on top while Visual Studio Code is in the foreground."
-        ),
         ["RobloxTopmostToggle"] = new(
             Title: "AUTO-TOPMOST ON ROBLOX",
             Description: "When enabled, automatically keeps the overlay on top while Roblox is in the foreground and lets other windows cover it when you tab out. (May be a bit buggy)"

@@ -16,24 +16,6 @@ public partial class WindowsProcessMonitor : IProcessMonitor
     private volatile bool _isRobloxRunning;
     private long _currentPlaceId;
     private int _slowPollCounter;
-    private bool _isEditorActive;
-
-    private static readonly string[] EditorProcesses = { "code.exe", "code - insiders.exe" };
-
-    public bool IsEditorActive
-    {
-        get => _isEditorActive;
-        private set
-        {
-            if (_isEditorActive != value)
-            {
-                _isEditorActive = value;
-                EditorActiveChanged?.Invoke(this, value);
-            }
-        }
-    }
-
-    public event EventHandler<bool>? EditorActiveChanged;
 
     public bool IsRobloxRunning => _isRobloxRunning;
     public long? CurrentPlaceId => Interlocked.Read(ref _currentPlaceId) is var id && id > 0 ? id : null;
@@ -111,9 +93,6 @@ public partial class WindowsProcessMonitor : IProcessMonitor
                     }
 
                     IsRobloxActive = newRobloxActive;
-
-                    bool isEditor = Array.IndexOf(EditorProcesses, procLower) >= 0;
-                    IsEditorActive = isEditor || (isOurs && _isEditorActive);
                 }
 
                 if (_slowPollCounter++ % 10 == 0)

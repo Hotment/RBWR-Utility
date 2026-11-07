@@ -28,9 +28,6 @@ public class AppSettings
     [JsonPropertyName("topmost_on_roblox")]
     public bool TopmostOnRoblox { get; set; } = true;
 
-    [JsonPropertyName("topmost_on_vscode")]
-    public bool TopmostOnVsCode { get; set; } = true;
-
     [JsonPropertyName("skipped_version")]
     public string SkippedVersion { get; set; } = string.Empty;
 
