@@ -1,6 +1,7 @@
 using System.Text.Json;
 using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.Platform;
 using Xunit;
 
 namespace RbwrOverlay.Tests;
@@ -144,6 +145,104 @@ public class ApiAndServiceTests
             string sanitizedCurrent = logger.SanitizeString(currentPath);
             Assert.DoesNotContain(Environment.UserName, sanitizedCurrent);
             Assert.Contains("%userprofile%", sanitizedCurrent);
+        }
+    }
+
+    [Fact]
+    public void TestRobloxJoinInfoRecord()
+    {
+        var info = new RobloxJoinInfo("d6386411-4385-4b3e-8f20-b4724bb4e357", 11765852158);
+        Assert.Equal("d6386411-4385-4b3e-8f20-b4724bb4e357", info.JobId);
+        Assert.Equal(11765852158, info.PlaceId);
+    }
+
+    [Fact]
+    public void TestRobloxLogReader_ParsesJobIdAndIgnoresCrashHandler()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "RobloxLogReaderTests_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string playerLog = Path.Combine(tempDir, "0.746.0_Player_ABC12_last.log");
+            string playerContent = """
+            2026-11-07T10:40:00.000Z,1.000,100,6 [FLog::Output] ! Joining game 'job-old-session-111' place 12345 at 10.0.0.1
+            2026-11-07T10:42:48.000Z,2.000,200,6 [FLog::Output] ! Joining game '240139be-5d8e-46ca-86c6-059050831aee' place 11765852158 at 10.18.6.21
+            """;
+            File.WriteAllText(playerLog, playerContent);
+            File.SetLastWriteTimeUtc(playerLog, DateTime.UtcNow.AddMinutes(-5));
+
+            string crashHandlerLog = Path.Combine(tempDir, "0.746.0_Player_C0819_CrashHandler_last.log");
+            string crashContent = """
+            [FLog::CrashpadHandlerLog] Crashpad handler logging initialized
+            [FLog::CrashpadHandlerLog] Handler executable command line: RobloxCrashHandler.exe
+            """;
+            File.WriteAllText(crashHandlerLog, crashContent);
+            File.SetLastWriteTimeUtc(crashHandlerLog, DateTime.UtcNow.AddMinutes(-1));
+
+            var result = RobloxLogReader.GetLastJoinedGame(tempDir);
+            Assert.NotNull(result);
+            Assert.Equal("240139be-5d8e-46ca-86c6-059050831aee", result.Value.JobId);
+            Assert.Equal(11765852158, result.Value.PlaceId);
+
+            var placeId = RobloxLogReader.GetLastJoinedPlaceId(tempDir);
+            Assert.Equal(11765852158, placeId);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void TestRobloxLogReader_ReturnsNull_WhenUserLeftGameAfterJoin()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "RobloxLogReaderTests_Leave_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string playerLog = Path.Combine(tempDir, "0.746.0_Player_XYZ_last.log");
+            string playerContent = """
+            2026-11-07T10:42:48.000Z,2.000,200,6 [FLog::Output] ! Joining game '240139be-5d8e-46ca-86c6-059050831aee' place 11765852158 at 10.18.6.21
+            2026-11-07T10:51:44.716Z,537.716,a5ac,6 [FLog::SingleSurfaceApp] leaveUGCGameInternal
+            2026-11-07T10:51:48.889Z,541.889,258c,6 [FLog::SessionTransitionFSM] Entered app session.
+            """;
+            File.WriteAllText(playerLog, playerContent);
+
+            var result = RobloxLogReader.GetLastJoinedGame(tempDir);
+            Assert.Null(result);
+
+            var placeId = RobloxLogReader.GetLastJoinedPlaceId(tempDir);
+            Assert.Null(placeId);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void TestRobloxLogReader_ReturnsSecondGame_WhenUserLeftFirstAndJoinedSecond()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "RobloxLogReaderTests_SecondJoin_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string playerLog = Path.Combine(tempDir, "0.746.0_Player_Second_last.log");
+            string playerContent = """
+            2026-11-07T10:42:48.000Z,2.000,200,6 [FLog::Output] ! Joining game 'rbwr-job-111' place 11765852158 at 10.18.6.21
+            2026-11-07T10:51:44.716Z,537.716,a5ac,6 [FLog::SingleSurfaceApp] leaveUGCGameInternal
+            2026-11-07T11:15:49.000Z,1982.00,4cd0,6 [FLog::Output] ! Joining game 'other-game-job-222' place 987654321 at 10.18.6.22
+            """;
+            File.WriteAllText(playerLog, playerContent);
+
+            var result = RobloxLogReader.GetLastJoinedGame(tempDir);
+            Assert.NotNull(result);
+            Assert.Equal("other-game-job-222", result.Value.JobId);
+            Assert.Equal(987654321, result.Value.PlaceId);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
         }
     }
 }

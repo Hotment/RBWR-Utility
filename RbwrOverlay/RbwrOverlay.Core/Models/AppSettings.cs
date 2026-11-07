@@ -28,6 +28,9 @@ public class AppSettings
     [JsonPropertyName("topmost_on_roblox")]
     public bool TopmostOnRoblox { get; set; } = true;
 
+    [JsonPropertyName("auto_sync_on_join")]
+    public bool AutoSyncOnJoin { get; set; } = true;
+
     [JsonPropertyName("skipped_version")]
     public string SkippedVersion { get; set; } = string.Empty;
 

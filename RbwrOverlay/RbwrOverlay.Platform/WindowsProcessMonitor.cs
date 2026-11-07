@@ -15,10 +15,12 @@ public partial class WindowsProcessMonitor : IProcessMonitor
     private IntPtr _lastLoggedHwnd = IntPtr.Zero;
     private volatile bool _isRobloxRunning;
     private long _currentPlaceId;
+    private string? _currentJobId;
     private int _slowPollCounter;
 
     public bool IsRobloxRunning => _isRobloxRunning;
     public long? CurrentPlaceId => Interlocked.Read(ref _currentPlaceId) is var id && id > 0 ? id : null;
+    public string? CurrentJobId => _currentJobId;
 
     public bool IsRobloxActive
     {
@@ -136,7 +138,20 @@ public partial class WindowsProcessMonitor : IProcessMonitor
         }
 
         _isRobloxRunning = running;
-        Interlocked.Exchange(ref _currentPlaceId, running ? (RobloxLogReader.GetLastJoinedPlaceId() ?? 0) : 0);
+        if (running)
+        {
+            var joinInfo = RobloxLogReader.GetLastJoinedGame();
+            long placeId = joinInfo?.PlaceId ?? 0;
+            Interlocked.Exchange(ref _currentPlaceId, placeId);
+            _currentJobId = (placeId == RobloxLogReader.RbwrPlaceId && !string.IsNullOrEmpty(joinInfo?.JobId))
+                ? joinInfo.Value.JobId
+                : null;
+        }
+        else
+        {
+            Interlocked.Exchange(ref _currentPlaceId, 0);
+            _currentJobId = null;
+        }
     }
 
     public string GetForegroundWindowInfo()

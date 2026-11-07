@@ -58,7 +58,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
-    private const long RbwrPlaceId = 11765852158;
+    private const long RbwrPlaceId = RobloxLogReader.RbwrPlaceId;
 
 
     [ObservableProperty]
@@ -383,6 +383,15 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private IBrush _tooltipsStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
 
+    [ObservableProperty]
+    private bool _autoSyncOnJoin = true;
+
+    [ObservableProperty]
+    private string _autoSyncOnJoinStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _autoSyncOnJoinStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+
 
     [ObservableProperty]
     private string _feedbackAuthor = string.Empty;
@@ -460,6 +469,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _showTooltips = _settings.ShowTooltips;
         TooltipCatalog.SetEnabled(_showTooltips);
         _enableDiscordPresence = _settings.EnableDiscordPresence;
+        _autoSyncOnJoin = _settings.AutoSyncOnJoin;
 
         _discord = new DiscordPresenceService(_logger);
         _discord.SetEnabled(_enableDiscordPresence);
@@ -1213,6 +1223,85 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     {
         TickDtlCountdown();
         UpdateDiscordPresence();
+        CheckAutoSyncOnJoin();
+    }
+
+    private string? _targetAutoSyncJobId;
+    private string? _lastAutoSyncedJobId;
+    private DateTime _lastAutoSyncAttemptTime = DateTime.MinValue;
+    private bool _isAutoSyncInProgress;
+
+    private void CheckAutoSyncOnJoin()
+    {
+        _ = CheckAutoSyncOnJoinAsync();
+    }
+
+    internal async Task CheckAutoSyncOnJoinAsync()
+    {
+        if (!AutoSyncOnJoin || !_processMonitor.IsRobloxRunning)
+        {
+            if (!_processMonitor.IsRobloxRunning)
+            {
+                _targetAutoSyncJobId = null;
+                _lastAutoSyncedJobId = null;
+            }
+            return;
+        }
+
+        if (_processMonitor.CurrentPlaceId != RbwrPlaceId)
+        {
+            _targetAutoSyncJobId = null;
+            _lastAutoSyncedJobId = null;
+            return;
+        }
+
+        string? detectedJobId = _processMonitor.CurrentJobId;
+        if (string.IsNullOrWhiteSpace(detectedJobId)) return;
+
+        if (_activeServer != null && string.Equals(_activeServer.JobId, detectedJobId, StringComparison.OrdinalIgnoreCase))
+        {
+            _targetAutoSyncJobId = detectedJobId;
+            _lastAutoSyncedJobId = detectedJobId;
+            return;
+        }
+
+        if (_isAutoSyncInProgress) return;
+
+        bool isNewJob = !string.Equals(detectedJobId, _targetAutoSyncJobId, StringComparison.OrdinalIgnoreCase);
+        double secondsSinceLastAttempt = (DateTime.UtcNow - _lastAutoSyncAttemptTime).TotalSeconds;
+
+        if (!isNewJob && secondsSinceLastAttempt < 3.0)
+        {
+            return;
+        }
+
+        _targetAutoSyncJobId = detectedJobId;
+        _lastAutoSyncAttemptTime = DateTime.UtcNow;
+        _isAutoSyncInProgress = true;
+
+        try
+        {
+            _logger.Info($"[AutoSync] {(isNewJob ? "Detected" : "Retrying")} RBWR server join with Job ID: {detectedJobId}. Synchronizing overlay (overriding existing sync)...");
+
+            CurrentJobId = detectedJobId;
+            JobIdInput = detectedJobId;
+
+            await ConnectServerAsync(detectedJobId, isUserInitiated: true);
+
+            if (_activeServer != null && string.Equals(_activeServer.JobId, detectedJobId, StringComparison.OrdinalIgnoreCase))
+            {
+                _lastAutoSyncedJobId = detectedJobId;
+                _logger.Info($"[AutoSync] Successfully synced and overridden to Job ID: {detectedJobId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"[AutoSync] Error during auto-sync to {detectedJobId}: {ex.Message}");
+        }
+        finally
+        {
+            _isAutoSyncInProgress = false;
+        }
     }
 
     private void UpdateDiscordPresence()
@@ -1233,7 +1322,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        bool inRbwr = _processMonitor.CurrentPlaceId == RbwrPlaceId || _activeServer != null;
+        bool inRbwr = _processMonitor.CurrentPlaceId == RbwrPlaceId;
         if (!inRbwr)
         {
             _discord.Update(new PresenceSnapshot
@@ -1279,6 +1368,21 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         UpdateSettingsVisuals();
         _settingsService.SaveSettings(_settings);
         if (EnableDiscordPresence) UpdateDiscordPresence();
+    }
+
+    [RelayCommand]
+    public void ToggleAutoSyncOnJoin()
+    {
+        AutoSyncOnJoin = !AutoSyncOnJoin;
+        _settings.AutoSyncOnJoin = AutoSyncOnJoin;
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
+        if (AutoSyncOnJoin)
+        {
+            _targetAutoSyncJobId = null;
+            _lastAutoSyncedJobId = null;
+            CheckAutoSyncOnJoin();
+        }
     }
 
     internal void TickDtlCountdown()
@@ -1793,6 +1897,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
         DiscordPresenceStatusBrush = EnableDiscordPresence ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+
+        AutoSyncOnJoinStatusText = AutoSyncOnJoin ? "ENABLED" : "DISABLED";
+        AutoSyncOnJoinStatusBrush = AutoSyncOnJoin ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
 
         TooltipsStatusText = ShowTooltips ? "ENABLED" : "DISABLED";
         TooltipsStatusBrush = ShowTooltips ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));

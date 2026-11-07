@@ -539,6 +539,13 @@
                             </Grid>
                         </Border>
 
+                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="AutoSyncOnJoinToggle">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Auto-Sync on Roblox Join:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber" Content="{Binding AutoSyncOnJoinStatusText}" Foreground="{Binding AutoSyncOnJoinStatusBrush}" Command="{Binding ToggleAutoSyncOnJoinCommand}" Padding="10,3" />
+                            </Grid>
+                        </Border>
+
                         <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RecircOverrideConfig">
                             <Grid ColumnDefinitions="*,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="Recirc Override (%):" VerticalAlignment="Center" FontSize="11" />

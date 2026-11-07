@@ -13,7 +13,7 @@ public sealed class PresenceSnapshot
 
 public sealed class DiscordPresenceService : IDisposable
 {
-    public const string DefaultApplicationId = "1568350684775059528";
+    public const string DefaultApplicationId = "1547513762087436288";
 
     private const string LargeImageKey = "icon";
     private const string ReleasesUrl = "https://github.com/Hotment/RBWR-Utility/releases/latest";

@@ -8,6 +8,7 @@ public interface IProcessMonitor : IDisposable
     bool IsRobloxRunning => IsRobloxActive;
 
     long? CurrentPlaceId => null;
+    string? CurrentJobId => null;
     void StartMonitoring();
     void StopMonitoring();
     string GetForegroundWindowInfo();

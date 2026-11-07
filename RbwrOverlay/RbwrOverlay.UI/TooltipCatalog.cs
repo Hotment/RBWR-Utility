@@ -247,6 +247,10 @@ public static class TooltipCatalog
             Title: "AUTO-TOPMOST ON ROBLOX",
             Description: "When enabled, automatically keeps the overlay on top while Roblox is in the foreground and lets other windows cover it when you tab out. (May be a bit buggy)"
         ),
+        ["AutoSyncOnJoinToggle"] = new(
+            Title: "AUTO-SYNC ON ROBLOX JOIN",
+            Description: "When enabled, automatically detects the server Job ID when you join an RBWR server and synchronizes the overlay."
+        ),
         ["RecircOverrideConfig"] = new(
             Title: "MANUAL RECIRCULATION OVERRIDE",
             Description: "Enter a fixed recirculation pump speed (0-100%) if not following the standard APRM curve (e.g. When running the reacotr in Self-Circ mode), or click Reset for automatic speed."
