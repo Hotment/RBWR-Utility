@@ -1339,8 +1339,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         {
             _discord.Update(new PresenceSnapshot
             {
-                Details = tablet ? WithTablet : "Roblox",
-                State = tablet ? "Roblox" : string.Empty,
+                Details = tablet ? WithTablet : "RBWR Overlay",
+                State = "Roblox",
                 SmallImageText = hover
             });
             return;
