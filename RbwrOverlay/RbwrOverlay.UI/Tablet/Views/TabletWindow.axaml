@@ -175,8 +175,8 @@
 
             <!-- Header (drag area) -->
             <Border x:Name="HeaderBar" Grid.Row="0" Background="#000000" Padding="12,2">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Grid ColumnDefinitions="*,Auto,*">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Button Classes="hdr" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
@@ -186,7 +186,7 @@
                         <TextBlock Text="RBWR" Foreground="White" FontWeight="ExtraBold"
                                    FontSize="22" LetterSpacing="1" />
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Classes="hdr" Content="—" Click="OnMinimize" />
                         <Button Classes="hdr close" Content="✕" Click="OnClose" />
                     </StackPanel>
