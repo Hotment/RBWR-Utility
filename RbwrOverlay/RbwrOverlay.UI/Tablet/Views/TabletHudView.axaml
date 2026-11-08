@@ -1,0 +1,248 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RbwrOverlay.UI.Tablet.ViewModels"
+             xmlns:m="using:RbwrOverlay.UI.Tablet.Models"
+             x:Class="RbwrOverlay.UI.Tablet.Views.TabletHudView"
+             x:DataType="vm:TabletViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.h">
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="Foreground" Value="#d8dce6" />
+        </Style>
+        <Style Selector="TextBlock.hhead">
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="Foreground" Value="#8b93a3" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Button.hhdr">
+            <Setter Property="Background" Value="#14161b" />
+            <Setter Property="Foreground" Value="#aab2c0" />
+            <Setter Property="BorderBrush" Value="#262a33" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.hhdr:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1d2028" />
+            <Setter Property="Foreground" Value="#ffffff" />
+        </Style>
+        <Style Selector="Button.hhdr.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#c42b1c" />
+        </Style>
+
+        <Style Selector="Button.htab">
+            <Setter Property="Background" Value="#14161b" />
+            <Setter Property="Foreground" Value="#8b93a3" />
+            <Setter Property="BorderBrush" Value="#262a33" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="0,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.htab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1b1e26" />
+            <Setter Property="Foreground" Value="#d8dce6" />
+        </Style>
+        <Style Selector="Button.htab.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#172554" />
+            <Setter Property="Foreground" Value="#60a5fa" />
+            <Setter Property="BorderBrush" Value="#3b82f6" />
+        </Style>
+        <Style Selector="Button.htab.on /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#172554" />
+            <Setter Property="Foreground" Value="#60a5fa" />
+            <Setter Property="BorderBrush" Value="#3b82f6" />
+        </Style>
+
+        <Style Selector="TextBox.hbox">
+            <Setter Property="Background" Value="#07080a" />
+            <Setter Property="Foreground" Value="#d8dce6" />
+            <Setter Property="CaretBrush" Value="#60a5fa" />
+            <Setter Property="PlaceholderForeground" Value="#5b6270" />
+            <Setter Property="BorderBrush" Value="#262a33" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.hbox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#07080a" />
+            <Setter Property="BorderBrush" Value="#3b82f6" />
+        </Style>
+        <Style Selector="TextBox.hbox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#07080a" />
+        </Style>
+
+        <Style Selector="Slider.hslider">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="24" />
+            <Style.Resources>
+                <SolidColorBrush x:Key="SliderTrackFill" Color="#262a33" />
+                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#262a33" />
+                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#262a33" />
+                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#38bdf8" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#38bdf8" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#38bdf8" />
+                <SolidColorBrush x:Key="SliderThumbBackground" Color="#60a5fa" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#93c5fd" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#93c5fd" />
+            </Style.Resources>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#0f1115" BorderBrush="#2a2e38" BorderThickness="2" CornerRadius="20" ClipToBounds="True">
+        <Grid>
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                <!-- Header (drag area): title centered regardless of the side buttons -->
+                <Border Grid.Row="0" Padding="14,8" BorderBrush="#1c1f26" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto,*">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center">
+                            <Button Classes="hhdr" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                    IsHitTestVisible="False">
+                            <PathIcon Foreground="#38bdf8" Width="20" Height="20"
+                                      Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                            <TextBlock Classes="h" Text="RBWR" Foreground="#38bdf8" FontWeight="ExtraBold"
+                                       FontSize="22" LetterSpacing="1" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <Button Classes="hhdr" Content="—" Click="OnMinimize" />
+                            <Button Classes="hhdr close" Content="✕" Click="OnClose" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Tabs -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="12,12,12,0">
+                    <Button Grid.Column="0" Classes="htab" Content="Unit 1" Classes.active="{Binding IsU1}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="u1" />
+                    <Button Grid.Column="1" Classes="htab" Content="Unit 2" Classes.active="{Binding IsU2}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="u2" />
+                    <Button Grid.Column="2" Classes="htab" Content="Misc" Classes.active="{Binding IsMisc}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="misc" />
+                    <Button Grid.Column="3" Classes="htab" Content="Config" Classes.active="{Binding IsConfig}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="config" />
+                </Grid>
+
+                <!-- Search -->
+                <Border Grid.Row="2" Margin="12,12,12,0" IsVisible="{Binding IsDataTab}">
+                    <TextBox Classes="hbox" Text="{Binding SearchText}" PlaceholderText="Search values..." />
+                </Border>
+
+                <!-- Content -->
+                <Grid Grid.Row="3" Margin="0,12,0,0">
+                    <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,0,12,12">
+                        <StackPanel Spacing="6">
+                            <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,14"
+                                        HorizontalAlignment="Center" MaxWidth="560">
+                                <Border Width="56" Height="56" CornerRadius="12" HorizontalAlignment="Center"
+                                        Background="#33ff6b6b" BorderBrush="#55ff6b6b" BorderThickness="1">
+                                    <PathIcon Foreground="#ff6b6b" Width="26" Height="26"
+                                              Data="M12 2L1 21h22L12 2zm0 4.5L19.5 19h-15L12 6.5zM11 10v4h2v-4h-2zm0 5v2h2v-2h-2z" />
+                                </Border>
+                                <TextBlock Classes="h" Text="{Binding EmptyTitle}" Foreground="White" FontWeight="Bold"
+                                           FontSize="24" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Classes="h" Foreground="#aab2c0" FontSize="15" TextAlignment="Center"
+                                           TextWrapping="Wrap">
+                                    <Run Text="{Binding EmptyPrefix}" />
+                                    <InlineUIContainer>
+                                        <Border Background="#cc2a2a2e" CornerRadius="4" Padding="8,2"
+                                                RenderTransform="translateY(4px)"
+                                                IsVisible="{Binding HasEmptyJobId}">
+                                            <TextBlock Classes="h" Text="{Binding EmptyJobId}" Foreground="#ff8a8a"
+                                                       FontSize="14" />
+                                        </Border>
+                                    </InlineUIContainer>
+                                    <Run Text="{Binding EmptySuffix}" />
+                                </TextBlock>
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="m:TabletRow">
+                                        <Border Background="#13151a" BorderBrush="#23262e" BorderThickness="1"
+                                                CornerRadius="10" Padding="16,6">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Classes="h" FontSize="15" FontWeight="Bold"
+                                                           Text="{Binding Label}" VerticalAlignment="Center" />
+                                                <Border Grid.Column="1" Background="#07080a" BorderBrush="#262a33"
+                                                        BorderThickness="1" CornerRadius="6" Width="210" Padding="10,6">
+                                                    <TextBlock Classes="h" Text="{Binding Value}" Foreground="#38bdf8"
+                                                               FontWeight="Bold" FontSize="16"
+                                                               HorizontalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Config -->
+                    <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12">
+                        <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
+                            <TextBlock Classes="hhead" Text="TABLET STYLE" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="htab" Classes.on="{Binding IsClassicStyle}" Content="Classic (OG)"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="classic" />
+                                <Button Grid.Column="1" Classes="htab" Classes.on="{Binding IsHudStyle}"
+                                        Content="Overlay HUD"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="hud" />
+                            </Grid>
+
+                            <TextBlock Classes="hhead" Text="TOPMOST ON ROBLOX" Margin="0,6,0,0" />
+                            <Button Classes="htab" Classes.on="{Binding TopmostOnRoblox}"
+                                    Content="{Binding RobloxTopmostLabel}"
+                                    Command="{Binding ToggleRobloxTopmostCommand}" />
+                            <TextBlock Classes="h" Foreground="#8b93a3" FontSize="13" TextWrapping="Wrap"
+                                       Text="Keeps the tablet on top while Roblox is in the foreground and lets other windows cover it when you tab out." />
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                                <TextBlock Classes="hhead" Text="UI SCALE" />
+                                <TextBlock Grid.Column="1" Classes="hhead" Foreground="#38bdf8"
+                                           Text="{Binding UiScaleText}" />
+                            </Grid>
+                            <Slider Classes="hslider" Minimum="0.75" Maximum="2.0" TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True" Value="{Binding UiScalePreview}" />
+                            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
+                                <Button Classes="htab" Padding="0,6" FontSize="13" Content="75%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="0.75" />
+                                <Button Grid.Column="1" Classes="htab" Padding="0,6" FontSize="13" Content="100%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.0" />
+                                <Button Grid.Column="2" Classes="htab" Padding="0,6" FontSize="13" Content="125%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.25" />
+                                <Button Grid.Column="3" Classes="htab" Padding="0,6" FontSize="13" Content="150%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.5" />
+                                <Button Grid.Column="4" Classes="htab" Padding="0,6" FontSize="13" Content="200%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="2.0" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

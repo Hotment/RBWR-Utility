@@ -19,14 +19,11 @@ public partial class TabletWindow : Window
         TabletRoot.PointerPressed += OnHeaderPressed;
         WindowRoot.SizeChanged += (_, e) => ApplyScale(e.NewSize);
 
-        var slider = this.FindControl<Slider>("UiScaleSlider");
-        if (slider != null)
-        {
-            var routes = RoutingStrategies.Bubble | RoutingStrategies.Tunnel;
-            slider.AddHandler(PointerReleasedEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
-            slider.AddHandler(PointerCaptureLostEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
-            slider.AddHandler(KeyUpEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
-        }
+        // The UI scale slider exists in both styles; commit the scale when it is released.
+        var routes = RoutingStrategies.Bubble | RoutingStrategies.Tunnel;
+        AddHandler(PointerReleasedEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
+        AddHandler(PointerCaptureLostEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
+        AddHandler(KeyUpEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -50,7 +47,15 @@ public partial class TabletWindow : Window
 
     private void OnScaleSliderCommit(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is TabletViewModel vm) vm.CommitUiScale();
+        if (e.Source is not Visual src) return;
+        for (var v = src; v != null; v = v.GetVisualParent())
+        {
+            if (v is Slider)
+            {
+                if (DataContext is TabletViewModel vm) vm.CommitUiScale();
+                return;
+            }
+        }
     }
 
     private void ApplyWindowSize(double scale)

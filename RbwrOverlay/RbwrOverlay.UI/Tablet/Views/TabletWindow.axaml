@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.Tablet.ViewModels"
         xmlns:m="using:RbwrOverlay.UI.Tablet.Models"
+        xmlns:views="using:RbwrOverlay.UI.Tablet.Views"
         x:Class="RbwrOverlay.UI.Tablet.Views.TabletWindow"
         x:DataType="vm:TabletViewModel"
         x:CompileBindings="True"
@@ -167,6 +168,7 @@
     <Grid x:Name="WindowRoot">
     <LayoutTransformControl x:Name="ScaleHost" HorizontalAlignment="Left" VerticalAlignment="Top">
     <Grid x:Name="TabletRoot" Margin="24" Width="920" Height="520">
+    <Grid IsVisible="{Binding IsClassicStyle}">
     <Border Background="#0f1013" BorderBrush="#1a1b20" BorderThickness="14" CornerRadius="36"
             Padding="18"
             BoxShadow="0 18 40 -8 #E6000000, inset 0 0 0 2 #14FFFFFF">
@@ -270,7 +272,17 @@
                 <!-- Config tab -->
                 <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,8,12,4">
                     <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
-                        <TextBlock Classes="lbl" Text="TOPMOST ON ROBLOX" />
+                        <TextBlock Classes="lbl" Text="TABLET STYLE" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="action" Classes.on="{Binding IsClassicStyle}" Content="Classic (OG)"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding SetStyleCommand}" CommandParameter="classic" />
+                            <Button Grid.Column="1" Classes="action" Classes.on="{Binding IsHudStyle}"
+                                    Content="Overlay HUD" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetStyleCommand}" CommandParameter="hud" />
+                        </Grid>
+
+                        <TextBlock Classes="lbl" Text="TOPMOST ON ROBLOX" Margin="0,6,0,0" />
                         <Button Classes="action" Classes.on="{Binding TopmostOnRoblox}" HorizontalAlignment="Stretch"
                                 Content="{Binding RobloxTopmostLabel}" Command="{Binding ToggleRobloxTopmostCommand}" />
                         <TextBlock Foreground="#1a1a1a" FontSize="14" TextWrapping="Wrap"
@@ -308,6 +320,8 @@
     <Border Width="6" Height="6" Background="#111a2e" BorderBrush="#1e293b" BorderThickness="1"
             CornerRadius="3" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"
             IsHitTestVisible="False" />
+    </Grid>
+    <views:TabletHudView IsVisible="{Binding IsHudStyle}" />
     </Grid>
     </LayoutTransformControl>
     </Grid>
