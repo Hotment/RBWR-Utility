@@ -14,6 +14,7 @@ public partial class MainWindow : Window
 {
     private CustomMessageWindow? _messageWindow;
     private UpdateWindow? _updateWindow;
+    private Tablet.Views.TabletWindow? _tabletWindow;
 
     public MainWindow()
     {
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
             vm.RequestShowMessage += OnShowMessage;
             vm.RequestShowUpdate += OnShowUpdate;
             vm.RequestQuit += OnQuit;
+            vm.RequestOpenTablet += OnOpenTablet;
 
             UpdateWindowSize(vm.IsCompact);
         }
@@ -139,8 +141,34 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnOpenTablet()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_tabletWindow != null)
+            {
+                if (_tabletWindow.WindowState == WindowState.Minimized)
+                    _tabletWindow.WindowState = WindowState.Normal;
+                _tabletWindow.Activate();
+                return;
+            }
+
+            if (DataContext is not MainOverlayViewModel vm) return;
+
+            _tabletWindow = new Tablet.Views.TabletWindow { DataContext = vm.CreateTabletViewModel() };
+            _tabletWindow.Closed += (s, ev) =>
+            {
+                _tabletWindow = null;
+                if (DataContext is MainOverlayViewModel closedVm) closedVm.IsTabletOpen = false;
+            };
+            vm.IsTabletOpen = true;
+            _tabletWindow.Show();
+        });
+    }
+
     private void OnQuit()
     {
+        _tabletWindow?.Close();
         Close();
         Environment.Exit(0);
     }

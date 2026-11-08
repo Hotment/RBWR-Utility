@@ -432,7 +432,15 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     public event Action<string, string, bool>? RequestShowMessage;
     public event Action<UpdateInfo>? RequestShowUpdate;
     public event Action? RequestQuit;
+    public event Action? RequestOpenTablet;
+    public bool IsTabletOpen { get; set; }
     public IApiClient ApiClient => _apiClient;
+
+    [RelayCommand]
+    public void OpenTablet() => RequestOpenTablet?.Invoke();
+
+    internal Tablet.ViewModels.TabletViewModel CreateTabletViewModel() =>
+        new(_settings, _settingsService, _processMonitor, _logger, () => CurrentJobId);
 
     public MainOverlayViewModel(
         ISettingsService? settingsService = null,
@@ -1311,13 +1319,17 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         bool robloxRunning = _processMonitor.IsRobloxRunning;
         string overlayMode = IsCompact ? "Compact HUD" : "Detailed HUD";
 
+        const string WithTablet = "RBWR Overlay + RBWR Tablet";
+        bool tablet = IsTabletOpen;
+        string hover = tablet ? $"{overlayMode} + Tablet" : overlayMode;
+
         if (!robloxRunning)
         {
             _discord.Update(new PresenceSnapshot
             {
-                Details = "RBWR Overlay",
+                Details = tablet ? WithTablet : "RBWR Overlay",
                 State = "Waiting for Roblox",
-                SmallImageText = overlayMode
+                SmallImageText = hover
             });
             return;
         }
@@ -1327,9 +1339,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         {
             _discord.Update(new PresenceSnapshot
             {
-                Details = "Roblox",
-                State = string.Empty,
-                SmallImageText = overlayMode
+                Details = tablet ? WithTablet : "Roblox",
+                State = tablet ? "Roblox" : string.Empty,
+                SmallImageText = hover
             });
             return;
         }
@@ -1349,6 +1361,22 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         else
         {
             state = IsError ? "Operating the plant" : GeneratorLoadText;
+        }
+
+        if (tablet)
+        {
+            // Discord only has two text lines: the tablet line goes right under the title and the
+            // sync/power data moves to the second line (full original text stays in the hover text).
+            string compactState = _activeServer != null
+                ? $"Synced | {unit} | {(IsError ? "no data" : MainStatusPowerText)} | {state.Replace("Synced | ", string.Empty)}"
+                : $"{unit} | {state}";
+            _discord.Update(new PresenceSnapshot
+            {
+                Details = WithTablet,
+                State = compactState,
+                SmallImageText = $"{hover}: {details} - {state}"
+            });
+            return;
         }
 
         _discord.Update(new PresenceSnapshot
