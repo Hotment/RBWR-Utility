@@ -204,7 +204,16 @@
                     <!-- Config -->
                     <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12">
                         <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
-                            <TextBlock Classes="hhead" Text="TOPMOST ON ROBLOX" />
+                            <TextBlock Classes="hhead" Text="TABLET STYLE" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="htab" Classes.on="{Binding IsClassicStyle}" Content="Classic"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="classic" />
+                                <Button Grid.Column="1" Classes="htab" Classes.on="{Binding IsHudStyle}"
+                                        Content="Overlay"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="hud" />
+                            </Grid>
+
+                            <TextBlock Classes="hhead" Text="TOPMOST ON ROBLOX" Margin="0,6,0,0" />
                             <Button Classes="htab" Classes.on="{Binding TopmostOnRoblox}"
                                     Content="{Binding RobloxTopmostLabel}"
                                     Command="{Binding ToggleRobloxTopmostCommand}" />

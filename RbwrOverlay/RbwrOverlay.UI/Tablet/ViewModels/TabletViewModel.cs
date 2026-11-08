@@ -36,6 +36,7 @@ public partial class TabletViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _selectedTab = "u1";
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private bool _isTopmost;
+    [ObservableProperty] private bool _isHudStyle;
     [ObservableProperty] private bool _topmostOnRoblox;
     [ObservableProperty] private double _uiScale = 1.0;
     [ObservableProperty] private double _uiScalePreview = 1.0;
@@ -49,6 +50,7 @@ public partial class TabletViewModel : ObservableObject, IDisposable
     public bool IsU1 => SelectedTab == "u1";
     public bool IsU2 => SelectedTab == "u2";
     public bool IsMisc => SelectedTab == "misc";
+    public bool IsClassicStyle => !IsHudStyle;
     public bool IsConfig => SelectedTab == "config";
     public bool IsDataTab => !IsConfig;
     private bool IsUnitTab => SelectedTab is "u1" or "u2";
@@ -70,6 +72,7 @@ public partial class TabletViewModel : ObservableObject, IDisposable
         _getJobId = getJobId;
 
         _isTopmost = settings.TabletTopmost;
+        _isHudStyle = settings.TabletHudStyle;
         _topmostOnRoblox = settings.TabletTopmostOnRoblox;
         _uiScale = Math.Clamp(settings.TabletUiScale <= 0 ? 1.0 : settings.TabletUiScale, 0.75, 2.0);
         _uiScalePreview = _uiScale;
@@ -123,6 +126,15 @@ public partial class TabletViewModel : ObservableObject, IDisposable
     [RelayCommand] private void SwitchTab(string tab) => SelectedTab = tab;
 
     // ---- config: topmost + UI scale ----
+
+    [RelayCommand] private void SetStyle(string style) => IsHudStyle = style == "hud";
+
+    partial void OnIsHudStyleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsClassicStyle));
+        _settings.TabletHudStyle = value;
+        SaveSettings();
+    }
 
     [RelayCommand] private void TogglePin() => IsTopmost = !IsTopmost;
     [RelayCommand] private void ToggleRobloxTopmost() => TopmostOnRoblox = !TopmostOnRoblox;

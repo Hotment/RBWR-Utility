@@ -34,6 +34,9 @@ public class AppSettings
     [JsonPropertyName("tablet_topmost_on_roblox")]
     public bool TabletTopmostOnRoblox { get; set; } = true;
 
+    [JsonPropertyName("tablet_hud_style")]
+    public bool TabletHudStyle { get; set; } = false;
+
     [JsonPropertyName("tablet_ui_scale")]
     public double TabletUiScale { get; set; } = 1.0;
 
