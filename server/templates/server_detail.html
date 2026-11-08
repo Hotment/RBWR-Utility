@@ -180,6 +180,14 @@
         </div>
 
         <div class="flex items-center gap-3 shrink-0 flex-wrap">
+            <button type="button" onclick="openFloatingCalc()"
+                class="px-4 py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 hover:text-blue-200 border border-blue-500/30 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md group"
+                title="Toggle Floating RTP Calculator window">
+                <svg class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                <span>RTP Calculator</span>
+            </button>
             {% if (not is_private) and (not is_archived) and (not is_historical or is_persistent) %}
             <a href="roblox://experiences/start?placeId=11765852158&gameInstanceId={{ job_id }}"
                 class="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-xs font-semibold font-display transition-all flex items-center gap-2 cursor-pointer shadow-md group"
@@ -319,8 +327,11 @@
             class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 rounded-2xl cursor-pointer transition-all"
             onclick="resumePageSync()">
             <div
-                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-2xl mb-3 animate-pulse shadow-lg shadow-amber-500/10">
-                ⏸</div>
+                class="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mb-3 animate-pulse shadow-lg shadow-amber-500/10">
+                <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+            </div>
             <h3 class="text-white font-bold text-lg sm:text-xl mb-1 whitespace-nowrap font-display">Sync Paused (Tab
                 Inactive)</h3>
             <p class="text-gray-300 text-xs sm:text-sm max-w-sm font-mono">Click anywhere or switch back to this tab to
@@ -402,6 +413,170 @@
     </div>
     {% include "_score_inspect_modal.html" %}
 </main>
+
+<aside id="sd-floating-calc" class="fixed right-3 sm:right-5 bottom-3 sm:bottom-5 z-40 flex flex-col items-end select-none font-sans" aria-label="Reactor Thermal Power Calculator Floating Window">
+    <div id="sd-floating-calc-window"
+        class="w-[320px] sm:w-[350px] max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-5rem)] overflow-y-auto bg-[#0d0d12] border border-white/10 rounded-xl shadow-2xl p-3 flex flex-col gap-2.5 transition-all duration-200">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold font-display text-white tracking-wide">RTP Calculator</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <a href="/calculator?jobId={{ job_id }}" target="_blank"
+                    class="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                    title="Open calculator in standalone full page">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+                <button type="button" onclick="toggleFloatingCalc()"
+                    class="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    title="Minimize/Expand floating calculator">
+                    <svg id="sd-floating-toggle-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="sd-floating-body" class="flex flex-col gap-2.5">
+            <div class="flex gap-1 p-1 bg-[#14141b] rounded-lg border border-white/5 w-full">
+                <button id="sd-tab-unit-1" type="button" onclick="selectSdUnit(1)"
+                    class="flex-1 py-1 rounded-md font-medium text-xs transition-all bg-[#232330] text-white whitespace-nowrap cursor-pointer text-center border border-white/10">
+                    Unit 1
+                </button>
+                <button id="sd-tab-unit-2" type="button" onclick="selectSdUnit(2)"
+                    class="flex-1 py-1 rounded-md font-medium text-xs transition-all text-gray-400 hover:text-gray-200 hover:bg-white/5 whitespace-nowrap cursor-pointer text-center border border-transparent">
+                    Unit 2
+                </button>
+            </div>
+
+            <div id="sd-status-screen"
+                class="rounded-lg bg-[#14141b] border border-white/10 p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <span id="sd-status-label" class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                        System Nominal
+                    </span>
+                    <span id="sd-unit-header" class="text-[10px] font-mono text-gray-400">
+                        UNIT 1 ACTIVE
+                    </span>
+                </div>
+
+                <div class="flex items-baseline justify-between py-0.5">
+                    <div id="display-sd-rtp"
+                        class="text-3xl font-mono font-medium tracking-tight text-white">
+                        0.00<span class="text-lg text-gray-500 ml-0.5">%</span>
+                    </div>
+                    <div id="display-sd-status-sub" class="text-[10px] font-mono text-gray-400 uppercase tracking-wider text-right">
+                        Power Target
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[11px] font-mono">
+                    <div>
+                        <span class="text-[9px] text-gray-500 block uppercase">Flow</span>
+                        <span class="text-gray-200 font-medium"><span id="display-sd-flow">0.00</span> <span class="text-[9px] text-gray-500">kg/s</span></span>
+                    </div>
+                    <div class="text-center">
+                        <span class="text-[9px] text-gray-500 block uppercase">Load</span>
+                        <span class="text-gray-200 font-medium"><span id="display-sd-gen">0.00</span> <span class="text-[9px] text-gray-500">MWe</span></span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[9px] text-gray-500 block uppercase">Aux</span>
+                        <span class="text-gray-200 font-medium"><span id="display-sd-usage">0.00</span> <span class="text-[9px] text-gray-500">MW</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center justify-between text-[11px]">
+                    <label for="sd-demand" class="text-gray-400 font-medium">Generator Demand (MWe)</label>
+                    <div class="flex items-center gap-1.5 font-mono text-[10px]">
+                        <span id="sd-calc-sync-status" class="text-emerald-400 font-semibold">Synced</span>
+                        <span class="text-gray-600">·</span>
+                        <span class="text-gray-400">DTL:</span>
+                        <span id="sd-calc-countdown-val" class="font-bold text-amber-300">--s</span>
+                        <span id="sd-calc-calib-offset-badge" class="text-blue-300 font-mono hidden text-[10px]"></span>
+                    </div>
+                </div>
+                <div class="flex items-stretch w-full h-8">
+                    <button type="button" onclick="adjustSdDemand(-10)"
+                        class="px-2.5 bg-[#171720] hover:bg-[#20202c] text-gray-400 hover:text-white border border-white/10 border-r-0 rounded-l-lg transition-colors font-mono font-medium text-xs focus:outline-none shrink-0 cursor-pointer">
+                        -10
+                    </button>
+                    <input type="number" id="sd-demand" step="any" min="0" placeholder="1000"
+                        oninput="onSdUserEditDemand()"
+                        class="w-full px-2 text-center text-xs border-y border-x-0 h-full font-mono bg-[#0f0f14] text-white border-white/10 focus:outline-none focus:border-blue-500">
+                    <button type="button" onclick="adjustSdDemand(10)"
+                        class="px-2.5 bg-[#171720] hover:bg-[#20202c] text-gray-400 hover:text-white border border-white/10 border-l-0 rounded-r-lg transition-colors font-mono font-medium text-xs focus:outline-none shrink-0 cursor-pointer">
+                        +10
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <label for="sd-rtp" id="sd-label-rtp" class="text-[11px] text-gray-400 font-medium flex justify-between items-center">
+                    <span>Reactor Thermal Power</span>
+                    <span class="font-mono text-gray-500 text-[10px]">APRM %</span>
+                </label>
+                <input type="number" id="sd-rtp" step="any" min="0" max="250" placeholder="100"
+                    oninput="onSdInputRTP()"
+                    class="w-full px-2.5 h-8 rounded-lg text-xs font-mono bg-[#0f0f14] text-white border border-white/10 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="pt-1 border-t border-white/5 flex flex-col gap-2">
+                <button type="button" onclick="toggleSdFloatingDrawer()" id="sd-floating-drawer-btn"
+                    class="flex items-center justify-between w-full px-2 py-1 rounded bg-[#14141b] hover:bg-[#1a1a24] text-[10px] font-mono text-gray-400 hover:text-gray-200 border border-white/5 transition-colors cursor-pointer">
+                    <span class="flex items-center gap-1.5">
+                        <span>Recirc &amp; Time Calibration</span>
+                    </span>
+                    <svg id="sd-floating-drawer-icon" class="w-3 h-3 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+
+                <div id="sd-floating-drawer-content" class="hidden flex-col gap-2 pt-1">
+                    <div class="flex flex-col gap-1">
+                        <label for="sd-recirc-toggle" class="flex items-center gap-2 cursor-pointer group text-[11px]">
+                            <input type="checkbox" id="sd-recirc-toggle" onchange="toggleSdRecircOverride()"
+                                class="rounded bg-[#0f0f14] border-white/20 text-blue-600 focus:ring-0">
+                            <span class="text-gray-400 group-hover:text-gray-300 transition-colors">
+                                Manual Recirc Override
+                            </span>
+                        </label>
+                        <div id="sd-recirc-override-container" class="hidden relative h-7">
+                            <input type="number" id="sd-recirc-override" step="any" min="0" max="100"
+                                placeholder="Speed % (0-100)" oninput="onSdInputRecircOverride()"
+                                class="w-full px-2 h-full rounded text-[11px] font-mono bg-[#0f0f14] text-white border border-white/10 focus:outline-none focus:border-blue-500">
+                            <span class="absolute right-2 top-1.5 text-[10px] text-gray-500 font-mono pointer-events-none">%</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1 pt-1.5 border-t border-white/5">
+                        <div class="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                            <span>Time Calibration:</span>
+                            <button type="button" onclick="resetSdCalcCalibration()" class="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer">Reset (0s)</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1 font-mono text-[10px]">
+                            <button type="button" onclick="adjustSdCalcCalibration(-5)" class="py-1 rounded bg-[#171720] hover:bg-[#20202c] text-gray-300 border border-white/10 transition-colors text-center cursor-pointer" title="Subtract 5 seconds">-5s</button>
+                            <button type="button" onclick="adjustSdCalcCalibration(-1)" class="py-1 rounded bg-[#171720] hover:bg-[#20202c] text-gray-300 border border-white/10 transition-colors text-center cursor-pointer" title="Subtract 1 second">-1s</button>
+                            <button type="button" onclick="adjustSdCalcCalibration(1)" class="py-1 rounded bg-[#171720] hover:bg-[#20202c] text-gray-300 border border-white/10 transition-colors text-center cursor-pointer" title="Add 1 second">+1s</button>
+                            <button type="button" onclick="adjustSdCalcCalibration(5)" class="py-1 rounded bg-[#171720] hover:bg-[#20202c] text-gray-300 border border-white/10 transition-colors text-center cursor-pointer" title="Add 5 seconds">+5s</button>
+                        </div>
+                        <div class="flex gap-1 pt-0.5">
+                            <input type="number" id="sd-calc-custom-calib-input" placeholder="In-game DTL..." step="any" min="0" max="120"
+                                class="flex-1 min-w-0 px-2 py-0.5 text-[10px] font-mono rounded bg-[#0f0f14] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                            <button type="button" onclick="applyCustomSdCalcCalibration()"
+                                class="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-mono font-medium transition-colors shrink-0 cursor-pointer">
+                                Calibrate
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</aside>
 {% endblock %}
 
 {% block scripts %}
@@ -466,24 +641,14 @@
     {% if not is_historical and not is_archived %}
     setInterval(function () {
         if (isTabFocused && !document.hidden) {
+            const calcEl = document.getElementById('sd-floating-calc');
+            if (calcEl && calcEl.contains(document.activeElement)) {
+                return;
+            }
             window.location.reload();
         }
     }, 30000);
     {% endif %}
-
-    const dtl = {{ time_to_next_demand | tojson }};
-    const timerElem = document.getElementById('demand-timer');
-    if (timerElem && typeof dtl === 'number') {
-        const startTime = Date.now();
-        const initialDtl = dtl;
-        const updateTimer = () => {
-            if (!isTabFocused) return;
-            const elapsed = (Date.now() - startTime) / 1000;
-            const remaining = Math.max(0, initialDtl - elapsed);
-            timerElem.textContent = Math.round(remaining) + 's';
-        };
-        setInterval(updateTimer, 1000);
-    }
 
     function formatTimeAgo(sec) {
         const s = Math.max(0, Math.round(sec));
@@ -1342,5 +1507,487 @@
             if (btn) btn.disabled = false;
         }
     }
+
+    let sdSelectedUnit = 1;
+    let sdRecircOverride = null;
+    let sdCalcSeq = 0;
+    let sdCalcAbortController = null;
+    let sdNextDemandSwitched = false;
+    let sdDemandChangedWaitingHeartbeat = false;
+    let sdPendingDemandValue = null;
+    let sdLastSyncedHeartbeat = null;
+    let sdLastSyncedDemand = null;
+
+    async function fetchReactorCalc(params) {
+        const seq = ++sdCalcSeq;
+        if (sdCalcAbortController) {
+            sdCalcAbortController.abort();
+        }
+        sdCalcAbortController = new AbortController();
+
+        const payload = {
+            unit: sdSelectedUnit,
+            recirc_override: sdRecircOverride,
+            ...params
+        };
+
+        try {
+            const res = await fetch('/api/calc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: sdCalcAbortController.signal
+            });
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (seq === sdCalcSeq && json.success && json.data) {
+                return json.data;
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('Calculation error:', e);
+            }
+        }
+        return null;
+    }
+
+    let sdDtlCalibrationOffset = 0.0;
+    try {
+        sdDtlCalibrationOffset = parseFloat(localStorage.getItem('rbwr_calc_dtl_offset')) || 0.0;
+    } catch (e) { }
+
+    const sdJobId = {{ job_id | tojson }};
+    const sdServerState = {
+        jobId: sdJobId,
+        lastHeartbeat: {{ last_refreshed | tojson }},
+        dtl: {{ time_to_next_demand | tojson }},
+        dmandU1: {{ dmandU1 | tojson }},
+        dmandU2: {{ dmandU2 | tojson }},
+        dmand_next1: {{ dmand_next1 | default(dmandU1) | tojson }},
+        dmand_next2: {{ dmand_next2 | default(dmandU2) | tojson }},
+    };
+
+    let sdHeartbeatStartTime = Date.now();
+    let sdHeartbeatInitialDtl = (typeof sdServerState.dtl === 'number') ? sdServerState.dtl : 0;
+
+    let sdFloatingCalcExpanded = true;
+    try {
+        const saved = localStorage.getItem('rbwr_sd_calc_floating_expanded');
+        if (saved !== null) {
+            sdFloatingCalcExpanded = (saved === 'true');
+        }
+    } catch (e) { }
+
+    function toggleFloatingCalc(expand) {
+        if (expand === undefined) {
+            sdFloatingCalcExpanded = !sdFloatingCalcExpanded;
+        } else {
+            sdFloatingCalcExpanded = !!expand;
+        }
+        try {
+            localStorage.setItem('rbwr_sd_calc_floating_expanded', sdFloatingCalcExpanded ? 'true' : 'false');
+        } catch (e) { }
+
+        const body = document.getElementById('sd-floating-body');
+        const icon = document.getElementById('sd-floating-toggle-icon');
+        if (body) {
+            if (sdFloatingCalcExpanded) {
+                body.classList.remove('hidden');
+                if (icon) icon.classList.remove('rotate-180');
+            } else {
+                body.classList.add('hidden');
+                if (icon) icon.classList.add('rotate-180');
+            }
+        }
+    }
+
+    function openFloatingCalc() {
+        toggleFloatingCalc(true);
+        const win = document.getElementById('sd-floating-calc-window');
+        if (win) {
+            win.classList.add('border-blue-500');
+            setTimeout(() => win.classList.remove('border-blue-500'), 1000);
+        }
+    }
+
+    function toggleSdFloatingDrawer() {
+        const content = document.getElementById('sd-floating-drawer-content');
+        const icon = document.getElementById('sd-floating-drawer-icon');
+        if (!content) return;
+        const isHidden = content.classList.contains('hidden');
+        if (isHidden) {
+            content.classList.remove('hidden');
+            content.classList.add('flex');
+            if (icon) icon.classList.add('rotate-180');
+        } else {
+            content.classList.add('hidden');
+            content.classList.remove('flex');
+            if (icon) icon.classList.remove('rotate-180');
+        }
+    }
+
+    function updateSdCalibrationDisplay() {
+        const badge = document.getElementById('sd-calc-calib-offset-badge');
+        if (badge) {
+            if (sdDtlCalibrationOffset !== 0) {
+                const sign = sdDtlCalibrationOffset > 0 ? '+' : '';
+                badge.innerText = `(${sign}${sdDtlCalibrationOffset.toFixed(1)}s)`;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    function adjustSdCalcCalibration(delta) {
+        sdDtlCalibrationOffset += delta;
+        try {
+            localStorage.setItem('rbwr_calc_dtl_offset', sdDtlCalibrationOffset);
+        } catch (e) { }
+        updateSdCalibrationDisplay();
+        updateAllTimers();
+    }
+
+    function resetSdCalcCalibration() {
+        sdDtlCalibrationOffset = 0.0;
+        try {
+            localStorage.removeItem('rbwr_calc_dtl_offset');
+        } catch (e) { }
+        updateSdCalibrationDisplay();
+        updateAllTimers();
+    }
+
+    function applyCustomSdCalcCalibration() {
+        const input = document.getElementById('sd-calc-custom-calib-input');
+        if (!input || !sdServerState || !sdServerState.lastHeartbeat) return;
+        const targetDtl = parseFloat(input.value);
+        if (isNaN(targetDtl) || targetDtl < 0) return;
+
+        const hbTime = new Date(sdServerState.lastHeartbeat).getTime();
+        const dtlRaw = parseFloat(sdServerState.dtl) || 0;
+        const elapsed = (Date.now() - hbTime) / 1000.0;
+
+        sdDtlCalibrationOffset = targetDtl - (dtlRaw - elapsed);
+        try {
+            localStorage.setItem('rbwr_calc_dtl_offset', sdDtlCalibrationOffset);
+        } catch (e) { }
+        input.value = '';
+        updateSdCalibrationDisplay();
+        updateAllTimers();
+    }
+
+    function selectSdUnit(unit) {
+        sdSelectedUnit = unit;
+
+        const btn1 = document.getElementById('sd-tab-unit-1');
+        const btn2 = document.getElementById('sd-tab-unit-2');
+        const labelRtp = document.getElementById('sd-label-rtp');
+        const unitHeader = document.getElementById('sd-unit-header');
+
+        const activeClass = "flex-1 py-1.5 rounded-lg font-medium text-xs transition-all bg-white/10 text-white shadow-sm whitespace-nowrap cursor-pointer text-center";
+        const inactiveClass = "flex-1 py-1.5 rounded-lg font-medium text-xs transition-all text-gray-400 hover:text-gray-200 hover:bg-white/5 whitespace-nowrap cursor-pointer text-center";
+
+        if (unit === 1) {
+            if (btn1) btn1.className = activeClass;
+            if (btn2) btn2.className = inactiveClass;
+            if (labelRtp) {
+                const span = labelRtp.querySelector('span');
+                const mono = labelRtp.querySelector('.font-mono');
+                if (span) span.innerText = "Reactor Thermal Power";
+                if (mono) mono.innerText = "APRM %";
+            }
+            if (unitHeader) unitHeader.innerText = "UNIT 1 ACTIVE";
+        } else {
+            if (btn2) btn2.className = activeClass;
+            if (btn1) btn1.className = inactiveClass;
+            if (labelRtp) {
+                const span = labelRtp.querySelector('span');
+                const mono = labelRtp.querySelector('.font-mono');
+                if (span) span.innerText = "Reactor Thermal Power";
+                if (mono) mono.innerText = "RTP %";
+            }
+            if (unitHeader) unitHeader.innerText = "UNIT 2 ACTIVE";
+        }
+
+        sdDemandChangedWaitingHeartbeat = false;
+        const curDem = unit === 1 ? sdServerState.dmandU1 : sdServerState.dmandU2;
+        const nextDem = unit === 1 ? sdServerState.dmand_next1 : sdServerState.dmand_next2;
+        const targetVal = sdNextDemandSwitched ? nextDem : curDem;
+
+        if (targetVal !== null && targetVal !== undefined) {
+            const num = parseFloat(targetVal);
+            const valToSet = (!isNaN(num) && num >= 0) ? num : 0;
+            const inputDem = document.getElementById('sd-demand');
+            if (inputDem) inputDem.value = valToSet;
+            const statusEl = document.getElementById('sd-calc-sync-status');
+            if (statusEl) {
+                if (sdNextDemandSwitched) {
+                    statusEl.className = "text-amber-300 font-semibold";
+                    statusEl.innerText = `Pre-loaded (${formatSdDemandLabel(targetVal)})`;
+                } else {
+                    statusEl.className = "text-emerald-400 font-semibold";
+                    statusEl.innerText = `Synced (${formatSdDemandLabel(targetVal)})`;
+                }
+            }
+        }
+
+        onSdInputDemand();
+    }
+
+    function toggleSdRecircOverride() {
+        const toggle = document.getElementById('sd-recirc-toggle');
+        const container = document.getElementById('sd-recirc-override-container');
+        const input = document.getElementById('sd-recirc-override');
+
+        if (toggle && toggle.checked) {
+            if (container) {
+                container.classList.remove('hidden');
+                container.classList.add('flex');
+            }
+            if (input) {
+                if (input.value !== "") {
+                    sdRecircOverride = parseFloat(input.value) || 0.0;
+                } else {
+                    sdRecircOverride = 100.0;
+                    input.value = "100";
+                }
+            }
+        } else {
+            if (container) {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+            }
+            sdRecircOverride = null;
+        }
+        onSdInputDemand();
+    }
+
+    function onSdInputRecircOverride() {
+        const input = document.getElementById('sd-recirc-override');
+        if (!input) return;
+        let val = parseFloat(input.value);
+        if (isNaN(val)) {
+            sdRecircOverride = 0.0;
+        } else {
+            if (val < 0) { val = 0; input.value = "0"; }
+            else if (val > 100) { val = 100; input.value = "100"; }
+            sdRecircOverride = val;
+        }
+        onSdInputDemand();
+    }
+
+    function onSdUserEditDemand() {
+        sdDemandChangedWaitingHeartbeat = true;
+        const input = document.getElementById('sd-demand');
+        if (input) {
+            sdPendingDemandValue = parseFloat(input.value) || 0;
+        }
+        onSdInputDemand();
+    }
+
+    function adjustSdDemand(amount) {
+        const input = document.getElementById('sd-demand');
+        if (!input) return;
+        let val = parseFloat(input.value);
+        if (isNaN(val)) val = 0;
+        val = Math.max(0, val + amount);
+        input.value = val;
+        sdDemandChangedWaitingHeartbeat = true;
+        sdPendingDemandValue = val;
+        onSdInputDemand();
+    }
+
+    async function onSdInputDemand() {
+        const demandInput = document.getElementById('sd-demand');
+        const rtpInput = document.getElementById('sd-rtp');
+        if (!demandInput || !rtpInput) return;
+
+        let demandVal = parseFloat(demandInput.value);
+        if (isNaN(demandVal) || demandVal < 0) demandVal = 0.0;
+
+        const data = await fetchReactorCalc({ demand: demandVal });
+        if (data) {
+            rtpInput.value = data.thermal_percent.toFixed(3);
+            renderSdOutputs(data);
+        }
+    }
+
+    async function onSdInputRTP() {
+        const demandInput = document.getElementById('sd-demand');
+        const rtpInput = document.getElementById('sd-rtp');
+        if (!demandInput || !rtpInput) return;
+
+        let thermalVal = parseFloat(rtpInput.value);
+        if (isNaN(thermalVal) || thermalVal < 0) {
+            thermalVal = 0.0;
+        } else if (thermalVal > 250) {
+            thermalVal = 250.0;
+            rtpInput.value = "250";
+        }
+
+        const data = await fetchReactorCalc({ thermal: thermalVal });
+        if (data) {
+            demandInput.value = data.demand_mwe.toFixed(2);
+            renderSdOutputs(data);
+        }
+    }
+
+    function renderSdOutputs(data) {
+        if (!data) return;
+        const limit = data.scram_limit_percent || 108;
+        const thermal = data.thermal_percent;
+        const flow = data.flow_kg_s;
+        const genLoad = data.gen_load_mwe;
+        const usage = data.station_usage_mwe;
+        const isScram = data.scram_risk;
+
+        const displayRtp = document.getElementById('display-sd-rtp');
+        const displaySub = document.getElementById('display-sd-status-sub');
+        const statusLabel = document.getElementById('sd-status-label');
+        const screen = document.getElementById('sd-status-screen');
+
+        const flowEl = document.getElementById('display-sd-flow');
+        const genEl = document.getElementById('display-sd-gen');
+        const usageEl = document.getElementById('display-sd-usage');
+
+        if (flowEl) flowEl.innerText = flow.toFixed(2);
+        if (genEl) genEl.innerText = genLoad.toFixed(2);
+        if (usageEl) usageEl.innerText = usage.toFixed(2);
+
+        if (displayRtp) {
+            displayRtp.innerHTML = `${thermal.toFixed(2)}<span class="text-xl text-gray-500 font-medium ml-0.5">%</span>`;
+        }
+
+        if (isScram) {
+            if (screen) screen.className = "rounded-lg bg-[#200e12] border border-rose-600/40 p-2.5 flex flex-col gap-2";
+            if (displayRtp) displayRtp.className = "text-3xl font-mono font-medium tracking-tight text-rose-400";
+            if (displaySub) {
+                displaySub.className = "text-[10px] font-mono text-rose-400 uppercase tracking-wider text-right";
+                displaySub.innerText = `SCRAM RISK (>${limit}%)`;
+            }
+            if (statusLabel) {
+                statusLabel.innerText = "SCRAM RISK";
+                statusLabel.className = "text-[10px] font-semibold text-rose-400 uppercase tracking-wider";
+            }
+        } else {
+            if (screen) screen.className = "rounded-lg bg-[#14141b] border border-white/10 p-2.5 flex flex-col gap-2";
+            if (displayRtp) displayRtp.className = "text-3xl font-mono font-medium tracking-tight text-white";
+            if (displaySub) {
+                displaySub.className = "text-[10px] font-mono text-gray-400 uppercase tracking-wider text-right";
+                displaySub.innerText = "Power Target";
+            }
+            if (statusLabel) {
+                statusLabel.innerText = "System Nominal";
+                statusLabel.className = "text-[10px] font-semibold text-gray-400 uppercase tracking-wider";
+            }
+        }
+    }
+
+    function formatSdDemandLabel(dem) {
+        if (dem === -4) return "Evac";
+        if (dem === -3) return "RST";
+        if (dem === -2) return "LOOP";
+        if (dem === -1) return "Maint";
+        return dem + " MWe";
+    }
+
+    function updateAllTimers() {
+        if (!isTabFocused) return;
+        const elapsed = (Date.now() - sdHeartbeatStartTime) / 1000.0;
+        const liveDTL = Math.max(0, sdHeartbeatInitialDtl - elapsed + sdDtlCalibrationOffset);
+
+        const topTimerElem = document.getElementById('demand-timer');
+        if (topTimerElem) {
+            topTimerElem.textContent = Math.round(liveDTL) + 's';
+        }
+
+        const calcCountdownVal = document.getElementById('sd-calc-countdown-val');
+        if (calcCountdownVal) {
+            calcCountdownVal.textContent = Math.round(liveDTL) + 's';
+        }
+
+        if (liveDTL < 60 && !sdNextDemandSwitched) {
+            sdNextDemandSwitched = true;
+            sdDemandChangedWaitingHeartbeat = true;
+            const nextDem = sdSelectedUnit === 1 ? sdServerState.dmand_next1 : sdServerState.dmand_next2;
+            if (nextDem !== null && nextDem !== undefined) {
+                const num = parseFloat(nextDem);
+                const calcVal = (!isNaN(num) && num >= 0) ? num : 0;
+                sdPendingDemandValue = calcVal;
+                const inputDem = document.getElementById('sd-demand');
+                if (inputDem) inputDem.value = calcVal;
+                onSdInputDemand();
+                const statusEl = document.getElementById('sd-calc-sync-status');
+                if (statusEl) {
+                    statusEl.className = "text-amber-300 font-semibold";
+                    statusEl.innerText = `Pre-loaded (${formatSdDemandLabel(nextDem)})`;
+                }
+            }
+        }
+    }
+
+    async function refreshSdServerData() {
+        {% if is_archived or is_historical %}
+        return;
+        {% endif %}
+        try {
+            const res = await fetch('/api/public-servers');
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.success && json.data && json.data.servers) {
+                const srv = json.data.servers.find(s => s && (s.jobId === sdJobId || s.id === sdJobId));
+                if (srv && srv.state) {
+                    const u1 = srv.state.Unit1 || {};
+                    const u2 = srv.state.Unit2 || {};
+                    const dtlRaw = parseFloat(u1['Demand Time Left'] || u2['Demand Time Left']) || 0;
+                    const d1 = u1.DemandU1 ?? u1.Demand;
+                    const d2 = u2.DemandU2 ?? u2.Demand;
+                    const nd1 = u1.NextDemandU1 ?? u1.NextDemand;
+                    const nd2 = u2.NextDemandU2 ?? u2.NextDemand;
+
+                    sdServerState.dmandU1 = d1;
+                    sdServerState.dmandU2 = d2;
+                    sdServerState.dmand_next1 = nd1 ?? d1;
+                    sdServerState.dmand_next2 = nd2 ?? d2;
+                    sdServerState.lastHeartbeat = srv.lastHeartbeat;
+                    sdServerState.dtl = dtlRaw;
+
+                    sdHeartbeatStartTime = Date.now();
+                    sdHeartbeatInitialDtl = dtlRaw;
+
+                    const curDem = sdSelectedUnit === 1 ? d1 : d2;
+                    const nowLiveDTL = Math.max(0, dtlRaw + sdDtlCalibrationOffset);
+
+                    if (nowLiveDTL >= 60) {
+                        sdNextDemandSwitched = false;
+                        if (!sdDemandChangedWaitingHeartbeat) {
+                            const num = parseFloat(curDem);
+                            const calcVal = (!isNaN(num) && num >= 0) ? num : 0;
+                            const inputDem = document.getElementById('sd-demand');
+                            if (inputDem) inputDem.value = calcVal;
+                            onSdInputDemand();
+                            const statusEl = document.getElementById('sd-calc-sync-status');
+                            if (statusEl) {
+                                statusEl.className = "text-emerald-400 font-semibold";
+                                statusEl.innerText = `Synced (${formatSdDemandLabel(curDem)})`;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) { }
+    }
+
+    // Initialize Floating Calculator on page load
+    const initialCalcUnit = ({{ u2_running | tojson }} && !{{ u1_running | tojson }}) ? 2 : 1;
+    selectSdUnit(initialCalcUnit);
+    updateSdCalibrationDisplay();
+    updateAllTimers();
+    toggleFloatingCalc(sdFloatingCalcExpanded);
+    setInterval(updateAllTimers, 1000);
+    {% if not is_historical and not is_archived %}
+    setInterval(refreshSdServerData, 15000);
+    {% endif %}
+
 </script>
 {% endblock %}

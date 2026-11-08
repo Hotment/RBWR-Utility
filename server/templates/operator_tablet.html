@@ -235,6 +235,154 @@
             max-width: 100%;
         }
     }
+
+    .tablet-theme-overlay .tablet-bezel {
+        background: rgba(18, 18, 23, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9),
+            0 0 30px rgba(59, 130, 246, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+        padding: 16px;
+    }
+
+    .tablet-theme-overlay .tablet-camera-notch,
+    .tablet-theme-overlay .tablet-lens {
+        display: none !important;
+    }
+
+    .tablet-theme-overlay .tablet-screen {
+        background-color: #0b0c10;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .tablet-theme-overlay .tablet-header {
+        background-color: #0e1017;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        color: #38bdf8;
+        padding: 12px 18px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.1rem;
+        justify-content: space-between;
+    }
+
+    .tablet-theme-overlay .tablet-tab-bar {
+        background-color: #0e1017;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .tablet-theme-overlay .tablet-tab {
+        background-color: rgba(255, 255, 255, 0.04);
+        color: #9ca3af;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.85rem;
+        padding: 8px 12px;
+        transition: all 0.2s ease;
+    }
+
+    .tablet-theme-overlay .tablet-tab:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: #f3f4f6;
+    }
+
+    .tablet-theme-overlay .tablet-tab.active {
+        background: rgba(59, 130, 246, 0.18);
+        color: #60a5fa;
+        border-color: rgba(59, 130, 246, 0.45);
+        border-bottom: 1px solid rgba(59, 130, 246, 0.45);
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+    }
+
+    .tablet-theme-overlay .tablet-search-container {
+        background-color: #0e1017;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tablet-theme-overlay .tablet-search-input {
+        background-color: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #f3f4f6;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-family: 'JetBrains Mono', monospace;
+        text-align: left;
+        padding: 9px 14px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .tablet-theme-overlay .tablet-search-input::placeholder {
+        color: #6b7280;
+        font-style: normal;
+    }
+
+    .tablet-theme-overlay .tablet-search-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
+
+    .tablet-theme-overlay .tablet-rows-container {
+        background-color: #0b0c10;
+        padding: 12px 14px;
+        gap: 6px;
+    }
+
+    .tablet-theme-overlay .tablet-row {
+        background-color: rgba(255, 255, 255, 0.025);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        padding: 8px 12px;
+        box-shadow: none;
+        transition: all 0.15s ease;
+    }
+
+    .tablet-theme-overlay .tablet-row:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .tablet-theme-overlay .tablet-row-label {
+        color: #d1d5db;
+        font-size: 0.85rem;
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: 0;
+        font-weight: 500;
+    }
+
+    .tablet-theme-overlay .tablet-row-value-box {
+        background-color: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        padding: 4px 10px;
+    }
+
+    .tablet-theme-overlay .tablet-row-value {
+        color: #38bdf8;
+        font-size: 0.95rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+    }
+
+    .tablet-theme-overlay .tablet-rows-container::-webkit-scrollbar-track {
+        background: #111218;
+    }
+
+    .tablet-theme-overlay .tablet-rows-container::-webkit-scrollbar-thumb {
+        background: #232634;
+        border: 2px solid #111218;
+    }
+
+    .tablet-theme-og .tablet-no-match { color: #1f2937; }
+    .tablet-theme-overlay .tablet-no-match { color: #9ca3af; }
 </style>
 {% endblock %}
 
@@ -286,9 +434,29 @@
             </div>
             <span class="text-zinc-500 whitespace-nowrap">Refreshes every 1 min</span>
         </div>
+
+        <div
+            class="bg-surfaceElevated border border-border p-4 rounded-2xl shadow-xl backdrop-blur-md flex flex-col gap-2.5">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-white font-display">Tablet Style</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 p-1 bg-black/40 rounded-xl border border-white/10 text-xs font-mono">
+                <button type="button" id="btnThemeOg" onclick="setTabletTheme('og')"
+                    class="py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium bg-white/15 text-white shadow-sm">
+                    Classic (OG)
+                </button>
+                <button type="button" id="btnThemeOverlay" onclick="setTabletTheme('overlay')"
+                    class="py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium text-gray-400 hover:text-white hover:bg-white/5">
+                    Overlay HUD
+                </button>
+            </div>
+            <p class="text-[11px] text-gray-400">
+                Switch between the in-game physical tablet simulation and the dark cyber overlay style.
+            </p>
+        </div>
     </div>
 
-    <div class="flex-1 min-w-0 w-full">
+    <div id="tabletWrapper" class="flex-1 min-w-0 w-full tablet-container tablet-theme-og">
         <div class="tablet-bezel p-3 md:p-5">
             <div class="tablet-camera-notch"></div>
             <div class="tablet-lens"></div>
@@ -298,18 +466,28 @@
                     class="hidden absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 rounded-xl cursor-pointer"
                     onclick="resumeTabletSync()">
                     <div
-                        class="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xl mb-3 animate-pulse">
-                        ⏸</div>
+                        class="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mb-3 animate-pulse">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
                     <h3 class="text-white font-bold text-lg mb-1 whitespace-nowrap">Sync Paused (Tab Inactive)</h3>
                     <p class="text-gray-300 text-xs max-w-xs">Click anywhere or switch to this tab to resume updating.
                     </p>
                 </div>
 
                 <div class="tablet-header">
-                    <svg class="w-6 h-6 text-white shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
-                    </svg>
-                    <span class="whitespace-nowrap">RBWR</span>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-6 h-6 text-current shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                        </svg>
+                        <span class="whitespace-nowrap font-display">RBWR</span>
+                    </div>
+                    <button type="button" onclick="toggleTabletTheme()" id="btnHeaderThemeToggle"
+                        class="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-gray-200 border border-white/10 transition-colors"
+                        title="Switch between Classic (OG) and Overlay HUD styles">
+                        Switch Style
+                    </button>
                 </div>
 
                 <div class="tablet-tab-bar">
@@ -684,7 +862,7 @@
         });
 
         if (matchCount === 0) {
-            html = `<div class="py-8 text-center text-gray-800 font-bold text-base">No parameters match "${filterQuery}"</div>`;
+            html = `<div class="py-8 text-center tablet-no-match font-bold text-base">No parameters match "${filterQuery}"</div>`;
         }
 
         container.innerHTML = html;
@@ -693,5 +871,53 @@
     function filterTabletRows() {
         renderTabletData();
     }
+
+    function setTabletTheme(theme) {
+        const wrapper = document.getElementById('tabletWrapper');
+        const btnOg = document.getElementById('btnThemeOg');
+        const btnOverlay = document.getElementById('btnThemeOverlay');
+        const btnHeader = document.getElementById('btnHeaderThemeToggle');
+
+        const activeTheme = (theme === 'overlay') ? 'overlay' : 'og';
+        try {
+            localStorage.setItem('rbwr_tablet_theme', activeTheme);
+        } catch (e) { }
+
+        if (wrapper) {
+            wrapper.className = activeTheme === 'overlay'
+                ? 'flex-1 min-w-0 w-full tablet-container tablet-theme-overlay'
+                : 'flex-1 min-w-0 w-full tablet-container tablet-theme-og';
+        }
+
+        if (btnOg && btnOverlay) {
+            if (activeTheme === 'overlay') {
+                btnOverlay.className = 'py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium bg-blue-600/30 text-blue-200 border border-blue-500/40 shadow-sm';
+                btnOg.className = 'py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium text-gray-400 hover:text-white hover:bg-white/5';
+            } else {
+                btnOg.className = 'py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium bg-white/15 text-white shadow-sm';
+                btnOverlay.className = 'py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer font-medium text-gray-400 hover:text-white hover:bg-white/5';
+            }
+        }
+
+        if (btnHeader) {
+            btnHeader.innerText = activeTheme === 'overlay' ? 'Style: Overlay' : 'Style: Classic';
+        }
+    }
+
+    function toggleTabletTheme() {
+        let cur = 'og';
+        try {
+            cur = localStorage.getItem('rbwr_tablet_theme') || 'og';
+        } catch (e) { }
+        setTabletTheme(cur === 'og' ? 'overlay' : 'og');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        let savedTheme = 'og';
+        try {
+            savedTheme = localStorage.getItem('rbwr_tablet_theme') || 'og';
+        } catch (e) { }
+        setTabletTheme(savedTheme);
+    });
 </script>
 {% endblock %}

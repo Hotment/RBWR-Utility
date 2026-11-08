@@ -93,9 +93,36 @@
                         class="hidden text-xs text-rose-400 font-mono p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30">
                     </div>
                     <div id="calc-countdown-bar"
-                        class="hidden flex items-center justify-between text-[11px] font-mono p-2 rounded-lg bg-black/40 border border-white/5">
-                        <span class="text-gray-400 whitespace-nowrap">Live Demand Time Left:</span>
-                        <span id="calc-countdown-val" class="font-bold text-amber-400 whitespace-nowrap">--s</span>
+                        class="hidden flex flex-col gap-2 p-2.5 rounded-lg bg-black/40 border border-white/5">
+                        <div class="flex items-center justify-between text-[11px] font-mono">
+                            <span class="text-gray-400 whitespace-nowrap">Live Demand Time Left:</span>
+                            <div class="flex items-center gap-2">
+                                <span id="calc-countdown-val" class="font-bold text-amber-400 whitespace-nowrap">--s</span>
+                                <span id="calc-calib-offset-badge"
+                                    class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-blue-500/15 border border-blue-500/30 text-blue-300 hidden whitespace-nowrap">Offset: 0.0s</span>
+                            </div>
+                        </div>
+
+                        <div id="calc-calib-panel" class="pt-2 border-t border-white/5 flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-[10px] font-mono text-gray-400">
+                                <span>Time Calibration:</span>
+                                <button type="button" onclick="resetCalcCalibration()" class="text-amber-400/80 hover:text-amber-300 transition-colors">Reset (0s)</button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-1 font-mono text-[11px]">
+                                <button type="button" onclick="adjustCalcCalibration(-5)" class="py-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5 transition-colors text-center" title="Subtract 5 seconds">-5s</button>
+                                <button type="button" onclick="adjustCalcCalibration(-1)" class="py-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5 transition-colors text-center" title="Subtract 1 second">-1s</button>
+                                <button type="button" onclick="adjustCalcCalibration(1)" class="py-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5 transition-colors text-center" title="Add 1 second">+1s</button>
+                                <button type="button" onclick="adjustCalcCalibration(5)" class="py-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5 transition-colors text-center" title="Add 5 seconds">+5s</button>
+                            </div>
+                            <div class="flex gap-1.5 pt-1">
+                                <input type="number" id="calc-custom-calib-input" placeholder="In-game DTL..." step="any" min="0" max="120"
+                                    class="flex-1 min-w-0 px-2 py-1 text-[11px] font-mono rounded bg-black/50 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <button type="button" onclick="applyCustomCalcCalibration()"
+                                    class="px-2.5 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 rounded text-[11px] font-mono font-medium transition-colors shrink-0">
+                                    Calibrate
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -674,7 +701,67 @@
         statusEl.className = "text-[10px] font-mono text-emerald-400 font-bold";
         statusEl.innerText = "Synced: " + activeCalcServer.jobId.slice(0, 8) + "...";
         if (countdownBar) countdownBar.classList.remove('hidden');
+        updateCalibrationDisplay();
 
+        startCalcDemandCountdown();
+    }
+
+    let dtlCalibrationOffset = 0.0;
+    try {
+        dtlCalibrationOffset = parseFloat(localStorage.getItem('rbwr_calc_dtl_offset')) || 0.0;
+    } catch (e) { }
+
+    function updateCalibrationDisplay() {
+        const badge = document.getElementById('calc-calib-offset-badge');
+        if (badge) {
+            if (dtlCalibrationOffset !== 0) {
+                const sign = dtlCalibrationOffset > 0 ? '+' : '';
+                badge.innerText = `Offset: ${sign}${dtlCalibrationOffset.toFixed(1)}s`;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    function adjustCalcCalibration(delta) {
+        dtlCalibrationOffset += delta;
+        try {
+            localStorage.setItem('rbwr_calc_dtl_offset', dtlCalibrationOffset);
+        } catch (e) { }
+        updateCalibrationDisplay();
+        if (activeCalcServer) {
+            startCalcDemandCountdown();
+        }
+    }
+
+    function resetCalcCalibration() {
+        dtlCalibrationOffset = 0.0;
+        try {
+            localStorage.removeItem('rbwr_calc_dtl_offset');
+        } catch (e) { }
+        updateCalibrationDisplay();
+        if (activeCalcServer) {
+            startCalcDemandCountdown();
+        }
+    }
+
+    function applyCustomCalcCalibration() {
+        const input = document.getElementById('calc-custom-calib-input');
+        if (!input || !activeCalcServer || !activeCalcServer.lastHeartbeat) return;
+        const targetDtl = parseFloat(input.value);
+        if (isNaN(targetDtl) || targetDtl < 0) return;
+
+        const hbTime = new Date(activeCalcServer.lastHeartbeat).getTime();
+        const dtlRaw = parseFloat(activeCalcServer.state?.Unit1?.['Demand Time Left'] || activeCalcServer.state?.Unit2?.['Demand Time Left']) || 0;
+        const elapsed = (Date.now() - hbTime) / 1000.0;
+
+        dtlCalibrationOffset = targetDtl - (dtlRaw - elapsed);
+        try {
+            localStorage.setItem('rbwr_calc_dtl_offset', dtlCalibrationOffset);
+        } catch (e) { }
+        input.value = '';
+        updateCalibrationDisplay();
         startCalcDemandCountdown();
     }
 
@@ -699,7 +786,7 @@
 
         const nowInitial = Date.now();
         const elapsedInitial = (nowInitial - hbTime) / 1000.0;
-        const initialLiveDTL = Math.max(0, dtlRaw - elapsedInitial);
+        const initialLiveDTL = Math.max(0, dtlRaw - elapsedInitial + dtlCalibrationOffset);
 
         const curDem = getCurrentDemandValue(activeCalcServer, calc.selected_unit);
         const nextDem = getNextDemandValue(activeCalcServer, calc.selected_unit);
@@ -763,7 +850,7 @@
         calcCountdownTimer = setInterval(() => {
             const now = Date.now();
             const elapsed = (now - hbTime) / 1000.0;
-            const liveDTL = Math.max(0, dtlRaw - elapsed);
+            const liveDTL = Math.max(0, dtlRaw - elapsed + dtlCalibrationOffset);
 
             countdownVal.innerText = Math.round(liveDTL) + "s";
 
@@ -802,6 +889,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        updateCalibrationDisplay();
         const jobIdInput = document.getElementById('calcJobIdInput');
         if (jobIdInput) {
             jobIdInput.addEventListener('focus', fetchCalcServersApi);
