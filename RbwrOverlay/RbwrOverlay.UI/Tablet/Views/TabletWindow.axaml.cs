@@ -19,7 +19,6 @@ public partial class TabletWindow : Window
         TabletRoot.PointerPressed += OnHeaderPressed;
         WindowRoot.SizeChanged += (_, e) => ApplyScale(e.NewSize);
 
-        // The UI scale slider exists in both styles; commit the scale when it is released.
         var routes = RoutingStrategies.Bubble | RoutingStrategies.Tunnel;
         AddHandler(PointerReleasedEvent, OnScaleSliderCommit, routes, handledEventsToo: true);
         AddHandler(PointerCaptureLostEvent, OnScaleSliderCommit, routes, handledEventsToo: true);

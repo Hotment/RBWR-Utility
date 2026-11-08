@@ -93,8 +93,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
 
     private void SaveSettings() => _settingsService.SaveSettings(_settings);
 
-    // ---- tabs / empty state ----
-
     partial void OnSelectedTabChanged(string value)
     {
         int prevUnit = _dtlUnit;
@@ -124,8 +122,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand] private void SwitchTab(string tab) => SelectedTab = tab;
-
-    // ---- config: topmost + UI scale ----
 
     [RelayCommand] private void SetStyle(string style) => IsHudStyle = style == "hud";
 
@@ -190,8 +186,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
         if (double.TryParse(scale, NumberStyles.Any, CultureInfo.InvariantCulture, out double s)) UiScale = s;
     }
 
-    // ---- data ----
-
     private TabletServer? ActiveServer() =>
         string.IsNullOrEmpty(CurrentJobId) ? null : TabletApiClient.Find(_servers, CurrentJobId);
 
@@ -219,8 +213,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
             _refreshLock.Release();
         }
     }
-
-    // ---- demand time left (same rules as the overlay) ----
 
     private double? LiveDtl()
     {
@@ -250,7 +242,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
 
     private void Tick()
     {
-        // The overlay owns the server selection; follow it.
         string job = _getJobId().Trim();
         if (!string.Equals(job, CurrentJobId, StringComparison.Ordinal))
         {
@@ -274,8 +265,6 @@ public partial class TabletViewModel : ObservableObject, IDisposable
         }
     }
 
-    // The countdown is local; the API (~1 update/min) is only re-fetched when DTL crosses
-    // the threshold and when it reaches zero, exactly like the overlay.
     private void RunDemandSwitchLogic(double? live)
     {
         if (live is not double dtl) { ResetDemandSwitch(); return; }

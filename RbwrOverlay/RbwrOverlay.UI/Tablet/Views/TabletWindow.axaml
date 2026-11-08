@@ -175,7 +175,6 @@
     <Border Background="#8c8c8c" CornerRadius="12" ClipToBounds="True">
         <Grid RowDefinitions="Auto,Auto,*">
 
-            <!-- Header (drag area) -->
             <Border x:Name="HeaderBar" Grid.Row="0" Background="#000000" Padding="12,2">
                 <Grid ColumnDefinitions="*,Auto,*">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -195,7 +194,6 @@
                 </Grid>
             </Border>
 
-            <!-- Tabs + search -->
             <StackPanel Grid.Row="1">
                 <Border Background="#000000" Padding="0,4,0,0">
                     <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="1">
@@ -217,9 +215,7 @@
                 </Border>
             </StackPanel>
 
-            <!-- Content -->
             <Grid Grid.Row="2">
-                <!-- Data tabs -->
                 <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,8,12,4">
                     <StackPanel Spacing="6">
                         <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,14"
@@ -269,7 +265,6 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Config tab -->
                 <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,8,12,4">
                     <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
                         <TextBlock Classes="lbl" Text="TABLET STYLE" />

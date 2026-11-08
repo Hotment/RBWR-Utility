@@ -1365,8 +1365,6 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         if (tablet)
         {
-            // Discord only has two text lines: the tablet line goes right under the title and the
-            // sync/power data moves to the second line (full original text stays in the hover text).
             string compactState = _activeServer != null
                 ? $"Synced | {unit} | {(IsError ? "no data" : MainStatusPowerText)} | {state.Replace("Synced | ", string.Empty)}"
                 : $"{unit} | {state}";

@@ -105,14 +105,12 @@
         </Style>
     </UserControl.Styles>
 
-    <!-- Frame: outer radius 22 - border 2 - padding 10 = inner radius 10, so the gap stays even in the corners -->
     <Border Background="#0b0c0f" BorderBrush="#23262e" BorderThickness="2" CornerRadius="22" Padding="10"
             BoxShadow="0 12 28 -8 #E6000000">
         <Border Background="#0f1115" BorderBrush="#1c1f26" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
         <Grid>
             <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-                <!-- Header (drag area): title centered regardless of the side buttons -->
                 <Border Grid.Row="0" Padding="14,8" BorderBrush="#1c1f26" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,*">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"
@@ -134,7 +132,6 @@
                     </Grid>
                 </Border>
 
-                <!-- Tabs -->
                 <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="12,12,12,0">
                     <Button Grid.Column="0" Classes="htab" Content="Unit 1" Classes.active="{Binding IsU1}"
                             Command="{Binding SwitchTabCommand}" CommandParameter="u1" />
@@ -146,12 +143,10 @@
                             Command="{Binding SwitchTabCommand}" CommandParameter="config" />
                 </Grid>
 
-                <!-- Search -->
                 <Border Grid.Row="2" Margin="12,12,12,0" IsVisible="{Binding IsDataTab}">
                     <TextBox Classes="hbox" Text="{Binding SearchText}" PlaceholderText="Search values..." />
                 </Border>
 
-                <!-- Content -->
                 <Grid Grid.Row="3" Margin="0,12,0,0">
                     <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,0,12,12">
                         <StackPanel Spacing="6">
@@ -204,7 +199,6 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Config -->
                     <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12">
                         <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
                             <TextBlock Classes="hhead" Text="TABLET STYLE" />
