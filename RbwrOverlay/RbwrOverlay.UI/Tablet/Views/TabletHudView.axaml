@@ -105,7 +105,10 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Background="#0f1115" BorderBrush="#2a2e38" BorderThickness="2" CornerRadius="20" ClipToBounds="True">
+    <!-- Frame: outer radius 22 - border 2 - padding 10 = inner radius 10, so the gap stays even in the corners -->
+    <Border Background="#0b0c0f" BorderBrush="#23262e" BorderThickness="2" CornerRadius="22" Padding="10"
+            BoxShadow="0 12 28 -8 #E6000000">
+        <Border Background="#0f1115" BorderBrush="#1c1f26" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
         <Grid>
             <Grid RowDefinitions="Auto,Auto,Auto,*">
 
@@ -244,5 +247,6 @@
                 </Grid>
             </Grid>
         </Grid>
+        </Border>
     </Border>
 </UserControl>
