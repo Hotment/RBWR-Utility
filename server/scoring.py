@@ -35,6 +35,13 @@ def get_unit_output_mw(unit_dict):
                 continue
     return 0.0
 
+def _safe_float(val, default=0.0):
+    if val is None or isinstance(val, (dict, list, tuple, set, bool)):
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
 
 def extract_snap_pps(snap_tuple):
     """
@@ -173,7 +180,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         u1_st = state.get("Unit1", {}) if isinstance(state.get("Unit1"), dict) else {}
         u2_st = state.get("Unit2", {}) if isinstance(state.get("Unit2"), dict) else {}
 
-        aprm2_val = float(u2_st.get("APRM") or 0.0)
+        aprm2_val = _safe_float(u2_st.get("APRM"), 0.0)
         out2_val = get_unit_output_mw(u2_st)
         d2_val = u2_st.get("DemandU2") if u2_st.get("DemandU2") is not None else u2_st.get("Demand")
         offsite2_val = u2_st.get("Offsite Power")
@@ -322,7 +329,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         u1 = state.get("Unit1", {}) if isinstance(state.get("Unit1"), dict) else {}
         d1 = u1.get("DemandU1") if u1.get("DemandU1") is not None else u1.get("Demand")
         offsite1 = u1.get("Offsite Power")
-        aprm1 = float(u1.get("APRM") or 0.0)
+        aprm1 = _safe_float(u1.get("APRM"), 0.0)
         out1 = get_unit_output_mw(u1)
         pps1 = u1.get("PointsPerSecond")
         turb1 = u1.get("TurbineHealth")
@@ -344,7 +351,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         elif server_pps is not None:
             u1_act = (aprm1 >= 5.0 and out1 > 0)
             u2_st_check = state.get("Unit2", {}) if isinstance(state.get("Unit2"), dict) else {}
-            u2_act = (float(u2_st_check.get("APRM") or 0) >= 5.0 and get_unit_output_mw(u2_st_check) > 0)
+            u2_act = (_safe_float(u2_st_check.get("APRM"), 0.0) >= 5.0 and get_unit_output_mw(u2_st_check) > 0)
             if u1_act and u2_act:
                 pps1_val = server_pps * (1.2 / 2.9)
             elif u1_act:
@@ -431,7 +438,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
         u2 = state.get("Unit2", {}) if isinstance(state.get("Unit2"), dict) else {}
         d2 = u2.get("DemandU2") if u2.get("DemandU2") is not None else u2.get("Demand")
         offsite2 = u2.get("Offsite Power")
-        aprm2 = float(u2.get("APRM") or 0.0)
+        aprm2 = _safe_float(u2.get("APRM"), 0.0)
         out2 = get_unit_output_mw(u2)
         pps2 = u2.get("PointsPerSecond")
         turb2 = u2.get("TurbineHealth")

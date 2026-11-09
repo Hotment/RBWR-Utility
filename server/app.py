@@ -1836,6 +1836,24 @@ def safe_dict_values(d, max_retries=3):
             time.sleep(0.005)
     return []
 
+def safe_float(val: Any, default: Any = 0.0) -> Any:
+    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+def safe_demand_numeric(val: Any) -> float | None:
+    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
 def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
     if job_id in _sc_public_server_ids:
         return False
@@ -3372,19 +3390,19 @@ def get_active_cards_base(servers_data, persistent_ids):
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
-                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
-                "demand_time_left": unit1.get("Demand Time Left", 0),
-                "aprm": unit1.get("APRM", 0),
-                "reactor_temp": unit1.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
+                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
-                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
-                "demand_time_left": unit2.get("Demand Time Left", 0),
-                "aprm": unit2.get("APRM", 0),
-                "reactor_temp": unit2.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
+                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
@@ -3487,19 +3505,19 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
-                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
-                "demand_time_left": unit1.get("Demand Time Left", 0),
-                "aprm": unit1.get("APRM", 0),
-                "reactor_temp": unit1.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
+                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
-                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
-                "demand_time_left": unit2.get("Demand Time Left", 0),
-                "aprm": unit2.get("APRM", 0),
-                "reactor_temp": unit2.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
+                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
@@ -3870,12 +3888,12 @@ def servers_page():
     )
 
 def format_demand_value(val):
-    if val is None:
+    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
         return "N/A"
     try:
         v = float(val)
     except (ValueError, TypeError):
-        return str(val)
+        return "N/A"
 
     if v == -4:
         return "Evac"
@@ -3891,14 +3909,25 @@ def format_demand_value(val):
         return f"{v:.2f} MW"
 
 def format_total_demand(u1, u2):
-    try:
-        v1 = float(u1) if u1 is not None else 0.0
-    except (ValueError, TypeError):
-        v1 = 0.0
-    try:
-        v2 = float(u2) if u2 is not None else 0.0
-    except (ValueError, TypeError):
-        v2 = 0.0
+    v1 = None
+    v2 = None
+    if u1 is not None and not isinstance(u1, (bool, dict, list, tuple, set)):
+        try:
+            v1 = float(u1)
+        except (ValueError, TypeError):
+            pass
+    if u2 is not None and not isinstance(u2, (bool, dict, list, tuple, set)):
+        try:
+            v2 = float(u2)
+        except (ValueError, TypeError):
+            pass
+
+    if v1 is None and v2 is None:
+        return "N/A"
+    if v1 is None:
+        return format_demand_value(v2)
+    if v2 is None:
+        return format_demand_value(v1)
 
     is_u1_special = v1 < 0
     is_u2_special = v2 < 0
@@ -3984,12 +4013,33 @@ def server_detail_page(job_id):
     server_top_score = calculate_server_top_score(snapshots)
 
     if not server:
-        latest_st = latest_state
+        latest_st = latest_state if isinstance(latest_state, dict) else {}
         unit1_st = latest_st.get("Unit1", {})
+        if not isinstance(unit1_st, dict):
+            unit1_st = {}
         unit2_st = latest_st.get("Unit2", {})
+        if not isinstance(unit2_st, dict):
+            unit2_st = {}
 
-        u1_dem = unit1_st.get("DemandU1") if unit1_st.get("DemandU1") is not None else unit1_st.get("NextDemandU1", 0)
-        u2_dem = unit2_st.get("DemandU2") if unit2_st.get("DemandU2") is not None else unit2_st.get("NextDemandU2", 0)
+        raw_u1_dem = unit1_st.get("DemandU1") if unit1_st.get("DemandU1") is not None else unit1_st.get("NextDemandU1")
+        raw_u2_dem = unit2_st.get("DemandU2") if unit2_st.get("DemandU2") is not None else unit2_st.get("NextDemandU2")
+        u1_dem = safe_float(raw_u1_dem, None)
+        u2_dem = safe_float(raw_u2_dem, None)
+
+        raw_next1 = unit1_st.get("NextDemandU1") if unit1_st.get("NextDemandU1") is not None else raw_u1_dem
+        raw_next2 = unit2_st.get("NextDemandU2") if unit2_st.get("NextDemandU2") is not None else raw_u2_dem
+        dmand_next1 = safe_float(raw_next1, None)
+        dmand_next2 = safe_float(raw_next2, None)
+
+        if dmand_next1 is not None and dmand_next2 is not None:
+            next_demand = round(dmand_next1 + dmand_next2, 2)
+        elif dmand_next1 is not None:
+            next_demand = round(dmand_next1, 2)
+        elif dmand_next2 is not None:
+            next_demand = round(dmand_next2, 2)
+        else:
+            next_demand = None
+
         pts_info = calculate_server_points_rate(unit1_st, unit2_st, job_id=job_id, latest_state=latest_st)
 
         summary = {
@@ -4004,13 +4054,15 @@ def server_detail_page(job_id):
             "uptime_seconds": uptime_sec,
             "uptime_str": uptime_str,
             "top_score": server_top_score,
-            "time_to_next_demand": max(0.0, float(unit1_st.get("Demand Time Left", 0))),
-            "next_demand": round(float(u1_dem or 0) + float(u2_dem or 0), 2),
-            "next_demand_formatted": format_total_demand(u1_dem, u2_dem),
-            "dmandU1": u1_dem,
-            "dmandU2": u2_dem,
-            "dmandU1_formatted": format_demand_value(u1_dem),
-            "dmandU2_formatted": format_demand_value(u2_dem),
+            "time_to_next_demand": max(0.0, safe_float(unit1_st.get("Demand Time Left", 0), 0.0)),
+            "next_demand": next_demand if next_demand is not None else "N/A",
+            "next_demand_formatted": format_total_demand(raw_next1, raw_next2),
+            "dmandU1": u1_dem if u1_dem is not None else "N/A",
+            "dmandU2": u2_dem if u2_dem is not None else "N/A",
+            "dmand_next1": dmand_next1 if dmand_next1 is not None else "N/A",
+            "dmand_next2": dmand_next2 if dmand_next2 is not None else "N/A",
+            "dmandU1_formatted": format_demand_value(raw_u1_dem),
+            "dmandU2_formatted": format_demand_value(raw_u2_dem),
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "u1_aprm": pts_info["u1_aprm"],
@@ -4027,15 +4079,34 @@ def server_detail_page(job_id):
         return render_template("server_detail.html", **payload, **summary)
 
     unit1_state = server.get('state', {}).get('Unit1', {})
+    if not isinstance(unit1_state, dict):
+        unit1_state = {}
     unit2_state = server.get('state', {}).get('Unit2', {})
+    if not isinstance(unit2_state, dict):
+        unit2_state = {}
     server_misc = (server.get('state', {}).get('Misc') or {}) if isinstance(server.get('state'), dict) else {}
     server_tot_pps = server_misc.get('Total points/second')
     pts_info = calculate_server_points_rate(unit1_state, unit2_state, job_id=job_id, total_pps=server_tot_pps, latest_state=server.get('state', {}))
 
-    dmand_left_data = float(unit1_state.get('Demand Time Left', 0))
-    dmand_next1 = float(unit1_state.get('NextDemandU1') if unit1_state.get('NextDemandU1') is not None else (unit1_state.get('DemandU1') or 0))
-    dmand_next2 = float(unit2_state.get('NextDemandU2') if unit2_state.get('NextDemandU2') is not None else (unit2_state.get('DemandU2') or 0))
-    next_demand = round(dmand_next1 + dmand_next2, 2)
+    dmand_left_data = safe_float(unit1_state.get('Demand Time Left', 0), 0.0)
+    raw_u1_live = unit1_state.get('DemandU1')
+    raw_u2_live = unit2_state.get('DemandU2')
+    u1_live_dem = safe_float(raw_u1_live, None)
+    u2_live_dem = safe_float(raw_u2_live, None)
+
+    raw_next1 = unit1_state.get('NextDemandU1') if unit1_state.get('NextDemandU1') is not None else raw_u1_live
+    raw_next2 = unit2_state.get('NextDemandU2') if unit2_state.get('NextDemandU2') is not None else raw_u2_live
+    dmand_next1 = safe_float(raw_next1, None)
+    dmand_next2 = safe_float(raw_next2, None)
+
+    if dmand_next1 is not None and dmand_next2 is not None:
+        next_demand = round(dmand_next1 + dmand_next2, 2)
+    elif dmand_next1 is not None:
+        next_demand = round(dmand_next1, 2)
+    elif dmand_next2 is not None:
+        next_demand = round(dmand_next2, 2)
+    else:
+        next_demand = None
 
     try:
         hb_ts = server.get('lastHeartbeat', '')
@@ -4058,12 +4129,14 @@ def server_detail_page(job_id):
         "uptime_str": uptime_str,
         "top_score": server_top_score,
         "time_to_next_demand": dmand_left,
-        "next_demand": next_demand,
-        "next_demand_formatted": format_total_demand(dmand_next1, dmand_next2),
-        "dmandU1": dmand_next1,
-        "dmandU2": dmand_next2,
-        "dmandU1_formatted": format_demand_value(dmand_next1),
-        "dmandU2_formatted": format_demand_value(dmand_next2),
+        "next_demand": next_demand if next_demand is not None else "N/A",
+        "next_demand_formatted": format_total_demand(raw_next1, raw_next2),
+        "dmandU1": u1_live_dem if u1_live_dem is not None else "N/A",
+        "dmandU2": u2_live_dem if u2_live_dem is not None else "N/A",
+        "dmand_next1": dmand_next1 if dmand_next1 is not None else "N/A",
+        "dmand_next2": dmand_next2 if dmand_next2 is not None else "N/A",
+        "dmandU1_formatted": format_demand_value(raw_u1_live),
+        "dmandU2_formatted": format_demand_value(raw_u2_live),
         "u1_running": pts_info["u1_running"],
         "u2_running": pts_info["u2_running"],
         "u1_aprm": pts_info["u1_aprm"],
@@ -4257,19 +4330,19 @@ def get_historical_cards_base(servers_data, persistent_ids):
             "u1_running": pts_info["u1_running"],
             "u2_running": pts_info["u2_running"],
             "unit1": {
-                "demand": unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand"),
-                "demand_time_left": unit1.get("Demand Time Left", 0),
-                "aprm": unit1.get("APRM", 0),
-                "reactor_temp": unit1.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
+                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
             },
             "unit2": {
-                "demand": unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand"),
-                "demand_time_left": unit2.get("Demand Time Left", 0),
-                "aprm": unit2.get("APRM", 0),
-                "reactor_temp": unit2.get("Reactor Temp", 0),
+                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
+                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
+                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
+                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
@@ -5903,6 +5976,369 @@ def test_notifier_api(username):
     return jsonify({
         "success": True,
         "message": "Direct DMs have been retired in favor of automated Discord ticket channels under category 1547529007334162432."
+    })
+
+def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(snapshots, dict):
+        return {
+            "total_snapshots": 0,
+            "anomalous_snapshots_count": 0,
+            "total_anomalies": 1,
+            "has_dict_demand": False,
+            "anomalies": [{
+                "timestamp": "N/A",
+                "unit": "Root",
+                "field": "snapshots",
+                "type": type(snapshots).__name__,
+                "severity": "CRITICAL",
+                "keys": [],
+                "raw_value": str(snapshots),
+                "message": f"Snapshots root is of type '{type(snapshots).__name__}', expected dictionary."
+            }],
+            "snapshots_summary": []
+        }
+
+    sorted_ts = sorted([k for k in snapshots.keys() if not k.startswith('_')])
+    anomalies: list[dict[str, Any]] = []
+    snapshots_summary: list[dict[str, Any]] = []
+    anomalous_snapshots_set = set()
+
+    for ts in sorted_ts:
+        st = snapshots.get(ts)
+        snap_anomalies = []
+        if not isinstance(st, dict):
+            anom = {
+                "timestamp": ts,
+                "unit": "Root",
+                "field": "state",
+                "type": type(st).__name__,
+                "severity": "CRITICAL",
+                "keys": [],
+                "raw_value": str(st),
+                "message": f"Snapshot state is of type '{type(st).__name__}' instead of a dictionary."
+            }
+            anomalies.append(anom)
+            snap_anomalies.append(anom)
+            anomalous_snapshots_set.add(ts)
+            continue
+
+        for unit_key in ("Unit1", "Unit2"):
+            ust = st.get(unit_key)
+            if ust is None:
+                continue
+            if not isinstance(ust, dict):
+                anom = {
+                    "timestamp": ts,
+                    "unit": unit_key,
+                    "field": unit_key,
+                    "type": type(ust).__name__,
+                    "severity": "CRITICAL",
+                    "keys": [],
+                    "raw_value": str(ust),
+                    "message": f"{unit_key} state is of type '{type(ust).__name__}' instead of a dictionary."
+                }
+                anomalies.append(anom)
+                snap_anomalies.append(anom)
+                anomalous_snapshots_set.add(ts)
+                continue
+
+            fields_to_check = [
+                ("DemandU1" if unit_key == "Unit1" else "DemandU2", "Active electrical demand setpoint"),
+                ("NextDemandU1" if unit_key == "Unit1" else "NextDemandU2", "Next scheduled demand setpoint"),
+                ("Demand", "Legacy demand setpoint"),
+                ("Demand Time Left", "Countdown timer to next demand update"),
+                ("PointsPerSecond", "Points generation rate per second"),
+                ("APRM", "Average Power Range Monitor percentage"),
+                ("Output", "Generator electrical output"),
+                ("ElectricOutputMW", "Grid electrical output (MW)"),
+                ("PradDoSieci", "Unit 2 grid electrical power (MW)"),
+                ("Reactor Temp", "Reactor core temperature"),
+            ]
+
+            for field_name, field_desc in fields_to_check:
+                if field_name not in ust:
+                    continue
+                val = ust[field_name]
+                if isinstance(val, dict):
+                    anom = {
+                        "timestamp": ts,
+                        "unit": unit_key,
+                        "field": field_name,
+                        "field_desc": field_desc,
+                        "type": "dict",
+                        "severity": "CRITICAL",
+                        "keys": list(val.keys()),
+                        "raw_value": val,
+                        "message": (
+                            f"{unit_key}.{field_name} received a dictionary object {json.dumps(val)} "
+                            f"(keys: {list(val.keys())}) instead of a numeric value. "
+                            f"This caused float({unit_key}.{field_name}) to raise TypeError."
+                        )
+                    }
+                    anomalies.append(anom)
+                    snap_anomalies.append(anom)
+                    anomalous_snapshots_set.add(ts)
+                elif isinstance(val, list):
+                    anom = {
+                        "timestamp": ts,
+                        "unit": unit_key,
+                        "field": field_name,
+                        "field_desc": field_desc,
+                        "type": "list",
+                        "severity": "CRITICAL",
+                        "keys": [],
+                        "raw_value": val,
+                        "message": f"{unit_key}.{field_name} received a list instead of a numeric value."
+                    }
+                    anomalies.append(anom)
+                    snap_anomalies.append(anom)
+                    anomalous_snapshots_set.add(ts)
+                elif isinstance(val, str):
+                    try:
+                        float(val)
+                    except ValueError:
+                        anom = {
+                            "timestamp": ts,
+                            "unit": unit_key,
+                            "field": field_name,
+                            "field_desc": field_desc,
+                            "type": "str",
+                            "severity": "WARNING",
+                            "keys": [],
+                            "raw_value": val,
+                            "message": f"{unit_key}.{field_name} is an unparseable non-numeric string '{val}'."
+                        }
+                        anomalies.append(anom)
+                        snap_anomalies.append(anom)
+                        anomalous_snapshots_set.add(ts)
+
+        u1_st = st.get("Unit1", {}) if isinstance(st.get("Unit1"), dict) else {}
+        u2_st = st.get("Unit2", {}) if isinstance(st.get("Unit2"), dict) else {}
+        u1_dem_val = u1_st.get("DemandU1") if "DemandU1" in u1_st else u1_st.get("Demand")
+        u2_dem_val = u2_st.get("DemandU2") if "DemandU2" in u2_st else u2_st.get("Demand")
+
+        snapshots_summary.append({
+            "timestamp": ts,
+            "has_anomaly": len(snap_anomalies) > 0,
+            "anomaly_count": len(snap_anomalies),
+            "u1_demand_type": type(u1_dem_val).__name__ if u1_dem_val is not None else "None",
+            "u1_demand_val": str(u1_dem_val) if not isinstance(u1_dem_val, (dict, list)) else json.dumps(u1_dem_val),
+            "u2_demand_type": type(u2_dem_val).__name__ if u2_dem_val is not None else "None",
+            "u2_demand_val": str(u2_dem_val) if not isinstance(u2_dem_val, (dict, list)) else json.dumps(u2_dem_val),
+            "u1_aprm": u1_st.get("APRM", "N/A"),
+            "u2_aprm": u2_st.get("APRM", "N/A"),
+            "u1_out": u1_st.get("Output", u1_st.get("ElectricOutputMW", "N/A")),
+            "u2_out": u2_st.get("Output", u2_st.get("ElectricOutputMW", "N/A")),
+        })
+
+    first_anom_snap = None
+    if anomalous_snapshots_set:
+        sorted_anom_ts = sorted(list(anomalous_snapshots_set))
+        first_anom_snap = {
+            "timestamp": sorted_anom_ts[0],
+            "state": snapshots.get(sorted_anom_ts[0])
+        }
+
+    return {
+        "total_snapshots": len(sorted_ts),
+        "anomalous_snapshots_count": len(anomalous_snapshots_set),
+        "total_anomalies": len(anomalies),
+        "has_dict_demand": any(a["type"] == "dict" and "Demand" in a["field"] for a in anomalies),
+        "anomalies": anomalies,
+        "first_anomaly": anomalies[0] if anomalies else None,
+        "first_anomalous_snapshot": first_anom_snap,
+        "earliest_timestamp": sorted_ts[0] if sorted_ts else None,
+        "latest_timestamp": sorted_ts[-1] if sorted_ts else None,
+        "earliest_state": snapshots.get(sorted_ts[0]) if sorted_ts else None,
+        "latest_state": snapshots.get(sorted_ts[-1]) if sorted_ts else None,
+        "snapshots_summary": snapshots_summary,
+    }
+
+def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
+    query = (job_id_query or "").strip()
+    if not query:
+        return {"found": False, "error": "No Server Job ID provided."}
+
+    clean_q = query.lower()
+    matched_job_id = None
+    snapshots: dict[str, Any] = {}
+    source_location = ""
+    is_live = False
+
+    if _sc_latest_data and isinstance(_sc_latest_data, dict):
+        for s in _sc_latest_data.get('data', {}).get('servers', []):
+            jid = str(s.get('jobId') or "")
+            if jid.lower() == clean_q or jid.lower().startswith(clean_q) or clean_q in jid.lower():
+                matched_job_id = jid
+                hb = s.get('lastHeartbeat') or datetime.now(timezone.utc).isoformat()
+                snapshots[hb] = s.get('state') or {}
+                source_location = "Live Memory Cache (_sc_latest_data)"
+                is_live = True
+                break
+
+    servers_data = get_sc_data("servers.json") or {}
+    if not snapshots and isinstance(servers_data, dict):
+        if query in servers_data:
+            matched_job_id = query
+            snapshots = dict(servers_data[query])
+            source_location = "servers.json (active cache)"
+        else:
+            for jid, snaps in safe_dict_items(servers_data):
+                if jid.lower() == clean_q or jid.lower().startswith(clean_q) or clean_q in jid.lower():
+                    matched_job_id = jid
+                    snapshots = dict(snaps)
+                    source_location = "servers.json (active cache)"
+                    break
+
+    if not snapshots:
+        idx_jid, date_str = lookup_archive_server_date(query)
+        if idx_jid and date_str:
+            matched_job_id = idx_jid
+            for ext in (".json.gz", ".json"):
+                target_rel = os.path.join("archives", f"servers_{date_str}{ext}")
+                full_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}{ext}")
+                if os.path.exists(full_path):
+                    day_data = get_sc_data(target_rel)
+                    if isinstance(day_data, dict) and idx_jid in day_data:
+                        snapshots = dict(day_data[idx_jid])
+                        source_location = f"data/archives/servers_{date_str}{ext} (via index)"
+                        break
+
+    if not snapshots and os.path.exists(ARCHIVES_DIR):
+        try:
+            archive_files = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
+            for fname in archive_files:
+                if not (fname.endswith(".json") or fname.endswith(".json.gz")):
+                    continue
+                fpath = os.path.join(ARCHIVES_DIR, fname)
+                try:
+                    if fname.endswith(".gz"):
+                        with gzip.open(fpath, "rt", encoding="utf-8") as gf:
+                            day_data = json.load(gf)
+                    else:
+                        with open(fpath, "r", encoding="utf-8") as jf:
+                            day_data = json.load(jf)
+                    if isinstance(day_data, dict):
+                        target_id = None
+                        if query in day_data:
+                            target_id = query
+                        else:
+                            for jid in day_data.keys():
+                                if jid.lower() == clean_q or jid.lower().startswith(clean_q) or clean_q in jid.lower():
+                                    target_id = jid
+                                    break
+                        if target_id and isinstance(day_data[target_id], dict):
+                            matched_job_id = target_id
+                            snapshots = dict(day_data[target_id])
+                            source_location = f"data/archives/{fname} (archive file scan)"
+                            break
+                except Exception as arc_ex:
+                    logger.debug(f"Error reading archive file {fname} during debug scan: {arc_ex}")
+        except Exception as scan_ex:
+            logger.warning(f"Error during deep archive scan for {query}: {scan_ex}")
+
+    matching_errors = []
+    try:
+        errors_path = os.path.join(DATA_DIR, "errors.json")
+        if os.path.exists(errors_path):
+            with open(errors_path, "r", encoding="utf-8") as ef:
+                err_content = json.load(ef)
+                for err in err_content.get("errors", []):
+                    err_str = json.dumps(err).lower()
+                    if clean_q in err_str or (matched_job_id and matched_job_id.lower() in err_str):
+                        matching_errors.append(err)
+    except Exception:
+        pass
+
+    if not snapshots or not matched_job_id:
+        return {
+            "found": False,
+            "query": query,
+            "searched_locations": [
+                "Memory Cache (_sc_latest_data)",
+                "servers.json",
+                f"archives_index.json ({len(_sc_archive_server_index)} index entries)",
+                f"data/archives/ ({len(os.listdir(ARCHIVES_DIR)) if os.path.exists(ARCHIVES_DIR) else 0} archive files)",
+            ],
+            "matching_errors": matching_errors,
+            "message": f"Server '{query}' was not located in any active storage tiers or archive files."
+        }
+
+    analysis = analyze_server_state_anomalies(snapshots)
+    persistent_data = load_persistent_servers()
+    is_persistent = matched_job_id in persistent_data.get("persistent", {})
+    meta = _sc_server_meta.get(matched_job_id, {})
+
+    return {
+        "found": True,
+        "job_id": matched_job_id,
+        "query": query,
+        "source": source_location,
+        "is_live": is_live,
+        "is_persistent": is_persistent,
+        "meta": meta,
+        **analysis,
+        "matching_errors": matching_errors,
+    }
+
+@app.route("/admin/debug", methods=["GET"])
+@admin_required
+def view_debug_dashboard(username):
+    if not is_root_user(username):
+        return redirect("/admin")
+    discord_id = session.get("discord_id") or username
+    notifier_cfg = get_admin_notifier_config(discord_id)
+    initial_job_id = request.args.get("job_id") or request.args.get("server") or request.args.get("q") or ""
+    return render_template(
+        "admin_panel.html",
+        username=username,
+        discord_id=session.get("discord_id") or "",
+        active_view="debug",
+        is_root=True,
+        permissions=get_user_permissions(username),
+        me=admin_panel_identity(username),
+        notifier=notifier_cfg,
+        initial_debug_job_id=initial_job_id,
+    )
+
+@app.route("/api/admin/debug/server/<path:job_id>", methods=["GET"])
+@admin_required
+def api_debug_server(username, job_id):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    result = diagnose_server_snapshots(job_id)
+    return jsonify(result)
+
+@app.route("/api/admin/debug/analyze_payload", methods=["POST"])
+@admin_required
+def api_debug_analyze_payload(username):
+    if not is_root_user(username):
+        return jsonify({"detail": "Forbidden - Root privileges required"}), 403
+    try:
+        req_json = request.get_json(silent=True) or {}
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON body: {e}"}), 400
+
+    payload = req_json.get("payload") if isinstance(req_json, dict) and "payload" in req_json else req_json
+    if isinstance(payload, dict):
+        if "Unit1" in payload or "Unit2" in payload:
+            now_ts = datetime.now(timezone.utc).isoformat()
+            snapshots = {now_ts: payload}
+        else:
+            snapshots = payload
+    else:
+        snapshots = {}
+
+    analysis = analyze_server_state_anomalies(snapshots)
+    return jsonify({
+        "found": True,
+        "job_id": req_json.get("job_id", "Custom Payload") if isinstance(req_json, dict) else "Custom Payload",
+        "source": "Custom Injected State Payload",
+        "is_live": False,
+        "is_persistent": False,
+        "meta": {},
+        **analysis,
+        "matching_errors": []
     })
 
 @app.route("/auth/discord/login", methods=["GET"])

@@ -1269,12 +1269,12 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
     words_list = [w[:60] for w in cfg_words.get("words", []) if w.strip()][:1000]
     words_enabled = is_global_enabled and bool(cfg_words.get("enabled")) and bool(words_list)
     words_actions = _build_actions(cfg_words.get("action", "warn"), cfg_words.get("duration", "10m"), allow_timeout=True)
-
+    edit_kwargs: dict[str, Any] = {}
     try:
         if rule_name_words in existing_by_name:
             existing = existing_by_name[rule_name_words]
             meta = disnake.AutoModTriggerMetadata(keyword_filter=words_list) if words_list else None
-            edit_kwargs: dict[str, Any] = {
+            edit_kwargs = {
                 "enabled": words_enabled,
                 "actions": words_actions,
                 "exempt_roles": exempt_roles,
@@ -1367,7 +1367,7 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
     try:
         if existing_mentions:
             meta = disnake.AutoModTriggerMetadata(mention_total_limit=mention_limit)
-            edit_kwargs: dict[str, Any] = {
+            edit_kwargs = {
                 "enabled": mentions_enabled,
                 "trigger_metadata": meta,
                 "actions": mentions_actions,

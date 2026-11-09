@@ -511,33 +511,39 @@ def _record_error_entry(
         log.warning(f"[Error Monitor] Could not record error: {ex}")
         return None
       
-def _build_alert_action_view() -> disnake.ui.View:
-    view = disnake.ui.View(timeout=None)
-    view.add_item(disnake.ui.Button(
-        label="Bug Reports & Tickets",
-        url=f"{DEFAULT_SERVER_BASE_URL}/tickets",
-        style=disnake.ButtonStyle.link,
-    ))
-    view.add_item(disnake.ui.Button(
-        label="Web Portal",
-        url=DEFAULT_SERVER_BASE_URL,
-        style=disnake.ButtonStyle.link,
-    ))
-    return view
+def _build_alert_action_view() -> disnake.ui.View | None:
+    try:
+        view = disnake.ui.View(timeout=None)
+        view.add_item(disnake.ui.Button(
+            label="Bug Reports & Tickets",
+            url=f"{DEFAULT_SERVER_BASE_URL}/tickets",
+            style=disnake.ButtonStyle.link,
+        ))
+        view.add_item(disnake.ui.Button(
+            label="Web Portal",
+            url=DEFAULT_SERVER_BASE_URL,
+            style=disnake.ButtonStyle.link,
+        ))
+        return view
+    except Exception:
+        return None
 
-def _build_crash_action_view(admin_url: str) -> disnake.ui.View:
-    view = disnake.ui.View(timeout=None)
-    view.add_item(disnake.ui.Button(
-        label="Open Crashes Dashboard",
-        url=admin_url,
-        style=disnake.ButtonStyle.link,
-    ))
-    view.add_item(disnake.ui.Button(
-        label="Web Portal",
-        url=DEFAULT_SERVER_BASE_URL,
-        style=disnake.ButtonStyle.link,
-    ))
-    return view
+def _build_crash_action_view(admin_url: str) -> disnake.ui.View | None:
+    try:
+        view = disnake.ui.View(timeout=None)
+        view.add_item(disnake.ui.Button(
+            label="Open Crashes Dashboard",
+            url=admin_url,
+            style=disnake.ButtonStyle.link,
+        ))
+        view.add_item(disnake.ui.Button(
+            label="Web Portal",
+            url=DEFAULT_SERVER_BASE_URL,
+            style=disnake.ButtonStyle.link,
+        ))
+        return view
+    except Exception:
+        return None
 
 async def send_interaction_error(
     inter: disnake.Interaction,
@@ -602,6 +608,8 @@ async def _send_alert_coro(
     embed_dict: dict[str, Any],
     file_bytes: bytes | None = None,
     view: disnake.ui.View | None = None,
+    action_type: str = "alert",
+    admin_url: str = "",
 ) -> bool:
     global disnake_bot
     if not disnake_bot:
@@ -614,6 +622,12 @@ async def _send_alert_coro(
         if not channel or not hasattr(channel, "send") or not isinstance(channel, disnake.abc.Messageable):
             log.warning(f"[Discord Alert] Channel {channel_id} not found or cannot send messages.")
             return False
+
+        if view is None:
+            if action_type == "crash":
+                view = _build_crash_action_view(admin_url)
+            else:
+                view = _build_alert_action_view()
 
         embed = disnake.Embed.from_dict(embed_dict)  # pyright: ignore[reportArgumentType]
         send_kwargs: dict[str, Any] = {"content": content, "embed": embed}
@@ -762,12 +776,11 @@ def report_error_to_discord(
             entry=entry,
         )
 
-        alert_view = _build_alert_action_view()
         global disnake_bot, disnake_bot_loop
         if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
             try:
                 fut = asyncio.run_coroutine_threadsafe(
-                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, view=alert_view),
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, action_type="alert"),
                     disnake_bot_loop,
                 )
                 if fut.result(timeout=6):
@@ -835,7 +848,6 @@ def report_crash_to_discord(
         embed.set_footer(text="RBWR Desktop Crash Monitoring")
         embed_dict: dict = embed.to_dict()  # pyright: ignore[reportAssignmentType]
 
-        crash_view = _build_crash_action_view(admin_url)
         crash_components = [
             {
                 "type": 1,
@@ -860,7 +872,7 @@ def report_crash_to_discord(
         if disnake_bot and disnake_bot.is_ready() and disnake_bot_loop and disnake_bot_loop.is_running():
             try:
                 fut = asyncio.run_coroutine_threadsafe(
-                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, view=crash_view),
+                    _send_alert_coro(channel_id, content, embed_dict, file_bytes, action_type="crash", admin_url=admin_url),
                     disnake_bot_loop,
                 )
                 if fut.result(timeout=6):

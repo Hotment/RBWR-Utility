@@ -282,6 +282,17 @@
                 </svg>
                 <span class="whitespace-nowrap">Audit Logs</span>
             </a>
+
+            <a href="/admin/debug" id="nav-debug"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'debug' %}bg-indigo-600/10 text-indigo-400 border border-indigo-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition shrink-0" fill="none"
+                    stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z">
+                    </path>
+                </svg>
+                <span class="whitespace-nowrap">Debug Inspector</span>
+            </a>
             {% endif %}
 
             {% if permissions.dms %}
@@ -602,6 +613,27 @@
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed mt-2">
                         Inspect detailed chronological records of administrator operations, security events, and configuration modifications.
+                    </p>
+                </a>
+
+                <a href="/admin/debug" id="card-link-debug"
+                    class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div
+                        class="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20 transition duration-300 shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2
+                            class="text-xl font-bold tracking-wide font-display text-white group-hover:text-indigo-400 transition duration-300 whitespace-nowrap">
+                            Debug Inspector</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed mt-2">
+                        Deep-scan server state structures across memory and compressed archives, pinpoint dictionary demand anomalies, and trace runtime exceptions.
                     </p>
                 </a>
                 {% endif %}
@@ -1621,6 +1653,173 @@
                 <div class="error-list" id="errors-list"></div>
         </main>
         {% endif %}
+
+        {% if is_root %}
+        <main id="view-debug"
+            class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'debug' %}hidden{% endif %}">
+            <header
+                class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-bold tracking-wide text-white font-display whitespace-nowrap">Debug Inspector</h2>
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono mt-1">Deep-scan server state structures across live cache and compressed archives to diagnose dictionary demand anomalies and type mismatches.</p>
+                </div>
+                <div class="flex items-center gap-3 font-mono text-xs flex-wrap">
+                    <button type="button" onclick="handleDebugRefresh()"
+                        class="px-3.5 py-2 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span>Re-scan</span>
+                    </button>
+                    <a href="/"
+                        class="px-3.5 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap">Home Site</a>
+                </div>
+            </header>
+
+            <div class="cyber-panel p-4 sm:p-6 rounded-xl border border-white/10 flex flex-col gap-4">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div class="relative grow font-mono text-xs">
+                        <input type="text" id="debug-server-id"
+                            value="{{ initial_debug_job_id | default('ee59bfac-eb2a-491e-b3f7-d3ada113e628') }}"
+                            placeholder="Enter server Job ID or prefix (e.g. ee59bfac-eb2a-491e-b3f7-d3ada113e628)..."
+                            class="w-full bg-slate-900/90 border border-white/10 rounded-lg px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition">
+                    </div>
+                    <button type="button" onclick="handleDebugInspectClick()"
+                        class="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold tracking-wider transition whitespace-nowrap flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <span>Inspect Server</span>
+                    </button>
+                    <button type="button" onclick="toggleDebugSimulator()"
+                        class="px-3.5 py-2.5 rounded-lg border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-mono text-xs transition whitespace-nowrap flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                        <span>Paste JSON Payload</span>
+                    </button>
+                </div>
+
+                <div id="debug-simulator-panel" class="hidden flex flex-col gap-3 pt-3 border-t border-white/10">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">Custom State / Snapshot Payload Analyzer</span>
+                        <span class="text-[10px] font-mono text-slate-500">Paste any raw state dictionary or snapshot mapping from Roblox/logs</span>
+                    </div>
+                    <textarea id="debug-payload-input" rows="6"
+                        placeholder='{"Unit1": {"DemandU1": {"Value": 800}, "APRM": 95.0}, "Unit2": {"DemandU2": 1100.0}}'
+                        class="w-full bg-slate-950/80 border border-white/10 rounded-lg p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition"></textarea>
+                    <div class="flex justify-end gap-2 font-mono text-xs">
+                        <button type="button" onclick="handleDebugAnalyzePayload()"
+                            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition">Analyze Pasted Payload</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="debug-loading" class="hidden cyber-panel p-8 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-3">
+                <div class="w-8 h-8 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                <span class="font-mono text-xs text-slate-400 tracking-wider">Scanning live memory, active cache (servers.json), and compressed archives...</span>
+            </div>
+
+            <div id="debug-not-found" class="hidden cyber-panel p-6 rounded-xl border border-amber-500/20 bg-amber-500/5 flex flex-col gap-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 font-mono font-bold text-xs">!</div>
+                    <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-bold font-mono text-amber-300">Server Not Located in Local Storage</h3>
+                        <p id="debug-not-found-msg" class="text-xs font-mono text-slate-400 leading-relaxed"></p>
+                    </div>
+                </div>
+                <div id="debug-not-found-locations" class="text-[11px] font-mono text-slate-400 pl-11 flex flex-col gap-1"></div>
+                <div id="debug-not-found-errors" class="hidden flex flex-col gap-2 pl-11 pt-2 border-t border-amber-500/10"></div>
+            </div>
+
+            <div id="debug-results" class="hidden flex flex-col gap-6">
+                <div id="debug-verdict-banner" class="cyber-panel p-5 rounded-xl border flex flex-col gap-3">
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Storage Source</span>
+                        <span id="debug-stat-source" class="text-xs font-bold font-mono text-indigo-400 truncate" title="">--</span>
+                    </div>
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Total Snapshots</span>
+                        <span id="debug-stat-total-snaps" class="text-lg font-bold font-display text-white">0</span>
+                    </div>
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Anomalous Snapshots</span>
+                        <span id="debug-stat-anom-snaps" class="text-lg font-bold font-display text-rose-400">0</span>
+                    </div>
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Total Anomalies</span>
+                        <span id="debug-stat-total-anom" class="text-lg font-bold font-display text-rose-400">0</span>
+                    </div>
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Demand Status</span>
+                        <span id="debug-stat-demand-status" class="text-xs font-bold font-mono text-white truncate">--</span>
+                    </div>
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Live Cache</span>
+                        <span id="debug-stat-is-live" class="text-xs font-bold font-mono text-slate-300">--</span>
+                    </div>
+                </div>
+
+                <div class="cyber-panel p-2 rounded-xl border border-white/5 flex items-center gap-2 overflow-x-auto font-mono text-xs">
+                    <button type="button" onclick="setDebugSubTab('anomalies')" id="debug-tab-btn-anomalies"
+                        class="px-3.5 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold transition whitespace-nowrap">
+                        Detected Anomalies (<span id="debug-count-anomalies">0</span>)
+                    </button>
+                    <button type="button" onclick="setDebugSubTab('snapshot-json')" id="debug-tab-btn-snapshot-json"
+                        class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap">
+                        Anomalous Snapshot (Raw JSON)
+                    </button>
+                    <button type="button" onclick="setDebugSubTab('timeline')" id="debug-tab-btn-timeline"
+                        class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap">
+                        Snapshot Timeline (<span id="debug-count-timeline">0</span>)
+                    </button>
+                    <button type="button" onclick="setDebugSubTab('errors')" id="debug-tab-btn-errors"
+                        class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap">
+                        Error Logs (<span id="debug-count-errors">0</span>)
+                    </button>
+                </div>
+
+                <div id="debug-subtab-anomalies" class="flex flex-col gap-4">
+                    <div id="debug-anomalies-list" class="flex flex-col gap-3 font-mono text-xs">
+                    </div>
+                </div>
+
+                <div id="debug-subtab-snapshot-json" class="hidden flex flex-col gap-3 font-mono text-xs">
+                    <div class="flex items-center justify-between">
+                        <span id="debug-raw-snap-title" class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Raw Snapshot Payload</span>
+                        <button type="button" onclick="copyDebugRawJson()"
+                            class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] transition">Copy JSON</button>
+                    </div>
+                    <pre id="debug-raw-snap-content" class="bg-slate-950 p-4 rounded-xl border border-white/10 text-emerald-400 text-[11px] leading-relaxed overflow-x-auto max-h-[600px] select-all"></pre>
+                </div>
+
+                <div id="debug-subtab-timeline" class="hidden flex flex-col gap-3 font-mono text-xs">
+                    <div class="overflow-x-auto rounded-xl border border-white/5">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white/5 border-b border-white/10 text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                                    <th class="p-3">Timestamp</th>
+                                    <th class="p-3">Unit 1 Demand</th>
+                                    <th class="p-3">Unit 2 Demand</th>
+                                    <th class="p-3">U1 Output</th>
+                                    <th class="p-3">U2 Output</th>
+                                    <th class="p-3">U1 APRM</th>
+                                    <th class="p-3">U2 APRM</th>
+                                    <th class="p-3 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="debug-timeline-body" class="divide-y divide-white/5 text-slate-300 text-[11px]">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="debug-subtab-errors" class="hidden flex flex-col gap-3 font-mono text-xs">
+                    <div id="debug-errors-list" class="flex flex-col gap-3">
+                    </div>
+                </div>
+            </div>
+        </main>
+        {% endif %}
     </div>
 
     <div id="ban-modal"
@@ -1725,6 +1924,7 @@
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
                 bindNavLink('nav-audit-logs', 'audit-logs', '/admin/audit-logs');
+                bindNavLink('nav-debug', 'debug', '/admin/debug');
             }
 
             const initialServerTab = '{{ initial_server_tab | default("all") }}';
@@ -1779,6 +1979,20 @@
                         navigateToView('audit-logs', '/admin/audit-logs');
                     });
                 }
+                const cardDbg = document.getElementById('card-link-debug');
+                if (cardDbg) {
+                    cardDbg.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateToView('debug', '/admin/debug');
+                    });
+                }
+            }
+
+            if (IS_ROOT && activeView === 'debug') {
+                const initDbgId = '{{ initial_debug_job_id | default("") }}';
+                if (initDbgId) {
+                    setDebugServerAndRun(initDbgId);
+                }
             }
 
             if (window.AdminBot) AdminBot.show(activeView);
@@ -1829,6 +2043,12 @@
                 } else {
                     navigateToView('overview', '/admin', false);
                 }
+            } else if (path === '/admin/debug') {
+                if (IS_ROOT) {
+                    navigateToView('debug', path, false);
+                } else {
+                    navigateToView('overview', '/admin', false);
+                }
             } else {
                 navigateToView('overview', path, false);
             }
@@ -1859,6 +2079,8 @@
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 transition group";
                 } else if (viewName === 'audit-logs') {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-amber-600/10 text-amber-400 border border-amber-500/20 transition group";
+                } else if (viewName === 'debug') {
+                    activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 transition group";
                 } else {
                     activeLink.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider bg-blue-600/10 text-blue-500 border border-blue-500/20 transition group";
                 }
@@ -1871,10 +2093,18 @@
             if (viewName === 'audit-logs' && IS_ROOT) {
                 loadAuditLogs(currentAuditPage);
             }
+            if (viewName === 'debug' && IS_ROOT) {
+                const initDbgId = '{{ initial_debug_job_id | default("") }}';
+                const inputEl = document.getElementById('debug-server-id');
+                if (initDbgId && inputEl) {
+                    inputEl.value = initDbgId;
+                    runServerDebug(initDbgId);
+                }
+            }
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'audit-logs', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'audit-logs', 'debug', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -4264,6 +4494,390 @@
                     btn.disabled = false;
                     btn.textContent = 'Purge Logs';
                 }
+            }
+        }
+
+        let currentDebugData = null;
+
+        function setDebugServerAndRun(jobId) {
+            const input = document.getElementById('debug-server-id');
+            if (input) input.value = jobId;
+            runServerDebug(jobId);
+        }
+
+        function handleDebugInspectClick() {
+            const input = document.getElementById('debug-server-id');
+            const jobId = (input ? input.value : '').trim();
+            if (!jobId) {
+                alert('Please enter a server Job ID or prefix.');
+                return;
+            }
+            runServerDebug(jobId);
+        }
+
+        function handleDebugRefresh() {
+            const input = document.getElementById('debug-server-id');
+            const jobId = (input ? input.value : '').trim();
+            if (jobId) {
+                runServerDebug(jobId);
+            }
+        }
+
+        function toggleDebugSimulator() {
+            const panel = document.getElementById('debug-simulator-panel');
+            if (panel) panel.classList.toggle('hidden');
+        }
+
+        async function handleDebugAnalyzePayload() {
+            const textarea = document.getElementById('debug-payload-input');
+            const raw = (textarea ? textarea.value : '').trim();
+            if (!raw) {
+                alert('Please paste a JSON state or snapshot payload to analyze.');
+                return;
+            }
+            let parsed = null;
+            try {
+                parsed = JSON.parse(raw);
+            } catch (err) {
+                alert('Invalid JSON syntax: ' + err.message);
+                return;
+            }
+
+            const loading = document.getElementById('debug-loading');
+            const notFound = document.getElementById('debug-not-found');
+            const results = document.getElementById('debug-results');
+            if (loading) loading.classList.remove('hidden');
+            if (notFound) notFound.classList.add('hidden');
+            if (results) results.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/admin/debug/analyze_payload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payload: parsed })
+                });
+                const data = await res.json();
+                renderDebugResults(data);
+            } catch (err) {
+                console.error(err);
+                alert('Failed to analyze payload: ' + err.message);
+            } finally {
+                if (loading) loading.classList.add('hidden');
+            }
+        }
+
+        async function runServerDebug(jobId) {
+            if (!jobId) return;
+            const loading = document.getElementById('debug-loading');
+            const notFound = document.getElementById('debug-not-found');
+            const results = document.getElementById('debug-results');
+
+            if (loading) loading.classList.remove('hidden');
+            if (notFound) notFound.classList.add('hidden');
+            if (results) results.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/admin/debug/server/' + encodeURIComponent(jobId));
+                const data = await res.json();
+                if (!res.ok || !data.found) {
+                    renderDebugNotFound(data);
+                } else {
+                    renderDebugResults(data);
+                }
+            } catch (err) {
+                console.error('Debug inspect error:', err);
+                renderDebugNotFound({
+                    query: jobId,
+                    message: 'Network error or unhandled server exception during diagnostic scan: ' + err.message,
+                    searched_locations: ['API request failed']
+                });
+            } finally {
+                if (loading) loading.classList.add('hidden');
+            }
+        }
+
+        function renderDebugNotFound(data) {
+            const notFound = document.getElementById('debug-not-found');
+            const results = document.getElementById('debug-results');
+            const msgEl = document.getElementById('debug-not-found-msg');
+            const locEl = document.getElementById('debug-not-found-locations');
+            const errEl = document.getElementById('debug-not-found-errors');
+
+            if (results) results.classList.add('hidden');
+            if (notFound) notFound.classList.remove('hidden');
+
+            if (msgEl) {
+                msgEl.textContent = data.message || `Server '${data.query || 'unknown'}' was not found in active cache or archive files.`;
+            }
+
+            if (locEl) {
+                let html = '<span class="text-slate-500 font-bold uppercase tracking-wider">Searched Storage Tiers:</span>';
+                (data.searched_locations || []).forEach(loc => {
+                    html += `<div>• ${escapeHtml(loc)}</div>`;
+                });
+                locEl.innerHTML = html;
+            }
+
+            if (errEl) {
+                if (data.matching_errors && data.matching_errors.length > 0) {
+                    errEl.classList.remove('hidden');
+                    let html = `<span class="text-rose-400 font-bold uppercase tracking-wider">Found ${data.matching_errors.length} Recorded Error(s) in Error Monitor for this Server:</span>`;
+                    data.matching_errors.forEach(err => {
+                        html += `
+                            <div class="p-3 bg-black/60 rounded border border-rose-500/20 flex flex-col gap-1.5 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-rose-400 font-bold font-mono">${escapeHtml(err.type || 'Exception')}: ${escapeHtml(err.message || '')}</span>
+                                    <span class="text-[10px] text-slate-500 font-mono">${escapeHtml(err.last_seen || '')}</span>
+                                </div>
+                                ${err.traceback ? `<pre class="p-2 bg-black/80 rounded border border-white/5 text-[10px] text-slate-400 max-h-40 overflow-y-auto font-mono">${escapeHtml(err.traceback)}</pre>` : ''}
+                            </div>
+                        `;
+                    });
+                    errEl.innerHTML = html;
+                } else {
+                    errEl.classList.add('hidden');
+                    errEl.innerHTML = '';
+                }
+            }
+        }
+
+        function renderDebugResults(data) {
+            currentDebugData = data;
+            const notFound = document.getElementById('debug-not-found');
+            const results = document.getElementById('debug-results');
+            if (notFound) notFound.classList.add('hidden');
+            if (results) results.classList.remove('hidden');
+
+            const banner = document.getElementById('debug-verdict-banner');
+            if (banner) {
+                if (data.has_dict_demand) {
+                    banner.className = "cyber-panel p-5 rounded-xl border border-rose-500/40 bg-rose-500/10 flex flex-col gap-3";
+                    banner.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 font-mono font-bold text-xs">[!]</div>
+                            <div class="flex flex-col gap-1">
+                                <h3 class="text-sm font-bold font-mono text-rose-300 uppercase tracking-wide">Critical Anomaly: Dictionary Object Detected in Demand Setpoint</h3>
+                                <p class="text-xs font-mono text-slate-300 leading-relaxed">
+                                    ${data.first_anomaly ? escapeHtml(data.first_anomaly.message) : 'A snapshot in this server received a Python dictionary instead of a numeric value for electrical demand.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-black/40 rounded-lg border border-rose-500/20 text-[11px] font-mono text-slate-300 flex flex-col gap-1.5">
+                            <span class="text-rose-400 font-bold uppercase tracking-wider text-[10px]">Root Cause & Mitigation:</span>
+                            <span>• When Roblox state payloads output structured data or dictionaries for Demand fields, standard <code>float()</code> conversions fail with <code>TypeError: float() argument must be a string or a real number, not 'dict'</code>.</span>
+                            <span>• The application has been patched with <code>safe_float</code> and <code>format_demand_value</code> to never attempt dictionary conversion or subfield extraction, returning <code>N/A</code> gracefully without cascading errors.</span>
+                        </div>
+                    `;
+                } else if (data.total_anomalies > 0) {
+                    banner.className = "cyber-panel p-5 rounded-xl border border-amber-500/40 bg-amber-500/10 flex flex-col gap-3";
+                    banner.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-mono font-bold text-xs">[!]</div>
+                            <div class="flex flex-col gap-1">
+                                <h3 class="text-sm font-bold font-mono text-amber-300 uppercase tracking-wide">Anomalies Detected (${data.total_anomalies})</h3>
+                                <p class="text-xs font-mono text-slate-300 leading-relaxed">Found non-standard or unparseable field structures in this server's snapshots.</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    banner.className = "cyber-panel p-5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 flex flex-col gap-3";
+                    banner.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col gap-1">
+                                <h3 class="text-sm font-bold font-mono text-emerald-300 uppercase tracking-wide">All Snapshot Structures Valid</h3>
+                                <p class="text-xs font-mono text-slate-400 leading-relaxed">All evaluated snapshots contained valid numeric values for demand, output, APRM, and core operational stats.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            const statSource = document.getElementById('debug-stat-source');
+            if (statSource) {
+                statSource.textContent = data.source || '--';
+                statSource.title = data.source || '';
+            }
+            const statTotalSnaps = document.getElementById('debug-stat-total-snaps');
+            if (statTotalSnaps) statTotalSnaps.textContent = data.total_snapshots || 0;
+
+            const statAnomSnaps = document.getElementById('debug-stat-anom-snaps');
+            if (statAnomSnaps) {
+                statAnomSnaps.textContent = data.anomalous_snapshots_count || 0;
+                statAnomSnaps.className = data.anomalous_snapshots_count > 0 ? "text-lg font-bold font-display text-rose-400" : "text-lg font-bold font-display text-slate-400";
+            }
+
+            const statTotalAnom = document.getElementById('debug-stat-total-anom');
+            if (statTotalAnom) {
+                statTotalAnom.textContent = data.total_anomalies || 0;
+                statTotalAnom.className = data.total_anomalies > 0 ? "text-lg font-bold font-display text-rose-400" : "text-lg font-bold font-display text-slate-400";
+            }
+
+            const statDemandStatus = document.getElementById('debug-stat-demand-status');
+            if (statDemandStatus) {
+                if (data.has_dict_demand) {
+                    statDemandStatus.textContent = "DICT DETECTED";
+                    statDemandStatus.className = "text-xs font-bold font-mono text-rose-400 truncate";
+                } else {
+                    statDemandStatus.textContent = "VALID NUMERIC";
+                    statDemandStatus.className = "text-xs font-bold font-mono text-emerald-400 truncate";
+                }
+            }
+
+            const statIsLive = document.getElementById('debug-stat-is-live');
+            if (statIsLive) statIsLive.textContent = data.is_live ? "Active Memory" : "Historical/Disk";
+
+            const countAnom = document.getElementById('debug-count-anomalies');
+            if (countAnom) countAnom.textContent = data.total_anomalies || 0;
+            const countTime = document.getElementById('debug-count-timeline');
+            if (countTime) countTime.textContent = data.total_snapshots || 0;
+            const countErr = document.getElementById('debug-count-errors');
+            if (countErr) countErr.textContent = (data.matching_errors || []).length;
+
+            const anomListEl = document.getElementById('debug-anomalies-list');
+            if (anomListEl) {
+                if (!data.anomalies || data.anomalies.length === 0) {
+                    anomListEl.innerHTML = '<div class="p-6 text-center text-slate-500 font-mono">No field anomalies or type mismatches detected across evaluated snapshots.</div>';
+                } else {
+                    let html = '';
+                    data.anomalies.forEach((a, idx) => {
+                        html += `
+                            <div class="cyber-panel p-4 rounded-xl border ${a.type === 'dict' ? 'border-rose-500/30 bg-rose-500/5' : 'border-amber-500/30 bg-amber-500/5'} flex flex-col gap-3">
+                                <div class="flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-0.5 rounded ${a.type === 'dict' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'} font-bold uppercase text-[10px]">
+                                            ${escapeHtml(a.type.toUpperCase())} ANOMALY
+                                        </span>
+                                        <span class="font-bold text-white text-xs">${escapeHtml(a.unit)}.${escapeHtml(a.field)}</span>
+                                        ${a.field_desc ? `<span class="text-slate-500 text-[10px]">(${escapeHtml(a.field_desc)})</span>` : ''}
+                                    </div>
+                                    <span class="text-slate-400 text-[10px]">${escapeHtml(a.timestamp)}</span>
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed font-mono">${escapeHtml(a.message)}</p>
+                                ${a.keys && a.keys.length > 0 ? `
+                                    <div class="flex items-center gap-1.5 flex-wrap text-[10px] font-mono">
+                                        <span class="text-slate-500 uppercase font-bold">Detected Dictionary Keys:</span>
+                                        ${a.keys.map(k => `<span class="px-1.5 py-0.5 rounded bg-black/60 border border-white/10 text-rose-300 font-bold">${escapeHtml(k)}</span>`).join('')}
+                                    </div>
+                                ` : ''}
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-[10px] uppercase font-bold text-slate-500 font-mono tracking-wider">Raw Field Value:</span>
+                                    <pre class="p-2.5 bg-black/80 rounded border border-white/10 text-rose-300 text-[11px] font-mono overflow-x-auto"><code>${escapeHtml(typeof a.raw_value === 'object' ? JSON.stringify(a.raw_value, null, 2) : String(a.raw_value))}</code></pre>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    anomListEl.innerHTML = html;
+                }
+            }
+
+            const rawTitle = document.getElementById('debug-raw-snap-title');
+            const rawContent = document.getElementById('debug-raw-snap-content');
+            if (rawContent) {
+                let targetState = null;
+                if (data.first_anomalous_snapshot) {
+                    targetState = data.first_anomalous_snapshot.state;
+                    if (rawTitle) rawTitle.textContent = `First Anomalous Snapshot State (${data.first_anomalous_snapshot.timestamp})`;
+                } else if (data.latest_state) {
+                    targetState = data.latest_state;
+                    if (rawTitle) rawTitle.textContent = `Latest Snapshot State (${data.latest_timestamp || 'latest'})`;
+                }
+                rawContent.textContent = targetState ? JSON.stringify(targetState, null, 2) : '// No snapshot state available';
+            }
+
+            const timelineBody = document.getElementById('debug-timeline-body');
+            if (timelineBody) {
+                if (!data.snapshots_summary || data.snapshots_summary.length === 0) {
+                    timelineBody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No snapshots recorded for this server.</td></tr>';
+                } else {
+                    let html = '';
+                    data.snapshots_summary.slice(-100).reverse().forEach(snap => {
+                        const hasAnom = snap.has_anomaly;
+                        html += `
+                            <tr class="${hasAnom ? 'bg-rose-500/10 hover:bg-rose-500/15' : 'hover:bg-white/5'} transition font-mono">
+                                <td class="p-3 text-[10px] text-slate-300 whitespace-nowrap">${escapeHtml(snap.timestamp)}</td>
+                                <td class="p-3 text-xs whitespace-nowrap">
+                                    <span class="font-bold ${snap.u1_demand_type === 'dict' ? 'text-rose-400 font-bold' : 'text-slate-200'}">${escapeHtml(snap.u1_demand_val)}</span>
+                                    <span class="text-[9px] px-1 rounded ml-1 ${snap.u1_demand_type === 'dict' ? 'bg-rose-500/20 text-rose-300' : 'bg-white/5 text-slate-500'}">${escapeHtml(snap.u1_demand_type)}</span>
+                                </td>
+                                <td class="p-3 text-xs whitespace-nowrap">
+                                    <span class="font-bold ${snap.u2_demand_type === 'dict' ? 'text-rose-400 font-bold' : 'text-slate-200'}">${escapeHtml(snap.u2_demand_val)}</span>
+                                    <span class="text-[9px] px-1 rounded ml-1 ${snap.u2_demand_type === 'dict' ? 'bg-rose-500/20 text-rose-300' : 'bg-white/5 text-slate-500'}">${escapeHtml(snap.u2_demand_type)}</span>
+                                </td>
+                                <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u1_out))}</td>
+                                <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_out))}</td>
+                                <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u1_aprm))}%</td>
+                                <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_aprm))}%</td>
+                                <td class="p-3 text-right whitespace-nowrap">
+                                    ${hasAnom ? '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">ANOMALY</span>' : '<span class="text-slate-500 text-[10px]">OK</span>'}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    timelineBody.innerHTML = html;
+                }
+            }
+
+            const errorsListEl = document.getElementById('debug-errors-list');
+            if (errorsListEl) {
+                if (!data.matching_errors || data.matching_errors.length === 0) {
+                    errorsListEl.innerHTML = '<div class="p-6 text-center text-slate-500 font-mono">No matching error records recorded in data/errors.json for this server.</div>';
+                } else {
+                    let html = '';
+                    data.matching_errors.forEach(err => {
+                        html += `
+                            <div class="cyber-panel p-4 rounded-xl border border-rose-500/30 bg-rose-500/5 flex flex-col gap-2 font-mono text-xs">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold uppercase text-[10px]">${escapeHtml(err.type || 'Error')}</span>
+                                        <span class="font-bold text-white text-xs">${escapeHtml(err.origin || 'App')}</span>
+                                    </div>
+                                    <span class="text-slate-500 text-[10px]">${escapeHtml(err.last_seen || err.first_seen || '')}</span>
+                                </div>
+                                <div class="text-rose-300 font-bold text-xs">${escapeHtml(err.message || 'No error message')}</div>
+                                ${err.traceback ? `<pre class="p-3 bg-black/80 rounded border border-white/5 text-[10px] text-slate-300 overflow-x-auto leading-relaxed max-h-60 overflow-y-auto"><code>${escapeHtml(err.traceback)}</code></pre>` : ''}
+                            </div>
+                        `;
+                    });
+                    errorsListEl.innerHTML = html;
+                }
+            }
+
+            if (data.total_anomalies > 0) {
+                setDebugSubTab('anomalies');
+            } else {
+                setDebugSubTab('timeline');
+            }
+        }
+
+        function setDebugSubTab(tabName) {
+            ['anomalies', 'snapshot-json', 'timeline', 'errors'].forEach(t => {
+                const btn = document.getElementById('debug-tab-btn-' + t);
+                const pane = document.getElementById('debug-subtab-' + t);
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = "px-3.5 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold transition whitespace-nowrap";
+                    } else {
+                        btn.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap";
+                    }
+                }
+                if (pane) {
+                    if (t === tabName) {
+                        pane.classList.remove('hidden');
+                    } else {
+                        pane.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        function copyDebugRawJson() {
+            const rawContent = document.getElementById('debug-raw-snap-content');
+            if (rawContent && rawContent.textContent) {
+                navigator.clipboard.writeText(rawContent.textContent).then(() => {
+                    alert('Raw snapshot JSON copied to clipboard.');
+                }).catch(() => {
+                    alert('Could not copy JSON to clipboard.');
+                });
             }
         }
     
