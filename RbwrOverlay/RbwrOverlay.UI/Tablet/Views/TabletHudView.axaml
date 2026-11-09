@@ -7,187 +7,200 @@
              x:CompileBindings="True">
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.h">
+        <Style Selector="TextBlock.cyber-head">
             <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
-            <Setter Property="Foreground" Value="#d8dce6" />
-        </Style>
-        <Style Selector="TextBlock.hhead">
-            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
-            <Setter Property="Foreground" Value="#8b93a3" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="LetterSpacing" Value="0.8" />
         </Style>
 
-        <Style Selector="Button.hhdr">
-            <Setter Property="Background" Value="#14161b" />
-            <Setter Property="Foreground" Value="#aab2c0" />
-            <Setter Property="BorderBrush" Value="#262a33" />
+        <Style Selector="TextBox.cyber-search">
+            <Setter Property="Background" Value="{DynamicResource CyberCardBg}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource NeonCyan}" />
+            <Setter Property="PlaceholderForeground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="4" />
             <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Padding" Value="10,3" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="Button.hhdr:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#1d2028" />
-            <Setter Property="Foreground" Value="#ffffff" />
-        </Style>
-        <Style Selector="Button.hhdr.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#c42b1c" />
-        </Style>
-
-        <Style Selector="Button.htab">
-            <Setter Property="Background" Value="#14161b" />
-            <Setter Property="Foreground" Value="#8b93a3" />
-            <Setter Property="BorderBrush" Value="#262a33" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="Padding" Value="0,10" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="Button.htab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#1b1e26" />
-            <Setter Property="Foreground" Value="#d8dce6" />
-        </Style>
-        <Style Selector="Button.htab.active /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#172554" />
-            <Setter Property="Foreground" Value="#60a5fa" />
-            <Setter Property="BorderBrush" Value="#3b82f6" />
-        </Style>
-        <Style Selector="Button.htab.on /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#172554" />
-            <Setter Property="Foreground" Value="#60a5fa" />
-            <Setter Property="BorderBrush" Value="#3b82f6" />
-        </Style>
-
-        <Style Selector="TextBox.hbox">
-            <Setter Property="Background" Value="#07080a" />
-            <Setter Property="Foreground" Value="#d8dce6" />
-            <Setter Property="CaretBrush" Value="#60a5fa" />
-            <Setter Property="PlaceholderForeground" Value="#5b6270" />
-            <Setter Property="BorderBrush" Value="#262a33" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
-            <Setter Property="FontSize" Value="18" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="10,6" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
-        <Style Selector="TextBox.hbox:focus /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#07080a" />
-            <Setter Property="BorderBrush" Value="#3b82f6" />
+        <Style Selector="TextBox.cyber-search:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#101828" />
+            <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         </Style>
-        <Style Selector="TextBox.hbox:pointerover /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#07080a" />
+        <Style Selector="TextBox.cyber-search:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#2c3c5d" />
         </Style>
 
-        <Style Selector="Slider.hslider">
-            <Setter Property="Margin" Value="0" />
+        <Style Selector="Slider.cyber-slider">
             <Setter Property="MinHeight" Value="24" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Style.Resources>
-                <SolidColorBrush x:Key="SliderTrackFill" Color="#262a33" />
-                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#262a33" />
-                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#262a33" />
-                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#38bdf8" />
-                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#38bdf8" />
-                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#38bdf8" />
-                <SolidColorBrush x:Key="SliderThumbBackground" Color="#60a5fa" />
-                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#93c5fd" />
-                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#93c5fd" />
+                <SolidColorBrush x:Key="SliderTrackFill" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderThumbBackground" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#5ff5ff" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#a0faff" />
             </Style.Resources>
+        </Style>
+
+        <Style Selector="ScrollViewer">
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Grid#Root">
+            <Setter Property="Background" Value="#070a12" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Rectangle#TrackRect">
+            <Setter Property="Fill" Value="#070a12" />
+            <Setter Property="Stroke" Value="{DynamicResource CyberBorder}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb">
+            <Setter Property="Background" Value="{DynamicResource CyberBorder}" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
+            <Setter Property="Background" Value="#243352" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pressed">
+            <Setter Property="Background" Value="{DynamicResource NeonCyan}" />
+        </Style>
+
+        <Style Selector="Border.cyber-data-row:pointerover">
+            <Setter Property="BorderBrush" Value="#2c3d5e" />
+            <Setter Property="Background" Value="#131b2e" />
         </Style>
     </UserControl.Styles>
 
-    <Border Background="#0b0c0f" BorderBrush="#23262e" BorderThickness="2" CornerRadius="22" Padding="10"
-            BoxShadow="0 12 28 -8 #E6000000">
-        <Border Background="#0f1115" BorderBrush="#1c1f26" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
-        <Grid>
+    <Border Background="{DynamicResource CyberMainBg}"
+            BorderBrush="{DynamicResource CyberBorderGlow}"
+            BorderThickness="1"
+            CornerRadius="8"
+            BoxShadow="0 0 24 0 #2800f0ff, 0 16 40 -8 #F0000000">
+        <Border CornerRadius="7" ClipToBounds="True">
             <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-                <Border Grid.Row="0" Padding="14,8" BorderBrush="#1c1f26" BorderThickness="0,0,0,1">
+                <Border Grid.Row="0"
+                        Background="{DynamicResource CyberHeaderBg}"
+                        Padding="12,8"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,*">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"
                                     VerticalAlignment="Center">
-                            <Button Classes="hhdr" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}" />
+                            <Button Classes="cyber-header-btn" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}"
+                                    Padding="8,3" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                                     IsHitTestVisible="False">
-                            <PathIcon Foreground="#38bdf8" Width="20" Height="20"
+                            <PathIcon Foreground="{DynamicResource NeonCyan}" Width="16" Height="16"
                                       Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
-                            <TextBlock Classes="h" Text="RBWR" Foreground="#38bdf8" FontWeight="ExtraBold"
-                                       FontSize="22" LetterSpacing="1" />
+                            <TextBlock Text="RBWR TABLET" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold"
+                                       FontSize="14" LetterSpacing="1" VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right"
                                     VerticalAlignment="Center">
-                            <Button Classes="hhdr" Content="—" Click="OnMinimize" />
-                            <Button Classes="hhdr close" Content="✕" Click="OnClose" />
+                            <Button Classes="cyber-header-btn" Content="—" Click="OnMinimize" />
+                            <Button Classes="cyber-close-btn" Content="X" Click="OnClose" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="12,12,12,0">
-                    <Button Grid.Column="0" Classes="htab" Content="Unit 1" Classes.active="{Binding IsU1}"
-                            Command="{Binding SwitchTabCommand}" CommandParameter="u1" />
-                    <Button Grid.Column="1" Classes="htab" Content="Unit 2" Classes.active="{Binding IsU2}"
-                            Command="{Binding SwitchTabCommand}" CommandParameter="u2" />
-                    <Button Grid.Column="2" Classes="htab" Content="Misc" Classes.active="{Binding IsMisc}"
-                            Command="{Binding SwitchTabCommand}" CommandParameter="misc" />
-                    <Button Grid.Column="3" Classes="htab" Content="Config" Classes.active="{Binding IsConfig}"
-                            Command="{Binding SwitchTabCommand}" CommandParameter="config" />
-                </Grid>
-
-                <Border Grid.Row="2" Margin="12,12,12,0" IsVisible="{Binding IsDataTab}">
-                    <TextBox Classes="hbox" Text="{Binding SearchText}" PlaceholderText="Search values..." />
+                <Border Grid.Row="1"
+                        Background="{DynamicResource CyberCardBg}"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Margin="12,10,12,0">
+                    <Grid ColumnDefinitions="*,*,*,*">
+                        <Button Grid.Column="0" Classes="cyber-nav" Content="UNIT 01" Classes.active="{Binding IsU1}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u1"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="1" Classes="cyber-nav" Content="UNIT 02" Classes.active="{Binding IsU2}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u2"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="2" Classes="cyber-nav" Content="MISC" Classes.active="{Binding IsMisc}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="misc"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG" Classes.active="{Binding IsConfig}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="config"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                    </Grid>
                 </Border>
 
-                <Grid Grid.Row="3" Margin="0,12,0,0">
-                    <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,0,12,12">
-                        <StackPanel Spacing="6">
-                            <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,14"
+                <Border Grid.Row="2" Margin="12,8,12,0" IsVisible="{Binding IsDataTab}">
+                    <TextBox Classes="cyber-search" Text="{Binding SearchText}" PlaceholderText="Search parameters..." />
+                </Border>
+
+                <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,0,12,12"
+                                  VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                        <StackPanel Spacing="4">
+                            <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,20"
                                         HorizontalAlignment="Center" MaxWidth="560">
-                                <Border Width="56" Height="56" CornerRadius="12" HorizontalAlignment="Center"
-                                        Background="#33ff6b6b" BorderBrush="#55ff6b6b" BorderThickness="1">
-                                    <PathIcon Foreground="#ff6b6b" Width="26" Height="26"
+                                <Border Width="48" Height="48" CornerRadius="8" HorizontalAlignment="Center"
+                                        Background="#1f1015" BorderBrush="{DynamicResource NeonRed}" BorderThickness="1">
+                                    <PathIcon Foreground="{DynamicResource NeonRed}" Width="22" Height="22"
                                               Data="M12 2L1 21h22L12 2zm0 4.5L19.5 19h-15L12 6.5zM11 10v4h2v-4h-2zm0 5v2h2v-2h-2z" />
                                 </Border>
-                                <TextBlock Classes="h" Text="{Binding EmptyTitle}" Foreground="White" FontWeight="Bold"
-                                           FontSize="24" TextAlignment="Center" TextWrapping="Wrap" />
-                                <TextBlock Classes="h" Foreground="#aab2c0" FontSize="15" TextAlignment="Center"
+                                <TextBlock Text="{Binding EmptyTitle}" Foreground="{DynamicResource TextLight}" FontWeight="Bold"
+                                           FontSize="18" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextAlignment="Center"
                                            TextWrapping="Wrap">
                                     <Run Text="{Binding EmptyPrefix}" />
                                     <InlineUIContainer>
-                                        <Border Background="#cc2a2a2e" CornerRadius="4" Padding="8,2"
-                                                RenderTransform="translateY(4px)"
+                                        <Border Background="#141f33" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1"
+                                                CornerRadius="3" Padding="6,1"
+                                                RenderTransform="translateY(2px)"
                                                 IsVisible="{Binding HasEmptyJobId}">
-                                            <TextBlock Classes="h" Text="{Binding EmptyJobId}" Foreground="#ff8a8a"
-                                                       FontSize="14" />
+                                            <TextBlock Text="{Binding EmptyJobId}" Foreground="{DynamicResource NeonGold}"
+                                                       FontSize="12" FontWeight="SemiBold" />
                                         </Border>
                                     </InlineUIContainer>
                                     <Run Text="{Binding EmptySuffix}" />
                                 </TextBlock>
                             </StackPanel>
+
                             <ItemsControl ItemsSource="{Binding Rows}">
                                 <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                    <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="m:TabletRow">
-                                        <Border Background="#13151a" BorderBrush="#23262e" BorderThickness="1"
-                                                CornerRadius="10" Padding="16,6">
+                                        <Border Classes="cyber-data-row"
+                                                Background="{DynamicResource CyberCardBg}"
+                                                BorderBrush="{DynamicResource CyberBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="12,5">
                                             <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Classes="h" FontSize="15" FontWeight="Bold"
-                                                           Text="{Binding Label}" VerticalAlignment="Center" />
-                                                <Border Grid.Column="1" Background="#07080a" BorderBrush="#262a33"
-                                                        BorderThickness="1" CornerRadius="6" Width="210" Padding="10,6">
-                                                    <TextBlock Classes="h" Text="{Binding Value}" Foreground="#38bdf8"
-                                                               FontWeight="Bold" FontSize="16"
+                                                <TextBlock Text="{Binding Label}"
+                                                           Foreground="{DynamicResource TextLight}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="13"
+                                                           VerticalAlignment="Center" />
+                                                <Border Grid.Column="1"
+                                                        Background="#070a12"
+                                                        BorderBrush="{DynamicResource CyberBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="3"
+                                                        Width="210"
+                                                        Padding="10,4">
+                                                    <TextBlock Text="{Binding Value}"
+                                                               Foreground="{DynamicResource NeonCyan}"
+                                                               FontWeight="Bold"
+                                                               FontSize="14"
                                                                HorizontalAlignment="Center"
                                                                TextTrimming="CharacterEllipsis" />
                                                 </Border>
@@ -199,48 +212,56 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12">
-                        <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
-                            <TextBlock Classes="hhead" Text="TABLET STYLE" />
+                    <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12"
+                                  VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                        <StackPanel Spacing="8" MaxWidth="620" HorizontalAlignment="Center">
+                            <TextBlock Classes="cyber-head" Text="TABLET STYLE" />
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                <Button Classes="htab" Classes.on="{Binding IsClassicStyle}" Content="Classic"
-                                        Command="{Binding SetStyleCommand}" CommandParameter="classic" />
-                                <Button Grid.Column="1" Classes="htab" Classes.on="{Binding IsHudStyle}"
+                                <Button Classes="cyber" Classes.active="{Binding IsClassicStyle}" Content="Classic"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="classic"
+                                        HorizontalAlignment="Stretch" Padding="0,7" />
+                                <Button Grid.Column="1" Classes="cyber" Classes.active="{Binding IsHudStyle}"
                                         Content="Overlay"
-                                        Command="{Binding SetStyleCommand}" CommandParameter="hud" />
+                                        Command="{Binding SetStyleCommand}" CommandParameter="hud"
+                                        HorizontalAlignment="Stretch" Padding="0,7" />
                             </Grid>
 
-                            <TextBlock Classes="hhead" Text="TOPMOST ON ROBLOX" Margin="0,6,0,0" />
-                            <Button Classes="htab" Classes.on="{Binding TopmostOnRoblox}"
+                            <TextBlock Classes="cyber-head" Text="TOPMOST ON ROBLOX" Margin="0,8,0,0" />
+                            <Button Classes="cyber" Classes.active="{Binding TopmostOnRoblox}"
                                     Content="{Binding RobloxTopmostLabel}"
-                                    Command="{Binding ToggleRobloxTopmostCommand}" />
-                            <TextBlock Classes="h" Foreground="#8b93a3" FontSize="13" TextWrapping="Wrap"
+                                    Command="{Binding ToggleRobloxTopmostCommand}"
+                                    HorizontalAlignment="Stretch" Padding="0,7" />
+                            <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap"
                                        Text="Keeps the tablet on top while Roblox is in the foreground and lets other windows cover it when you tab out." />
 
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
-                                <TextBlock Classes="hhead" Text="UI SCALE" />
-                                <TextBlock Grid.Column="1" Classes="hhead" Foreground="#38bdf8"
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                                <TextBlock Classes="cyber-head" Text="UI SCALE" />
+                                <TextBlock Grid.Column="1" Classes="cyber-head" Foreground="{DynamicResource NeonCyan}"
                                            Text="{Binding UiScaleText}" />
                             </Grid>
-                            <Slider Classes="hslider" Minimum="0.75" Maximum="2.0" TickFrequency="0.05"
-                                    IsSnapToTickEnabled="True" Value="{Binding UiScalePreview}" />
+                            <Slider Classes="cyber-slider" Minimum="0.75" Maximum="2.0" TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True" Value="{Binding UiScalePreview}" Margin="0,2" />
                             <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
-                                <Button Classes="htab" Padding="0,6" FontSize="13" Content="75%"
-                                        Command="{Binding SetUiScaleCommand}" CommandParameter="0.75" />
-                                <Button Grid.Column="1" Classes="htab" Padding="0,6" FontSize="13" Content="100%"
-                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.0" />
-                                <Button Grid.Column="2" Classes="htab" Padding="0,6" FontSize="13" Content="125%"
-                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.25" />
-                                <Button Grid.Column="3" Classes="htab" Padding="0,6" FontSize="13" Content="150%"
-                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.5" />
-                                <Button Grid.Column="4" Classes="htab" Padding="0,6" FontSize="13" Content="200%"
-                                        Command="{Binding SetUiScaleCommand}" CommandParameter="2.0" />
+                                <Button Classes="cyber" Padding="0,6" FontSize="11" Content="75%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="0.75"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="1" Classes="cyber" Padding="0,6" FontSize="11" Content="100%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.0"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="2" Classes="cyber" Padding="0,6" FontSize="11" Content="125%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.25"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="3" Classes="cyber" Padding="0,6" FontSize="11" Content="150%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.5"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="4" Classes="cyber" Padding="0,6" FontSize="11" Content="200%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="2.0"
+                                        HorizontalAlignment="Stretch" />
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </Grid>
-        </Grid>
         </Border>
     </Border>
 </UserControl>

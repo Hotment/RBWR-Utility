@@ -163,6 +163,30 @@
             <Setter Property="Margin" Value="0" />
             <Setter Property="MinHeight" Value="24" />
         </Style>
+        <Style Selector="ScrollViewer">
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Grid#Root">
+            <Setter Property="Background" Value="#787878" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Rectangle#TrackRect">
+            <Setter Property="Fill" Value="#787878" />
+            <Setter Property="Stroke" Value="#555555" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb">
+            <Setter Property="Background" Value="#3a3a3a" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
+            <Setter Property="Background" Value="#252525" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pressed">
+            <Setter Property="Background" Value="#000000" />
+        </Style>
     </Window.Styles>
 
     <Grid x:Name="WindowRoot">
@@ -189,7 +213,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Classes="hdr" Content="—" Click="OnMinimize" />
-                        <Button Classes="hdr close" Content="✕" Click="OnClose" />
+                        <Button Classes="hdr close" Content="X" Click="OnClose" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -216,7 +240,8 @@
             </StackPanel>
 
             <Grid Grid.Row="2">
-                <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,8,12,4">
+                <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,8,12,4"
+                              VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
                     <StackPanel Spacing="6">
                         <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,14"
                                     HorizontalAlignment="Center" MaxWidth="560">
@@ -265,7 +290,8 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,8,12,4">
+                <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,8,12,4"
+                              VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
                     <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
                         <TextBlock Classes="lbl" Text="TABLET STYLE" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
