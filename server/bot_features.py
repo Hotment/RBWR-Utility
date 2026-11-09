@@ -1299,7 +1299,10 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
             )
             synced_rules.append(rule_name_words)
     except Exception as exc:
-        log.warning("Failed to sync %s: %s", rule_name_words, exc)
+        if "AUTO_MODERATION_MAX_RULES_OF_TYPE_EXCEEDED" in str(exc):
+            log.info("Guild %s reached max keyword AutoMod rules (Discord allows max 6); skipped creating duplicate %s.", guild.id, rule_name_words)
+        else:
+            log.warning("Failed to sync %s: %s", rule_name_words, exc)
 
     rule_name_links = "[RBWR] Blocked Invites & Links"
     cfg_invites = config.get("filters", {}).get("invites", {})
@@ -1345,7 +1348,10 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
             )
             synced_rules.append(rule_name_links)
     except Exception as exc:
-        log.warning("Failed to sync %s: %s", rule_name_links, exc)
+        if "AUTO_MODERATION_MAX_RULES_OF_TYPE_EXCEEDED" in str(exc):
+            log.info("Guild %s reached max keyword AutoMod rules (Discord allows max 6); skipped creating duplicate %s.", guild.id, rule_name_links)
+        else:
+            log.warning("Failed to sync %s: %s", rule_name_links, exc)
 
     rule_name_mentions = "[RBWR] Mass Mentions"
     cfg_mentions = config.get("filters", {}).get("mentions", {})
@@ -1353,18 +1359,25 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
     mention_limit = max(1, min(50, int(cfg_mentions.get("max", 5))))
     mentions_actions = _build_actions(cfg_mentions.get("action", "timeout"), cfg_mentions.get("duration", "10m"), allow_timeout=True)
 
+    existing_mentions = existing_by_name.get(rule_name_mentions) or next(
+        (r for r in existing_rules if getattr(r, "trigger_type", None) == disnake.AutoModTriggerType.mention_spam or getattr(getattr(r, "trigger_type", None), "value", None) == 5),
+        None
+    )
+
     try:
-        if rule_name_mentions in existing_by_name:
-            existing = existing_by_name[rule_name_mentions]
+        if existing_mentions:
             meta = disnake.AutoModTriggerMetadata(mention_total_limit=mention_limit)
-            await existing.edit(
-                enabled=mentions_enabled,
-                trigger_metadata=meta,
-                actions=mentions_actions,
-                exempt_roles=exempt_roles,
-                exempt_channels=exempt_channels,
-            )
-            synced_rules.append(rule_name_mentions)
+            edit_kwargs: dict[str, Any] = {
+                "enabled": mentions_enabled,
+                "trigger_metadata": meta,
+                "actions": mentions_actions,
+                "exempt_roles": exempt_roles,
+                "exempt_channels": exempt_channels,
+            }
+            if existing_mentions.name.startswith("[RBWR]") or (_bot and _bot.user and getattr(existing_mentions, "creator_id", None) == _bot.user.id):
+                edit_kwargs["name"] = rule_name_mentions
+            await existing_mentions.edit(**edit_kwargs)
+            synced_rules.append(existing_mentions.name)
         elif mentions_enabled:
             meta = disnake.AutoModTriggerMetadata(mention_total_limit=mention_limit)
             await guild.create_automod_rule(
@@ -1380,23 +1393,33 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
             )
             synced_rules.append(rule_name_mentions)
     except Exception as exc:
-        log.warning("Failed to sync %s: %s", rule_name_mentions, exc)
+        if "AUTO_MODERATION_MAX_RULES_OF_TYPE_EXCEEDED" in str(exc):
+            log.info("Guild %s already has an active %s rule (Discord limit: max 1 per server); skipped duplicate.", guild.id, rule_name_mentions)
+        else:
+            log.warning("Failed to sync %s: %s", rule_name_mentions, exc)
 
     rule_name_spam = "[RBWR] Suspected Spam"
     cfg_spam = config.get("filters", {}).get("spam", {})
     spam_enabled = is_global_enabled and bool(cfg_spam.get("enabled"))
     spam_actions = _build_actions(cfg_spam.get("action", "timeout"), cfg_spam.get("duration", "10m"), allow_timeout=False)
 
+    existing_spam = existing_by_name.get(rule_name_spam) or next(
+        (r for r in existing_rules if getattr(r, "trigger_type", None) == disnake.AutoModTriggerType.spam or getattr(getattr(r, "trigger_type", None), "value", None) == 3),
+        None
+    )
+
     try:
-        if rule_name_spam in existing_by_name:
-            existing = existing_by_name[rule_name_spam]
-            await existing.edit(
-                enabled=spam_enabled,
-                actions=spam_actions,
-                exempt_roles=exempt_roles,
-                exempt_channels=exempt_channels,
-            )
-            synced_rules.append(rule_name_spam)
+        if existing_spam:
+            edit_kwargs = {
+                "enabled": spam_enabled,
+                "actions": spam_actions,
+                "exempt_roles": exempt_roles,
+                "exempt_channels": exempt_channels,
+            }
+            if existing_spam.name.startswith("[RBWR]") or (_bot and _bot.user and getattr(existing_spam, "creator_id", None) == _bot.user.id):
+                edit_kwargs["name"] = rule_name_spam
+            await existing_spam.edit(**edit_kwargs)
+            synced_rules.append(existing_spam.name)
         elif spam_enabled:
             await guild.create_automod_rule(
                 name=rule_name_spam,
@@ -1410,7 +1433,10 @@ async def sync_discord_automod_rules(config: dict | None = None) -> dict[str, An
             )
             synced_rules.append(rule_name_spam)
     except Exception as exc:
-        log.warning("Failed to sync %s: %s", rule_name_spam, exc)
+        if "AUTO_MODERATION_MAX_RULES_OF_TYPE_EXCEEDED" in str(exc):
+            log.info("Guild %s already has an active %s rule (Discord limit: max 1 per server); skipped duplicate.", guild.id, rule_name_spam)
+        else:
+            log.warning("Failed to sync %s: %s", rule_name_spam, exc)
 
     _discord_automod_synced = True
     _discord_automod_error = None
