@@ -1,0 +1,349 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.Tablet.ViewModels"
+        xmlns:m="using:RbwrOverlay.UI.Tablet.Models"
+        xmlns:views="using:RbwrOverlay.UI.Tablet.Views"
+        x:Class="RbwrOverlay.UI.Tablet.Views.TabletWindow"
+        x:DataType="vm:TabletViewModel"
+        x:CompileBindings="True"
+        Title="RBWR Tablet"
+        Icon="avares://RbwrOverlay/Assets/icon.ico"
+        Width="620" Height="350"
+        FontFamily="Segoe UI, Tahoma, Geneva, Verdana, sans-serif"
+        CanResize="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        Topmost="{Binding IsTopmost}">
+
+    <Window.Styles>
+        <Style Selector="Button.tab">
+            <Setter Property="Background" Value="#b0b0b0" />
+            <Setter Property="Foreground" Value="#1a1a1a" />
+            <Setter Property="BorderBrush" Value="#5a5a5a" />
+            <Setter Property="BorderThickness" Value="2,2,2,0" />
+            <Setter Property="CornerRadius" Value="2,2,0,0" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="0,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#c5c5c5" />
+            <Setter Property="Foreground" Value="#000000" />
+        </Style>
+        <Style Selector="Button.tab.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#e2e2e2" />
+            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="BorderBrush" Value="#000000" />
+        </Style>
+        <Style Selector="Button.hdr">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#cfcfcf" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.hdr:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2a2a2a" />
+            <Setter Property="Foreground" Value="#ffffff" />
+        </Style>
+        <Style Selector="Button.hdr.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#c42b1c" />
+        </Style>
+        <Style Selector="Button.action">
+            <Setter Property="Background" Value="#b0b0b0" />
+            <Setter Property="Foreground" Value="#1a1a1a" />
+            <Setter Property="BorderBrush" Value="#5a5a5a" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#c5c5c5" />
+            <Setter Property="Foreground" Value="#000000" />
+        </Style>
+        <Style Selector="Button.action.on /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#e2e2e2" />
+            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="BorderBrush" Value="#000000" />
+        </Style>
+        <Style Selector="TextBox.tabletbox">
+            <Setter Property="Background" Value="#ffffff" />
+            <Setter Property="Foreground" Value="#333333" />
+            <Setter Property="CaretBrush" Value="#000000" />
+            <Setter Property="PlaceholderForeground" Value="#777777" />
+            <Setter Property="BorderBrush" Value="#4a4a4a" />
+            <Setter Property="BorderThickness" Value="3" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.tabletbox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#ffffff" />
+            <Setter Property="BorderBrush" Value="#0000d6" />
+        </Style>
+        <Style Selector="TextBox.tabletbox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#ffffff" />
+        </Style>
+        <Style Selector="Button.suggest">
+            <Setter Property="Background" Value="#bebebe" />
+            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="BorderBrush" Value="#000000" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.suggest:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#e2e2e2" />
+            <Setter Property="Foreground" Value="#000000" />
+        </Style>
+        <Style Selector="TextBlock.lbl">
+            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+        <Style Selector="ProgressBar.tabletbar">
+            <Setter Property="Background" Value="#5a5a5a" />
+            <Setter Property="Foreground" Value="#0000d6" />
+            <Setter Property="CornerRadius" Value="2" />
+        </Style>
+        <Style Selector="Slider.tabletslider">
+            <Style.Resources>
+                <SolidColorBrush x:Key="SliderTrackFill" Color="#5a5a5a" />
+                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#5a5a5a" />
+                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#5a5a5a" />
+                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#000000" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#000000" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#000000" />
+                <SolidColorBrush x:Key="SliderThumbBackground" Color="#000000" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#000000" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#000000" />
+            </Style.Resources>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,0,5" />
+            <Setter Property="Foreground" Value="#000000" />
+        </Style>
+        <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#bebebe" />
+            <Setter Property="BorderBrush" Value="#000000" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#d0d0d0" />
+        </Style>
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#e2e2e2" />
+            <Setter Property="BorderBrush" Value="#0000d6" />
+        </Style>
+    
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Tahoma, Geneva, Verdana, sans-serif" />
+        </Style>
+        <Style Selector="Slider.tabletslider">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+        <Style Selector="ScrollViewer">
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Grid#Root">
+            <Setter Property="Background" Value="#787878" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Rectangle#TrackRect">
+            <Setter Property="Fill" Value="#787878" />
+            <Setter Property="Stroke" Value="#555555" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb">
+            <Setter Property="Background" Value="#3a3a3a" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
+            <Setter Property="Background" Value="#252525" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pressed">
+            <Setter Property="Background" Value="#000000" />
+        </Style>
+    </Window.Styles>
+
+    <Grid x:Name="WindowRoot">
+    <LayoutTransformControl x:Name="ScaleHost" HorizontalAlignment="Left" VerticalAlignment="Top">
+    <Grid x:Name="TabletRoot" Margin="24" Width="920" Height="520">
+    <Grid IsVisible="{Binding IsClassicStyle}">
+    <Border Background="#0f1013" BorderBrush="#1a1b20" BorderThickness="14" CornerRadius="36"
+            Padding="18"
+            BoxShadow="0 18 40 -8 #E6000000, inset 0 0 0 2 #14FFFFFF">
+    <Border Background="#8c8c8c" CornerRadius="12" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,Auto,*">
+
+            <Border x:Name="HeaderBar" Grid.Row="0" Background="#000000" Padding="12,2">
+                <Grid ColumnDefinitions="*,Auto,*">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Button Classes="hdr" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                                VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
+                        <PathIcon Foreground="White" Width="20" Height="20"
+                                  Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                        <TextBlock Text="RBWR" Foreground="White" FontWeight="ExtraBold"
+                                   FontSize="22" LetterSpacing="1" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Classes="hdr" Content="—" Click="OnMinimize" />
+                        <Button Classes="hdr close" Content="X" Click="OnClose" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1">
+                <Border Background="#000000" Padding="0,4,0,0">
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="1">
+                        <Button Grid.Column="0" Classes="tab" Content="Unit 1" Classes.active="{Binding IsU1}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u1" />
+                        <Button Grid.Column="1" Classes="tab" Content="Unit 2" Classes.active="{Binding IsU2}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u2" />
+                        <Button Grid.Column="2" Classes="tab" Content="Misc" Classes.active="{Binding IsMisc}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="misc" />
+                        <Button Grid.Column="3" Classes="tab" Content="Config" Classes.active="{Binding IsConfig}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="config" />
+                    </Grid>
+                </Border>
+                <Border Background="#000000" Height="3" />
+                <Border Background="#8c8c8c" Padding="12,10" BorderBrush="#000000" BorderThickness="0,0,0,3"
+                        IsVisible="{Binding IsDataTab}">
+                    <TextBox Classes="tabletbox" Text="{Binding SearchText}" PlaceholderText="Search values..."
+                             HorizontalContentAlignment="Center" FontSize="30" Padding="8,2" />
+                </Border>
+            </StackPanel>
+
+            <Grid Grid.Row="2">
+                <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,8,12,4"
+                              VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                    <StackPanel Spacing="6">
+                        <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,14"
+                                    HorizontalAlignment="Center" MaxWidth="560">
+                            <Border Width="56" Height="56" CornerRadius="12" HorizontalAlignment="Center"
+                                    Background="#33ff6b6b" BorderBrush="#55ff6b6b" BorderThickness="1">
+                                <PathIcon Foreground="#ff6b6b" Width="26" Height="26"
+                                          Data="M12 2L1 21h22L12 2zm0 4.5L19.5 19h-15L12 6.5zM11 10v4h2v-4h-2zm0 5v2h2v-2h-2z" />
+                            </Border>
+                            <TextBlock Text="{Binding EmptyTitle}" Foreground="White" FontWeight="Bold"
+                                       FontSize="24" TextAlignment="Center" TextWrapping="Wrap" />
+                            <TextBlock Foreground="White" FontSize="15" TextAlignment="Center" TextWrapping="Wrap">
+                                <Run Text="{Binding EmptyPrefix}" />
+                                <InlineUIContainer>
+                                    <Border Background="#cc2a2a2e" CornerRadius="4" Padding="8,2"
+                                            RenderTransform="translateY(4px)"
+                                            IsVisible="{Binding HasEmptyJobId}">
+                                        <TextBlock Text="{Binding EmptyJobId}" Foreground="#ff8a8a"
+                                                   FontFamily="Consolas" FontSize="14" />
+                                    </Border>
+                                </InlineUIContainer>
+                                <Run Text="{Binding EmptySuffix}" />
+                            </TextBlock>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="3" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="m:TabletRow">
+                                    <Border Background="#bebebe" BorderBrush="#000000" BorderThickness="2"
+                                            CornerRadius="3" Padding="12,4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="lbl" FontSize="15.5" Text="{Binding Label}" VerticalAlignment="Center" />
+                                            <Border Grid.Column="1" Background="#f4f4f4" BorderBrush="#a0a0a0"
+                                                    BorderThickness="1" CornerRadius="0" Width="210" Padding="10,5">
+                                                <TextBlock Text="{Binding Value}" Foreground="#0000d6"
+                                                           FontWeight="Black" FontSize="14.5"
+                                                           HorizontalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,8,12,4"
+                              VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                    <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Center">
+                        <TextBlock Classes="lbl" Text="TABLET STYLE" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="action" Classes.on="{Binding IsClassicStyle}" Content="Classic"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding SetStyleCommand}" CommandParameter="classic" />
+                            <Button Grid.Column="1" Classes="action" Classes.on="{Binding IsHudStyle}"
+                                    Content="Overlay" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetStyleCommand}" CommandParameter="hud" />
+                        </Grid>
+
+                        <TextBlock Classes="lbl" Text="TOPMOST ON ROBLOX" Margin="0,6,0,0" />
+                        <Button Classes="action" Classes.on="{Binding TopmostOnRoblox}" HorizontalAlignment="Stretch"
+                                Content="{Binding RobloxTopmostLabel}" Command="{Binding ToggleRobloxTopmostCommand}" />
+                        <TextBlock Foreground="#1a1a1a" FontSize="14" TextWrapping="Wrap"
+                                   Text="Keeps the tablet on top while Roblox is in the foreground and lets other windows cover it when you tab out." />
+
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                            <TextBlock Classes="lbl" Text="UI SCALE" />
+                            <TextBlock Grid.Column="1" Classes="lbl" Text="{Binding UiScaleText}" />
+                        </Grid>
+                        <Slider x:Name="UiScaleSlider" Classes="tabletslider" Minimum="0.75" Maximum="2.0"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                Value="{Binding UiScalePreview}" />
+                        <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4">
+                            <Button Classes="action" Content="75%" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetUiScaleCommand}" CommandParameter="0.75" />
+                            <Button Grid.Column="1" Classes="action" Content="100%" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetUiScaleCommand}" CommandParameter="1.0" />
+                            <Button Grid.Column="2" Classes="action" Content="125%" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetUiScaleCommand}" CommandParameter="1.25" />
+                            <Button Grid.Column="3" Classes="action" Content="150%" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetUiScaleCommand}" CommandParameter="1.5" />
+                            <Button Grid.Column="4" Classes="action" Content="200%" HorizontalAlignment="Stretch"
+                                    Command="{Binding SetUiScaleCommand}" CommandParameter="2.0" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+        </Grid>
+    </Border>
+    </Border>
+    <Border Width="10" Height="48" Background="#090a0d" CornerRadius="5" BorderBrush="#0DFFFFFF"
+            BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0"
+            IsHitTestVisible="False" />
+    <Border Width="6" Height="6" Background="#111a2e" BorderBrush="#1e293b" BorderThickness="1"
+            CornerRadius="3" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"
+            IsHitTestVisible="False" />
+    </Grid>
+    <views:TabletHudView IsVisible="{Binding IsHudStyle}" />
+    </Grid>
+    </LayoutTransformControl>
+    </Grid>
+</Window>

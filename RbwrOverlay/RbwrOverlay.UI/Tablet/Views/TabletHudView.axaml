@@ -1,0 +1,267 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RbwrOverlay.UI.Tablet.ViewModels"
+             xmlns:m="using:RbwrOverlay.UI.Tablet.Models"
+             x:Class="RbwrOverlay.UI.Tablet.Views.TabletHudView"
+             x:DataType="vm:TabletViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.cyber-head">
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="LetterSpacing" Value="0.8" />
+        </Style>
+
+        <Style Selector="TextBox.cyber-search">
+            <Setter Property="Background" Value="{DynamicResource CyberCardBg}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource NeonCyan}" />
+            <Setter Property="PlaceholderForeground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.cyber-search:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#101828" />
+            <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        </Style>
+        <Style Selector="TextBox.cyber-search:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#2c3c5d" />
+        </Style>
+
+        <Style Selector="Slider.cyber-slider">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Resources>
+                <SolidColorBrush x:Key="SliderTrackFill" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#1b253b" />
+                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderThumbBackground" Color="#00f0ff" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#5ff5ff" />
+                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#a0faff" />
+            </Style.Resources>
+        </Style>
+
+        <Style Selector="ScrollViewer">
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Grid#Root">
+            <Setter Property="Background" Value="#070a12" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Rectangle#TrackRect">
+            <Setter Property="Fill" Value="#070a12" />
+            <Setter Property="Stroke" Value="{DynamicResource CyberBorder}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb">
+            <Setter Property="Background" Value="{DynamicResource CyberBorder}" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
+            <Setter Property="Background" Value="#243352" />
+        </Style>
+        <Style Selector="ScrollBar:vertical /template/ Thumb:pressed">
+            <Setter Property="Background" Value="{DynamicResource NeonCyan}" />
+        </Style>
+
+        <Style Selector="Border.cyber-data-row:pointerover">
+            <Setter Property="BorderBrush" Value="#2c3d5e" />
+            <Setter Property="Background" Value="#131b2e" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{DynamicResource CyberMainBg}"
+            BorderBrush="{DynamicResource CyberBorderGlow}"
+            BorderThickness="1"
+            CornerRadius="8"
+            BoxShadow="0 0 24 0 #2800f0ff, 0 16 40 -8 #F0000000">
+        <Border CornerRadius="7" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                <Border Grid.Row="0"
+                        Background="{DynamicResource CyberHeaderBg}"
+                        Padding="12,8"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto,*">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center">
+                            <Button Classes="cyber-header-btn" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}"
+                                    Padding="8,3" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                    IsHitTestVisible="False">
+                            <PathIcon Foreground="{DynamicResource NeonCyan}" Width="16" Height="16"
+                                      Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                            <TextBlock Text="RBWR TABLET" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold"
+                                       FontSize="14" LetterSpacing="1" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <Button Classes="cyber-header-btn" Content="—" Click="OnMinimize" />
+                            <Button Classes="cyber-close-btn" Content="X" Click="OnClose" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Background="{DynamicResource CyberCardBg}"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Margin="12,10,12,0">
+                    <Grid ColumnDefinitions="*,*,*,*">
+                        <Button Grid.Column="0" Classes="cyber-nav" Content="UNIT 01" Classes.active="{Binding IsU1}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u1"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="1" Classes="cyber-nav" Content="UNIT 02" Classes.active="{Binding IsU2}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="u2"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="2" Classes="cyber-nav" Content="MISC" Classes.active="{Binding IsMisc}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="misc"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                        <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG" Classes.active="{Binding IsConfig}"
+                                Command="{Binding SwitchTabCommand}" CommandParameter="config"
+                                HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2" Margin="12,8,12,0" IsVisible="{Binding IsDataTab}">
+                    <TextBox Classes="cyber-search" Text="{Binding SearchText}" PlaceholderText="Search parameters..." />
+                </Border>
+
+                <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <ScrollViewer IsVisible="{Binding IsDataTab}" Padding="12,0,12,12"
+                                  VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                        <StackPanel Spacing="4">
+                            <StackPanel IsVisible="{Binding HasEmptyText}" Spacing="10" Margin="0,20"
+                                        HorizontalAlignment="Center" MaxWidth="560">
+                                <Border Width="48" Height="48" CornerRadius="8" HorizontalAlignment="Center"
+                                        Background="#1f1015" BorderBrush="{DynamicResource NeonRed}" BorderThickness="1">
+                                    <PathIcon Foreground="{DynamicResource NeonRed}" Width="22" Height="22"
+                                              Data="M12 2L1 21h22L12 2zm0 4.5L19.5 19h-15L12 6.5zM11 10v4h2v-4h-2zm0 5v2h2v-2h-2z" />
+                                </Border>
+                                <TextBlock Text="{Binding EmptyTitle}" Foreground="{DynamicResource TextLight}" FontWeight="Bold"
+                                           FontSize="18" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextAlignment="Center"
+                                           TextWrapping="Wrap">
+                                    <Run Text="{Binding EmptyPrefix}" />
+                                    <InlineUIContainer>
+                                        <Border Background="#141f33" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1"
+                                                CornerRadius="3" Padding="6,1"
+                                                RenderTransform="translateY(2px)"
+                                                IsVisible="{Binding HasEmptyJobId}">
+                                            <TextBlock Text="{Binding EmptyJobId}" Foreground="{DynamicResource NeonGold}"
+                                                       FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                    </InlineUIContainer>
+                                    <Run Text="{Binding EmptySuffix}" />
+                                </TextBlock>
+                            </StackPanel>
+
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="m:TabletRow">
+                                        <Border Classes="cyber-data-row"
+                                                Background="{DynamicResource CyberCardBg}"
+                                                BorderBrush="{DynamicResource CyberBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="4"
+                                                Padding="12,5">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding Label}"
+                                                           Foreground="{DynamicResource TextLight}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="13"
+                                                           VerticalAlignment="Center" />
+                                                <Border Grid.Column="1"
+                                                        Background="#070a12"
+                                                        BorderBrush="{DynamicResource CyberBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="3"
+                                                        Width="210"
+                                                        Padding="10,4">
+                                                    <TextBlock Text="{Binding Value}"
+                                                               Foreground="{DynamicResource NeonCyan}"
+                                                               FontWeight="Bold"
+                                                               FontSize="14"
+                                                               HorizontalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <ScrollViewer IsVisible="{Binding IsConfig}" Padding="12,0,12,12"
+                                  VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+                        <StackPanel Spacing="8" MaxWidth="620" HorizontalAlignment="Center">
+                            <TextBlock Classes="cyber-head" Text="TABLET STYLE" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="cyber" Classes.active="{Binding IsClassicStyle}" Content="Classic"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="classic"
+                                        HorizontalAlignment="Stretch" Padding="0,7" />
+                                <Button Grid.Column="1" Classes="cyber" Classes.active="{Binding IsHudStyle}"
+                                        Content="Overlay"
+                                        Command="{Binding SetStyleCommand}" CommandParameter="hud"
+                                        HorizontalAlignment="Stretch" Padding="0,7" />
+                            </Grid>
+
+                            <TextBlock Classes="cyber-head" Text="TOPMOST ON ROBLOX" Margin="0,8,0,0" />
+                            <Button Classes="cyber" Classes.active="{Binding TopmostOnRoblox}"
+                                    Content="{Binding RobloxTopmostLabel}"
+                                    Command="{Binding ToggleRobloxTopmostCommand}"
+                                    HorizontalAlignment="Stretch" Padding="0,7" />
+                            <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap"
+                                       Text="Keeps the tablet on top while Roblox is in the foreground and lets other windows cover it when you tab out." />
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                                <TextBlock Classes="cyber-head" Text="UI SCALE" />
+                                <TextBlock Grid.Column="1" Classes="cyber-head" Foreground="{DynamicResource NeonCyan}"
+                                           Text="{Binding UiScaleText}" />
+                            </Grid>
+                            <Slider Classes="cyber-slider" Minimum="0.75" Maximum="2.0" TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True" Value="{Binding UiScalePreview}" Margin="0,2" />
+                            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
+                                <Button Classes="cyber" Padding="0,6" FontSize="11" Content="75%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="0.75"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="1" Classes="cyber" Padding="0,6" FontSize="11" Content="100%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.0"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="2" Classes="cyber" Padding="0,6" FontSize="11" Content="125%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.25"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="3" Classes="cyber" Padding="0,6" FontSize="11" Content="150%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="1.5"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="4" Classes="cyber" Padding="0,6" FontSize="11" Content="200%"
+                                        Command="{Binding SetUiScaleCommand}" CommandParameter="2.0"
+                                        HorizontalAlignment="Stretch" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
+    </Border>
+</UserControl>

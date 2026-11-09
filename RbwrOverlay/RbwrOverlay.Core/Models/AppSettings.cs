@@ -28,6 +28,18 @@ public class AppSettings
     [JsonPropertyName("topmost_on_roblox")]
     public bool TopmostOnRoblox { get; set; } = true;
 
+    [JsonPropertyName("tablet_topmost")]
+    public bool TabletTopmost { get; set; } = false;
+
+    [JsonPropertyName("tablet_topmost_on_roblox")]
+    public bool TabletTopmostOnRoblox { get; set; } = true;
+
+    [JsonPropertyName("tablet_hud_style")]
+    public bool TabletHudStyle { get; set; } = false;
+
+    [JsonPropertyName("tablet_ui_scale")]
+    public double TabletUiScale { get; set; } = 1.0;
+
     [JsonPropertyName("auto_sync_on_join")]
     public bool AutoSyncOnJoin { get; set; } = true;
 
