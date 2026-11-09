@@ -46,7 +46,7 @@ public static class TabletFields
         new("Demand", "DemandU1", Dp: 0), new("Next Demand", "NextDemandU1", Dp: 0),
         new("Demand Time Left", "Demand Time Left", Dp: 0),
         new("Last Scram Reason", "SCRAMreason", FieldType.String),
-        new("Trip Reason", "TRIPreason", FieldType.String),
+        new("Last Trip Reason", "TRIPreason", FieldType.String),
         new("Offsite Power", "Offsite Power", FieldType.Bool),
         new("Fuel Burn", "Fuel Burn (default 0.54)"),
         new("Points Per Second", "PointsPerSecond"),
