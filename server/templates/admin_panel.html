@@ -1759,6 +1759,33 @@
                     </div>
                 </div>
 
+                <div id="debug-meta-panel" class="cyber-panel p-4 rounded-xl border border-white/5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Server Type</span>
+                        <span id="debug-meta-type" class="font-bold text-white truncate">--</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Privacy / Owner</span>
+                        <span id="debug-meta-privacy" class="font-bold text-slate-300 truncate" title="">--</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Players / Max</span>
+                        <span id="debug-meta-players" class="font-bold text-slate-300">--</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">FPS / Ping</span>
+                        <span id="debug-meta-fps-ping" class="font-bold text-slate-300">--</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Uptime</span>
+                        <span id="debug-meta-uptime" class="font-bold text-slate-300">--</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Place ID</span>
+                        <span id="debug-meta-place-id" class="font-bold text-slate-400">--</span>
+                    </div>
+                </div>
+
                 <div class="cyber-panel p-2 rounded-xl border border-white/5 flex items-center gap-2 overflow-x-auto font-mono text-xs">
                     <button type="button" onclick="setDebugSubTab('anomalies')" id="debug-tab-btn-anomalies"
                         class="px-3.5 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold transition whitespace-nowrap">
@@ -1766,7 +1793,7 @@
                     </button>
                     <button type="button" onclick="setDebugSubTab('snapshot-json')" id="debug-tab-btn-snapshot-json"
                         class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap">
-                        Anomalous Snapshot (Raw JSON)
+                        Snapshot Inspector (<span id="debug-count-snapshots">0</span>)
                     </button>
                     <button type="button" onclick="setDebugSubTab('timeline')" id="debug-tab-btn-timeline"
                         class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-medium transition whitespace-nowrap">
@@ -1783,13 +1810,127 @@
                     </div>
                 </div>
 
-                <div id="debug-subtab-snapshot-json" class="hidden flex flex-col gap-3 font-mono text-xs">
-                    <div class="flex items-center justify-between">
-                        <span id="debug-raw-snap-title" class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Raw Snapshot Payload</span>
-                        <button type="button" onclick="copyDebugRawJson()"
-                            class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] transition">Copy JSON</button>
+                <div id="debug-subtab-snapshot-json" class="hidden flex flex-col gap-4 font-mono text-xs">
+                    <div class="cyber-panel p-3.5 rounded-xl border border-white/5 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Inspect:</span>
+                            <button type="button" onclick="navigateDebugSnapshot(-1)" id="debug-snap-prev-btn"
+                                class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] transition font-bold disabled:opacity-30 disabled:cursor-not-allowed">
+                                &lt; Prev
+                            </button>
+                            <select id="debug-snap-selector" onchange="handleDebugSnapshotSelect(this.value)"
+                                class="bg-slate-900 border border-white/10 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[280px] sm:max-w-[420px]">
+                            </select>
+                            <button type="button" onclick="navigateDebugSnapshot(1)" id="debug-snap-next-btn"
+                                class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] transition font-bold disabled:opacity-30 disabled:cursor-not-allowed">
+                                Next &gt;
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 select-none">
+                                <input type="checkbox" id="debug-filter-anomalies-only" onchange="toggleDebugFilterAnomaliesOnly(this.checked)"
+                                    class="rounded bg-slate-900 border-white/10 text-indigo-600 focus:ring-0">
+                                <span>Anomalies Only</span>
+                            </label>
+                            <button type="button" onclick="jumpToFirstAnomalySnapshot()" id="debug-jump-anomaly-btn"
+                                class="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] transition font-bold">
+                                First Anomaly
+                            </button>
+                            <button type="button" onclick="copyDebugRawJson()"
+                                class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] transition">
+                                Copy JSON
+                            </button>
+                        </div>
                     </div>
-                    <pre id="debug-raw-snap-content" class="bg-slate-950 p-4 rounded-xl border border-white/10 text-emerald-400 text-[11px] leading-relaxed overflow-x-auto max-h-[600px] select-all"></pre>
+
+                    <div id="debug-snap-details-card" class="cyber-panel p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-white/5 pb-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span id="debug-snap-badge-index" class="px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold text-[10px]">Snapshot #1</span>
+                                <span id="debug-snap-badge-status" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-[10px]">OK</span>
+                                <span id="debug-snap-badge-owner" class="hidden px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold text-[10px]">Owner ID: --</span>
+                                <span id="debug-snap-timestamp-label" class="text-white text-xs font-bold font-mono">--</span>
+                            </div>
+                            <span id="debug-snap-time-ago" class="text-slate-500 text-[10px] font-mono">--</span>
+                        </div>
+
+                        <div id="debug-snap-anomaly-banner" class="hidden p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold uppercase">Anomaly Detected</span>
+                                <span id="debug-snap-anomaly-tag" class="text-rose-400 text-xs font-bold"></span>
+                            </div>
+                            <p id="debug-snap-anomaly-text" class="text-slate-300 text-[11px] font-mono leading-relaxed"></p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="p-3 rounded-lg bg-black/40 border border-white/5 flex flex-col gap-2">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 border-b border-white/5 pb-1">Unit 1 Operational State</span>
+                                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Demand Setpoint:</span>
+                                        <span id="debug-snap-u1-demand" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Next Demand:</span>
+                                        <span id="debug-snap-u1-next-demand" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Electric Output:</span>
+                                        <span id="debug-snap-u1-output" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">APRM:</span>
+                                        <span id="debug-snap-u1-aprm" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Reactor Temp:</span>
+                                        <span id="debug-snap-u1-temp" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Points / Sec:</span>
+                                        <span id="debug-snap-u1-pps" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-black/40 border border-white/5 flex flex-col gap-2">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-400 border-b border-white/5 pb-1">Unit 2 Operational State</span>
+                                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Demand Setpoint:</span>
+                                        <span id="debug-snap-u2-demand" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Next Demand:</span>
+                                        <span id="debug-snap-u2-next-demand" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Electric Output:</span>
+                                        <span id="debug-snap-u2-output" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">APRM:</span>
+                                        <span id="debug-snap-u2-aprm" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Reactor Temp:</span>
+                                        <span id="debug-snap-u2-temp" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Points / Sec:</span>
+                                        <span id="debug-snap-u2-pps" class="font-bold text-slate-200">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <span id="debug-raw-snap-title" class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Raw Snapshot Payload</span>
+                            <span class="text-[10px] text-slate-500 font-mono">Highlight text freely to copy individual keys or values</span>
+                        </div>
+                        <pre id="debug-raw-snap-content" class="bg-slate-950 p-4 rounded-xl border border-white/10 text-emerald-400 text-[11px] leading-relaxed overflow-x-auto max-h-[600px] select-text font-mono"></pre>
+                    </div>
                 </div>
 
                 <div id="debug-subtab-timeline" class="hidden flex flex-col gap-3 font-mono text-xs">
@@ -1804,7 +1945,8 @@
                                     <th class="p-3">U2 Output</th>
                                     <th class="p-3">U1 APRM</th>
                                     <th class="p-3">U2 APRM</th>
-                                    <th class="p-3 text-right">Status</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="debug-timeline-body" class="divide-y divide-white/5 text-slate-300 text-[11px]">
@@ -4498,6 +4640,8 @@
         }
 
         let currentDebugData = null;
+        let selectedSnapshotTs = null;
+        let filterAnomaliesOnly = false;
 
         function setDebugServerAndRun(jobId) {
             const input = document.getElementById('debug-server-id');
@@ -4654,25 +4798,23 @@
                     banner.className = "cyber-panel p-5 rounded-xl border border-rose-500/40 bg-rose-500/10 flex flex-col gap-3";
                     banner.innerHTML = `
                         <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 font-mono font-bold text-xs">[!]</div>
                             <div class="flex flex-col gap-1">
                                 <h3 class="text-sm font-bold font-mono text-rose-300 uppercase tracking-wide">Critical Anomaly: Dictionary Object Detected in Demand Setpoint</h3>
                                 <p class="text-xs font-mono text-slate-300 leading-relaxed">
-                                    ${data.first_anomaly ? escapeHtml(data.first_anomaly.message) : 'A snapshot in this server received a Python dictionary instead of a numeric value for electrical demand.'}
+                                    ${data.first_anomaly ? escapeHtml(data.first_anomaly.message) : 'A snapshot in this server received a dictionary instead of a numeric value for electrical demand.'}
                                 </p>
                             </div>
                         </div>
                         <div class="p-3 bg-black/40 rounded-lg border border-rose-500/20 text-[11px] font-mono text-slate-300 flex flex-col gap-1.5">
                             <span class="text-rose-400 font-bold uppercase tracking-wider text-[10px]">Root Cause & Mitigation:</span>
-                            <span>• When Roblox state payloads output structured data or dictionaries for Demand fields, standard <code>float()</code> conversions fail with <code>TypeError: float() argument must be a string or a real number, not 'dict'</code>.</span>
-                            <span>• The application has been patched with <code>safe_float</code> and <code>format_demand_value</code> to never attempt dictionary conversion or subfield extraction, returning <code>N/A</code> gracefully without cascading errors.</span>
+                            <span>• When Roblox state payloads output structured data or typed NaN dictionaries <code>{"m": null, "t": "numeric", "v": "nan"}</code> for Demand fields, standard <code>float()</code> conversions fail with <code>TypeError: float() argument must be a string or a real number, not 'dict'</code>.</span>
+                            <span>• The application has been patched with <code>safe_float</code>, <code>safe_demand_numeric</code>, and <code>format_demand_value</code> to never attempt dictionary conversion or subfield extraction, returning <code>N/A</code> gracefully without cascading errors.</span>
                         </div>
                     `;
                 } else if (data.total_anomalies > 0) {
                     banner.className = "cyber-panel p-5 rounded-xl border border-amber-500/40 bg-amber-500/10 flex flex-col gap-3";
                     banner.innerHTML = `
                         <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-mono font-bold text-xs">[!]</div>
                             <div class="flex flex-col gap-1">
                                 <h3 class="text-sm font-bold font-mono text-amber-300 uppercase tracking-wide">Anomalies Detected (${data.total_anomalies})</h3>
                                 <p class="text-xs font-mono text-slate-300 leading-relaxed">Found non-standard or unparseable field structures in this server's snapshots.</p>
@@ -4698,7 +4840,7 @@
                 statSource.title = data.source || '';
             }
             const statTotalSnaps = document.getElementById('debug-stat-total-snaps');
-            if (statTotalSnaps) statTotalSnaps.textContent = data.total_snapshots || 0;
+            if (statTotalSnaps) statTotalSnaps.textContent = (data.meta && data.meta.snapshot_count !== undefined) ? data.meta.snapshot_count : (data.total_snapshots || 0);
 
             const statAnomSnaps = document.getElementById('debug-stat-anom-snaps');
             if (statAnomSnaps) {
@@ -4715,7 +4857,7 @@
             const statDemandStatus = document.getElementById('debug-stat-demand-status');
             if (statDemandStatus) {
                 if (data.has_dict_demand) {
-                    statDemandStatus.textContent = "DICT DETECTED";
+                    statDemandStatus.textContent = "DICT / NAN DETECTED";
                     statDemandStatus.className = "text-xs font-bold font-mono text-rose-400 truncate";
                 } else {
                     statDemandStatus.textContent = "VALID NUMERIC";
@@ -4726,8 +4868,55 @@
             const statIsLive = document.getElementById('debug-stat-is-live');
             if (statIsLive) statIsLive.textContent = data.is_live ? "Active Memory" : "Historical/Disk";
 
+            const meta = data.meta || {};
+            const metaType = document.getElementById('debug-meta-type');
+            if (metaType) {
+                const sType = meta.server_type || (meta.is_private ? "Private Server" : "Public Server");
+                metaType.textContent = sType;
+                metaType.className = meta.is_private ? "font-bold text-purple-400 truncate" : "font-bold text-cyan-400 truncate";
+            }
+            const metaPrivacy = document.getElementById('debug-meta-privacy');
+            if (metaPrivacy) {
+                if (meta.is_private) {
+                    const ownerVal = meta.privateServerOwnerId || "Private";
+                    metaPrivacy.textContent = `Owner: ${ownerVal}`;
+                    metaPrivacy.title = `Private Server Owner: ${ownerVal}`;
+                    metaPrivacy.className = "font-bold text-purple-300 truncate";
+                } else {
+                    metaPrivacy.textContent = "Public (Null / Null)";
+                    metaPrivacy.title = "is_private: null, owner: null";
+                    metaPrivacy.className = "font-bold text-slate-400 truncate";
+                }
+            }
+            const metaPlayers = document.getElementById('debug-meta-players');
+            if (metaPlayers) {
+                if (meta.is_private) {
+                    metaPlayers.textContent = "N/A (Private)";
+                } else {
+                    const pc = meta.player_count !== undefined && meta.player_count !== null ? meta.player_count : '--';
+                    const mp = meta.max_players !== undefined && meta.max_players !== null ? meta.max_players : 50;
+                    metaPlayers.textContent = `${pc} / ${mp}`;
+                }
+            }
+            const metaFpsPing = document.getElementById('debug-meta-fps-ping');
+            if (metaFpsPing) {
+                const fpsStr = meta.fps !== undefined && meta.fps !== null ? `${meta.fps} FPS` : "-- FPS";
+                const pingStr = meta.ping !== undefined && meta.ping !== null ? `${meta.ping} ms` : "-- ms";
+                metaFpsPing.textContent = `${fpsStr} / ${pingStr}`;
+            }
+            const metaUptime = document.getElementById('debug-meta-uptime');
+            if (metaUptime) {
+                metaUptime.textContent = meta.uptime_formatted || (meta.uptime_seconds ? `${Math.round(meta.uptime_seconds / 60)}m` : "--");
+            }
+            const metaPlaceId = document.getElementById('debug-meta-place-id');
+            if (metaPlaceId) {
+                metaPlaceId.textContent = meta.place_id || "11765852158";
+            }
+
             const countAnom = document.getElementById('debug-count-anomalies');
             if (countAnom) countAnom.textContent = data.total_anomalies || 0;
+            const countSnaps = document.getElementById('debug-count-snapshots');
+            if (countSnaps) countSnaps.textContent = data.total_snapshots || 0;
             const countTime = document.getElementById('debug-count-timeline');
             if (countTime) countTime.textContent = data.total_snapshots || 0;
             const countErr = document.getElementById('debug-count-errors');
@@ -4743,14 +4932,25 @@
                         html += `
                             <div class="cyber-panel p-4 rounded-xl border ${a.type === 'dict' ? 'border-rose-500/30 bg-rose-500/5' : 'border-amber-500/30 bg-amber-500/5'} flex flex-col gap-3">
                                 <div class="flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
                                         <span class="px-2 py-0.5 rounded ${a.type === 'dict' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'} font-bold uppercase text-[10px]">
                                             ${escapeHtml(a.type.toUpperCase())} ANOMALY
                                         </span>
+                                        ${a.is_roblox_nan ? `
+                                            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-200 border border-rose-500/50 font-bold uppercase text-[10px]">
+                                                ROBLOX SERIALIZED NAN FLOAT
+                                            </span>
+                                        ` : ''}
                                         <span class="font-bold text-white text-xs">${escapeHtml(a.unit)}.${escapeHtml(a.field)}</span>
                                         ${a.field_desc ? `<span class="text-slate-500 text-[10px]">(${escapeHtml(a.field_desc)})</span>` : ''}
                                     </div>
-                                    <span class="text-slate-400 text-[10px]">${escapeHtml(a.timestamp)}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-slate-400 text-[10px]">${escapeHtml(a.timestamp)}</span>
+                                        <button type="button" onclick="inspectSnapshotAt('${escapeHtml(a.timestamp)}')"
+                                            class="px-2.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[10px] font-bold font-mono transition">
+                                            Inspect Snapshot
+                                        </button>
+                                    </div>
                                 </div>
                                 <p class="text-xs text-slate-300 leading-relaxed font-mono">${escapeHtml(a.message)}</p>
                                 ${a.keys && a.keys.length > 0 ? `
@@ -4761,7 +4961,7 @@
                                 ` : ''}
                                 <div class="flex flex-col gap-1">
                                     <span class="text-[10px] uppercase font-bold text-slate-500 font-mono tracking-wider">Raw Field Value:</span>
-                                    <pre class="p-2.5 bg-black/80 rounded border border-white/10 text-rose-300 text-[11px] font-mono overflow-x-auto"><code>${escapeHtml(typeof a.raw_value === 'object' ? JSON.stringify(a.raw_value, null, 2) : String(a.raw_value))}</code></pre>
+                                    <pre class="p-2.5 bg-black/80 rounded border border-white/10 text-rose-300 text-[11px] font-mono overflow-x-auto select-text"><code>${escapeHtml(typeof a.raw_value === 'object' ? JSON.stringify(a.raw_value, null, 2) : String(a.raw_value))}</code></pre>
                                 </div>
                             </div>
                         `;
@@ -4770,27 +4970,29 @@
                 }
             }
 
-            const rawTitle = document.getElementById('debug-raw-snap-title');
-            const rawContent = document.getElementById('debug-raw-snap-content');
-            if (rawContent) {
-                let targetState = null;
-                if (data.first_anomalous_snapshot) {
-                    targetState = data.first_anomalous_snapshot.state;
-                    if (rawTitle) rawTitle.textContent = `First Anomalous Snapshot State (${data.first_anomalous_snapshot.timestamp})`;
-                } else if (data.latest_state) {
-                    targetState = data.latest_state;
-                    if (rawTitle) rawTitle.textContent = `Latest Snapshot State (${data.latest_timestamp || 'latest'})`;
-                }
-                rawContent.textContent = targetState ? JSON.stringify(targetState, null, 2) : '// No snapshot state available';
+            populateSnapshotSelector();
+
+            if (data.first_anomalous_snapshot) {
+                selectedSnapshotTs = data.first_anomalous_snapshot.timestamp;
+            } else if (data.latest_timestamp) {
+                selectedSnapshotTs = data.latest_timestamp;
+            } else if (data.snapshots_summary && data.snapshots_summary.length > 0) {
+                selectedSnapshotTs = data.snapshots_summary[data.snapshots_summary.length - 1].timestamp;
+            } else {
+                selectedSnapshotTs = null;
+            }
+
+            if (selectedSnapshotTs) {
+                renderSnapshotDetails(selectedSnapshotTs);
             }
 
             const timelineBody = document.getElementById('debug-timeline-body');
             if (timelineBody) {
                 if (!data.snapshots_summary || data.snapshots_summary.length === 0) {
-                    timelineBody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No snapshots recorded for this server.</td></tr>';
+                    timelineBody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-500">No snapshots recorded for this server.</td></tr>';
                 } else {
                     let html = '';
-                    data.snapshots_summary.slice(-100).reverse().forEach(snap => {
+                    data.snapshots_summary.slice(-150).reverse().forEach(snap => {
                         const hasAnom = snap.has_anomaly;
                         html += `
                             <tr class="${hasAnom ? 'bg-rose-500/10 hover:bg-rose-500/15' : 'hover:bg-white/5'} transition font-mono">
@@ -4807,8 +5009,14 @@
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_out))}</td>
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u1_aprm))}%</td>
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_aprm))}%</td>
+                                <td class="p-3 whitespace-nowrap">
+                                    ${hasAnom ? (snap.is_roblox_nan ? '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">ROBLOX NAN</span>' : '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">ANOMALY</span>') : '<span class="text-slate-500 text-[10px]">OK</span>'}
+                                </td>
                                 <td class="p-3 text-right whitespace-nowrap">
-                                    ${hasAnom ? '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">ANOMALY</span>' : '<span class="text-slate-500 text-[10px]">OK</span>'}
+                                    <button type="button" onclick="inspectSnapshotAt('${escapeHtml(snap.timestamp)}')"
+                                        class="px-2.5 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold font-mono transition">
+                                        Inspect
+                                    </button>
                                 </td>
                             </tr>
                         `;
@@ -4834,7 +5042,7 @@
                                     <span class="text-slate-500 text-[10px]">${escapeHtml(err.last_seen || err.first_seen || '')}</span>
                                 </div>
                                 <div class="text-rose-300 font-bold text-xs">${escapeHtml(err.message || 'No error message')}</div>
-                                ${err.traceback ? `<pre class="p-3 bg-black/80 rounded border border-white/5 text-[10px] text-slate-300 overflow-x-auto leading-relaxed max-h-60 overflow-y-auto"><code>${escapeHtml(err.traceback)}</code></pre>` : ''}
+                                ${err.traceback ? `<pre class="p-3 bg-black/80 rounded border border-white/5 text-[10px] text-slate-300 overflow-x-auto leading-relaxed max-h-60 overflow-y-auto select-text"><code>${escapeHtml(err.traceback)}</code></pre>` : ''}
                             </div>
                         `;
                     });
@@ -4845,7 +5053,215 @@
             if (data.total_anomalies > 0) {
                 setDebugSubTab('anomalies');
             } else {
-                setDebugSubTab('timeline');
+                setDebugSubTab('snapshot-json');
+            }
+        }
+
+        function getActiveSnapshotsList() {
+            if (!currentDebugData || !currentDebugData.snapshots_summary) return [];
+            if (!filterAnomaliesOnly) return currentDebugData.snapshots_summary;
+            return currentDebugData.snapshots_summary.filter(s => s.has_anomaly);
+        }
+
+        function populateSnapshotSelector() {
+            const selector = document.getElementById('debug-snap-selector');
+            if (!selector || !currentDebugData) return;
+            const snaps = getActiveSnapshotsList();
+            selector.innerHTML = '';
+            if (snaps.length === 0) {
+                selector.innerHTML = '<option value="">No snapshots matching filter</option>';
+                return;
+            }
+            snaps.forEach((s, idx) => {
+                const opt = document.createElement('option');
+                opt.value = s.timestamp;
+                const prefix = s.has_anomaly ? (s.is_roblox_nan ? '[ROBLOX NAN] ' : '[ANOMALY] ') : '[OK] ';
+                opt.textContent = `#${idx + 1}/${snaps.length}: ${prefix}${s.timestamp}`;
+                selector.appendChild(opt);
+            });
+            if (selectedSnapshotTs) {
+                selector.value = selectedSnapshotTs;
+            }
+        }
+
+        function renderSnapshotDetails(timestamp) {
+            if (!currentDebugData) return;
+            selectedSnapshotTs = timestamp;
+            const snaps = getActiveSnapshotsList();
+            const idx = snaps.findIndex(s => s.timestamp === timestamp);
+            const summaryEntry = (currentDebugData.snapshots_summary || []).find(s => s.timestamp === timestamp) || {};
+
+            let snapState = null;
+            if (currentDebugData.snapshots && currentDebugData.snapshots[timestamp]) {
+                snapState = currentDebugData.snapshots[timestamp];
+            } else if (currentDebugData.first_anomalous_snapshot && currentDebugData.first_anomalous_snapshot.timestamp === timestamp) {
+                snapState = currentDebugData.first_anomalous_snapshot.state;
+            } else if (currentDebugData.latest_timestamp === timestamp && currentDebugData.latest_state) {
+                snapState = currentDebugData.latest_state;
+            } else if (currentDebugData.earliest_timestamp === timestamp && currentDebugData.earliest_state) {
+                snapState = currentDebugData.earliest_state;
+            }
+
+            const selector = document.getElementById('debug-snap-selector');
+            if (selector && selector.value !== timestamp) {
+                selector.value = timestamp;
+            }
+
+            const badgeIndex = document.getElementById('debug-snap-badge-index');
+            if (badgeIndex) {
+                const displayIdx = idx >= 0 ? idx + 1 : (currentDebugData.snapshots_summary ? currentDebugData.snapshots_summary.findIndex(s => s.timestamp === timestamp) + 1 : 1);
+                const totalCount = currentDebugData.snapshots_summary ? currentDebugData.snapshots_summary.length : 1;
+                badgeIndex.textContent = `Snapshot #${displayIdx} of ${totalCount}`;
+            }
+
+            const badgeStatus = document.getElementById('debug-snap-badge-status');
+            if (badgeStatus) {
+                if (summaryEntry.has_anomaly) {
+                    if (summaryEntry.is_roblox_nan) {
+                        badgeStatus.textContent = "ROBLOX NAN DETECTED";
+                        badgeStatus.className = "px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold text-[10px]";
+                    } else {
+                        badgeStatus.textContent = "ANOMALY DETECTED";
+                        badgeStatus.className = "px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold text-[10px]";
+                    }
+                } else {
+                    badgeStatus.textContent = "STATUS OK";
+                    badgeStatus.className = "px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold text-[10px]";
+                }
+            }
+
+            const badgeOwner = document.getElementById('debug-snap-badge-owner');
+            if (badgeOwner) {
+                const ownerId = (snapState && snapState.privateServerOwnerId)
+                    || (currentDebugData.meta && currentDebugData.meta.privateServerOwnerId)
+                    || (currentDebugData.server_meta && currentDebugData.server_meta.privateServerOwnerId)
+                    || null;
+                if (ownerId && ownerId !== "null" && ownerId !== "None") {
+                    badgeOwner.textContent = `Owner ID: ${ownerId}`;
+                    badgeOwner.classList.remove('hidden');
+                } else {
+                    badgeOwner.classList.add('hidden');
+                }
+            }
+
+            const tsLabel = document.getElementById('debug-snap-timestamp-label');
+            if (tsLabel) tsLabel.textContent = timestamp;
+
+            const timeAgo = document.getElementById('debug-snap-time-ago');
+            if (timeAgo) {
+                try {
+                    const snapDate = new Date(timestamp.replace('Z', '+00:00'));
+                    const now = new Date();
+                    const diffSec = Math.floor((now - snapDate) / 1000);
+                    if (diffSec < 60) timeAgo.textContent = `${diffSec}s ago`;
+                    else if (diffSec < 3600) timeAgo.textContent = `${Math.floor(diffSec / 60)}m ago`;
+                    else if (diffSec < 86400) timeAgo.textContent = `${Math.floor(diffSec / 3600)}h ago`;
+                    else timeAgo.textContent = `${Math.floor(diffSec / 86400)}d ago`;
+                } catch {
+                    timeAgo.textContent = '';
+                }
+            }
+
+            const anomBanner = document.getElementById('debug-snap-anomaly-banner');
+            const anomTag = document.getElementById('debug-snap-anomaly-tag');
+            const anomText = document.getElementById('debug-snap-anomaly-text');
+            if (anomBanner) {
+                if (summaryEntry.has_anomaly && summaryEntry.anomalies && summaryEntry.anomalies.length > 0) {
+                    anomBanner.classList.remove('hidden');
+                    const firstAnom = summaryEntry.anomalies[0];
+                    if (anomTag) anomTag.textContent = firstAnom.field ? `${firstAnom.unit}.${firstAnom.field}` : "Snapshot Field";
+                    if (anomText) anomText.textContent = firstAnom.message || "Non-numeric data structure encountered.";
+                } else {
+                    anomBanner.classList.add('hidden');
+                }
+            }
+
+            const u1 = (snapState && typeof snapState.Unit1 === 'object') ? snapState.Unit1 : {};
+            const u2 = (snapState && typeof snapState.Unit2 === 'object') ? snapState.Unit2 : {};
+
+            const setField = (id, val, suffix = '') => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (val === undefined || val === null) {
+                    el.textContent = '--';
+                    el.className = 'font-bold text-slate-500';
+                } else if (typeof val === 'object') {
+                    el.textContent = JSON.stringify(val);
+                    el.className = 'font-bold text-rose-400 font-mono text-[10px] break-all';
+                } else {
+                    el.textContent = `${val}${suffix}`;
+                    el.className = 'font-bold text-slate-200';
+                }
+            };
+
+            setField('debug-snap-u1-demand', u1.DemandU1 !== undefined ? u1.DemandU1 : u1.Demand);
+            setField('debug-snap-u1-next-demand', u1.NextDemandU1 !== undefined ? u1.NextDemandU1 : u1.NextDemand);
+            setField('debug-snap-u1-output', u1.Output !== undefined ? u1.Output : u1.ElectricOutputMW, ' MW');
+            setField('debug-snap-u1-aprm', u1.APRM, '%');
+            setField('debug-snap-u1-temp', u1['Reactor Temp'], ' °C');
+            setField('debug-snap-u1-pps', u1.PointsPerSecond, ' pts/s');
+
+            setField('debug-snap-u2-demand', u2.DemandU2 !== undefined ? u2.DemandU2 : u2.Demand);
+            setField('debug-snap-u2-next-demand', u2.NextDemandU2 !== undefined ? u2.NextDemandU2 : u2.NextDemand);
+            setField('debug-snap-u2-output', u2.Output !== undefined ? u2.Output : u2.ElectricOutputMW, ' MW');
+            setField('debug-snap-u2-aprm', u2.APRM, '%');
+            setField('debug-snap-u2-temp', u2['Reactor Temp'], ' °C');
+            setField('debug-snap-u2-pps', u2.PointsPerSecond, ' pts/s');
+
+            const rawTitle = document.getElementById('debug-raw-snap-title');
+            const rawContent = document.getElementById('debug-raw-snap-content');
+            if (rawTitle) rawTitle.textContent = `Raw Snapshot Payload (${timestamp})`;
+            if (rawContent) {
+                rawContent.textContent = snapState ? JSON.stringify(snapState, null, 2) : '// No state available for this snapshot';
+            }
+
+            const prevBtn = document.getElementById('debug-snap-prev-btn');
+            const nextBtn = document.getElementById('debug-snap-next-btn');
+            if (prevBtn) prevBtn.disabled = (idx <= 0);
+            if (nextBtn) nextBtn.disabled = (idx < 0 || idx >= snaps.length - 1);
+        }
+
+        function handleDebugSnapshotSelect(timestamp) {
+            if (timestamp) {
+                renderSnapshotDetails(timestamp);
+            }
+        }
+
+        function navigateDebugSnapshot(direction) {
+            const snaps = getActiveSnapshotsList();
+            if (snaps.length === 0) return;
+            const currentIdx = snaps.findIndex(s => s.timestamp === selectedSnapshotTs);
+            const targetIdx = currentIdx + direction;
+            if (targetIdx >= 0 && targetIdx < snaps.length) {
+                renderSnapshotDetails(snaps[targetIdx].timestamp);
+            }
+        }
+
+        function toggleDebugFilterAnomaliesOnly(checked) {
+            filterAnomaliesOnly = checked;
+            populateSnapshotSelector();
+            const snaps = getActiveSnapshotsList();
+            if (snaps.length > 0) {
+                const stillValid = snaps.some(s => s.timestamp === selectedSnapshotTs);
+                if (!stillValid) {
+                    renderSnapshotDetails(snaps[0].timestamp);
+                }
+            }
+        }
+
+        function jumpToFirstAnomalySnapshot() {
+            if (currentDebugData && currentDebugData.first_anomalous_snapshot) {
+                setDebugSubTab('snapshot-json');
+                renderSnapshotDetails(currentDebugData.first_anomalous_snapshot.timestamp);
+            }
+        }
+
+        function inspectSnapshotAt(timestamp) {
+            setDebugSubTab('snapshot-json');
+            renderSnapshotDetails(timestamp);
+            const tabPane = document.getElementById('debug-subtab-snapshot-json');
+            if (tabPane) {
+                tabPane.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
 

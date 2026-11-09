@@ -109,8 +109,9 @@
                 </h1>
                 {% if is_private %}
                 <span
-                    class="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold">
-                    Private Server
+                    class="px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold"
+                    {% if privateServerOwnerId %}title="Owner ID: {{ privateServerOwnerId }}"{% endif %}>
+                    Private Server{% if privateServerOwnerId %} (Owner ID: {{ privateServerOwnerId }}){% endif %}
                 </span>
                 {% endif %}
                 {% if is_persistent %}
@@ -1978,7 +1979,6 @@
         } catch (e) { }
     }
 
-    // Initialize Floating Calculator on page load
     const initialCalcUnit = ({{ u2_running | tojson }} && !{{ u1_running | tojson }}) ? 2 : 1;
     selectSdUnit(initialCalcUnit);
     updateSdCalibrationDisplay();

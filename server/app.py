@@ -1854,6 +1854,71 @@ def safe_demand_numeric(val: Any) -> float | None:
     except (ValueError, TypeError):
         return None
 
+def format_demand_value(val: Any) -> str:
+    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
+        return "N/A"
+    try:
+        v = float(val)
+    except (ValueError, TypeError):
+        return "N/A"
+
+    if v == -4:
+        return "Evac"
+    elif v == -3:
+        return "RST"
+    elif v == -2:
+        return "LOOP"
+    elif v == -1:
+        return "Maint"
+    else:
+        if v.is_integer():
+            return f"{int(v)} MW"
+        return f"{v:.2f} MW"
+
+def format_total_demand(u1: Any, u2: Any) -> str:
+    v1 = None
+    v2 = None
+    if u1 is not None and not isinstance(u1, (bool, dict, list, tuple, set)):
+        try:
+            v1 = float(u1)
+        except (ValueError, TypeError):
+            pass
+    if u2 is not None and not isinstance(u2, (bool, dict, list, tuple, set)):
+        try:
+            v2 = float(u2)
+        except (ValueError, TypeError):
+            pass
+
+    if v1 is None and v2 is None:
+        return "N/A"
+    if v1 is None:
+        return format_demand_value(v2)
+    if v2 is None:
+        return format_demand_value(v1)
+
+    is_u1_special = v1 < 0
+    is_u2_special = v2 < 0
+
+    if is_u1_special and is_u2_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        if lbl1 == lbl2:
+            return lbl1
+        return f"{lbl1} / {lbl2}"
+    elif is_u1_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        return f"{lbl1} (U1) | {lbl2} (U2)"
+    elif is_u2_special:
+        lbl1 = format_demand_value(v1)
+        lbl2 = format_demand_value(v2)
+        return f"{lbl1} (U1) | {lbl2} (U2)"
+    else:
+        total = v1 + v2
+        if total.is_integer():
+            return f"{int(total)} MW"
+        return f"{total:.2f} MW"
+
 def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
     if job_id in _sc_public_server_ids:
         return False
@@ -2127,6 +2192,178 @@ load_server_meta()
 def save_server_meta():
     save_sc_data(_sc_server_meta, "server_meta.json")
 
+def build_server_metadata(
+    job_id: str,
+    snapshots: dict[str, Any] | None,
+    server_raw: dict[str, Any] | None = None,
+    existing_meta: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    existing = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    server_info = dict(server_raw) if isinstance(server_raw, dict) else {}
+    snaps = dict(snapshots) if isinstance(snapshots, dict) else {}
+
+    valid_ts = sorted([k for k in safe_dict_keys(snaps) if not str(k).startswith('_')])
+    snapshot_count = len(valid_ts)
+
+    raw_owner_id = server_info.get("privateServerOwnerId")
+    if raw_owner_id in (None, "", 0, "0", "None", "null", False):
+        raw_owner_id = None
+    else:
+        raw_owner_id = str(raw_owner_id).strip()
+
+    if raw_owner_id is None and existing:
+        raw_owner_id = existing.get("privateServerOwnerId")
+        if raw_owner_id in (None, "", 0, "0", "None", "null", False):
+            raw_owner_id = None
+        else:
+            raw_owner_id = str(raw_owner_id).strip()
+
+    if raw_owner_id is None and snaps:
+        for ts_k in reversed(valid_ts[-5:]):
+            st = snaps.get(ts_k)
+            if isinstance(st, dict):
+                snap_owner = st.get("privateServerOwnerId")
+                if snap_owner not in (None, "", 0, "0", "None", "null", False):
+                    raw_owner_id = str(snap_owner).strip()
+                    break
+
+    is_priv = False
+    if raw_owner_id is not None:
+        is_priv = True
+    elif _sc_public_server_ids and job_id in _sc_public_server_ids:
+        is_priv = False
+    elif existing.get("is_private") is True:
+        is_priv = True
+    elif _sc_public_server_ids and job_id not in _sc_public_server_ids:
+        is_priv = True
+    else:
+        found_in_snaps = False
+        for ts_k in reversed(valid_ts[-5:]):
+            st = snaps.get(ts_k)
+            if isinstance(st, dict) and "IsPrivate" in st:
+                if st["IsPrivate"]:
+                    is_priv = True
+                    found_in_snaps = True
+                    break
+                else:
+                    is_priv = False
+                    found_in_snaps = True
+                    break
+        if not found_in_snaps:
+            is_priv = bool(existing.get("is_private"))
+
+    if is_priv:
+        is_private_val = True
+        owner_id_val = raw_owner_id or existing.get("privateServerOwnerId")
+        owner_str_val = str(owner_id_val).strip() if owner_id_val not in (None, "", "None", "null") else "private"
+        server_type_str = "Private Server"
+        player_count_val = None
+        max_players_val = None
+    else:
+        is_private_val = None
+        owner_str_val = None
+        server_type_str = "Public Server"
+        pub_info = _sc_public_servers_info.get(job_id, {})
+        player_count_val = server_info.get("playerCount", pub_info.get("playing", existing.get("player_count", existing.get("last_player_count", 0))))
+        max_players_val = server_info.get("maxPlayers", pub_info.get("maxPlayers", existing.get("max_players", 50)))
+
+    place_id = server_info.get("placeId") or existing.get("place_id") or 11765852158
+    fps = server_info.get("fps", existing.get("fps"))
+    ping = server_info.get("ping", existing.get("ping"))
+
+    now_utc_str = datetime.now(timezone.utc).isoformat()
+    start_ts = existing.get("start_timestamp") or (valid_ts[0] if valid_ts else server_info.get("lastHeartbeat", now_utc_str))
+    last_hb = (valid_ts[-1] if valid_ts else None) or server_info.get("lastHeartbeat") or now_utc_str
+
+    uptime_sec = 0.0
+    try:
+        clean_start = str(start_ts).replace("Z", "+00:00")
+        clean_hb = str(last_hb).replace("Z", "+00:00")
+        dt_start = datetime.fromisoformat(clean_start)
+        dt_hb = datetime.fromisoformat(clean_hb)
+        uptime_sec = max(0.0, (dt_hb - dt_start).total_seconds())
+    except Exception:
+        pass
+
+    hours = int(uptime_sec // 3600)
+    mins = int((uptime_sec % 3600) // 60)
+    uptime_fmt = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+
+    has_dict_demand = False
+    has_anomalies = False
+    anomaly_count = 0
+
+    for ts_k in valid_ts:
+        st = snaps.get(ts_k)
+        if not isinstance(st, dict):
+            has_anomalies = True
+            anomaly_count += 1
+            continue
+        for uk in ("Unit1", "Unit2"):
+            ust = st.get(uk)
+            if not isinstance(ust, dict):
+                continue
+            for dk in ("DemandU1", "DemandU2", "Demand", "NextDemandU1", "NextDemandU2"):
+                if dk in ust:
+                    val = ust[dk]
+                    if isinstance(val, dict):
+                        has_dict_demand = True
+                        has_anomalies = True
+                        anomaly_count += 1
+                    elif isinstance(val, (list, tuple)):
+                        has_anomalies = True
+                        anomaly_count += 1
+
+    latest_summary = {}
+    if valid_ts:
+        last_snap = snaps.get(valid_ts[-1], {})
+        if isinstance(last_snap, dict):
+            u1 = last_snap.get("Unit1", {}) if isinstance(last_snap.get("Unit1"), dict) else {}
+            u2 = last_snap.get("Unit2", {}) if isinstance(last_snap.get("Unit2"), dict) else {}
+            u1_mw = safe_float(u1.get("Output", u1.get("ElectricOutputMW")), 0.0)
+            u2_mw = safe_float(u2.get("Output", u2.get("ElectricOutputMW")), 0.0)
+            u1_dem = format_demand_value(u1.get("DemandU1", u1.get("Demand")))
+            u2_dem = format_demand_value(u2.get("DemandU2", u2.get("Demand")))
+            latest_summary = {
+                "u1_mw": round(u1_mw, 1),
+                "u2_mw": round(u2_mw, 1),
+                "total_mw": round(u1_mw + u2_mw, 1),
+                "u1_aprm": safe_float(u1.get("APRM"), 0.0),
+                "u2_aprm": safe_float(u2.get("APRM"), 0.0),
+                "u1_demand": u1_dem,
+                "u2_demand": u2_dem,
+                "pps": safe_float(last_snap.get("Total points/second", 0.0), 0.0)
+            }
+
+    meta_dict = {
+        "job_id": job_id,
+        "jobId": job_id,
+        "id": server_info.get("id") or existing.get("id"),
+        "server_id": server_info.get("id") or existing.get("id"),
+        "snapshot_count": snapshot_count,
+        "is_private": is_private_val,
+        "privateServerOwnerId": owner_str_val if is_priv else None,
+        "server_type": server_type_str,
+        "place_id": place_id,
+        "player_count": player_count_val,
+        "max_players": max_players_val,
+        "fps": fps,
+        "ping": ping,
+        "start_timestamp": start_ts,
+        "first_seen_timestamp": existing.get("first_seen_timestamp", start_ts),
+        "last_heartbeat": last_hb,
+        "last_seen_timestamp": last_hb,
+        "uptime_seconds": round(uptime_sec, 1),
+        "uptime_formatted": uptime_fmt,
+        "last_archived_ts": existing.get("last_archived_ts", ""),
+        "has_dict_demand": has_dict_demand,
+        "has_anomalies": has_anomalies,
+        "anomaly_count": anomaly_count,
+        "latest_state_summary": latest_summary,
+        "updated_at": now_utc_str,
+    }
+    return meta_dict
+
 _sc_archives_meta_cache = {}
 
 def load_archives_meta():
@@ -2396,6 +2633,10 @@ def archive_expired_server_data(expired_by_date: dict, current_data: dict | None
             else:
                 existing_archive[job_id] = dict(existing_archive[job_id])
             existing_archive[job_id].update(snaps)
+            if job_id in _sc_server_meta:
+                existing_archive[job_id]["_meta"] = _sc_server_meta[job_id]
+            elif isinstance(snaps, dict) and "_meta" in snaps:
+                existing_archive[job_id]["_meta"] = snaps["_meta"]
             _sc_archive_server_index[job_id] = date_str
             
         day_has_active_servers = (date_str in active_dates)
@@ -2933,27 +3174,54 @@ def pull_server_checker_data():
                 del state["Misc"]
 
             owner_id = server.get("privateServerOwnerId")
-            if owner_id not in (None, "", 0, "None", "null"):
+            if owner_id not in (None, "", 0, "0", "None", "null", False):
+                owner_id = str(owner_id).strip()
+            else:
+                owner_id = None
+
+            if owner_id is not None:
                 is_priv = True
-                state["IsPrivate"] = is_priv
-                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
+                state["IsPrivate"] = True
+                state["privateServerOwnerId"] = owner_id
+                if server.get("id"):
+                    state["ServerId"] = server.get("id")
+                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv or _sc_server_meta[job_id].get("privateServerOwnerId") != owner_id:
                     if job_id not in _sc_server_meta:
                         _sc_server_meta[job_id] = {}
-                    _sc_server_meta[job_id]["is_private"] = is_priv
+                    _sc_server_meta[job_id]["is_private"] = True
+                    _sc_server_meta[job_id]["privateServerOwnerId"] = owner_id
+                    if server.get("id"):
+                        _sc_server_meta[job_id]["id"] = server.get("id")
                     meta_dirty = True
             elif _sc_public_server_ids:
                 is_priv = job_id not in _sc_public_server_ids
                 state["IsPrivate"] = is_priv
+                if is_priv:
+                    prev_oid = _sc_server_meta.get(job_id, {}).get("privateServerOwnerId")
+                    state["privateServerOwnerId"] = prev_oid or "private"
+                else:
+                    state["privateServerOwnerId"] = None
                 if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
                     if job_id not in _sc_server_meta:
                         _sc_server_meta[job_id] = {}
-                    _sc_server_meta[job_id]["is_private"] = is_priv
+                    _sc_server_meta[job_id]["is_private"] = is_priv if is_priv else None
+                    if not is_priv:
+                        _sc_server_meta[job_id]["privateServerOwnerId"] = None
+                    if server.get("id"):
+                        _sc_server_meta[job_id]["id"] = server.get("id")
                     meta_dirty = True
             elif job_id in _sc_server_meta and "is_private" in _sc_server_meta[job_id]:
                 is_priv = bool(_sc_server_meta[job_id]["is_private"])
                 state["IsPrivate"] = is_priv
+                if is_priv:
+                    prev_oid = _sc_server_meta[job_id].get("privateServerOwnerId")
+                    state["privateServerOwnerId"] = prev_oid or "private"
+                else:
+                    state["privateServerOwnerId"] = None
             else:
                 is_priv = False
+                state["IsPrivate"] = False
+                state["privateServerOwnerId"] = None
 
             info = _sc_public_servers_info.get(job_id, {})
             if is_priv:
@@ -2992,6 +3260,23 @@ def pull_server_checker_data():
                 _sc_server_meta[job_id]["start_timestamp"] = heartbeat
                 meta_dirty = True
             current_data[job_id][heartbeat] = state
+
+            meta_record = build_server_metadata(
+                job_id=job_id,
+                snapshots=current_data[job_id],
+                server_raw=server,
+                existing_meta=_sc_server_meta.get(job_id)
+            )
+            current_data[job_id]["_meta"] = meta_record
+            _sc_server_meta[job_id] = meta_record
+            meta_dirty = True
+
+        for s_id, s_snaps in current_data.items():
+            if isinstance(s_snaps, dict) and "_meta" not in s_snaps:
+                m_rec = build_server_metadata(s_id, s_snaps, existing_meta=_sc_server_meta.get(s_id))
+                s_snaps["_meta"] = m_rec
+                _sc_server_meta[s_id] = m_rec
+                meta_dirty = True
 
         servers_dirty = bool(servers_list)
         pruned_dirty = prune_and_archive_servers_data(current_data, persistent_ids)
@@ -3346,6 +3631,12 @@ def get_active_cards_base(servers_data, persistent_ids):
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
         is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
 
+        meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
+        card_owner_id = (
+            meta.get("privateServerOwnerId")
+            or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
+        ) if is_private else None
+
         if is_historical and not is_persistent:
             continue
 
@@ -3372,6 +3663,7 @@ def get_active_cards_base(servers_data, persistent_ids):
             "job_id": job_id,
             "short_id": short_id,
             "is_private": is_private,
+            "privateServerOwnerId": card_owner_id,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
             "is_archived": False,
@@ -3449,6 +3741,12 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
         is_persistent = job_id in persistent_ids
         is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
 
+        meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
+        card_owner_id = (
+            meta.get("privateServerOwnerId")
+            or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
+        ) if is_private else None
+
         server_is_archived = is_archived or (isinstance(snapshots, dict) and bool(snapshots.get('_is_archived', False)))
         is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or server_is_archived
         if is_private:
@@ -3487,6 +3785,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
             "job_id": job_id,
             "short_id": short_id,
             "is_private": is_private,
+            "privateServerOwnerId": card_owner_id,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
             "is_archived": server_is_archived,
@@ -3887,70 +4186,10 @@ def servers_page():
         charts=global_payload.get("charts", [])
     )
 
-def format_demand_value(val):
-    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
-        return "N/A"
-    try:
-        v = float(val)
-    except (ValueError, TypeError):
-        return "N/A"
-
-    if v == -4:
-        return "Evac"
-    elif v == -3:
-        return "RST"
-    elif v == -2:
-        return "LOOP"
-    elif v == -1:
-        return "Maint"
-    else:
-        if v.is_integer():
-            return f"{int(v)} MW"
-        return f"{v:.2f} MW"
-
-def format_total_demand(u1, u2):
-    v1 = None
-    v2 = None
-    if u1 is not None and not isinstance(u1, (bool, dict, list, tuple, set)):
-        try:
-            v1 = float(u1)
-        except (ValueError, TypeError):
-            pass
-    if u2 is not None and not isinstance(u2, (bool, dict, list, tuple, set)):
-        try:
-            v2 = float(u2)
-        except (ValueError, TypeError):
-            pass
-
-    if v1 is None and v2 is None:
-        return "N/A"
-    if v1 is None:
-        return format_demand_value(v2)
-    if v2 is None:
-        return format_demand_value(v1)
-
-    is_u1_special = v1 < 0
-    is_u2_special = v2 < 0
-
-    if is_u1_special and is_u2_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        if lbl1 == lbl2:
-            return lbl1
-        return f"{lbl1} / {lbl2}"
-    elif is_u1_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        return f"{lbl1} (U1) | {lbl2} (U2)"
-    elif is_u2_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        return f"{lbl1} (U1) | {lbl2} (U2)"
-    else:
-        tot = v1 + v2
-        if tot.is_integer():
-            return f"{int(tot)} MW"
-        return f"{tot:.2f} MW"
+@app.route("/servers/", methods=["GET"])
+def servers_trailing_slash_redirect():
+    qs = f"?{request.query_string.decode('utf-8')}" if request.query_string else ""
+    return redirect(f"/servers{qs}")
 
 @app.route("/servers/<job_id>", methods=["GET"])
 def server_detail_page(job_id):
@@ -3999,6 +4238,14 @@ def server_detail_page(job_id):
 
     is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600 and not is_archived))
     is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or is_archived
+
+    meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
+    private_server_owner_id = (
+        meta.get("privateServerOwnerId")
+        or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
+        or (server.get("privateServerOwnerId") if isinstance(server, dict) else None)
+    ) if is_private else None
+
     if is_private:
         player_count = None
         max_players = None
@@ -4044,6 +4291,7 @@ def server_detail_page(job_id):
 
         summary = {
             "is_private": is_private,
+            "privateServerOwnerId": private_server_owner_id,
             "is_persistent": is_persistent,
             "is_historical": is_historical,
             "is_archived": is_archived,
@@ -4118,6 +4366,7 @@ def server_detail_page(job_id):
 
     summary = {
         "is_private": is_private,
+        "privateServerOwnerId": private_server_owner_id,
         "is_persistent": is_persistent,
         "is_historical": is_historical,
         "is_archived": is_archived,
@@ -4461,6 +4710,11 @@ def browse_archives_page():
     days_list, summary_stats = get_all_archive_days_info()
     return render_template("archives.html", days=days_list, stats=summary_stats)
 
+@app.route("/archives/", methods=["GET"])
+def archives_trailing_slash_redirect():
+    qs = f"?{request.query_string.decode('utf-8')}" if request.query_string else ""
+    return redirect(f"/archives{qs}")
+
 @app.route("/archives/<date_str>", methods=["GET"])
 def view_archive_day_page(date_str):
     date_str = date_str.strip()
@@ -4614,10 +4868,16 @@ def get_public_servers_payload(public_only=False):
                 continue
             is_priv = get_server_visibility(jid, is_active=True)
             owner_id = s.get("privateServerOwnerId")
-            if not is_priv and owner_id not in (None, "", 0, "None", "null"):
+            if not is_priv and owner_id not in (None, "", 0, "0", "None", "null", False):
                 is_priv = True
             s_copy = dict(s)
-            s_copy["is_private"] = is_priv
+            if is_priv:
+                s_copy["is_private"] = True
+                clean_oid = str(owner_id).strip() if owner_id not in (None, "", 0, "0", "None", "null", False) else (_sc_server_meta.get(jid, {}).get("privateServerOwnerId") or "private")
+                s_copy["privateServerOwnerId"] = clean_oid
+            else:
+                s_copy["is_private"] = None
+                s_copy["privateServerOwnerId"] = None
             if not is_priv:
                 p_count = get_server_player_count(jid, is_private=False)
                 if p_count is not None:
@@ -6060,20 +6320,47 @@ def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
                     continue
                 val = ust[field_name]
                 if isinstance(val, dict):
+                    is_roblox_nan = (
+                        (val.get("t") == "numeric" and str(val.get("v")).lower() == "nan")
+                        or (str(val.get("v")).lower() == "nan")
+                    )
+                    is_typed_num = "t" in val and "v" in val
+
+                    if is_roblox_nan:
+                        subtype = "roblox_nan_dict"
+                        message = (
+                            f"{unit_key}.{field_name} received Roblox serialized NaN float {json.dumps(val)} "
+                            f"(typed numeric object representing 'nan' from division by zero or uninitialized float). "
+                            f"Passing this dictionary into float() triggers TypeError: float() argument must be a string or a real number, not 'dict'. "
+                            f"The application safely handles this as non-numeric (N/A) without attempting dictionary extraction."
+                        )
+                    elif is_typed_num:
+                        subtype = "typed_numeric_dict"
+                        message = (
+                            f"{unit_key}.{field_name} received typed numeric dictionary {json.dumps(val)}. "
+                            f"Passing this dictionary into float() triggers TypeError. "
+                            f"The application safely handles this as non-numeric (N/A) without attempting dictionary extraction."
+                        )
+                    else:
+                        subtype = "dict"
+                        message = (
+                            f"{unit_key}.{field_name} received a dictionary object {json.dumps(val)} "
+                            f"(keys: {list(val.keys())}) instead of a numeric value. "
+                            f"This caused float({unit_key}.{field_name}) to raise TypeError."
+                        )
+
                     anom = {
                         "timestamp": ts,
                         "unit": unit_key,
                         "field": field_name,
                         "field_desc": field_desc,
                         "type": "dict",
+                        "subtype": subtype,
+                        "is_roblox_nan": is_roblox_nan,
                         "severity": "CRITICAL",
                         "keys": list(val.keys()),
                         "raw_value": val,
-                        "message": (
-                            f"{unit_key}.{field_name} received a dictionary object {json.dumps(val)} "
-                            f"(keys: {list(val.keys())}) instead of a numeric value. "
-                            f"This caused float({unit_key}.{field_name}) to raise TypeError."
-                        )
+                        "message": message
                     }
                     anomalies.append(anom)
                     snap_anomalies.append(anom)
@@ -6112,6 +6399,31 @@ def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
                         snap_anomalies.append(anom)
                         anomalous_snapshots_set.add(ts)
 
+        for rf_name, rf_desc in [("Demand", "Root legacy demand setpoint"), ("Total points/second", "Plant points/sec rate"), ("PlayerCount", "Player count")]:
+            if rf_name in st:
+                rval = st[rf_name]
+                if isinstance(rval, dict):
+                    is_roblox_nan = (
+                        (rval.get("t") == "numeric" and str(rval.get("v")).lower() == "nan")
+                        or (str(rval.get("v")).lower() == "nan")
+                    )
+                    anom = {
+                        "timestamp": ts,
+                        "unit": "Root",
+                        "field": rf_name,
+                        "field_desc": rf_desc,
+                        "type": "dict",
+                        "subtype": "roblox_nan_dict" if is_roblox_nan else "dict",
+                        "is_roblox_nan": is_roblox_nan,
+                        "severity": "CRITICAL",
+                        "keys": list(rval.keys()),
+                        "raw_value": rval,
+                        "message": f"Root.{rf_name} received dictionary object {json.dumps(rval)} instead of a numeric value."
+                    }
+                    anomalies.append(anom)
+                    snap_anomalies.append(anom)
+                    anomalous_snapshots_set.add(ts)
+
         u1_st = st.get("Unit1", {}) if isinstance(st.get("Unit1"), dict) else {}
         u2_st = st.get("Unit2", {}) if isinstance(st.get("Unit2"), dict) else {}
         u1_dem_val = u1_st.get("DemandU1") if "DemandU1" in u1_st else u1_st.get("Demand")
@@ -6121,6 +6433,9 @@ def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
             "timestamp": ts,
             "has_anomaly": len(snap_anomalies) > 0,
             "anomaly_count": len(snap_anomalies),
+            "anomalies": snap_anomalies,
+            "has_dict_demand": any(a["type"] == "dict" and "Demand" in a["field"] for a in snap_anomalies),
+            "is_roblox_nan": any(a.get("is_roblox_nan") for a in snap_anomalies),
             "u1_demand_type": type(u1_dem_val).__name__ if u1_dem_val is not None else "None",
             "u1_demand_val": str(u1_dem_val) if not isinstance(u1_dem_val, (dict, list)) else json.dumps(u1_dem_val),
             "u2_demand_type": type(u2_dem_val).__name__ if u2_dem_val is not None else "None",
@@ -6267,7 +6582,12 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
     analysis = analyze_server_state_anomalies(snapshots)
     persistent_data = load_persistent_servers()
     is_persistent = matched_job_id in persistent_data.get("persistent", {})
-    meta = _sc_server_meta.get(matched_job_id, {})
+    meta = snapshots.get("_meta") or _sc_server_meta.get(matched_job_id, {})
+    if not meta or not meta.get("snapshot_count"):
+        meta = build_server_metadata(matched_job_id, snapshots, existing_meta=meta)
+        _sc_server_meta[matched_job_id] = meta
+
+    clean_snapshots = {k: v for k, v in snapshots.items() if not str(k).startswith('_')}
 
     return {
         "found": True,
@@ -6277,6 +6597,7 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
         "is_live": is_live,
         "is_persistent": is_persistent,
         "meta": meta,
+        "snapshots": clean_snapshots,
         **analysis,
         "matching_errors": matching_errors,
     }
@@ -6320,23 +6641,35 @@ def api_debug_analyze_payload(username):
         return jsonify({"error": f"Invalid JSON body: {e}"}), 400
 
     payload = req_json.get("payload") if isinstance(req_json, dict) and "payload" in req_json else req_json
+    server_raw = None
     if isinstance(payload, dict):
-        if "Unit1" in payload or "Unit2" in payload:
+        if "state" in payload and isinstance(payload["state"], dict):
+            server_raw = payload
+            server_state = dict(payload["state"])
+            hb = payload.get("lastHeartbeat") or datetime.now(timezone.utc).isoformat()
+            snapshots = {hb: server_state}
+            matched_job_id = str(payload.get("jobId") or payload.get("id") or req_json.get("job_id", "Custom Payload"))
+        elif "Unit1" in payload or "Unit2" in payload:
             now_ts = datetime.now(timezone.utc).isoformat()
             snapshots = {now_ts: payload}
+            matched_job_id = str(req_json.get("job_id", "Custom Payload")) if isinstance(req_json, dict) else "Custom Payload"
         else:
             snapshots = payload
+            matched_job_id = str(req_json.get("job_id", "Custom Payload")) if isinstance(req_json, dict) else "Custom Payload"
     else:
         snapshots = {}
+        matched_job_id = "Custom Payload"
 
     analysis = analyze_server_state_anomalies(snapshots)
+    meta = build_server_metadata(matched_job_id, snapshots, server_raw=server_raw)
     return jsonify({
         "found": True,
-        "job_id": req_json.get("job_id", "Custom Payload") if isinstance(req_json, dict) else "Custom Payload",
+        "job_id": matched_job_id,
         "source": "Custom Injected State Payload",
         "is_live": False,
         "is_persistent": False,
-        "meta": {},
+        "meta": meta,
+        "snapshots": {k: v for k, v in snapshots.items() if not str(k).startswith('_')},
         **analysis,
         "matching_errors": []
     })
