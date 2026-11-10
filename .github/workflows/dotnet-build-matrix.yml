@@ -70,6 +70,8 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
             -o publish-standalone/${{ matrix.rid }}
 
           Copy-Item "publish-standalone/${{ matrix.rid }}/RbwrOverlay.exe" "RBWR_APRM_Calculator_${{ matrix.rid }}.exe"
@@ -81,16 +83,19 @@ jobs:
             -r ${{ matrix.rid }} `
             --self-contained true `
             -p:PublishSingleFile=false `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
             -o publish-bundle/${{ matrix.rid }}
 
           $bundleDir = "RBWR_APRM_Calculator_Windows_${{ matrix.rid }}"
           New-Item -ItemType Directory -Path $bundleDir -Force
 
           Copy-Item -Path "publish-bundle/${{ matrix.rid }}/*" -Destination $bundleDir -Recurse
+          Get-ChildItem -Path $bundleDir -Filter "*.pdb" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
           if (Test-Path "icon.ico") { Copy-Item "icon.ico" "$bundleDir/" }
           if (Test-Path "icon.png") { Copy-Item "icon.png" "$bundleDir/" }
 
-          Compress-Archive -Path "$bundleDir" -DestinationPath "${bundleDir}.zip"
+          Compress-Archive -Path "$bundleDir" -DestinationPath "${bundleDir}.zip" -CompressionLevel Optimal
 
       - name: Upload Windows Standalone Executable
         uses: actions/upload-artifact@v4
@@ -130,6 +135,8 @@ jobs:
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
             -o publish-standalone/${{ matrix.rid }}
 
           cp "publish-standalone/${{ matrix.rid }}/RbwrOverlay" "RbwrOverlay_${{ matrix.rid }}"
@@ -143,12 +150,16 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
             -o publish-bundle/${{ matrix.rid }}
 
           BUNDLE_NAME="RBWR_APRM_Calculator_Linux_${{ matrix.rid }}"
           mkdir -p "${BUNDLE_NAME}"
           cp -r publish-bundle/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
           chmod +x "${BUNDLE_NAME}/RbwrOverlay"
+          rm -f "${BUNDLE_NAME}"/*.pdb "${BUNDLE_NAME}"/*.dbg
 
           if [ -f "icon.png" ]; then cp "icon.png" "${BUNDLE_NAME}/"; fi
           if [ -f "icon.ico" ]; then cp "icon.ico" "${BUNDLE_NAME}/"; fi
@@ -174,8 +185,8 @@ jobs:
           EOF
           chmod +x "${BUNDLE_NAME}/rbwr-overlay.desktop"
 
-          tar -czvf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
-          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
+          GZIP=-9 tar -czf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
+          zip -9 -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
 
       - name: Upload Linux Package (tar.gz)
         uses: actions/upload-artifact@v4
@@ -205,6 +216,7 @@ jobs:
 
           cp -r publish-bundle/linux-x64/* "${APPDIR}/usr/bin/"
           chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
+          rm -f "${APPDIR}/usr/bin"/*.pdb "${APPDIR}/usr/bin"/*.dbg
 
           APP_VER="2.1.1"
           if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
@@ -298,6 +310,9 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
             -o publish/${{ matrix.rid }}
 
       - name: Build macOS Application Bundle (.app)
@@ -309,6 +324,7 @@ jobs:
 
           cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/"
           chmod +x "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrOverlay"
+          rm -f "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS"/*.pdb
 
           if [ -f "icon.icns" ]; then
             cp icon.icns "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.icns"

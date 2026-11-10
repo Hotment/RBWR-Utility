@@ -57,7 +57,7 @@ set "NUMERIC_VER=!P1!.!P2!.!P3!.!P4!"
 echo [INFO] Detected Application Version: !APP_VER! (PE File Version: !NUMERIC_VER!)
 echo [INFO] Executable Details: RBWR APRM Calculator by Hotment
 
-set BUILD_METADATA=-p:Version="!APP_VER!" -p:InformationalVersion="!APP_VER!" -p:AssemblyVersion="!NUMERIC_VER!" -p:FileVersion="!NUMERIC_VER!" -p:Product="RBWR APRM Calculator" -p:AssemblyTitle="RBWR APRM Calculator" -p:Title="RBWR APRM Calculator" -p:Description="Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator Overlay" -p:Company="Hotment" -p:Authors="Hotment" -p:Copyright="Copyright (C) 2026 Hotment" -p:IncludeSourceRevisionInInformationalVersion=false
+set BUILD_METADATA=-p:Version="!APP_VER!" -p:InformationalVersion="!APP_VER!" -p:AssemblyVersion="!NUMERIC_VER!" -p:FileVersion="!NUMERIC_VER!" -p:Product="RBWR APRM Calculator" -p:AssemblyTitle="RBWR APRM Calculator" -p:Title="RBWR APRM Calculator" -p:Description="Realistic Boiling Water Reactor Transparent APRM & Thermal Calculator Overlay" -p:Company="Hotment" -p:Authors="Hotment" -p:Copyright="Copyright (C) 2026 Hotment" -p:IncludeSourceRevisionInInformationalVersion=false -p:DebugType=none -p:DebugSymbols=false
 
 if not exist "publish" mkdir "publish"
 if not exist "publish\releases" mkdir "publish\releases"
@@ -195,7 +195,7 @@ if exist "publish\win-x64-standalone\RbwrOverlay.exe" (
 )
 if exist "icon.ico" copy /y "icon.ico" "publish\win-x64-standalone\icon.ico" >nul
 
-powershell -NoProfile -Command "Compress-Archive -Path 'publish/win-x64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Windows_x64.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path 'publish/win-x64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Windows_x64.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] Windows x64 Standalone published:
 echo      - Executable: publish\releases\RBWR_APRM_Calculator_win-x64.exe (Double-click to run)
@@ -225,7 +225,7 @@ if exist "publish\win-arm64-standalone\RbwrOverlay.exe" (
 )
 if exist "icon.ico" copy /y "icon.ico" "publish\win-arm64-standalone\icon.ico" >nul
 
-powershell -NoProfile -Command "Compress-Archive -Path 'publish/win-arm64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Windows_ARM64.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path 'publish/win-arm64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Windows_ARM64.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] Windows ARM64 Standalone published:
 echo      - Executable: publish\releases\RBWR_APRM_Calculator_win-arm64.exe
@@ -260,7 +260,7 @@ echo Building: Linux x64 Standalone
 echo ==================================================
 if not exist "publish\linux-x64-standalone" mkdir "publish\linux-x64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\linux-x64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\linux-x64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Linux x64 standalone build failed.
@@ -298,7 +298,7 @@ where tar >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     tar -czf "publish\releases\RBWR_APRM_Calculator_Linux_x64.tar.gz" -C "publish" "linux-x64-standalone" >nul 2>&1
 )
-powershell -NoProfile -Command "Compress-Archive -Path 'publish/linux-x64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Linux_x64.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path 'publish/linux-x64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Linux_x64.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] Linux x64 Standalone published:
 echo      - Binary: ./RbwrOverlay (or run ./run.sh)
@@ -313,7 +313,7 @@ echo Building: Linux ARM64 Standalone (Raspberry Pi 4/5)
 echo ==================================================
 if not exist "publish\linux-arm64-standalone" mkdir "publish\linux-arm64-standalone"
 
-dotnet publish "%PROJECT_PATH%" -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\linux-arm64-standalone"
+dotnet publish "%PROJECT_PATH%" -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\linux-arm64-standalone"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Linux ARM64 standalone build failed.
@@ -350,7 +350,7 @@ where tar >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     tar -czf "publish\releases\RBWR_APRM_Calculator_Linux_ARM64.tar.gz" -C "publish" "linux-arm64-standalone" >nul 2>&1
 )
-powershell -NoProfile -Command "Compress-Archive -Path 'publish/linux-arm64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Linux_ARM64.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path 'publish/linux-arm64-standalone/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_Linux_ARM64.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] Linux ARM64 Standalone published:
 echo      - Archives: publish\releases\RBWR_APRM_Calculator_Linux_ARM64.tar.gz (.zip)
@@ -424,7 +424,7 @@ if exist "!MAC_DIR!" rmdir /s /q "!MAC_DIR!" >nul 2>&1
 mkdir "!APP_DIR!\Contents\MacOS" >nul 2>&1
 mkdir "!APP_DIR!\Contents\Resources" >nul 2>&1
 
-dotnet publish "%PROJECT_PATH%" -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\osx-arm64-tmp"
+dotnet publish "%PROJECT_PATH%" -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\osx-arm64-tmp"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] macOS ARM64 build failed.
@@ -471,7 +471,7 @@ if exist "icon.png" copy /y "icon.png" "!APP_DIR!\Contents\Resources\icon.png" >
 >> "!MAC_DIR!\run.command" echo chmod +x "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" 2^>/dev/null
 >> "!MAC_DIR!\run.command" echo exec "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" "$@"
 
-powershell -NoProfile -Command "Compress-Archive -Path '!MAC_DIR!/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_macOS_AppleSilicon.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path '!MAC_DIR!/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_macOS_AppleSilicon.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] macOS Apple Silicon (ARM64) published:
 echo      - Double-click App: 'RBWR APRM Calculator.app'
@@ -490,7 +490,7 @@ if exist "!MAC_DIR!" rmdir /s /q "!MAC_DIR!" >nul 2>&1
 mkdir "!APP_DIR!\Contents\MacOS" >nul 2>&1
 mkdir "!APP_DIR!\Contents\Resources" >nul 2>&1
 
-dotnet publish "%PROJECT_PATH%" -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true %BUILD_METADATA% -o "publish\osx-x64-tmp"
+dotnet publish "%PROJECT_PATH%" -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false -p:EnableCompressionInSingleFile=true %BUILD_METADATA% -o "publish\osx-x64-tmp"
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] macOS Intel x64 build failed.
@@ -537,7 +537,7 @@ if exist "icon.png" copy /y "icon.png" "!APP_DIR!\Contents\Resources\icon.png" >
 >> "!MAC_DIR!\run.command" echo chmod +x "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" 2^>/dev/null
 >> "!MAC_DIR!\run.command" echo exec "${DIR}/RBWR APRM Calculator.app/Contents/MacOS/RbwrOverlay" "$@"
 
-powershell -NoProfile -Command "Compress-Archive -Path '!MAC_DIR!/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_macOS_Intel.zip' -Force" >nul 2>&1
+powershell -NoProfile -Command "Compress-Archive -Path '!MAC_DIR!/*' -DestinationPath 'publish/releases/RBWR_APRM_Calculator_macOS_Intel.zip' -CompressionLevel Optimal -Force" >nul 2>&1
 
 echo [OK] macOS Intel (x64) published:
 echo      - Double-click App: 'RBWR APRM Calculator.app'

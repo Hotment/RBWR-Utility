@@ -11,6 +11,7 @@ mkdir -p "${APPDIR}/usr/lib"
 
 cp -r publish/linux-x64-standalone/* "${APPDIR}/usr/bin/"
 chmod +x "${APPDIR}/usr/bin/RbwrOverlay"
+rm -f "${APPDIR}/usr/bin"/*.pdb "${APPDIR}/usr/bin"/*.dbg
 
 APP_VER="2.1.1"
 if [ -f "RbwrOverlay/RbwrOverlay.UI/ViewModels/MainOverlayViewModel.cs" ]; then
