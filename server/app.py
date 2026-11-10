@@ -4461,11 +4461,11 @@ def lookup_server_api():
         "card_html": card_html
     })
 
-@app.route("/api/servers/<job_id>/score_breakdown", methods=["GET"])
-def server_score_breakdown_api(job_id):
-    query = (job_id or "").strip()
+def resolve_server_snapshots(query: str):
+    """Resolves server snapshots and canonical Job ID across live cache, servers.json, and archives."""
+    query = (query or "").strip()
     if not query:
-        return jsonify({"success": False, "error": "Job ID is required"}), 400
+        return None, None
 
     servers_data = get_sc_data("servers.json") or {}
     snapshots = servers_data.get(query)
@@ -4492,6 +4492,15 @@ def server_score_breakdown_api(job_id):
             matched_job_id = archived_jid
             snapshots = archived_snaps
 
+    return matched_job_id, snapshots
+
+@app.route("/api/servers/<job_id>/score_breakdown", methods=["GET"])
+def server_score_breakdown_api(job_id):
+    query = (job_id or "").strip()
+    if not query:
+        return jsonify({"success": False, "error": "Job ID is required"}), 400
+
+    matched_job_id, snapshots = resolve_server_snapshots(query)
     if not snapshots:
         return jsonify({"success": False, "error": f"Server '{query}' not found"}), 404
 
@@ -4506,6 +4515,25 @@ def server_score_breakdown_api(job_id):
         "job_id": matched_job_id,
         "score": score,
         "breakdown": breakdown
+    })
+
+@app.route("/api/servers/<job_id>/snapshots", methods=["GET"])
+@app.route("/api/servers/snapshots", methods=["GET"])
+def server_snapshots_api(job_id=None):
+    query = (job_id or request.args.get("jobId") or request.args.get("q") or request.args.get("id") or "").strip()
+    if not query:
+        return jsonify({"success": False, "error": "Server Job ID or query parameter 'q' is required."}), 400
+
+    matched_job_id, snapshots = resolve_server_snapshots(query)
+    if not snapshots or not matched_job_id:
+        return jsonify({"success": False, "error": f"Server '{query}' not found."}), 404
+
+    clean_snapshots = {k: v for k, v in safe_dict_items(snapshots) if not str(k).startswith('_')}
+    return jsonify({
+        "success": True,
+        "job_id": matched_job_id,
+        "snapshot_count": len(clean_snapshots),
+        "snapshots": clean_snapshots
     })
 
 def get_historical_cards_base(servers_data, persistent_ids):
