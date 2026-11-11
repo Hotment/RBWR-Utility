@@ -4501,7 +4501,7 @@ def server_score_breakdown_api(job_id):
         return jsonify({"success": False, "error": "Job ID is required"}), 400
 
     matched_job_id, snapshots = resolve_server_snapshots(query)
-    if not snapshots:
+    if not snapshots or not matched_job_id:
         return jsonify({"success": False, "error": f"Server '{query}' not found"}), 404
 
     now_utc = datetime.now(timezone.utc)
