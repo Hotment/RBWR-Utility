@@ -16,6 +16,24 @@ try:
 except ImportError:
     pass
 
+try:
+    from server.scoring import calculate_server_top_score
+except ImportError:
+    from scoring import calculate_server_top_score
+
+try:
+    from server.fuel import (
+        calculate_u1_fuel_level,
+        calculate_u2_fuel_level,
+        evaluate_server_fuel,
+    )
+except ImportError:
+    from fuel import (
+        calculate_u1_fuel_level,
+        calculate_u2_fuel_level,
+        evaluate_server_fuel,
+    )
+
 def _json_dumps(obj):
     if orjson:
         try:
@@ -1762,6 +1780,7 @@ SERVER_CHECKER_FIELD_PRECISION = {
     "PradDoSieci": 0,
     "Output (MW)": 0,
     "Reactor Temp": 4,
+    "EstimatedFuel": 2,
 }
 
 PERSISTENT_SERVERS_FILE = os.path.join(DATA_DIR, "persistent_servers.json")
@@ -2019,10 +2038,25 @@ def ensure_unit_output_mw(unit_dict):
                 unit_dict["Output (MW)"] = val
     return unit_dict
 
+def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
+    if not isinstance(unit_dict, dict):
+        return unit_dict
+    if unit_dict.get("EstimatedFuel") is None:
+        try:
+            clean_u = "Unit2" if "2" in str(unit_name) else "Unit1"
+            if clean_u == "Unit2":
+                fuel_val = calculate_u2_fuel_level(unit_dict)
+            else:
+                fuel_val = calculate_u1_fuel_level(unit_dict)
+            unit_dict["EstimatedFuel"] = fuel_val
+        except Exception:
+            pass
+    return unit_dict
+
 def normalize_snapshots_power(data):
     """
     Walks a servers dictionary {job_id: {timestamp: state}} and ensures
-    both Unit 1 and Unit 2 have 'Output (MW)' populated.
+    both Unit 1 and Unit 2 have 'Output (MW)' and 'EstimatedFuel' populated.
     """
     if not isinstance(data, dict):
         return data
@@ -2032,8 +2066,10 @@ def normalize_snapshots_power(data):
                 if isinstance(state, dict):
                     if isinstance(state.get("Unit2"), dict):
                         ensure_unit_output_mw(state["Unit2"])
+                        ensure_unit_fuel_level("Unit2", state["Unit2"])
                     if isinstance(state.get("Unit1"), dict):
                         ensure_unit_output_mw(state["Unit1"])
+                        ensure_unit_fuel_level("Unit1", state["Unit1"])
     return data
 
 def get_sc_data(filename: str, max_retries: int = 8):
@@ -3145,8 +3181,10 @@ def pull_server_checker_data():
             if isinstance(st, dict):
                 if isinstance(st.get('Unit2'), dict):
                     ensure_unit_output_mw(st['Unit2'])
+                    ensure_unit_fuel_level('Unit2', st['Unit2'])
                 if isinstance(st.get('Unit1'), dict):
                     ensure_unit_output_mw(st['Unit1'])
+                    ensure_unit_fuel_level('Unit1', st['Unit1'])
 
         persistent_data = load_persistent_servers()
         persistent_ids = set(persistent_data.get("persistent", {}).keys())
@@ -3249,6 +3287,7 @@ def pull_server_checker_data():
                         else:
                             unit_dict[k] = v
                     ensure_unit_output_mw(unit_dict)
+                    ensure_unit_fuel_level(unit, unit_dict)
                     state[unit] = unit_dict
                 else:
                     state[unit] = {}
@@ -3596,12 +3635,6 @@ def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, late
         "points_rate": points_rate,
         "points_rate_str": points_rate_str,
     }
-
-try:
-    from server.scoring import calculate_server_top_score, extract_snap_pps
-except ImportError:
-    from scoring import calculate_server_top_score, extract_snap_pps
-
 
 def get_active_cards_base(servers_data, persistent_ids):
     global _sc_active_cards_base, _sc_active_cards_key
@@ -4536,6 +4569,25 @@ def server_snapshots_api(job_id=None):
         "snapshots": clean_snapshots
     })
 
+@app.route("/api/servers/<job_id>/fuel", methods=["GET"])
+@app.route("/api/servers/fuel", methods=["GET"])
+def server_fuel_api(job_id=None):
+    query = (job_id or request.args.get("jobId") or request.args.get("q") or request.args.get("id") or "").strip()
+    if not query:
+        return jsonify({"success": False, "error": "Server Job ID or query parameter 'q' is required."}), 400
+
+    matched_job_id, snapshots = resolve_server_snapshots(query)
+    if not snapshots or not matched_job_id:
+        return jsonify({"success": False, "error": f"Server '{query}' not found."}), 404
+
+    clean_snapshots = {k: v for k, v in safe_dict_items(snapshots) if not str(k).startswith('_')}
+    fuel_eval = evaluate_server_fuel(clean_snapshots)
+    return jsonify({
+        "success": True,
+        "job_id": matched_job_id,
+        **fuel_eval.to_dict()
+    })
+
 def get_historical_cards_base(servers_data, persistent_ids):
     global _sc_historical_cards_base, _sc_historical_cards_key
     cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
@@ -4923,8 +4975,10 @@ def get_public_servers_payload(public_only=False):
             if isinstance(st, dict):
                 if isinstance(st.get("Unit2"), dict):
                     ensure_unit_output_mw(st["Unit2"])
+                    ensure_unit_fuel_level("Unit2", st["Unit2"])
                 if isinstance(st.get("Unit1"), dict):
                     ensure_unit_output_mw(st["Unit1"])
+                    ensure_unit_fuel_level("Unit1", st["Unit1"])
             if public_only and is_priv:
                 continue
             enriched.append(s_copy)

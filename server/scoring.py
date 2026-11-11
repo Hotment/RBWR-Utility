@@ -9,6 +9,14 @@ Outputs a Top Score between 0.0 and 100.0 with optional detailed breakdown.
 import math
 from datetime import datetime, timezone
 
+try:
+    from server.fuel import get_refuel_info_by_epoch
+except ImportError:
+    try:
+        from fuel import get_refuel_info_by_epoch
+    except ImportError:
+        get_refuel_info_by_epoch = None
+
 __all__ = [
     "calculate_server_top_score",
     "get_unit_output_mw",
@@ -167,81 +175,10 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
     parsed_snaps.sort(key=lambda x: x[0])
     latest_epoch = parsed_snaps[-1][0]
 
-    u2_refuel_start_epoch = None
-    u2_had_qualifying_event = False
-    u2_had_prior_downtime = False
-    u2_is_currently_refueling = False
-    prev_d2_pre = None
-    last_d2_change_pre = None
-
-    refuel_info_by_epoch = {}
-
-    for epoch, ts, state in parsed_snaps:
-        u1_st = state.get("Unit1", {}) if isinstance(state.get("Unit1"), dict) else {}
-        u2_st = state.get("Unit2", {}) if isinstance(state.get("Unit2"), dict) else {}
-
-        aprm2_val = _safe_float(u2_st.get("APRM"), 0.0)
-        out2_val = get_unit_output_mw(u2_st)
-        d2_val = u2_st.get("DemandU2") if u2_st.get("DemandU2") is not None else u2_st.get("Demand")
-        offsite2_val = u2_st.get("Offsite Power")
-        rod2_val = u2_st.get("Avg. Rod")
-        press2_val = u2_st.get("Pressure")
-
-        if prev_d2_pre is not None and d2_val != prev_d2_pre:
-            last_d2_change_pre = epoch
-        prev_d2_pre = d2_val
-        in_grace_2_pre = (last_d2_change_pre is not None and (epoch - last_d2_change_pre) <= 60.0)
-
-        is_loop_2_pre = (offsite2_val is False) or (d2_val == -2)
-        has_demand_2_pre = (d2_val is not None and isinstance(d2_val, (int, float)) and d2_val > 0)
-
-        is_u2_generating = (aprm2_val >= 5.0 and out2_val > 0)
-        if is_u2_generating:
-            u2_had_qualifying_event = False
-            u2_had_prior_downtime = False
-            u2_is_currently_refueling = False
-            u2_refuel_start_epoch = None
-
-        if not u2_is_currently_refueling:
-            if has_demand_2_pre and not is_loop_2_pre and not in_grace_2_pre and (aprm2_val < 5.0 or out2_val <= 0.0):
-                u2_had_prior_downtime = True
-                u2_had_qualifying_event = False
-                u2_refuel_start_epoch = None
-
-        is_event = (d2_val in (-1, -2, -3, -4)) or (offsite2_val is False)
-        if is_event and not u2_had_prior_downtime:
-            u2_had_qualifying_event = True
-            if u2_refuel_start_epoch is None:
-                u2_refuel_start_epoch = epoch
-
-        rod_inserted = True
-        if rod2_val is not None:
-            try:
-                rod_inserted = (float(rod2_val) <= 1.0)
-            except (ValueError, TypeError):
-                pass
-
-        depressurized = True
-        if press2_val is not None:
-            try:
-                depressurized = (float(press2_val) <= 15.0)
-            except (ValueError, TypeError):
-                pass
-
-        is_cold_offline = (aprm2_val < 5.0 and out2_val <= 0.0 and rod_inserted and depressurized)
-
-        if is_cold_offline and u2_had_qualifying_event and not u2_had_prior_downtime:
-            if u2_refuel_start_epoch is None:
-                u2_refuel_start_epoch = epoch
-            elapsed_min = max(0.0, (epoch - u2_refuel_start_epoch) / 60.0)
-            refuel_info_by_epoch[epoch] = (True, elapsed_min)
-            u2_is_currently_refueling = True
-        else:
-            if not is_cold_offline:
-                u2_refuel_start_epoch = None
-                u2_had_qualifying_event = False
-            u2_is_currently_refueling = False
-            refuel_info_by_epoch[epoch] = (False, 0.0)
+    if get_refuel_info_by_epoch is not None:
+        refuel_info_by_epoch = get_refuel_info_by_epoch(parsed_snaps, "Unit2")
+    else:
+        refuel_info_by_epoch = {}
 
     eval_snaps = [s for s in parsed_snaps if (latest_epoch - s[0]) <= 3600]
     if not eval_snaps:
