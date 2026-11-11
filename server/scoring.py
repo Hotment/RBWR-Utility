@@ -710,6 +710,7 @@ def calculate_server_top_score(snapshots, now_utc=None, return_breakdown=False):
             "refuel_minutes_latest": round(u2_refuel_min_latest, 1) if u2_refuel_min_latest is not None else None,
             "avg_refuel_score": round(u2_refuel_score_sum / u2_refuel_count, 1) if u2_refuel_count > 0 else None,
             "pred_points_lost_latest": u2_refuel_pts_lost_latest,
+            "refuel_note": "Core reactivity (how rods, recirc, and fuel affect APRM) changes by reactor model. Refueling estimation is calibrated for classic mode." if u2_refuel_count > 0 else None,
             "avg_turbine_health": round(u2_turb_sum / u2_turb_count, 1) if u2_turb_count > 0 else None,
             "avg_points_per_sec": round(u2_pps_sum / u2_pps_count, 1) if u2_pps_count > 0 else 0.0,
             "scram_reasons": list(set(u2_scram_reasons)),

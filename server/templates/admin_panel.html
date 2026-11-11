@@ -3865,10 +3865,12 @@
 
             const formatFuelBadge = (u) => {
                 if (!u) return { text: '--', color: 'text-slate-500', metric: '' };
-                const fuelVal = (u.median_fuel !== undefined && u.median_fuel !== null) ? Number(u.median_fuel)
+                const fuelVal = (u.kalman_fuel !== undefined && u.kalman_fuel !== null) ? Number(u.kalman_fuel)
                     : ((u.estimated_fuel !== undefined && u.estimated_fuel !== null) ? Number(u.estimated_fuel)
+                    : ((u.projected_fuel !== undefined && u.projected_fuel !== null) ? Number(u.projected_fuel)
                     : ((u.weighted_fuel !== undefined && u.weighted_fuel !== null) ? Number(u.weighted_fuel)
-                    : ((u.mean_fuel !== undefined && u.mean_fuel !== null) ? Number(u.mean_fuel) : null)));
+                    : ((u.median_fuel !== undefined && u.median_fuel !== null) ? Number(u.median_fuel)
+                    : ((u.mean_fuel !== undefined && u.mean_fuel !== null) ? Number(u.mean_fuel) : null)))));
                 if (fuelVal === null || isNaN(fuelVal)) {
                     return { text: '--', color: 'text-slate-500', metric: '' };
                 }
@@ -3877,7 +3879,9 @@
                     return { text: 'N/A', color: 'text-slate-500', metric: '' };
                 }
                 const formatted = `~${num.toFixed(1)}%`;
-                const metricLabel = u.median_fuel ? 'median' : (u.weighted_fuel ? 'weighted' : (u.mean_fuel ? 'mean' : ''));
+                const metricLabel = (u.kalman_fuel !== undefined && u.kalman_fuel !== null) ? 'kalman'
+                    : (u.estimated_fuel !== undefined && u.estimated_fuel !== null ? 'est'
+                    : (u.projected_fuel ? 'projected' : (u.weighted_fuel ? 'weighted' : (u.median_fuel ? 'median' : (u.mean_fuel ? 'mean' : '')))));
                 if (num >= 85) {
                     return { text: formatted, color: 'text-emerald-400', metric: metricLabel };
                 } else if (num >= 67) {
@@ -3890,8 +3894,13 @@
             const buildFuelTooltip = (u) => {
                 if (!u) return 'Fuel estimation';
                 const parts = [];
-                if (u.median_fuel) parts.push(`Moving Median: ~${Number(u.median_fuel).toFixed(1)}%`);
+                if (u.kalman_fuel !== undefined && u.kalman_fuel !== null) {
+                    const unc = (u.uncertainty !== undefined && u.uncertainty !== null) ? ` (+/-${Number(u.uncertainty).toFixed(1)}%)` : '';
+                    parts.push(`Kalman State: ~${Number(u.kalman_fuel).toFixed(1)}%${unc}`);
+                }
+                if (u.projected_fuel) parts.push(`Projected Burnup: ~${Number(u.projected_fuel).toFixed(1)}%`);
                 if (u.weighted_fuel) parts.push(`Recency-Weighted: ~${Number(u.weighted_fuel).toFixed(1)}%`);
+                if (u.median_fuel) parts.push(`Moving Median: ~${Number(u.median_fuel).toFixed(1)}%`);
                 if (u.mean_fuel) parts.push(`Arithmetic Mean: ~${Number(u.mean_fuel).toFixed(1)}%`);
                 if (u.instantaneous_fuel) parts.push(`Latest Instantaneous: ~${Number(u.instantaneous_fuel).toFixed(1)}%`);
                 return parts.length > 0 ? parts.join(' | ') : 'Fuel estimation';
@@ -5287,8 +5296,9 @@
             setField('debug-snap-u1-aprm', u1.APRM, '%');
             setField('debug-snap-u1-temp', u1['Reactor Temp'], ' °C');
             setField('debug-snap-u1-pps', u1.PointsPerSecond, ' pts/s');
-            const u1FuelVal = (data.fuel_assessment && data.fuel_assessment.unit1 && data.fuel_assessment.unit1.median_fuel)
-                ? data.fuel_assessment.unit1.median_fuel
+            const u1Fa = data.fuel_assessment && data.fuel_assessment.unit1 ? data.fuel_assessment.unit1 : null;
+            const u1FuelVal = u1Fa
+                ? (u1Fa.kalman_fuel ?? u1Fa.projected_fuel ?? u1Fa.weighted_fuel ?? u1Fa.median_fuel ?? u1.EstimatedFuel ?? null)
                 : (u1.EstimatedFuel !== undefined ? u1.EstimatedFuel : null);
             setField('debug-snap-u1-fuel', u1FuelVal !== undefined && u1FuelVal !== null && u1FuelVal > 0 ? Math.min(100.0, Number(u1FuelVal)).toFixed(1) : null, '%');
 
@@ -5298,8 +5308,9 @@
             setField('debug-snap-u2-aprm', u2.APRM, '%');
             setField('debug-snap-u2-temp', u2['Reactor Temp'], ' °C');
             setField('debug-snap-u2-pps', u2.PointsPerSecond, ' pts/s');
-            const u2FuelVal = (data.fuel_assessment && data.fuel_assessment.unit2 && data.fuel_assessment.unit2.median_fuel)
-                ? data.fuel_assessment.unit2.median_fuel
+            const u2Fa = data.fuel_assessment && data.fuel_assessment.unit2 ? data.fuel_assessment.unit2 : null;
+            const u2FuelVal = u2Fa
+                ? (u2Fa.kalman_fuel ?? u2Fa.projected_fuel ?? u2Fa.weighted_fuel ?? u2Fa.median_fuel ?? u2.EstimatedFuel ?? null)
                 : (u2.EstimatedFuel !== undefined ? u2.EstimatedFuel : null);
             setField('debug-snap-u2-fuel', u2FuelVal !== undefined && u2FuelVal !== null && u2FuelVal > 0 ? Math.min(100.0, Number(u2FuelVal)).toFixed(1) : null, '%');
 

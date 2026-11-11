@@ -27,6 +27,7 @@ try:
         calculate_u2_fuel_level,
         evaluate_server_fuel,
         approximate_fuel_from_snapshots,
+        resolve_unit_name,
     )
 except ImportError:
     from fuel import (
@@ -34,6 +35,7 @@ except ImportError:
         calculate_u2_fuel_level,
         evaluate_server_fuel,
         approximate_fuel_from_snapshots,
+        resolve_unit_name,
     )
 
 def _json_dumps(obj):
@@ -2046,7 +2048,7 @@ def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
     raw_val = unit_dict.get("EstimatedFuel")
     if raw_val is None:
         try:
-            clean_u = "Unit2" if "2" in str(unit_name) else "Unit1"
+            clean_u = resolve_unit_name(unit_name) if "resolve_unit_name" in globals() else ("Unit2" if "2" in str(unit_name) else "Unit1")
             if clean_u == "Unit2":
                 fuel_val = calculate_u2_fuel_level(unit_dict)
             else:
@@ -2066,14 +2068,21 @@ def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
     return unit_dict
 
 def get_card_unit_fuel_stats(snapshots: Any, unit_name: str, unit_dict: Any) -> Dict[str, Optional[float]]:
+    kalman_val = None
+    projected_val = None
     median_val = None
     weighted_val = None
     mean_val = None
     instant_val = None
+    uncertainty_val = None
 
     if isinstance(snapshots, dict) and snapshots:
         try:
             assessment = approximate_fuel_from_snapshots(snapshots, unit_name)
+            if assessment.kalman_fuel is not None and assessment.kalman_fuel > 0.0:
+                kalman_val = round(min(100.0, max(0.0, float(assessment.kalman_fuel))), 1)
+            if assessment.projected_fuel is not None and assessment.projected_fuel > 0.0:
+                projected_val = round(min(100.0, max(0.0, float(assessment.projected_fuel))), 1)
             if assessment.median_fuel is not None and assessment.median_fuel > 0.0:
                 median_val = round(min(100.0, max(0.0, float(assessment.median_fuel))), 1)
             if assessment.weighted_fuel is not None and assessment.weighted_fuel > 0.0:
@@ -2082,6 +2091,7 @@ def get_card_unit_fuel_stats(snapshots: Any, unit_name: str, unit_dict: Any) -> 
                 mean_val = round(min(100.0, max(0.0, float(assessment.mean_fuel))), 1)
             if assessment.latest_instantaneous and assessment.latest_instantaneous > 0.0:
                 instant_val = round(min(100.0, max(0.0, float(assessment.latest_instantaneous))), 1)
+            uncertainty_val = assessment.uncertainty
         except Exception:
             pass
 
@@ -2096,14 +2106,21 @@ def get_card_unit_fuel_stats(snapshots: Any, unit_name: str, unit_dict: Any) -> 
             except (ValueError, TypeError):
                 pass
 
-    primary_fuel = median_val if median_val is not None else (
-        weighted_val if weighted_val is not None else (
-            mean_val if mean_val is not None else instant_val
+    primary_fuel = kalman_val if kalman_val is not None else (
+        projected_val if projected_val is not None else (
+            median_val if median_val is not None else (
+                weighted_val if weighted_val is not None else (
+                    mean_val if mean_val is not None else instant_val
+                )
+            )
         )
     )
 
     return {
         "estimated_fuel": primary_fuel,
+        "kalman_fuel": kalman_val,
+        "uncertainty": uncertainty_val,
+        "projected_fuel": projected_val,
         "median_fuel": median_val,
         "weighted_fuel": weighted_val,
         "mean_fuel": mean_val,
@@ -3778,6 +3795,9 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
                 "estimated_fuel": u1_stats["estimated_fuel"],
+                "kalman_fuel": u1_stats["kalman_fuel"],
+                "projected_fuel": u1_stats["projected_fuel"],
+                "uncertainty": u1_stats["uncertainty"],
                 "median_fuel": u1_stats["median_fuel"],
                 "weighted_fuel": u1_stats["weighted_fuel"],
                 "mean_fuel": u1_stats["mean_fuel"],
@@ -3792,6 +3812,9 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
                 "estimated_fuel": u2_stats["estimated_fuel"],
+                "kalman_fuel": u2_stats["kalman_fuel"],
+                "projected_fuel": u2_stats["projected_fuel"],
+                "uncertainty": u2_stats["uncertainty"],
                 "median_fuel": u2_stats["median_fuel"],
                 "weighted_fuel": u2_stats["weighted_fuel"],
                 "mean_fuel": u2_stats["mean_fuel"],
@@ -3912,6 +3935,9 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
                 "estimated_fuel": u1_stats["estimated_fuel"],
+                "kalman_fuel": u1_stats["kalman_fuel"],
+                "projected_fuel": u1_stats["projected_fuel"],
+                "uncertainty": u1_stats["uncertainty"],
                 "median_fuel": u1_stats["median_fuel"],
                 "weighted_fuel": u1_stats["weighted_fuel"],
                 "mean_fuel": u1_stats["mean_fuel"],
@@ -3926,6 +3952,9 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
                 "estimated_fuel": u2_stats["estimated_fuel"],
+                "kalman_fuel": u2_stats["kalman_fuel"],
+                "projected_fuel": u2_stats["projected_fuel"],
+                "uncertainty": u2_stats["uncertainty"],
                 "median_fuel": u2_stats["median_fuel"],
                 "weighted_fuel": u2_stats["weighted_fuel"],
                 "mean_fuel": u2_stats["mean_fuel"],
@@ -4746,6 +4775,9 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
                 "estimated_fuel": u1_stats["estimated_fuel"],
+                "kalman_fuel": u1_stats["kalman_fuel"],
+                "projected_fuel": u1_stats["projected_fuel"],
+                "uncertainty": u1_stats["uncertainty"],
                 "median_fuel": u1_stats["median_fuel"],
                 "weighted_fuel": u1_stats["weighted_fuel"],
                 "mean_fuel": u1_stats["mean_fuel"],
@@ -4760,6 +4792,9 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
                 "estimated_fuel": u2_stats["estimated_fuel"],
+                "kalman_fuel": u2_stats["kalman_fuel"],
+                "projected_fuel": u2_stats["projected_fuel"],
+                "uncertainty": u2_stats["uncertainty"],
                 "median_fuel": u2_stats["median_fuel"],
                 "weighted_fuel": u2_stats["weighted_fuel"],
                 "mean_fuel": u2_stats["mean_fuel"],

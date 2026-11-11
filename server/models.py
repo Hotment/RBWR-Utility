@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Tuple
 
 
 class DictLikeModel:
@@ -33,6 +33,24 @@ class DictLikeModel:
             else:
                 result[k] = v
         return result
+
+
+@dataclass(frozen=True)
+class UnitConfig:
+    """Configuration parameters and physical coefficients for a reactor unit."""
+    name: str
+    calibration: float
+    void_coeff: float
+    downtime_min: float
+    downtime_max: Optional[float]
+    post_fuel_min: float
+    rod_alpha: float = 0.55
+    recirc_coeff: float = 0.25
+    pressure_coeff: float = 0.25
+    natural_flow_fraction: float = 0.25
+    nominal_pressure_kpa: float = 7000.0
+    expected_refuel_fuel: float = 97.0
+    default_burn_rate_per_efph: float = 2.40
 
 
 @dataclass
@@ -93,18 +111,25 @@ class UnitFuelAssessment(DictLikeModel):
     total_snapshots: int = 0
     steady_samples: int = 0
     latest_instantaneous: Optional[float] = None
+    projected_fuel: Optional[float] = None
+    kalman_fuel: Optional[float] = None
+    uncertainty: Optional[float] = None
+    confidence_interval: Optional[Tuple[float, float]] = None
     median_fuel: Optional[float] = None
     mean_fuel: Optional[float] = None
     weighted_fuel: Optional[float] = None
     std_dev: Optional[float] = None
+    residual_std: Optional[float] = None
     confidence: str = ""
     burn_rate_pct_hr: Optional[float] = None
+    burn_rate_efph: Optional[float] = None
     time_span_minutes: Optional[float] = None
     latest_timestamp: Optional[str] = None
     latest_aprm: Optional[float] = None
     latest_rods: Optional[float] = None
     refuel_detected: bool = False
     refuel_info: Optional[ConfirmedRefuel] = None
+    mode: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -131,6 +156,16 @@ class ServerFuelAssessment(DictLikeModel):
             d["job_id"] = self.job_id
         return d
 
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    if val is None or isinstance(val, (dict, list, tuple, set, bool)):
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 @dataclass
 class UnitState(DictLikeModel):
     """
@@ -151,6 +186,7 @@ class UnitState(DictLikeModel):
     offsite_power: bool = True
     demand: Optional[float] = None
     points_per_second: float = 0.0
+    mode: Optional[str] = None
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -159,15 +195,16 @@ class UnitState(DictLikeModel):
         if not isinstance(data, dict):
             return cls()
 
-        aprm = float(data.get("APRM", 0.0) or 0.0)
-        rods = float(data.get("Avg. Rod", 0.0) or 0.0)
-        recirc1 = float(data.get("Recirc1", 0.0) or 0.0)
-        recirc2 = float(data.get("Recirc2", 0.0) or 0.0)
-        recirc = (recirc1 + recirc2) / 2.0 if (recirc1 or recirc2) else float(data.get("Recirc", 0.0) or 0.0)
-        temp = float(data.get("Reactor Temp") or data.get("CasingTemperature") or 0.0)
-        xenon = float(data.get("Xenon", 0.0) or 0.0)
-        iodine = float(data.get("Iodine", 0.0) or 0.0)
-        level = float(data.get("ReactorLevel", 0.0) or 0.0)
+        aprm = _safe_float(data.get("APRM"), 0.0)
+        rods = _safe_float(data.get("Avg. Rod"), 0.0)
+        recirc1 = _safe_float(data.get("Recirc1"), 0.0)
+        recirc2 = _safe_float(data.get("Recirc2"), 0.0)
+        recirc = (recirc1 + recirc2) / 2.0 if (recirc1 or recirc2) else _safe_float(data.get("Recirc"), 0.0)
+        temp_val = data.get("Reactor Temp") if data.get("Reactor Temp") is not None else data.get("CasingTemperature")
+        temp = _safe_float(temp_val, 0.0)
+        xenon = _safe_float(data.get("Xenon"), 0.0)
+        iodine = _safe_float(data.get("Iodine"), 0.0)
+        level = _safe_float(data.get("ReactorLevel"), 0.0)
 
         output_mw = 0.0
         for k in ("Output (MW)", "PradDoSieci", "Output", "Power", "megawatts", "output_mw"):
@@ -178,14 +215,17 @@ class UnitState(DictLikeModel):
                 except (ValueError, TypeError):
                     pass
 
-        pressure = float(data.get("Pressure", 0.0) or 0.0)
+        pressure = _safe_float(data.get("Pressure"), 0.0)
         offsite = bool(data.get("Offsite Power", True))
 
-        demand_key = "DemandU2" if "2" in unit_name else "DemandU1"
+        demand_key = "DemandU2" if "2" in str(unit_name) else "DemandU1"
         demand_val = data.get(demand_key)
-        demand = float(demand_val) if demand_val is not None else None
+        demand = float(demand_val) if demand_val is not None and not isinstance(demand_val, (dict, list, bool)) else None
 
-        pps = float(data.get("PointsPerSecond", 0.0) or 0.0)
+        pps = _safe_float(data.get("PointsPerSecond"), 0.0)
+
+        mode_val = data.get("Mode") or data.get("ReactorMode") or data.get("GameMode")
+        mode = str(mode_val).strip() if mode_val is not None else None
 
         return cls(
             aprm=aprm,
@@ -202,6 +242,7 @@ class UnitState(DictLikeModel):
             offsite_power=offsite,
             demand=demand,
             points_per_second=pps,
+            mode=mode,
             raw=data,
         )
 
@@ -256,6 +297,7 @@ class ScoreBreakdown(DictLikeModel):
 
 __all__ = [
     "DictLikeModel",
+    "UnitConfig",
     "PendingRefuel",
     "ConfirmedRefuel",
     "SteadySample",
