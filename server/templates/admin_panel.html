@@ -3863,28 +3863,46 @@
 
             const canJoin = !isPrivate && !isArchived && (!isHistorical || isPersistent);
 
-            const formatFuelBadge = (fuelVal) => {
-                if (fuelVal === undefined || fuelVal === null || isNaN(fuelVal)) {
-                    return { text: '--', color: 'text-slate-500' };
+            const formatFuelBadge = (u) => {
+                if (!u) return { text: '--', color: 'text-slate-500', metric: '' };
+                const fuelVal = (u.median_fuel !== undefined && u.median_fuel !== null) ? Number(u.median_fuel)
+                    : ((u.estimated_fuel !== undefined && u.estimated_fuel !== null) ? Number(u.estimated_fuel)
+                    : ((u.weighted_fuel !== undefined && u.weighted_fuel !== null) ? Number(u.weighted_fuel)
+                    : ((u.mean_fuel !== undefined && u.mean_fuel !== null) ? Number(u.mean_fuel) : null)));
+                if (fuelVal === null || isNaN(fuelVal)) {
+                    return { text: '--', color: 'text-slate-500', metric: '' };
                 }
-                const num = Number(fuelVal);
+                const num = Math.min(100.0, Math.max(0.0, Number(fuelVal)));
                 if (num <= 0) {
-                    return { text: 'N/A', color: 'text-slate-500' };
+                    return { text: 'N/A', color: 'text-slate-500', metric: '' };
                 }
                 const formatted = `~${num.toFixed(1)}%`;
+                const metricLabel = u.median_fuel ? 'median' : (u.weighted_fuel ? 'weighted' : (u.mean_fuel ? 'mean' : ''));
                 if (num >= 85) {
-                    return { text: formatted, color: 'text-emerald-400' };
+                    return { text: formatted, color: 'text-emerald-400', metric: metricLabel };
                 } else if (num >= 67) {
-                    return { text: formatted, color: 'text-amber-400' };
+                    return { text: formatted, color: 'text-amber-400', metric: metricLabel };
                 } else {
-                    return { text: formatted, color: 'text-rose-400' };
+                    return { text: formatted, color: 'text-rose-400', metric: metricLabel };
                 }
             };
 
+            const buildFuelTooltip = (u) => {
+                if (!u) return 'Fuel estimation';
+                const parts = [];
+                if (u.median_fuel) parts.push(`Moving Median: ~${Number(u.median_fuel).toFixed(1)}%`);
+                if (u.weighted_fuel) parts.push(`Recency-Weighted: ~${Number(u.weighted_fuel).toFixed(1)}%`);
+                if (u.mean_fuel) parts.push(`Arithmetic Mean: ~${Number(u.mean_fuel).toFixed(1)}%`);
+                if (u.instantaneous_fuel) parts.push(`Latest Instantaneous: ~${Number(u.instantaneous_fuel).toFixed(1)}%`);
+                return parts.length > 0 ? parts.join(' | ') : 'Fuel estimation';
+            };
+
+            const u1FuelData = formatFuelBadge(s.unit1);
+            const u2FuelData = formatFuelBadge(s.unit2);
+            const u1FuelTooltip = buildFuelTooltip(s.unit1);
+            const u2FuelTooltip = buildFuelTooltip(s.unit2);
             const u1Fuel = (s.unit1 && s.unit1.estimated_fuel !== undefined && s.unit1.estimated_fuel !== null) ? Number(s.unit1.estimated_fuel) : null;
             const u2Fuel = (s.unit2 && s.unit2.estimated_fuel !== undefined && s.unit2.estimated_fuel !== null) ? Number(s.unit2.estimated_fuel) : null;
-            const u1FuelData = formatFuelBadge(u1Fuel);
-            const u2FuelData = formatFuelBadge(u2Fuel);
 
             return `
                 <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isArchived ? 'border-cyan-500/30 bg-cyan-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60'))} flex flex-col justify-between gap-4 transition-all"
@@ -3928,12 +3946,18 @@
                                 <span class="text-slate-500 text-[10px]">U2 APRM</span>
                                 <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
                             </div>
-                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
-                                <span class="text-slate-500 text-[10px]">U1 Est. Fuel</span>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5" title="${escapeHtml(u1FuelTooltip)}">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 text-[10px]">U1 Est. Fuel</span>
+                                    ${u1FuelData.metric ? `<span class="text-[9px] text-slate-500 uppercase font-mono">${escapeHtml(u1FuelData.metric)}</span>` : ''}
+                                </div>
                                 <span class="${u1FuelData.color} font-bold">${u1FuelData.text}</span>
                             </div>
-                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
-                                <span class="text-slate-500 text-[10px]">U2 Est. Fuel</span>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5" title="${escapeHtml(u2FuelTooltip)}">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 text-[10px]">U2 Est. Fuel</span>
+                                    ${u2FuelData.metric ? `<span class="text-[9px] text-slate-500 uppercase font-mono">${escapeHtml(u2FuelData.metric)}</span>` : ''}
+                                </div>
                                 <span class="${u2FuelData.color} font-bold">${u2FuelData.text}</span>
                             </div>
                             ${!isPrivate ? `
@@ -5263,7 +5287,10 @@
             setField('debug-snap-u1-aprm', u1.APRM, '%');
             setField('debug-snap-u1-temp', u1['Reactor Temp'], ' °C');
             setField('debug-snap-u1-pps', u1.PointsPerSecond, ' pts/s');
-            setField('debug-snap-u1-fuel', u1.EstimatedFuel !== undefined && u1.EstimatedFuel !== null && u1.EstimatedFuel > 0 ? Number(u1.EstimatedFuel).toFixed(1) : null, '%');
+            const u1FuelVal = (data.fuel_assessment && data.fuel_assessment.unit1 && data.fuel_assessment.unit1.median_fuel)
+                ? data.fuel_assessment.unit1.median_fuel
+                : (u1.EstimatedFuel !== undefined ? u1.EstimatedFuel : null);
+            setField('debug-snap-u1-fuel', u1FuelVal !== undefined && u1FuelVal !== null && u1FuelVal > 0 ? Math.min(100.0, Number(u1FuelVal)).toFixed(1) : null, '%');
 
             setField('debug-snap-u2-demand', u2.DemandU2 !== undefined ? u2.DemandU2 : u2.Demand);
             setField('debug-snap-u2-next-demand', u2.NextDemandU2 !== undefined ? u2.NextDemandU2 : u2.NextDemand);
@@ -5271,7 +5298,10 @@
             setField('debug-snap-u2-aprm', u2.APRM, '%');
             setField('debug-snap-u2-temp', u2['Reactor Temp'], ' °C');
             setField('debug-snap-u2-pps', u2.PointsPerSecond, ' pts/s');
-            setField('debug-snap-u2-fuel', u2.EstimatedFuel !== undefined && u2.EstimatedFuel !== null && u2.EstimatedFuel > 0 ? Number(u2.EstimatedFuel).toFixed(1) : null, '%');
+            const u2FuelVal = (data.fuel_assessment && data.fuel_assessment.unit2 && data.fuel_assessment.unit2.median_fuel)
+                ? data.fuel_assessment.unit2.median_fuel
+                : (u2.EstimatedFuel !== undefined ? u2.EstimatedFuel : null);
+            setField('debug-snap-u2-fuel', u2FuelVal !== undefined && u2FuelVal !== null && u2FuelVal > 0 ? Math.min(100.0, Number(u2FuelVal)).toFixed(1) : null, '%');
 
             const rawTitle = document.getElementById('debug-raw-snap-title');
             const rawContent = document.getElementById('debug-raw-snap-content');

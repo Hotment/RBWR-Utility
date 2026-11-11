@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 from collections import OrderedDict
@@ -2043,46 +2043,74 @@ def ensure_unit_output_mw(unit_dict):
 def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
     if not isinstance(unit_dict, dict):
         return unit_dict
-    if unit_dict.get("EstimatedFuel") is None:
+    raw_val = unit_dict.get("EstimatedFuel")
+    if raw_val is None:
         try:
             clean_u = "Unit2" if "2" in str(unit_name) else "Unit1"
             if clean_u == "Unit2":
                 fuel_val = calculate_u2_fuel_level(unit_dict)
             else:
                 fuel_val = calculate_u1_fuel_level(unit_dict)
+            if fuel_val is not None:
+                fuel_val = round(min(100.0, max(0.0, float(fuel_val))), 2)
             unit_dict["EstimatedFuel"] = fuel_val
         except Exception:
             pass
+    else:
+        try:
+            f_val = float(raw_val)
+            if f_val > 100.0 or f_val < 0.0:
+                unit_dict["EstimatedFuel"] = round(min(100.0, max(0.0, f_val)), 2)
+        except (ValueError, TypeError):
+            pass
     return unit_dict
 
-def get_card_unit_fuel(snapshots: Any, unit_name: str, unit_dict: Any) -> Optional[float]:
-    if isinstance(unit_dict, dict):
+def get_card_unit_fuel_stats(snapshots: Any, unit_name: str, unit_dict: Any) -> Dict[str, Optional[float]]:
+    median_val = None
+    weighted_val = None
+    mean_val = None
+    instant_val = None
+
+    if isinstance(snapshots, dict) and snapshots:
+        try:
+            assessment = approximate_fuel_from_snapshots(snapshots, unit_name)
+            if assessment.median_fuel is not None and assessment.median_fuel > 0.0:
+                median_val = round(min(100.0, max(0.0, float(assessment.median_fuel))), 1)
+            if assessment.weighted_fuel is not None and assessment.weighted_fuel > 0.0:
+                weighted_val = round(min(100.0, max(0.0, float(assessment.weighted_fuel))), 1)
+            if assessment.mean_fuel is not None and assessment.mean_fuel > 0.0:
+                mean_val = round(min(100.0, max(0.0, float(assessment.mean_fuel))), 1)
+            if assessment.latest_instantaneous and assessment.latest_instantaneous > 0.0:
+                instant_val = round(min(100.0, max(0.0, float(assessment.latest_instantaneous))), 1)
+        except Exception:
+            pass
+
+    if instant_val is None and isinstance(unit_dict, dict):
         ensure_unit_fuel_level(unit_name, unit_dict)
-        val = unit_dict.get("EstimatedFuel")
-        if val is not None:
+        raw_fuel = unit_dict.get("EstimatedFuel")
+        if raw_fuel is not None:
             try:
-                f_val = float(val)
+                f_val = float(raw_fuel)
                 if f_val > 0.0:
-                    return round(f_val, 1)
+                    instant_val = round(min(100.0, max(0.0, f_val)), 1)
             except (ValueError, TypeError):
                 pass
 
-    if isinstance(snapshots, dict):
-        try:
-            assessment = approximate_fuel_from_snapshots(snapshots, unit_name)
-            if assessment.weighted_fuel is not None and assessment.weighted_fuel > 0.0:
-                return round(float(assessment.weighted_fuel), 1)
-            if assessment.latest_instantaneous and assessment.latest_instantaneous > 0.0:
-                return round(float(assessment.latest_instantaneous), 1)
-        except Exception:
-            pass
-    return None
+    primary_fuel = median_val if median_val is not None else (
+        weighted_val if weighted_val is not None else (
+            mean_val if mean_val is not None else instant_val
+        )
+    )
+
+    return {
+        "estimated_fuel": primary_fuel,
+        "median_fuel": median_val,
+        "weighted_fuel": weighted_val,
+        "mean_fuel": mean_val,
+        "instantaneous_fuel": instant_val,
+    }
 
 def normalize_snapshots_power(data):
-    """
-    Walks a servers dictionary {job_id: {timestamp: state}} and ensures
-    both Unit 1 and Unit 2 have 'Output (MW)' and 'EstimatedFuel' populated.
-    """
     if not isinstance(data, dict):
         return data
     for job_id, snaps in safe_dict_items(data):
@@ -3716,8 +3744,8 @@ def get_active_cards_base(servers_data, persistent_ids):
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
-        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
+        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
+        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
 
         cards.append({
             "job_id": job_id,
@@ -3749,7 +3777,11 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_fuel,
+                "estimated_fuel": u1_stats["estimated_fuel"],
+                "median_fuel": u1_stats["median_fuel"],
+                "weighted_fuel": u1_stats["weighted_fuel"],
+                "mean_fuel": u1_stats["mean_fuel"],
+                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -3759,7 +3791,11 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_fuel,
+                "estimated_fuel": u2_stats["estimated_fuel"],
+                "median_fuel": u2_stats["median_fuel"],
+                "weighted_fuel": u2_stats["weighted_fuel"],
+                "mean_fuel": u2_stats["mean_fuel"],
+                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
             },
         })
 
@@ -3842,8 +3878,8 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
-        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
+        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
+        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
 
         cards.append({
             "job_id": job_id,
@@ -3875,7 +3911,11 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_fuel,
+                "estimated_fuel": u1_stats["estimated_fuel"],
+                "median_fuel": u1_stats["median_fuel"],
+                "weighted_fuel": u1_stats["weighted_fuel"],
+                "mean_fuel": u1_stats["mean_fuel"],
+                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -3885,7 +3925,11 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_fuel,
+                "estimated_fuel": u2_stats["estimated_fuel"],
+                "median_fuel": u2_stats["median_fuel"],
+                "weighted_fuel": u2_stats["weighted_fuel"],
+                "mean_fuel": u2_stats["mean_fuel"],
+                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
             },
         })
     return cards
@@ -4669,8 +4713,8 @@ def get_historical_cards_base(servers_data, persistent_ids):
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
-        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
+        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
+        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
 
         base_cards.append({
             "job_id": job_id,
@@ -4701,7 +4745,11 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_fuel,
+                "estimated_fuel": u1_stats["estimated_fuel"],
+                "median_fuel": u1_stats["median_fuel"],
+                "weighted_fuel": u1_stats["weighted_fuel"],
+                "mean_fuel": u1_stats["mean_fuel"],
+                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -4711,7 +4759,11 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_fuel,
+                "estimated_fuel": u2_stats["estimated_fuel"],
+                "median_fuel": u2_stats["median_fuel"],
+                "weighted_fuel": u2_stats["weighted_fuel"],
+                "mean_fuel": u2_stats["mean_fuel"],
+                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
             },
         })
 
@@ -6711,6 +6763,7 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
         _sc_server_meta[matched_job_id] = meta
 
     clean_snapshots = {k: v for k, v in snapshots.items() if not str(k).startswith('_')}
+    fuel_eval = evaluate_server_fuel(clean_snapshots)
 
     return {
         "found": True,
@@ -6721,6 +6774,7 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
         "is_persistent": is_persistent,
         "meta": meta,
         "snapshots": clean_snapshots,
+        "fuel_assessment": fuel_eval.to_dict(),
         **analysis,
         "matching_errors": matching_errors,
     }
