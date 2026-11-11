@@ -877,6 +877,8 @@
                             <option value="players_asc">Sort: Fewest Players</option>
                             <option value="snapshots_desc">Sort: Most Snapshots</option>
                             <option value="snapshots_asc">Sort: Fewest Snapshots</option>
+                            <option value="fuel_desc">Sort: Highest Fuel</option>
+                            <option value="fuel_asc">Sort: Lowest Fuel</option>
                         </select>
                         <svg class="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-slate-500 pointer-events-none"
                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1890,6 +1892,10 @@
                                         <span class="text-slate-500 block text-[10px]">Points / Sec:</span>
                                         <span id="debug-snap-u1-pps" class="font-bold text-slate-200">--</span>
                                     </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Est. Fuel Level:</span>
+                                        <span id="debug-snap-u1-fuel" class="font-bold text-emerald-400">--</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="p-3 rounded-lg bg-black/40 border border-white/5 flex flex-col gap-2">
@@ -1919,6 +1925,10 @@
                                         <span class="text-slate-500 block text-[10px]">Points / Sec:</span>
                                         <span id="debug-snap-u2-pps" class="font-bold text-slate-200">--</span>
                                     </div>
+                                    <div>
+                                        <span class="text-slate-500 block text-[10px]">Est. Fuel Level:</span>
+                                        <span id="debug-snap-u2-fuel" class="font-bold text-cyan-400">--</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1945,6 +1955,8 @@
                                     <th class="p-3">U2 Output</th>
                                     <th class="p-3">U1 APRM</th>
                                     <th class="p-3">U2 APRM</th>
+                                    <th class="p-3">U1 Fuel</th>
+                                    <th class="p-3">U2 Fuel</th>
                                     <th class="p-3">Status</th>
                                     <th class="p-3 text-right">Action</th>
                                 </tr>
@@ -2652,7 +2664,23 @@
                 const privA = a.dataset.isPrivate === 'true' ? 1 : 0;
                 const privB = b.dataset.isPrivate === 'true' ? 1 : 0;
 
-                if (adminCurrentSort === 'players_desc') {
+                if (adminCurrentSort === 'fuel_desc') {
+                    const f1A = parseFloat(a.dataset.u1Fuel || -1);
+                    const f2A = parseFloat(a.dataset.u2Fuel || -1);
+                    const maxA = Math.max(f1A, f2A);
+                    const f1B = parseFloat(b.dataset.u1Fuel || -1);
+                    const f2B = parseFloat(b.dataset.u2Fuel || -1);
+                    const maxB = Math.max(f1B, f2B);
+                    return (maxB - maxA) || (pB - pA);
+                } else if (adminCurrentSort === 'fuel_asc') {
+                    const f1A = parseFloat(a.dataset.u1Fuel || -1);
+                    const f2A = parseFloat(a.dataset.u2Fuel || -1);
+                    const minA = (f1A > 0 && f2A > 0) ? Math.min(f1A, f2A) : Math.max(f1A, f2A);
+                    const f1B = parseFloat(b.dataset.u1Fuel || -1);
+                    const f2B = parseFloat(b.dataset.u2Fuel || -1);
+                    const minB = (f1B > 0 && f2B > 0) ? Math.min(f1B, f2B) : Math.max(f1B, f2B);
+                    return (minA - minB) || (pB - pA);
+                } else if (adminCurrentSort === 'players_desc') {
                     return (pB - pA) || (sB - sA) || (uB - uA);
                 } else if (adminCurrentSort === 'players_asc') {
                     return (pA - pB) || (sA - sB) || (uA - uB);
@@ -3835,6 +3863,29 @@
 
             const canJoin = !isPrivate && !isArchived && (!isHistorical || isPersistent);
 
+            const formatFuelBadge = (fuelVal) => {
+                if (fuelVal === undefined || fuelVal === null || isNaN(fuelVal)) {
+                    return { text: '--', color: 'text-slate-500' };
+                }
+                const num = Number(fuelVal);
+                if (num <= 0) {
+                    return { text: 'N/A', color: 'text-slate-500' };
+                }
+                const formatted = `~${num.toFixed(1)}%`;
+                if (num >= 85) {
+                    return { text: formatted, color: 'text-emerald-400' };
+                } else if (num >= 67) {
+                    return { text: formatted, color: 'text-amber-400' };
+                } else {
+                    return { text: formatted, color: 'text-rose-400' };
+                }
+            };
+
+            const u1Fuel = (s.unit1 && s.unit1.estimated_fuel !== undefined && s.unit1.estimated_fuel !== null) ? Number(s.unit1.estimated_fuel) : null;
+            const u2Fuel = (s.unit2 && s.unit2.estimated_fuel !== undefined && s.unit2.estimated_fuel !== null) ? Number(s.unit2.estimated_fuel) : null;
+            const u1FuelData = formatFuelBadge(u1Fuel);
+            const u2FuelData = formatFuelBadge(u2Fuel);
+
             return `
                 <div class="admin-server-card cyber-panel p-4 md:p-5 rounded-xl border ${isPersistent ? 'border-amber-500/40 bg-amber-950/10' : (isArchived ? 'border-cyan-500/30 bg-cyan-950/10' : (isHistorical ? 'border-white/5 bg-surface/40 opacity-80' : 'border-emerald-500/30 bg-surface/60'))} flex flex-col justify-between gap-4 transition-all"
                     data-job-id="${escapeHtml(s.job_id)}"
@@ -3847,7 +3898,9 @@
                     data-snapshot-count="${s.snapshot_count || 0}"
                     data-age-seconds="${s.age_seconds || 0}"
                     data-uptime-seconds="${s.uptime_seconds || 0}"
-                    data-raw-timestamp="${escapeHtml(s.raw_timestamp || '')}">
+                    data-raw-timestamp="${escapeHtml(s.raw_timestamp || '')}"
+                    data-u1-fuel="${u1Fuel !== null ? u1Fuel : ''}"
+                    data-u2-fuel="${u2Fuel !== null ? u2Fuel : ''}">
                     <div class="flex flex-col gap-2.5">
                         <div class="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
                             <div class="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -3874,6 +3927,14 @@
                             <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
                                 <span class="text-slate-500 text-[10px]">U2 APRM</span>
                                 <span class="text-white font-bold">${(s.unit2 && s.unit2.aprm !== undefined) ? Number(s.unit2.aprm).toFixed(2) : '0.00'}%</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                <span class="text-slate-500 text-[10px]">U1 Est. Fuel</span>
+                                <span class="${u1FuelData.color} font-bold">${u1FuelData.text}</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                                <span class="text-slate-500 text-[10px]">U2 Est. Fuel</span>
+                                <span class="${u2FuelData.color} font-bold">${u2FuelData.text}</span>
                             </div>
                             ${!isPrivate ? `
                             <div class="bg-black/30 p-2 rounded-lg border border-white/5 flex items-center justify-between col-span-2">
@@ -4989,7 +5050,7 @@
             const timelineBody = document.getElementById('debug-timeline-body');
             if (timelineBody) {
                 if (!data.snapshots_summary || data.snapshots_summary.length === 0) {
-                    timelineBody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-500">No snapshots recorded for this server.</td></tr>';
+                    timelineBody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-slate-500">No snapshots recorded for this server.</td></tr>';
                 } else {
                     let html = '';
                     data.snapshots_summary.slice(-150).reverse().forEach(snap => {
@@ -5009,6 +5070,8 @@
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_out))}</td>
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u1_aprm))}%</td>
                                 <td class="p-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(String(snap.u2_aprm))}%</td>
+                                <td class="p-3 text-xs text-emerald-400 whitespace-nowrap font-semibold">${snap.u1_fuel !== undefined && snap.u1_fuel !== null && snap.u1_fuel > 0 ? '~' + Number(snap.u1_fuel).toFixed(1) + '%' : '--'}</td>
+                                <td class="p-3 text-xs text-cyan-400 whitespace-nowrap font-semibold">${snap.u2_fuel !== undefined && snap.u2_fuel !== null && snap.u2_fuel > 0 ? '~' + Number(snap.u2_fuel).toFixed(1) + '%' : '--'}</td>
                                 <td class="p-3 whitespace-nowrap">
                                     ${hasAnom ? (snap.is_roblox_nan ? '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">ROBLOX NAN</span>' : '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">ANOMALY</span>') : '<span class="text-slate-500 text-[10px]">OK</span>'}
                                 </td>
@@ -5200,6 +5263,7 @@
             setField('debug-snap-u1-aprm', u1.APRM, '%');
             setField('debug-snap-u1-temp', u1['Reactor Temp'], ' °C');
             setField('debug-snap-u1-pps', u1.PointsPerSecond, ' pts/s');
+            setField('debug-snap-u1-fuel', u1.EstimatedFuel !== undefined && u1.EstimatedFuel !== null && u1.EstimatedFuel > 0 ? Number(u1.EstimatedFuel).toFixed(1) : null, '%');
 
             setField('debug-snap-u2-demand', u2.DemandU2 !== undefined ? u2.DemandU2 : u2.Demand);
             setField('debug-snap-u2-next-demand', u2.NextDemandU2 !== undefined ? u2.NextDemandU2 : u2.NextDemand);
@@ -5207,6 +5271,7 @@
             setField('debug-snap-u2-aprm', u2.APRM, '%');
             setField('debug-snap-u2-temp', u2['Reactor Temp'], ' °C');
             setField('debug-snap-u2-pps', u2.PointsPerSecond, ' pts/s');
+            setField('debug-snap-u2-fuel', u2.EstimatedFuel !== undefined && u2.EstimatedFuel !== null && u2.EstimatedFuel > 0 ? Number(u2.EstimatedFuel).toFixed(1) : null, '%');
 
             const rawTitle = document.getElementById('debug-raw-snap-title');
             const rawContent = document.getElementById('debug-raw-snap-content');

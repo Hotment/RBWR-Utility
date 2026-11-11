@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 from collections import OrderedDict
@@ -26,12 +26,14 @@ try:
         calculate_u1_fuel_level,
         calculate_u2_fuel_level,
         evaluate_server_fuel,
+        approximate_fuel_from_snapshots,
     )
 except ImportError:
     from fuel import (
         calculate_u1_fuel_level,
         calculate_u2_fuel_level,
         evaluate_server_fuel,
+        approximate_fuel_from_snapshots,
     )
 
 def _json_dumps(obj):
@@ -2053,6 +2055,29 @@ def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
             pass
     return unit_dict
 
+def get_card_unit_fuel(snapshots: Any, unit_name: str, unit_dict: Any) -> Optional[float]:
+    if isinstance(unit_dict, dict):
+        ensure_unit_fuel_level(unit_name, unit_dict)
+        val = unit_dict.get("EstimatedFuel")
+        if val is not None:
+            try:
+                f_val = float(val)
+                if f_val > 0.0:
+                    return round(f_val, 1)
+            except (ValueError, TypeError):
+                pass
+
+    if isinstance(snapshots, dict):
+        try:
+            assessment = approximate_fuel_from_snapshots(snapshots, unit_name)
+            if assessment.weighted_fuel is not None and assessment.weighted_fuel > 0.0:
+                return round(float(assessment.weighted_fuel), 1)
+            if assessment.latest_instantaneous and assessment.latest_instantaneous > 0.0:
+                return round(float(assessment.latest_instantaneous), 1)
+        except Exception:
+            pass
+    return None
+
 def normalize_snapshots_power(data):
     """
     Walks a servers dictionary {job_id: {timestamp: state}} and ensures
@@ -3691,6 +3716,8 @@ def get_active_cards_base(servers_data, persistent_ids):
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
+        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
+        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
 
         cards.append({
             "job_id": job_id,
@@ -3722,6 +3749,7 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
+                "estimated_fuel": u1_fuel,
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -3731,6 +3759,7 @@ def get_active_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
+                "estimated_fuel": u2_fuel,
             },
         })
 
@@ -3813,6 +3842,8 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
         short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
+        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
+        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
 
         cards.append({
             "job_id": job_id,
@@ -3844,6 +3875,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
+                "estimated_fuel": u1_fuel,
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -3853,6 +3885,7 @@ def build_server_cards(data, search_query=None, is_archived=False, exact_search_
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
+                "estimated_fuel": u2_fuel,
             },
         })
     return cards
@@ -4636,6 +4669,8 @@ def get_historical_cards_base(servers_data, persistent_ids):
         unit2 = latest_state.get("Unit2", {})
         pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
         top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
+        u1_fuel = get_card_unit_fuel(snapshots, "Unit1", unit1)
+        u2_fuel = get_card_unit_fuel(snapshots, "Unit2", unit2)
 
         base_cards.append({
             "job_id": job_id,
@@ -4666,6 +4701,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit1), 1),
                 "is_running": pts_info["u1_running"],
                 "points_rate": pts_info["u1_rate"],
+                "estimated_fuel": u1_fuel,
             },
             "unit2": {
                 "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
@@ -4675,6 +4711,7 @@ def get_historical_cards_base(servers_data, persistent_ids):
                 "output_mw": round(get_unit_output_mw(unit2), 1),
                 "is_running": pts_info["u2_running"],
                 "points_rate": pts_info["u2_rate"],
+                "estimated_fuel": u2_fuel,
             },
         })
 
@@ -6510,6 +6547,8 @@ def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
         u2_st = st.get("Unit2", {}) if isinstance(st.get("Unit2"), dict) else {}
         u1_dem_val = u1_st.get("DemandU1") if "DemandU1" in u1_st else u1_st.get("Demand")
         u2_dem_val = u2_st.get("DemandU2") if "DemandU2" in u2_st else u2_st.get("Demand")
+        ensure_unit_fuel_level("Unit1", u1_st)
+        ensure_unit_fuel_level("Unit2", u2_st)
 
         snapshots_summary.append({
             "timestamp": ts,
@@ -6526,6 +6565,8 @@ def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
             "u2_aprm": u2_st.get("APRM", "N/A"),
             "u1_out": u1_st.get("Output", u1_st.get("ElectricOutputMW", "N/A")),
             "u2_out": u2_st.get("Output", u2_st.get("ElectricOutputMW", "N/A")),
+            "u1_fuel": u1_st.get("EstimatedFuel"),
+            "u2_fuel": u2_st.get("EstimatedFuel"),
         })
 
     first_anom_snap = None
