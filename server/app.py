@@ -1688,16 +1688,18 @@ def submit_contact_message():
         return jsonify({"detail": "Access restricted."}), 403
 
     payload = request.get_json() or {}
-    message_text = payload.get("message", "").strip()
+    if not isinstance(payload, dict):
+        return jsonify({"detail": "Invalid request body."}), 400
+    message_text = str(payload.get("message", "")).strip()
     if not message_text:
         return jsonify({"detail": "Message body cannot be empty."}), 400
 
     if len(message_text) > 2000:
         return jsonify({"detail": "Message text exceeds maximum length of 2000 characters."}), 400
 
-    name = payload.get("name", "").strip() or "Anonymous"
-    contact_info = payload.get("contact_info", "").strip() or "N/A"
-    subject = payload.get("subject", "").strip() or "General Inquiry"
+    name = str(payload.get("name", "")).strip() or "Anonymous"
+    contact_info = str(payload.get("contact_info", "")).strip() or "N/A"
+    subject = str(payload.get("subject", "")).strip() or "General Inquiry"
 
     contact_data = load_contact_messages()
     messages = contact_data.get("messages", [])
@@ -5252,6 +5254,8 @@ def add_ticket_message_api(ticket_id):
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = TicketMessagePayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5525,6 +5529,8 @@ def submit_ticket():
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = TicketPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5676,6 +5682,8 @@ def submit_crash():
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CrashPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5733,6 +5741,8 @@ def update_crash_status(username):
         return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CrashStatusPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5769,6 +5779,8 @@ def delete_crash(username):
         return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteCrashPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5804,6 +5816,8 @@ def update_suggestion_status(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = StatusUpdatePayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5869,6 +5883,8 @@ def update_suggestion_comment(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CommentPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5910,6 +5926,8 @@ def update_suggestion_visibility(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = VisibilitySuggestionPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5933,6 +5951,8 @@ def delete_suggestion(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteSuggestionPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5989,6 +6009,8 @@ def ban_ip(username):
         return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = BanPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6023,6 +6045,8 @@ def unban_ip(username):
         return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = UnbanPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6174,6 +6198,8 @@ def toggle_server_persistence(username):
         return jsonify({"detail": "Permission denied for servers section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = ServerPersistPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6311,6 +6337,8 @@ def create_admin_account(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CreateAdminPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6351,6 +6379,8 @@ def update_admin_permissions(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = UpdateAdminPermissionsPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6383,6 +6413,8 @@ def delete_admin_account(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteAdminPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6424,6 +6456,8 @@ def save_notifier_api(username):
         return jsonify({"detail": "Permission denied for suggestions"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = NotifierConfigPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
