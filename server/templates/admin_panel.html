@@ -4090,7 +4090,9 @@
                         { key: "crashes", label: "Crash Logs", desc: "Client crash stack traces and analysis" },
                         { key: "suggestions", label: "Suggestions", desc: "User suggestion inbox and review" },
                         { key: "contact", label: "Messages", desc: "Direct contact and support messages" },
-                        { key: "bans", label: "Banned IPs", desc: "IP bans and rate-limit access control" }
+                        { key: "bans", label: "Banned IPs", desc: "IP bans and rate-limit access control" },
+                        { key: "debug", label: "Debug Inspector", desc: "Inject and analyze raw server state payloads" },
+                        { key: "audit_logs", label: "Audit Logs", desc: "View, export, and clear administrator audit history" }
                     ]
                 },
                 {
@@ -4114,15 +4116,6 @@
                         { key: "faq", label: "FAQ", desc: "Knowledgebase and automated questions" },
                         { key: "commands", label: "Commands", desc: "Custom prefix bot commands" },
                         { key: "errors", label: "Errors", desc: "Bot exceptions and tracebacks" }
-                    ]
-                },
-                {
-                    name: "Root Diagnostics",
-                    badge: "ROOT",
-                    badgeClass: "text-rose-400 border-rose-500/30 bg-rose-500/10",
-                    items: [
-                        { key: "debug", label: "Debug Inspector", desc: "Inject and analyze raw server state payloads" },
-                        { key: "audit_logs", label: "Audit Logs", desc: "View, export, and clear administrator audit history" }
                     ]
                 }
             ];
@@ -4310,6 +4303,8 @@
                         faq: getVal('faq'),
                         commands: getVal('commands'),
                         errors: getVal('errors'),
+                        debug: getVal('debug'),
+                        audit_logs: getVal('audit_logs'),
                     }
                 };
 
