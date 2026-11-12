@@ -44,9 +44,9 @@ class UnitConfig:
     downtime_min: float
     downtime_max: Optional[float]
     post_fuel_min: float
-    rod_alpha: float = 0.55
-    recirc_coeff: float = 0.25
-    pressure_coeff: float = 0.25
+    rod_alpha: float = 0.45
+    recirc_coeff: float = 0.28
+    pressure_coeff: float = 0.35
     natural_flow_fraction: float = 0.25
     nominal_pressure_kpa: float = 7000.0
     expected_refuel_fuel: float = 97.0

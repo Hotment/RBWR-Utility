@@ -92,13 +92,13 @@ __all__ = [
     "get_refuel_info_by_epoch",
 ]
 
-# Calibrated core reactivity constants (Joint empirical fit across Classic mode ground truth)
-CALIBRATION_CONST_U1 = 44.7987
-CALIBRATION_CONST_U2 = 41.4260
+# Calibrated core reactivity constants (Joint empirical fit across 8 Classic mode ground-truth points)
+CALIBRATION_CONST_U1 = 41.6032
+CALIBRATION_CONST_U2 = 40.0043
 
 # Void coefficients
-VOID_COEFF_U1 = 0.25
-VOID_COEFF_U2 = 0.25
+VOID_COEFF_U1 = 0.28
+VOID_COEFF_U2 = 0.28
 
 # Refueling detection physical thresholds
 REFUEL_DOWNTIME_MIN_U1 = 300.0    # At least 5 minutes offline
@@ -145,9 +145,9 @@ UNIT_CONFIGS = {
         downtime_min=REFUEL_DOWNTIME_MIN_U1,
         downtime_max=REFUEL_DOWNTIME_MAX_U1,
         post_fuel_min=REFUEL_POST_FUEL_MIN_U1,
-        rod_alpha=0.55,
-        recirc_coeff=0.25,
-        pressure_coeff=0.25,
+        rod_alpha=0.45,
+        recirc_coeff=0.28,
+        pressure_coeff=0.35,
         natural_flow_fraction=0.25,
         nominal_pressure_kpa=7000.0,
         expected_refuel_fuel=REFUEL_EXPECTED_U1,
@@ -160,9 +160,9 @@ UNIT_CONFIGS = {
         downtime_min=REFUEL_DOWNTIME_MIN_U2,
         downtime_max=REFUEL_DOWNTIME_MAX_U2,
         post_fuel_min=REFUEL_POST_FUEL_MIN_U2,
-        rod_alpha=0.55,
-        recirc_coeff=0.25,
-        pressure_coeff=0.25,
+        rod_alpha=0.45,
+        recirc_coeff=0.28,
+        pressure_coeff=0.35,
         natural_flow_fraction=0.25,
         nominal_pressure_kpa=7000.0,
         expected_refuel_fuel=REFUEL_EXPECTED_U2,
