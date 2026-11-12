@@ -427,7 +427,7 @@ def broadcast_update(data_type):
                     "data": get_accounts_payload_data()
                 }
             elif data_type == "audit_logs":
-                if uname and not is_root_user(uname):
+                if uname and not has_permission(uname, "audit_logs"):
                     continue
                 payload = {
                     "type": "audit_logs",
@@ -506,7 +506,7 @@ def admin_ws(ws):
             "type": "all",
             "dashboard": get_dashboard_payload_data(username),
             "accounts": get_accounts_payload_data() if is_root_user(username) else None,
-            "audit_logs": get_audit_logs_payload_data() if is_root_user(username) else None
+            "audit_logs": get_audit_logs_payload_data() if has_permission(username, "audit_logs") else None
         }
         ws.send(json.dumps(initial_payload))
     except Exception:
@@ -764,7 +764,7 @@ def is_website_admin_discord_id(discord_id: str | int) -> bool:
 # sections an admin can be given access to in Accounts. The original ones default to on,
 # the Discord bot sections added later default to off until a root admin ticks them.
 LEGACY_PERMISSION_SECTIONS = ["suggestions", "crashes", "contact", "bans", "servers"]
-BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors"]
+BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"]
 ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
 
 
@@ -6232,7 +6232,7 @@ def toggle_server_persistence(username):
 @app.route("/admin/auditlogs", methods=["GET"])
 @admin_required
 def view_audit_logs_dashboard(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return redirect("/admin")
     discord_id = session.get("discord_id") or username
     notifier_cfg = get_admin_notifier_config(discord_id)
@@ -6241,7 +6241,7 @@ def view_audit_logs_dashboard(username):
         username=username,
         discord_id=session.get("discord_id") or "",
         active_view="audit-logs",
-        is_root=True,
+        is_root=is_root_user(username),
         permissions=get_user_permissions(username),
         me=admin_panel_identity(username),
         notifier=notifier_cfg,
@@ -6250,7 +6250,7 @@ def view_audit_logs_dashboard(username):
 @app.route("/api/admin/audit-logs", methods=["GET"])
 @admin_required
 def api_get_audit_logs(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     category = request.args.get("category")
     action = request.args.get("action")
@@ -6277,7 +6277,7 @@ def api_get_audit_logs(username):
 @app.route("/api/admin/audit-logs/export", methods=["GET"])
 @admin_required
 def api_export_audit_logs(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     logs = audit.load_raw_audit_logs()
     filename = f"rbwr_audit_logs_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
@@ -6851,7 +6851,7 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
 @app.route("/admin/debug", methods=["GET"])
 @admin_required
 def view_debug_dashboard(username):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return redirect("/admin")
     discord_id = session.get("discord_id") or username
     notifier_cfg = get_admin_notifier_config(discord_id)
@@ -6861,7 +6861,7 @@ def view_debug_dashboard(username):
         username=username,
         discord_id=session.get("discord_id") or "",
         active_view="debug",
-        is_root=True,
+        is_root=is_root_user(username),
         permissions=get_user_permissions(username),
         me=admin_panel_identity(username),
         notifier=notifier_cfg,
@@ -6871,7 +6871,7 @@ def view_debug_dashboard(username):
 @app.route("/api/admin/debug/server/<path:job_id>", methods=["GET"])
 @admin_required
 def api_debug_server(username, job_id):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     result = diagnose_server_snapshots(job_id)
     return jsonify(result)
@@ -6879,7 +6879,7 @@ def api_debug_server(username, job_id):
 @app.route("/api/admin/debug/analyze_payload", methods=["POST"])
 @admin_required
 def api_debug_analyze_payload(username):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json(silent=True) or {}
