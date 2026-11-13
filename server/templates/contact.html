@@ -157,6 +157,12 @@
                 </div>
             </div>
 
+            {% if turnstile_enabled and not is_authenticated_user %}
+            <div class="pt-1">
+                <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="dark"></div>
+            </div>
+            {% endif %}
+
             <div class="pt-2">
                 <button type="submit" id="btnSubmitContact"
                     class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
@@ -175,7 +181,11 @@
 {% endblock %}
 
 {% block scripts %}
+{% if turnstile_enabled and not is_authenticated_user %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endif %}
 <script>
+    const TURNSTILE_REQUIRED = {{ (turnstile_enabled and not is_authenticated_user) | tojson }};
     const messageInput = document.getElementById('contactMessage');
     const charCounter = document.getElementById('charCounter');
 
@@ -207,6 +217,17 @@
             return;
         }
 
+        let turnstileToken = "";
+        if (TURNSTILE_REQUIRED) {
+            const tsInput = document.querySelector('#contactForm [name="cf-turnstile-response"]');
+            turnstileToken = tsInput ? tsInput.value.trim() : "";
+            if (!turnstileToken) {
+                errorText.innerText = "Please complete the CAPTCHA verification.";
+                errorAlert.classList.remove('hidden');
+                return;
+            }
+        }
+
         btn.disabled = true;
         btn.innerText = "Sending...";
 
@@ -214,7 +235,7 @@
             const res = await fetch('/api/contact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, contact_info, subject, message })
+                body: JSON.stringify({ name, contact_info, subject, message, 'cf-turnstile-response': turnstileToken })
             });
 
             const json = await res.json();
@@ -230,6 +251,9 @@
             errorText.innerText = "Network error while sending message.";
             errorAlert.classList.remove('hidden');
         } finally {
+            if (TURNSTILE_REQUIRED && window.turnstile) {
+                try { window.turnstile.reset(); } catch (e) {}
+            }
             btn.disabled = false;
             btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg> Send Private Message`;
         }

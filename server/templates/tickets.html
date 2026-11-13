@@ -433,6 +433,12 @@
                         class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono resize-none"></textarea>
                 </div>
 
+                {% if turnstile_enabled and not is_authenticated_user %}
+                <div class="pt-1">
+                    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="dark"></div>
+                </div>
+                {% endif %}
+
                 <div id="submit-form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
 
                 <div class="flex justify-end">
@@ -448,7 +454,11 @@
 {% endblock %}
 
 {% block scripts %}
+{% if turnstile_enabled and not is_authenticated_user %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endif %}
 <script>
+    const TURNSTILE_REQUIRED = {{ (turnstile_enabled and not is_authenticated_user) | tojson }};
     const LOGGED_IN_DISCORD_USER = {{ discord_user | tojson | safe }};
     const IS_ADMIN = {{ is_admin | tojson | safe }};
     let allTickets = {{ tickets | tojson | safe }};
@@ -1209,6 +1219,18 @@
 
         const isAnon = anonCheckbox ? anonCheckbox.checked : false;
 
+        let turnstileToken = "";
+        if (TURNSTILE_REQUIRED) {
+            const tsInput = document.querySelector('#ticket-submit-modal [name="cf-turnstile-response"]') || document.querySelector('[name="cf-turnstile-response"]');
+            turnstileToken = tsInput ? tsInput.value.trim() : "";
+            if (!turnstileToken) {
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-rose-950/20 text-rose-400 border border-rose-500/20';
+                statusDiv.innerText = "Error: Please complete the CAPTCHA verification.";
+                statusDiv.classList.remove('hidden');
+                return;
+            }
+        }
+
         const payload = {
             type: selectedType,
             title: titleInput ? titleInput.value.trim() : '',
@@ -1216,7 +1238,8 @@
             suggestion: descInput.value.trim(),
             anonymous: isAnon,
             target: selectedTarget,
-            is_server_checker: selectedTarget === "server_checker"
+            is_server_checker: selectedTarget === "server_checker",
+            'cf-turnstile-response': turnstileToken
         };
 
         submitBtn.disabled = true;
@@ -1263,6 +1286,9 @@
             statusDiv.innerText = "Error: Failed to connect to server.";
             statusDiv.classList.remove('hidden');
         } finally {
+            if (TURNSTILE_REQUIRED && window.turnstile) {
+                try { window.turnstile.reset(); } catch (e) {}
+            }
             submitBtn.disabled = false;
             updateFormPlaceholders();
         }

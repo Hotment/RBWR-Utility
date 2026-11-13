@@ -226,6 +226,12 @@
                         class="premium-input px-4 py-3 rounded-xl text-sm font-mono resize-none"></textarea>
                 </div>
 
+                {% if turnstile_enabled and not is_authenticated_user %}
+                <div>
+                    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="dark"></div>
+                </div>
+                {% endif %}
+
                 <div id="form-status" class="hidden text-xs font-mono p-3 rounded-xl"></div>
 
                 <button type="submit" id="submit-btn"
@@ -244,7 +250,11 @@
 {% endblock %}
 
 {% block scripts %}
+{% if turnstile_enabled and not is_authenticated_user %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endif %}
 <script>
+    const TURNSTILE_REQUIRED = {{ (turnstile_enabled and not is_authenticated_user) | tojson }};
     document.getElementById('feedback-form').addEventListener('submit', async function (e) {
         e.preventDefault();
 
@@ -254,10 +264,23 @@
         const statusDiv = document.getElementById('form-status');
         const submitBtn = document.getElementById('submit-btn');
 
+        let turnstileToken = "";
+        if (TURNSTILE_REQUIRED) {
+            const tsInput = document.querySelector('#feedback-form [name="cf-turnstile-response"]');
+            turnstileToken = tsInput ? tsInput.value.trim() : "";
+            if (!turnstileToken) {
+                statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-red-950/20 text-red-400 border border-red-500/20';
+                statusDiv.innerText = "Error: Please complete the CAPTCHA verification.";
+                statusDiv.classList.remove('hidden');
+                return;
+            }
+        }
+
         const payload = {
             name: anonymousField.checked ? "Anonymous" : nameField.value.trim(),
             suggestion: suggestionField.value.trim(),
-            anonymous: anonymousField.checked
+            anonymous: anonymousField.checked,
+            'cf-turnstile-response': turnstileToken
         };
 
         submitBtn.disabled = true;
@@ -298,6 +321,9 @@
             statusDiv.innerText = "Error: Failed to connect to server.";
             statusDiv.classList.remove('hidden');
         } finally {
+            if (TURNSTILE_REQUIRED && window.turnstile) {
+                try { window.turnstile.reset(); } catch (e) {}
+            }
             submitBtn.disabled = false;
             submitBtn.innerText = "Submit Suggestion";
         }

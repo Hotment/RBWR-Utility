@@ -11,6 +11,9 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    {% endif %}
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -164,6 +167,12 @@
                             <input type="password" id="password" name="password" placeholder="password"
                                 class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
                         </div>
+
+                        {% if turnstile_enabled %}
+                        <div class="pt-1">
+                            <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="dark"></div>
+                        </div>
+                        {% endif %}
 
                         <button type="submit"
                             class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-slate-300 hover:text-white rounded-xl text-xs font-mono font-semibold transition mt-1">

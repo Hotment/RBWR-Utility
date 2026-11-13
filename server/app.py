@@ -246,6 +246,80 @@ def fmt_score_filter(val):
     except Exception:
         return str(val)
 
+
+def is_turnstile_enabled() -> bool:
+    return bool(
+        os.environ.get("TURNSTILE_SITE_KEY", "").strip()
+        and os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
+    )
+
+
+def is_session_authenticated() -> bool:
+    return bool(session.get("admin_logged_in") or session.get("discord_user"))
+
+
+def get_client_ip() -> str:
+    ip = request.remote_addr or "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    return ip
+
+
+def extract_turnstile_token(req_json=None) -> str:
+    if isinstance(req_json, dict):
+        tok = req_json.get("cf-turnstile-response") or req_json.get("turnstile_token")
+        if tok:
+            return str(tok).strip()
+    form_tok = request.form.get("cf-turnstile-response") or request.form.get("turnstile_token")
+    if form_tok:
+        return str(form_tok).strip()
+    hdr_tok = request.headers.get("X-Turnstile-Token")
+    return str(hdr_tok).strip() if hdr_tok else ""
+
+
+def verify_turnstile_token(token: str, remote_ip: Optional[str] = None) -> tuple[bool, Optional[str]]:
+    """Verify a Cloudflare Turnstile response token when Turnstile is configured."""
+    if not is_turnstile_enabled():
+        return True, None
+
+    secret = os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
+    if not token:
+        return False, "CAPTCHA verification required. Please complete the challenge."
+
+    payload = {
+        "secret": secret,
+        "response": token,
+    }
+    if remote_ip and remote_ip != "unknown":
+        payload["remoteip"] = remote_ip
+
+    try:
+        resp = requests.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data=payload,
+            timeout=5,
+        )
+        data = resp.json() if resp.ok else {}
+        if data.get("success") is True:
+            return True, None
+        logger.warning(f"Turnstile verification failed: {data.get('error-codes')}")
+        return False, "CAPTCHA verification failed. Please try again."
+    except Exception as ex:
+        logger.warning(f"Turnstile verification request error: {ex}")
+        return False, "CAPTCHA verification service unavailable. Please try again."
+
+
+@app.context_processor
+def inject_turnstile_config():
+    enabled = is_turnstile_enabled()
+    site_key = os.environ.get("TURNSTILE_SITE_KEY", "").strip() if enabled else ""
+    return {
+        "turnstile_enabled": enabled,
+        "turnstile_site_key": site_key,
+        "is_authenticated_user": is_session_authenticated(),
+    }
+
 @app.template_filter("fmt_refreshed_date")
 def fmt_refreshed_date_filter(val):
     if not val or val == "now":
@@ -1692,6 +1766,12 @@ def submit_contact_message():
     payload = request.get_json() or {}
     if not isinstance(payload, dict):
         return jsonify({"detail": "Invalid request body."}), 400
+
+    if not is_session_authenticated():
+        captcha_ok, captcha_err = verify_turnstile_token(extract_turnstile_token(payload), ip)
+        if not captcha_ok:
+            return jsonify({"detail": captcha_err}), 400
+
     message_text = str(payload.get("message", "")).strip()
     if not message_text:
         return jsonify({"detail": "Message body cannot be empty."}), 400
@@ -4910,6 +4990,11 @@ def get_historical_servers_api():
 
 @app.route("/api/servers/refresh", methods=["POST"])
 def refresh_servers_api():
+    if not is_session_authenticated():
+        req_json = request.get_json(silent=True)
+        captcha_ok, captcha_err = verify_turnstile_token(extract_turnstile_token(req_json), get_client_ip())
+        if not captcha_ok:
+            return jsonify({"success": False, "detail": captcha_err}), 400
     success = pull_server_checker_data()
     return jsonify({"success": success})
 
@@ -5533,6 +5618,10 @@ def submit_ticket():
         req_json = request.get_json() or {}
         if not isinstance(req_json, dict):
             return jsonify({"detail": "Invalid request body."}), 400
+        if not is_session_authenticated():
+            captcha_ok, captcha_err = verify_turnstile_token(extract_turnstile_token(req_json), ip)
+            if not captcha_ok:
+                return jsonify({"detail": captcha_err}), 400
         payload = TicketPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -7177,7 +7266,11 @@ def admin_login():
             
         if is_login_rate_limited(ip):
             return render_template("admin_login.html", error="Too many login attempts. Please try again in 1 minute.", next_url=next_url, discord_login_url=discord_login_url, discord_configured=bool(discord_client_id)), 429
-            
+
+        captcha_ok, captcha_err = verify_turnstile_token(extract_turnstile_token(), ip)
+        if not captcha_ok:
+            return render_template("admin_login.html", error=captcha_err, next_url=next_url, discord_login_url=discord_login_url, discord_configured=bool(discord_client_id)), 400
+
         username = request.form.get("username", "")
         password = request.form.get("password", "")
         
