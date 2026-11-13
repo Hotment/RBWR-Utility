@@ -245,14 +245,21 @@ class CalculateRequest(BaseModel):
 class ReactorMetrics(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    unit: Optional[int] = None
-    aprm: Optional[float] = None
-    rtp: Optional[float] = None
-    electric_mw: Optional[float] = None
-    demand_mw: Optional[float] = None
-    recirc: Optional[float] = None
-    mss: Optional[float] = None
-    ocl: Optional[float] = None
+    unit: int
+    demand_mwe: float
+    thermal_percent: float
+    rtp_percent: float
+    aprm_percent: float
+    flow_kg_s: float
+    gen_load_mwe: float
+    station_usage_mwe: float
+    net_output_mwe: float
+    recirc_pump_speed: float
+    is_recirc_overridden: bool
+    scram_risk: bool
+    scram_limit_percent: float
+    parameters: dict[str, Any]
+    regression_parameters: dict[str, Any]
 
 class CalculateResponse(BaseModel):
     success: bool = True
@@ -287,10 +294,11 @@ class PublicServerEntry(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     jobId: str
-    placeId: Optional[int] = None
+    id: Optional[str] = None
     playerCount: int = 0
-    maxPlayers: Optional[int] = None
-    isPrivate: Optional[bool] = None
+    lastHeartbeat: Optional[str] = None
+    privateServerOwnerId: Optional[str] = None
+    is_private: Optional[bool] = None
     top_score: Optional[float] = None
     state: Optional[PublicServerState] = None
 
@@ -310,7 +318,6 @@ class LatestServersResponse(BaseModel):
 
     success: Optional[bool] = None
     servers: Optional[dict[str, Any]] = None
-    data: Optional[dict[str, Any]] = None
 
 class ServerCard(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -319,6 +326,7 @@ class ServerCard(BaseModel):
     short_id: Optional[str] = None
     player_count: Optional[int] = None
     is_private: Optional[bool] = None
+    private_server_owner_id: Optional[str] = None
     is_persistent: Optional[bool] = None
     is_archived: Optional[bool] = None
     top_score: Optional[float] = None
@@ -616,7 +624,13 @@ def _collect_all_server_cards(
                 filtered.append(c)
         cards = filtered
 
-    return cards
+    return [_normalize_api_server_card(c) for c in cards]
+
+def _normalize_api_server_card(card: dict) -> dict:
+    out = dict(card)
+    if "privateServerOwnerId" in out:
+        out["private_server_owner_id"] = out.pop("privateServerOwnerId")
+    return out
 
 SCALAR_DOCS_HTML = """<!doctype html>
 <html lang="en">
@@ -1024,7 +1038,7 @@ def get_historical_servers(
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
     clamped_page = min(page, total_pages)
     start_idx = (clamped_page - 1) * per_page
-    page_cards = sorted_cards[start_idx:start_idx + per_page]
+    page_cards = [_normalize_api_server_card(c) for c in sorted_cards[start_idx:start_idx + per_page]]
 
     return {
         "success": True,
@@ -1060,7 +1074,7 @@ def lookup_server(
 
     if not target_card:
         return {"success": True, "found": False}
-    return {"success": True, "found": True, "server": target_card}
+    return {"success": True, "found": True, "server": _normalize_api_server_card(target_card)}
 
 @app.get(
     "/api/servers/{job_id}",
@@ -1567,7 +1581,10 @@ def get_archive_day(
     if not isinstance(day_data, dict):
         raise HTTPException(status_code=500, detail="Failed to read archive data.")
 
-    server_cards = core.build_server_cards(day_data, search_query=q.strip(), is_archived=True, exact_search_only=False)
+    server_cards = [
+        _normalize_api_server_card(c)
+        for c in core.build_server_cards(day_data, search_query=q.strip(), is_archived=True, exact_search_only=False)
+    ]
     return {
         "success": True,
         "date": clean_date,
