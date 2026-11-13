@@ -232,7 +232,7 @@
         btn.innerText = "Sending...";
 
         try {
-            const res = await fetch('/api/contact', {
+            const res = await fetch('/contact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, contact_info, subject, message, 'cf-turnstile-response': turnstileToken })

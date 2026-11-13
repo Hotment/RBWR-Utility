@@ -573,7 +573,7 @@
         const now = Date.now();
         if (calcServersList.length > 0 && (now - lastCalcFetchTime) < 3000) return;
         try {
-            const res = await fetch('/api/public-servers');
+            const res = await fetch('/api/public/servers');
             if (!res.ok) return;
             const json = await res.json();
             if (json.success && json.data && json.data.servers) {

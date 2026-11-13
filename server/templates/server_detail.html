@@ -1533,7 +1533,7 @@
         };
 
         try {
-            const res = await fetch('/api/calc', {
+            const res = await fetch('/api/calculate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -1932,7 +1932,7 @@
         return;
         {% endif %}
         try {
-            const res = await fetch('/api/public-servers');
+            const res = await fetch('/api/public/servers');
             if (!res.ok) return;
             const json = await res.json();
             if (json.success && json.data && json.data.servers) {

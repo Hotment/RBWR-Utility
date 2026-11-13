@@ -998,7 +998,7 @@
                         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         <span>Refresh</span>
                     </button>
-                    <a href="/api/admin/audit-logs/export" download
+                    <a href="/admin/audit-logs/export" download
                         class="px-3.5 py-2 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 hover:text-amber-200 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 tracking-wide font-medium text-xs transition whitespace-nowrap flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                         <span>Export JSON</span>
@@ -2190,7 +2190,7 @@
             const path = window.location.pathname;
             if (path === '/admin/crashes') {
                 navigateToView('crashes', path, false);
-            } else if (path === '/admin/suggestions' || path === '/admin/tickets') {
+            } else if (path === '/admin/tickets') {
                 navigateToView('suggestions', path, false);
             } else if (path === '/admin/contact') {
                 navigateToView('contact', path, false);
@@ -2585,7 +2585,7 @@
             }
 
             try {
-                const url = `/api/servers/historical?page=${page}&per_page=${ADMIN_PAGE_SIZE}&q=${encodeURIComponent(searchVal)}&sort=${encodeURIComponent(adminCurrentSort)}`;
+                const url = `/servers/cards/historical?page=${page}&per_page=${ADMIN_PAGE_SIZE}&q=${encodeURIComponent(searchVal)}&sort=${encodeURIComponent(adminCurrentSort)}`;
                 const resp = await fetch(url, { signal: adminHistoricalAbortController.signal });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const data = await resp.json();
@@ -3328,7 +3328,7 @@
 
             const text = input.value.trim();
             try {
-                const response = await fetch(`/api/tickets/${id}/messages`, {
+                const response = await fetch(`/tickets/${id}/messages`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
@@ -3370,7 +3370,7 @@
 
             const newText = textarea.value.trim();
             try {
-                const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                const response = await fetch(`/tickets/${ticketId}/messages/${msgId}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: newText })
@@ -3393,7 +3393,7 @@
                 return;
             }
             try {
-                const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+                const response = await fetch(`/tickets/${ticketId}/messages/${msgId}`, {
                     method: 'DELETE'
                 });
                 const data = await response.json();
@@ -3770,7 +3770,7 @@
             const duration_minutes = durationVal === 'permanent' ? null : parseInt(durationVal);
 
             try {
-                const response = await fetch('/admin/suggestions/ban', {
+                const response = await fetch('/admin/tickets/ban', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ip, duration_minutes, reason })
@@ -4444,7 +4444,7 @@
                     params.set('q', currentAuditQuery);
                 }
 
-                const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+                const res = await fetch(`/admin/audit-logs/data?${params.toString()}`);
                 if (!res.ok) {
                     if (res.status === 403) return;
                     throw new Error(`HTTP ${res.status}`);
@@ -4729,7 +4729,7 @@
             }
 
             try {
-                const res = await fetch('/api/admin/audit-logs/clear', {
+                const res = await fetch('/admin/audit-logs/clear', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                 });
@@ -4808,7 +4808,7 @@
             if (results) results.classList.add('hidden');
 
             try {
-                const res = await fetch('/api/admin/debug/analyze_payload', {
+                const res = await fetch('/admin/debug/analyze_payload', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ payload: parsed })
@@ -4834,7 +4834,7 @@
             if (results) results.classList.add('hidden');
 
             try {
-                const res = await fetch('/api/admin/debug/server/' + encodeURIComponent(jobId));
+                const res = await fetch('/admin/debug/server/' + encodeURIComponent(jobId));
                 const data = await res.json();
                 if (!res.ok || !data.found) {
                     renderDebugNotFound(data);

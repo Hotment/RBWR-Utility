@@ -1,12 +1,10 @@
-from typing import Any, Optional, Dict
-from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context, stream_with_context
+from typing import Any, Optional
+from flask import Flask, request, jsonify, send_from_directory, redirect, Response, render_template, session, has_request_context
 from pydantic import BaseModel, Field, ValidationError
-from collections import OrderedDict
 import os
 import sys
 import json
 import gzip
-import queue
 import traceback
 import re
 from werkzeug.exceptions import HTTPException
@@ -22,21 +20,9 @@ except ImportError:
     from scoring import calculate_server_top_score
 
 try:
-    from server.fuel import (
-        calculate_u1_fuel_level,
-        calculate_u2_fuel_level,
-        evaluate_server_fuel,
-        approximate_fuel_from_snapshots,
-        resolve_unit_name,
-    )
+    from server.fuel import evaluate_server_fuel
 except ImportError:
-    from fuel import (
-        calculate_u1_fuel_level,
-        calculate_u2_fuel_level,
-        evaluate_server_fuel,
-        approximate_fuel_from_snapshots,
-        resolve_unit_name,
-    )
+    from fuel import evaluate_server_fuel
 
 def _json_dumps(obj):
     if orjson:
@@ -85,7 +71,6 @@ import time
 import threading
 from datetime import datetime, timezone, timedelta
 from functools import wraps
-import asyncio
 from flask_sock import Sock
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -147,15 +132,87 @@ except NameError:
     def report_crash_to_discord(*args, **kwargs) -> bool:
         return False
 
-try:
-    from server.calculator import calculate_reactor_metrics
-except ImportError:
-    from calculator import calculate_reactor_metrics
+import atexit
+import socket
+import subprocess
 
 try:
     from server import audit
 except ImportError:
     import audit
+
+try:
+    from server import core
+    from server.core import (
+        load_suggestions,
+        save_suggestions,
+        load_persistent_servers,
+        save_persistent_servers,
+        safe_dict_items,
+        safe_dict_keys,
+        safe_float,
+        format_demand_value,
+        format_total_demand,
+        get_server_visibility,
+        get_server_player_count,
+        ensure_unit_fuel_level,
+        get_sc_data,
+        build_server_metadata,
+        is_exact_job_or_server_id_match,
+        lookup_archive_server_date,
+        get_archived_server_snapshots,
+        format_file_size,
+        get_all_archive_days_info,
+        convert_ISO_to_secs,
+        format_uptime_duration,
+        get_server_uptime_seconds,
+        is_server_historical,
+        get_unit_output_mw,
+        calculate_server_points_rate,
+        get_historical_cards_base,
+        sort_historical_cards,
+        build_server_cards,
+        build_chart_payload,
+        build_global_chart_payload,
+        get_public_servers_payload,
+        get_github_latest_release,
+    )
+except ImportError:
+    import core
+    from core import (
+        load_suggestions,
+        save_suggestions,
+        load_persistent_servers,
+        save_persistent_servers,
+        safe_dict_items,
+        safe_dict_keys,
+        safe_float,
+        format_demand_value,
+        format_total_demand,
+        get_server_visibility,
+        get_server_player_count,
+        ensure_unit_fuel_level,
+        get_sc_data,
+        build_server_metadata,
+        is_exact_job_or_server_id_match,
+        lookup_archive_server_date,
+        get_archived_server_snapshots,
+        format_file_size,
+        get_all_archive_days_info,
+        convert_ISO_to_secs,
+        format_uptime_duration,
+        get_server_uptime_seconds,
+        is_server_historical,
+        get_unit_output_mw,
+        calculate_server_points_rate,
+        get_historical_cards_base,
+        sort_historical_cards,
+        build_server_cards,
+        build_chart_payload,
+        build_global_chart_payload,
+        get_public_servers_payload,
+        get_github_latest_release,
+    )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -246,17 +303,14 @@ def fmt_score_filter(val):
     except Exception:
         return str(val)
 
-
 def is_turnstile_enabled() -> bool:
     return bool(
         os.environ.get("TURNSTILE_SITE_KEY", "").strip()
         and os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
     )
 
-
 def is_session_authenticated() -> bool:
     return bool(session.get("admin_logged_in") or session.get("discord_user"))
-
 
 def get_client_ip() -> str:
     ip = request.remote_addr or "unknown"
@@ -264,7 +318,6 @@ def get_client_ip() -> str:
     if forwarded:
         ip = forwarded.split(",")[0].strip()
     return ip
-
 
 def extract_turnstile_token(req_json=None) -> str:
     if isinstance(req_json, dict):
@@ -276,7 +329,6 @@ def extract_turnstile_token(req_json=None) -> str:
         return str(form_tok).strip()
     hdr_tok = request.headers.get("X-Turnstile-Token")
     return str(hdr_tok).strip() if hdr_tok else ""
-
 
 def verify_turnstile_token(token: str, remote_ip: Optional[str] = None) -> tuple[bool, Optional[str]]:
     """Verify a Cloudflare Turnstile response token when Turnstile is configured."""
@@ -308,7 +360,6 @@ def verify_turnstile_token(token: str, remote_ip: Optional[str] = None) -> tuple
     except Exception as ex:
         logger.warning(f"Turnstile verification request error: {ex}")
         return False, "CAPTCHA verification service unavailable. Please try again."
-
 
 @app.context_processor
 def inject_turnstile_config():
@@ -847,11 +898,9 @@ ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
 def default_permission(section: str) -> bool:
     return True
 
-
 def normalize_permissions(perms: dict | None) -> dict:
     perms = perms or {}
     return {s: bool(perms.get(s, default_permission(s))) for s in ALL_PERMISSION_SECTIONS}
-
 
 def get_user_permissions(user_identifier: str) -> dict:
     if not user_identifier:
@@ -941,7 +990,6 @@ def save_admin_notifier_config(user_identifier: str, notifier_config: dict):
     
     save_admins(admins_data)
 
-
 def get_authenticated_user():
     if has_request_context():
         try:
@@ -995,11 +1043,11 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         username = get_authenticated_user()
         if not username:
-            if request.path.startswith("/admin/suggestions/status") or \
-               request.path.startswith("/admin/suggestions/comment") or \
-               request.path.startswith("/admin/suggestions/delete") or \
-               request.path.startswith("/admin/suggestions/ban") or \
-               request.path.startswith("/admin/suggestions/unban"):
+            if request.path.startswith("/admin/tickets/status") or \
+               request.path.startswith("/admin/tickets/comment") or \
+               request.path.startswith("/admin/tickets/delete") or \
+               request.path.startswith("/admin/tickets/ban") or \
+               request.path.startswith("/admin/tickets/unban"):
                 return Response(
                     "Unauthorized access - Credentials required",
                     401,
@@ -1052,108 +1100,6 @@ def admin_panel_identity(username: str) -> dict:
         name = info.get("display_name") or name
     return {"id": discord_id or str(username), "discord_id": discord_id or None, "name": name, "picture": picture}
 
-_github_version_cache = {
-    "data": None,
-    "timestamp": 0.0
-}
-_github_version_lock = threading.Lock()
-GITHUB_RELEASE_CACHE_TTL = 300  # 5 minutes cache to respect GitHub API rate limits
-
-def get_github_latest_release(force_refresh: bool = False) -> dict:
-    """
-    Fetches the latest release from the GitHub repository API with in-memory caching.
-    """
-    now = time.time()
-    with _github_version_lock:
-        if not force_refresh and _github_version_cache["data"] and (now - _github_version_cache["timestamp"] < GITHUB_RELEASE_CACHE_TTL):
-            return _github_version_cache["data"]
-
-    headers = {"User-Agent": "RBWR-Utility-Server/2.0"}
-    try:
-        r = requests.get(
-            "https://api.github.com/repos/Hotment/RBWR-Utility/releases/latest",
-            headers=headers,
-            timeout=5
-        )
-        if r.status_code == 200:
-            rel = r.json()
-            tag_name = rel.get("tag_name", "")
-            version = tag_name.lstrip("vV") if tag_name else "unknown"
-            published_at = rel.get("published_at", "")
-            release_date = published_at.split("T")[0] if published_at else datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            body_content = rel.get("body", "") or "No release notes available."
-            body_content = body_content.replace("\r\n", "\n")
-            html_url = rel.get("html_url", "https://github.com/Hotment/RBWR-Utility/releases/latest")
-
-            assets = []
-            download_url = html_url
-            for a in rel.get("assets", []):
-                asset_info = {
-                    "name": a.get("name"),
-                    "size": a.get("size"),
-                    "download_url": a.get("browser_download_url")
-                }
-                assets.append(asset_info)
-
-            for a in assets:
-                aname = (a.get("name") or "").lower()
-                if "win-x64" in aname and aname.endswith(".exe"):
-                    download_url = a.get("download_url") or html_url
-                    break
-            if download_url == html_url:
-                for a in assets:
-                    aname = (a.get("name") or "").lower()
-                    if aname.endswith((".exe", ".zip")):
-                        download_url = a.get("download_url") or html_url
-                        break
-
-            result = {
-                "version": version,
-                "tag_name": tag_name,
-                "name": rel.get("name", f"Release {version}"),
-                "release_date": release_date,
-                "published_at": published_at,
-                "notes": body_content,
-                "html_url": html_url,
-                "download_url": download_url,
-                "assets": assets
-            }
-            with _github_version_lock:
-                _github_version_cache["data"] = result
-                _github_version_cache["timestamp"] = now
-            return result
-    except Exception as e:
-        logger.warning(f"Error fetching latest release from GitHub: {e}")
-
-    with _github_version_lock:
-        if _github_version_cache["data"]:
-            return _github_version_cache["data"]
-
-    return {
-        "version": "2.0.5",
-        "tag_name": "v2.0.5",
-        "name": "Version 2.0.5",
-        "release_date": "2026-09-23",
-        "published_at": "2026-09-23T23:15:33Z",
-        "notes": "No release notes available.",
-        "html_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
-        "download_url": "https://github.com/Hotment/RBWR-Utility/releases/latest",
-        "assets": []
-    }
-
-def load_suggestions():
-    if not os.path.exists(SUGGESTIONS_FILE):
-        return {"suggestions": []}
-    with open(SUGGESTIONS_FILE, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except Exception:
-            return {"suggestions": []}
-
-def save_suggestions(data):
-    with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
 def get_next_ticket_id(data: dict) -> int:
     """
     Computes the next unique ticket ID ensuring IDs never overlap,
@@ -1193,7 +1139,6 @@ try:
 except Exception as e:
     logger.warning(f"[Discord Bot] Failed to initialize bot from bot.py: {e}")
 
-# ---------------------------------------------------------------- admin panel: Discord bot sections
 try:
     import bot_features
     import admin_features
@@ -1237,10 +1182,6 @@ def get_public_suggestions():
     return get_public_tickets()
 
 def get_public_tickets():
-    data = load_suggestions()
-    suggestions = data.get("suggestions", [])
-    public_list = []
-    
     is_admin = False
     current_discord_id = None
     if has_request_context():
@@ -1250,48 +1191,7 @@ def get_public_tickets():
             current_discord_id = str(discord_user.get("id") or "")
         except Exception:
             pass
-
-    for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
-        if s.get("hidden"):
-            continue
-        is_anon = bool(s.get("anonymous")) or (s.get("name") or "").lower() == "anonymous"
-        pub_name = "Anonymous" if is_anon else (s.get("name") or "Anonymous")
-        pub_avatar = None if is_anon else s.get("discord_avatar")
-        raw_text = s.get("suggestion") or s.get("description", "")
-        
-        ticket_discord_id = str(s.get("discord_id") or "")
-        is_author = bool(current_discord_id and ticket_discord_id and current_discord_id == ticket_discord_id and not is_anon)
-        
-        can_view_conversation = is_admin or is_author
-        ticket_messages = s.get("messages", []) if can_view_conversation else []
-        messages_count = len(s.get("messages", [])) if can_view_conversation else 0
-
-        public_list.append({
-            "id": s.get("id"),
-            "type": s.get("type", "suggestion"),
-            "title": s.get("title", ""),
-            "name": pub_name,
-            "suggestion": raw_text,
-            "description": raw_text,
-            "timestamp": s.get("timestamp", ""),
-            "status": s.get("status", "pending"),
-            "admin_comment": s.get("admin_comment", ""),
-            "comment_by": s.get("comment_by", ""),
-            "comment_timestamp": s.get("comment_timestamp", ""),
-            "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
-            "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
-            "anonymous": is_anon,
-            "discord_avatar": pub_avatar,
-            "discord_id": None if is_anon else (s.get("discord_id") or ""),
-            "discord_username": None if is_anon else (s.get("discord_username") or ""),
-            "is_discord_user": bool(s.get("discord_id")) and not is_anon,
-            "can_view_conversation": can_view_conversation,
-            "is_author": is_author,
-            "messages": ticket_messages,
-            "messages_count": messages_count
-        })
-    return public_list
-
+    return core.get_public_tickets(is_admin=is_admin, current_discord_id=current_discord_id)
 
 def load_crashes():
     if not os.path.exists(CRASHES_FILE):
@@ -1543,100 +1443,9 @@ def sitemap_xml():
     xml_content = "\n".join(xml_lines).replace("\u00a0", " ")
     return Response(xml_content, mimetype="application/xml; charset=utf-8")
 
-@app.route("/api/status", methods=["GET", "HEAD"])
-def status_check():
-    uptime_sec = max(0.0, round(time.time() - SERVER_START_TIME, 2))
-    release = get_github_latest_release()
-    version = release.get("version", "unknown")
-
-    payload = {
-        "status": "ok",
-        "service": "RBWR Utility Server",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "uptime_seconds": uptime_sec,
-        "uptime": format_uptime(uptime_sec),
-        "version": version
-    }
-    response = jsonify(payload)
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response, 200
-
 @app.route("/calculator", methods=["GET"])
 def calculator_page():
     return render_template("calculator.html")
-
-@app.route("/api/calculate", methods=["GET", "POST"])
-@app.route("/api/calc", methods=["GET", "POST"])
-def calculate_api():
-    req_data = {}
-    if request.method == "POST":
-        req_data = request.get_json(silent=True) or {}
-
-    unit_raw = req_data.get("unit") if req_data.get("unit") is not None else request.args.get("unit", 1)
-    demand_raw = req_data.get("demand") if req_data.get("demand") is not None else request.args.get("demand")
-    thermal_raw = (
-        req_data.get("thermal")
-        if req_data.get("thermal") is not None
-        else req_data.get("aprm")
-        if req_data.get("aprm") is not None
-        else req_data.get("rtp")
-        if req_data.get("rtp") is not None
-        else request.args.get("thermal") or request.args.get("aprm") or request.args.get("rtp")
-    )
-    recirc_raw = (
-        req_data.get("recirc_override")
-        if req_data.get("recirc_override") is not None
-        else req_data.get("recirc")
-        if req_data.get("recirc") is not None
-        else request.args.get("recirc_override") or request.args.get("recirc")
-    )
-
-    try:
-        unit = int(unit_raw)  # pyright: ignore[reportArgumentType]
-        if unit not in (1, 2):
-            unit = 1
-    except (ValueError, TypeError):
-        unit = 1
-
-    demand = None
-    if demand_raw is not None and str(demand_raw).strip() != "":
-        try:
-            demand = float(demand_raw)
-        except (ValueError, TypeError):
-            return jsonify({"success": False, "error": f"Invalid demand value: {demand_raw}"}), 400
-
-    thermal = None
-    if thermal_raw is not None and str(thermal_raw).strip() != "":
-        try:
-            thermal = float(thermal_raw)
-        except (ValueError, TypeError):
-            return jsonify({"success": False, "error": f"Invalid thermal/aprm value: {thermal_raw}"}), 400
-
-    recirc_override = None
-    if recirc_raw is not None and str(recirc_raw).strip() != "":
-        try:
-            recirc_override = float(recirc_raw)
-        except (ValueError, TypeError):
-            recirc_override = None
-
-    try:
-        metrics = calculate_reactor_metrics(
-            unit=unit,
-            demand=demand,
-            thermal=thermal,
-            recirc_override=recirc_override,
-        )
-        return jsonify({
-            "success": True,
-            "data": metrics
-        })
-    except ValueError as ve:
-        return jsonify({"success": False, "error": str(ve)}), 400
-    except Exception as ex:
-        logger.error(f"Error executing reactor calculations: {ex}", exc_info=True)
-        return jsonify({"success": False, "error": str(ex)}), 500
 
 @app.route("/points", methods=["GET"])
 def points_page():
@@ -1646,13 +1455,11 @@ def points_page():
 def local_viewer_page():
     return render_template("local_viewer.html")
 
-@app.route("/tablet", methods=["GET"])
 @app.route("/operator-tablet", methods=["GET"])
 def operator_tablet_page():
     return render_template("operator_tablet.html")
 
 @app.route("/privacy", methods=["GET"])
-@app.route("/privacy-policy", methods=["GET"])
 def privacy_page():
     privacy_file = os.path.join(TEMPLATES_DIR, "privacy.html")
     if os.path.exists(privacy_file):
@@ -1667,7 +1474,6 @@ def contact_page():
     return render_template("contact.html")
 
 @app.route("/credits", methods=["GET"])
-@app.route("/acknowledgements", methods=["GET"])
 def credits_page():
     return render_template("credits.html")
 
@@ -1748,7 +1554,7 @@ def handle_unhandled_exception(e):
             "<a href='/' style='color:#38bdf8;'>Return to Home</a></body></html>"
         ), 500
 
-@app.route("/api/contact", methods=["POST"])
+@app.route("/contact", methods=["POST"])
 def submit_contact_message():
     ip = request.remote_addr or "unknown"
     forwarded = request.headers.get("X-Forwarded-For")
@@ -1820,1685 +1626,18 @@ def submit_contact_message():
     return jsonify({"success": True, "id": msg_id})
 
 # ==============================================================================
-# RBWR Server Checker Engine
-# Original implementation & architecture by felixq (https://github.com/felixqx1/RBWR-Server-checker)
-# Licensed under GNU General Public License v2.0 (GPL-2.0)
+# RBWR Server Checker Background Worker (logic lives in server/core.py)
 # ==============================================================================
-
-SERVER_CHECKER_PURGE_KEYS = [
-    "APRM Setpoint",
-    "AutoPressure",
-    "BusA",
-    "BusB",
-    "BypassTurbineAutoTrip",
-    "DCBus",
-    "Demand Time Left",
-    "DieselRPM",
-    "DoAutoScramU1",
-    "DiffPressure",
-    "Disk Ruptured",
-    "DoAutoScramU2",
-    "Fuel Burn (default 0.54)",
-    "NextDemandU1",
-    "NextDemandU2",
-    "RPS Trip State B",
-    "RPS Trip State A",
-    "Reactor Scram State",
-    "SCRAMreason",
-    "Startup XFMR",
-    "StartupUnit1",
-    "StartupUnit2",
-    "TRIPreason",
-    "TotalPowerGenerated",
-    "Turbine RPM",
-    "TurbineTrip",
-    "Vibrations",
-]
-
-SERVER_CHECKER_FIELD_PRECISION = {
-    "APRM": None,
-    "RTP": None,
-    "Xenon": None,
-    "Iodine": None,
-    "FWP1 Temp": 4,
-    "FWP2 Temp": 4,
-    "Recirc1": 3,
-    "Recirc2": 3,
-    "CasingTemperature": 4,
-    "PradDoSieci": 0,
-    "Output (MW)": 0,
-    "Reactor Temp": 4,
-    "EstimatedFuel": 2,
-}
-
-PERSISTENT_SERVERS_FILE = os.path.join(DATA_DIR, "persistent_servers.json")
-
-def load_persistent_servers():
-    if not os.path.exists(PERSISTENT_SERVERS_FILE):
-        return {"persistent": {}}
-    try:
-        with open(PERSISTENT_SERVERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"persistent": {}}
-
-def save_persistent_servers(data):
-    os.makedirs(os.path.dirname(PERSISTENT_SERVERS_FILE), exist_ok=True)
-    with open(PERSISTENT_SERVERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
-_sc_lock = threading.RLock()
-_sc_public_server_ids = []
-_sc_public_servers_info = {}
-_sc_server_ids = []
-_sc_latest_data = {}
-_sc_server_meta = {}
-
-def safe_dict_items(d, max_retries=3):
-    """
-    Safely returns list(d.items()) even if the dictionary is being modified concurrently in another thread.
-    """
-    if not isinstance(d, dict):
-        return []
-    for attempt in range(max_retries):
-        try:
-            return list(d.items())
-        except RuntimeError:
-            if attempt == max_retries - 1:
-                try:
-                    keys = list(d.keys())
-                    return [(k, d[k]) for k in keys if k in d]
-                except Exception:
-                    return []
-            time.sleep(0.005)
-    return []
-
-def safe_dict_keys(d, max_retries=3):
-    """
-    Safely returns list(d.keys()) even if the dictionary is being modified concurrently in another thread.
-    """
-    if not isinstance(d, dict):
-        return []
-    for attempt in range(max_retries):
-        try:
-            return list(d.keys())
-        except RuntimeError:
-            if attempt == max_retries - 1:
-                return []
-            time.sleep(0.005)
-    return []
-
-def safe_dict_values(d, max_retries=3):
-    """
-    Safely returns list(d.values()) even if the dictionary is being modified concurrently in another thread.
-    """
-    if not isinstance(d, dict):
-        return []
-    for attempt in range(max_retries):
-        try:
-            return list(d.values())
-        except RuntimeError:
-            if attempt == max_retries - 1:
-                return []
-            time.sleep(0.005)
-    return []
-
-def safe_float(val: Any, default: Any = 0.0) -> Any:
-    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
-        return default
-    if isinstance(val, (int, float)):
-        return float(val)
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return default
-
-def safe_demand_numeric(val: Any) -> float | None:
-    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-def format_demand_value(val: Any) -> str:
-    if val is None or isinstance(val, (bool, dict, list, tuple, set)):
-        return "N/A"
-    try:
-        v = float(val)
-    except (ValueError, TypeError):
-        return "N/A"
-
-    if v == -4:
-        return "Evac"
-    elif v == -3:
-        return "RST"
-    elif v == -2:
-        return "LOOP"
-    elif v == -1:
-        return "Maint"
-    else:
-        if v.is_integer():
-            return f"{int(v)} MW"
-        return f"{v:.2f} MW"
-
-def format_total_demand(u1: Any, u2: Any) -> str:
-    v1 = None
-    v2 = None
-    if u1 is not None and not isinstance(u1, (bool, dict, list, tuple, set)):
-        try:
-            v1 = float(u1)
-        except (ValueError, TypeError):
-            pass
-    if u2 is not None and not isinstance(u2, (bool, dict, list, tuple, set)):
-        try:
-            v2 = float(u2)
-        except (ValueError, TypeError):
-            pass
-
-    if v1 is None and v2 is None:
-        return "N/A"
-    if v1 is None:
-        return format_demand_value(v2)
-    if v2 is None:
-        return format_demand_value(v1)
-
-    is_u1_special = v1 < 0
-    is_u2_special = v2 < 0
-
-    if is_u1_special and is_u2_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        if lbl1 == lbl2:
-            return lbl1
-        return f"{lbl1} / {lbl2}"
-    elif is_u1_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        return f"{lbl1} (U1) | {lbl2} (U2)"
-    elif is_u2_special:
-        lbl1 = format_demand_value(v1)
-        lbl2 = format_demand_value(v2)
-        return f"{lbl1} (U1) | {lbl2} (U2)"
-    else:
-        total = v1 + v2
-        if total.is_integer():
-            return f"{int(total)} MW"
-        return f"{total:.2f} MW"
-
-def get_server_visibility(job_id, snapshots=None, latest_state=None, is_active=False):
-    if job_id in _sc_public_server_ids:
-        return False
-    meta = _sc_server_meta.get(job_id)
-    if meta is not None and "is_private" in meta:
-        return bool(meta["is_private"])
-    if latest_state and "IsPrivate" in latest_state:
-        return bool(latest_state["IsPrivate"])
-    if snapshots:
-        for snap in safe_dict_values(snapshots):
-            if isinstance(snap, dict) and "IsPrivate" in snap:
-                return bool(snap["IsPrivate"])
-    if is_active and _sc_public_server_ids:
-        return job_id not in _sc_public_server_ids
-    return False
-
-def get_server_player_count(job_id, snapshots=None, latest_state=None, is_private=None):
-    if is_private is True:
-        return None
-    if is_private is None and get_server_visibility(job_id, snapshots, latest_state):
-        return None
-    if job_id in _sc_public_servers_info:
-        return int(_sc_public_servers_info[job_id].get("playing", 0))
-    if latest_state and latest_state.get("PlayerCount", 0) > 0:
-        return int(latest_state["PlayerCount"])
-    meta = _sc_server_meta.get(job_id)
-    if meta and meta.get("last_player_count", 0) > 0:
-        return int(meta["last_player_count"])
-    if snapshots:
-        valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        for ts in sorted(valid_ts, reverse=True):
-            snap = snapshots.get(ts)
-            if isinstance(snap, dict):
-                p = snap.get("PlayerCount", 0)
-                if p > 0:
-                    return int(p)
-    return 0
-
-_sc_file_cache = {}
-_sc_archive_cache = OrderedDict()
-_sc_max_archive_cache_entries = 2
-_sc_cache_lock = threading.Lock()
-_sc_file_io_lock = threading.RLock()
-
-def is_archive_filename(filename: str) -> bool:
-    normalized = filename.replace("\\", "/").strip()
-    return normalized.startswith("archives/") or "servers_" in normalized
-
-def _update_sc_cache(filename: str, mtime: float, data: dict):
-    with _sc_cache_lock:
-        if is_archive_filename(filename):
-            _sc_archive_cache[filename] = (mtime, data)
-            _sc_archive_cache.move_to_end(filename)
-            while len(_sc_archive_cache) > _sc_max_archive_cache_entries:
-                _sc_archive_cache.popitem(last=False)
-            _sc_file_cache.pop(filename, None)
-        else:
-            _sc_file_cache[filename] = (mtime, data)
-
-def _invalidate_sc_cache(filename: str):
-    with _sc_cache_lock:
-        _sc_file_cache.pop(filename, None)
-        _sc_archive_cache.pop(filename, None)
-
-_sc_historical_cards_base = None
-_sc_historical_cards_key = None
-_sc_historical_lock = threading.Lock()
-
-_sc_active_cards_base = None
-_sc_active_cards_key = None
-_sc_active_lock = threading.Lock()
-
-def invalidate_historical_cards_cache():
-    global _sc_historical_cards_base, _sc_historical_cards_key
-    global _sc_active_cards_base, _sc_active_cards_key
-    with _sc_historical_lock:
-        _sc_historical_cards_base = None
-        _sc_historical_cards_key = None
-    with _sc_active_lock:
-        _sc_active_cards_base = None
-        _sc_active_cards_key = None
-
-def ensure_unit_output_mw(unit_dict):
-    """
-    Ensures 'Output (MW)' is automatically populated on a unit dictionary
-    """
-    if not isinstance(unit_dict, dict):
-        return unit_dict
-    if unit_dict.get("Output (MW)") is None:
-        val = unit_dict.get("PradDoSieci")
-        if val is None:
-            val = unit_dict.get("Output") or unit_dict.get("Power") or unit_dict.get("megawatts")
-        if val is not None:
-            try:
-                prec = SERVER_CHECKER_FIELD_PRECISION.get("Output (MW)", 0)
-                unit_dict["Output (MW)"] = round(float(val), prec) if prec is not None else float(val)
-            except (ValueError, TypeError):
-                unit_dict["Output (MW)"] = val
-    return unit_dict
-
-def ensure_unit_fuel_level(unit_name: str, unit_dict: dict):
-    if not isinstance(unit_dict, dict):
-        return unit_dict
-    raw_val = unit_dict.get("EstimatedFuel")
-    if raw_val is None:
-        try:
-            clean_u = resolve_unit_name(unit_name) if "resolve_unit_name" in globals() else ("Unit2" if "2" in str(unit_name) else "Unit1")
-            if clean_u == "Unit2":
-                fuel_val = calculate_u2_fuel_level(unit_dict)
-            else:
-                fuel_val = calculate_u1_fuel_level(unit_dict)
-            if fuel_val is not None:
-                fuel_val = round(min(100.0, max(0.0, float(fuel_val))), 2)
-            unit_dict["EstimatedFuel"] = fuel_val
-        except Exception:
-            pass
-    else:
-        try:
-            f_val = float(raw_val)
-            if f_val > 100.0 or f_val < 0.0:
-                unit_dict["EstimatedFuel"] = round(min(100.0, max(0.0, f_val)), 2)
-        except (ValueError, TypeError):
-            pass
-    return unit_dict
-
-def get_card_unit_fuel_stats(snapshots: Any, unit_name: str, unit_dict: Any) -> Dict[str, Optional[float]]:
-    kalman_val = None
-    projected_val = None
-    median_val = None
-    weighted_val = None
-    mean_val = None
-    instant_val = None
-    uncertainty_val = None
-
-    if isinstance(snapshots, dict) and snapshots:
-        try:
-            assessment = approximate_fuel_from_snapshots(snapshots, unit_name)
-            if assessment.kalman_fuel is not None and assessment.kalman_fuel > 0.0:
-                kalman_val = round(min(100.0, max(0.0, float(assessment.kalman_fuel))), 1)
-            if assessment.projected_fuel is not None and assessment.projected_fuel > 0.0:
-                projected_val = round(min(100.0, max(0.0, float(assessment.projected_fuel))), 1)
-            if assessment.median_fuel is not None and assessment.median_fuel > 0.0:
-                median_val = round(min(100.0, max(0.0, float(assessment.median_fuel))), 1)
-            if assessment.weighted_fuel is not None and assessment.weighted_fuel > 0.0:
-                weighted_val = round(min(100.0, max(0.0, float(assessment.weighted_fuel))), 1)
-            if assessment.mean_fuel is not None and assessment.mean_fuel > 0.0:
-                mean_val = round(min(100.0, max(0.0, float(assessment.mean_fuel))), 1)
-            if assessment.latest_instantaneous and assessment.latest_instantaneous > 0.0:
-                instant_val = round(min(100.0, max(0.0, float(assessment.latest_instantaneous))), 1)
-            uncertainty_val = assessment.uncertainty
-        except Exception:
-            pass
-
-    if instant_val is None and isinstance(unit_dict, dict):
-        ensure_unit_fuel_level(unit_name, unit_dict)
-        raw_fuel = unit_dict.get("EstimatedFuel")
-        if raw_fuel is not None:
-            try:
-                f_val = float(raw_fuel)
-                if f_val > 0.0:
-                    instant_val = round(min(100.0, max(0.0, f_val)), 1)
-            except (ValueError, TypeError):
-                pass
-
-    primary_fuel = kalman_val if kalman_val is not None else (
-        projected_val if projected_val is not None else (
-            median_val if median_val is not None else (
-                weighted_val if weighted_val is not None else (
-                    mean_val if mean_val is not None else instant_val
-                )
-            )
-        )
-    )
-
-    return {
-        "estimated_fuel": primary_fuel,
-        "kalman_fuel": kalman_val,
-        "uncertainty": uncertainty_val,
-        "projected_fuel": projected_val,
-        "median_fuel": median_val,
-        "weighted_fuel": weighted_val,
-        "mean_fuel": mean_val,
-        "instantaneous_fuel": instant_val,
-    }
-
-def normalize_snapshots_power(data):
-    if not isinstance(data, dict):
-        return data
-    for job_id, snaps in safe_dict_items(data):
-        if isinstance(snaps, dict):
-            for ts, state in safe_dict_items(snaps):
-                if isinstance(state, dict):
-                    if isinstance(state.get("Unit2"), dict):
-                        ensure_unit_output_mw(state["Unit2"])
-                        ensure_unit_fuel_level("Unit2", state["Unit2"])
-                    if isinstance(state.get("Unit1"), dict):
-                        ensure_unit_output_mw(state["Unit1"])
-                        ensure_unit_fuel_level("Unit1", state["Unit1"])
-    return data
-
-def get_sc_data(filename: str, max_retries: int = 8):
-    filepath = os.path.join(DATA_DIR, filename)
-    if not os.path.exists(filepath):
-        return {}
-
-    try:
-        current_mtime = os.path.getmtime(filepath)
-    except OSError:
-        current_mtime = None
-
-    is_archive = is_archive_filename(filename)
-
-    if current_mtime is not None:
-        with _sc_cache_lock:
-            if is_archive:
-                cached_entry = _sc_archive_cache.get(filename)
-                if cached_entry and cached_entry[0] == current_mtime:
-                    _sc_archive_cache.move_to_end(filename)
-                    return cached_entry[1]
-            else:
-                cached_entry = _sc_file_cache.get(filename)
-                if cached_entry and cached_entry[0] == current_mtime:
-                    return cached_entry[1]
-
-    for attempt in range(max_retries):
-        try:
-            with _sc_file_io_lock:
-                if not os.path.exists(filepath):
-                    time.sleep(0.05 * (attempt + 1))
-                    continue
-                with open(filepath, "rb") as f:
-                    raw_bytes = f.read()
-
-            if not raw_bytes or not raw_bytes.strip():
-                if attempt < max_retries - 1:
-                    time.sleep(0.05 * (attempt + 1))
-                    continue
-                with _sc_cache_lock:
-                    target_cache = _sc_archive_cache if is_archive else _sc_file_cache
-                    if filename in target_cache:
-                        return target_cache[filename][1]
-                return {}
-
-            if filename.endswith(".gz") or filepath.endswith(".gz"):
-                try:
-                    raw_bytes = gzip.decompress(raw_bytes)
-                except Exception:
-                    if attempt < max_retries - 1:
-                        time.sleep(0.05 * (attempt + 1))
-                        continue
-                    raise
-
-            data = _json_loads(raw_bytes)
-            if not isinstance(data, dict):
-                data = {}
-            else:
-                if filename.startswith("servers") or filename.startswith("archives"):
-                    normalize_snapshots_power(data)
-
-            try:
-                mtime_after = os.path.getmtime(filepath)
-            except OSError:
-                mtime_after = current_mtime
-
-            _update_sc_cache(filename, mtime_after or 0.0, data)
-            return data
-        except (PermissionError, Exception) as e:
-            if attempt < max_retries - 1:
-                time.sleep(0.05 * (attempt + 1))
-            else:
-                with _sc_cache_lock:
-                    target_cache = _sc_archive_cache if is_archive else _sc_file_cache
-                    if filename in target_cache:
-                        return target_cache[filename][1]
-                logger.error(f"Error loading sc data from {filename}: {e}")
-
-    with _sc_cache_lock:
-        target_cache = _sc_archive_cache if is_archive else _sc_file_cache
-        if filename in target_cache:
-            return target_cache[filename][1]
-    return {}
-
-def save_sc_data(data, filename: str, max_retries: int = 10):
-    if isinstance(data, dict) and (filename.startswith("servers") or filename.startswith("archives")):
-        normalize_snapshots_power(data)
-    filepath = os.path.join(DATA_DIR, filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    unique_id = f"{os.getpid()}_{threading.get_ident()}_{time.time_ns()}"
-    temp_path = f"{filepath}.{unique_id}.tmp"
-    
-    try:
-        raw_bytes = _json_dumps(data)
-        if filename.endswith(".gz") or filepath.endswith(".gz"):
-            raw_bytes = gzip.compress(raw_bytes, compresslevel=9)
-        with open(temp_path, "wb") as f:
-            f.write(raw_bytes)
-            f.flush()
-            
-        for attempt in range(max_retries):
-            try:
-                with _sc_file_io_lock:
-                    os.replace(temp_path, filepath)
-                try:
-                    new_mtime = os.path.getmtime(filepath)
-                except OSError:
-                    new_mtime = time.time()
-                _update_sc_cache(filename, new_mtime, data)
-                if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
-                    invalidate_historical_cards_cache()
-                return True
-            except PermissionError:
-                if attempt < max_retries - 1:
-                    time.sleep(0.05 * (attempt + 1))
-                else:
-                    try:
-                        with _sc_file_io_lock:
-                            with open(filepath, "wb") as f:
-                                f.write(raw_bytes)
-                        try:
-                            new_mtime = os.path.getmtime(filepath)
-                        except OSError:
-                            new_mtime = time.time()
-                        _update_sc_cache(filename, new_mtime, data)
-                        if filename in ("servers.json", "persistent_servers.json", "server_meta.json"):
-                            invalidate_historical_cards_cache()
-                        return True
-                    except Exception as fallback_err:
-                        logger.error(f"Error in direct save fallback for {filename}: {fallback_err}")
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(0.05 * (attempt + 1))
-                else:
-                    logger.error(f"Error replacing {temp_path} to {filepath}: {e}")
-    except Exception as e:
-        logger.error(f"Error saving server checker data to {filename}: {e}")
-        return False
-    finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-    return False
-
-def load_server_meta():
-    global _sc_server_meta
-    data = get_sc_data("server_meta.json")
-    if isinstance(data, dict):
-        _sc_server_meta = dict(data)
-    return _sc_server_meta
-
-load_server_meta()
-
-def save_server_meta():
-    save_sc_data(_sc_server_meta, "server_meta.json")
-
-def build_server_metadata(
-    job_id: str,
-    snapshots: dict[str, Any] | None,
-    server_raw: dict[str, Any] | None = None,
-    existing_meta: dict[str, Any] | None = None
-) -> dict[str, Any]:
-    existing = dict(existing_meta) if isinstance(existing_meta, dict) else {}
-    server_info = dict(server_raw) if isinstance(server_raw, dict) else {}
-    snaps = dict(snapshots) if isinstance(snapshots, dict) else {}
-
-    valid_ts = sorted([k for k in safe_dict_keys(snaps) if not str(k).startswith('_')])
-    snapshot_count = len(valid_ts)
-
-    raw_owner_id = server_info.get("privateServerOwnerId")
-    if raw_owner_id in (None, "", 0, "0", "None", "null", False):
-        raw_owner_id = None
-    else:
-        raw_owner_id = str(raw_owner_id).strip()
-
-    if raw_owner_id is None and existing:
-        raw_owner_id = existing.get("privateServerOwnerId")
-        if raw_owner_id in (None, "", 0, "0", "None", "null", False):
-            raw_owner_id = None
-        else:
-            raw_owner_id = str(raw_owner_id).strip()
-
-    if raw_owner_id is None and snaps:
-        for ts_k in reversed(valid_ts[-5:]):
-            st = snaps.get(ts_k)
-            if isinstance(st, dict):
-                snap_owner = st.get("privateServerOwnerId")
-                if snap_owner not in (None, "", 0, "0", "None", "null", False):
-                    raw_owner_id = str(snap_owner).strip()
-                    break
-
-    is_priv = False
-    if raw_owner_id is not None:
-        is_priv = True
-    elif _sc_public_server_ids and job_id in _sc_public_server_ids:
-        is_priv = False
-    elif existing.get("is_private") is True:
-        is_priv = True
-    elif _sc_public_server_ids and job_id not in _sc_public_server_ids:
-        is_priv = True
-    else:
-        found_in_snaps = False
-        for ts_k in reversed(valid_ts[-5:]):
-            st = snaps.get(ts_k)
-            if isinstance(st, dict) and "IsPrivate" in st:
-                if st["IsPrivate"]:
-                    is_priv = True
-                    found_in_snaps = True
-                    break
-                else:
-                    is_priv = False
-                    found_in_snaps = True
-                    break
-        if not found_in_snaps:
-            is_priv = bool(existing.get("is_private"))
-
-    if is_priv:
-        is_private_val = True
-        owner_id_val = raw_owner_id or existing.get("privateServerOwnerId")
-        owner_str_val = str(owner_id_val).strip() if owner_id_val not in (None, "", "None", "null") else "private"
-        server_type_str = "Private Server"
-        player_count_val = None
-        max_players_val = None
-    else:
-        is_private_val = None
-        owner_str_val = None
-        server_type_str = "Public Server"
-        pub_info = _sc_public_servers_info.get(job_id, {})
-        player_count_val = server_info.get("playerCount", pub_info.get("playing", existing.get("player_count", existing.get("last_player_count", 0))))
-        max_players_val = server_info.get("maxPlayers", pub_info.get("maxPlayers", existing.get("max_players", 50)))
-
-    place_id = server_info.get("placeId") or existing.get("place_id") or 11765852158
-    fps = server_info.get("fps", existing.get("fps"))
-    ping = server_info.get("ping", existing.get("ping"))
-
-    now_utc_str = datetime.now(timezone.utc).isoformat()
-    start_ts = existing.get("start_timestamp") or (valid_ts[0] if valid_ts else server_info.get("lastHeartbeat", now_utc_str))
-    last_hb = (valid_ts[-1] if valid_ts else None) or server_info.get("lastHeartbeat") or now_utc_str
-
-    uptime_sec = 0.0
-    try:
-        clean_start = str(start_ts).replace("Z", "+00:00")
-        clean_hb = str(last_hb).replace("Z", "+00:00")
-        dt_start = datetime.fromisoformat(clean_start)
-        dt_hb = datetime.fromisoformat(clean_hb)
-        uptime_sec = max(0.0, (dt_hb - dt_start).total_seconds())
-    except Exception:
-        pass
-
-    hours = int(uptime_sec // 3600)
-    mins = int((uptime_sec % 3600) // 60)
-    uptime_fmt = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
-
-    has_dict_demand = False
-    has_anomalies = False
-    anomaly_count = 0
-
-    for ts_k in valid_ts:
-        st = snaps.get(ts_k)
-        if not isinstance(st, dict):
-            has_anomalies = True
-            anomaly_count += 1
-            continue
-        for uk in ("Unit1", "Unit2"):
-            ust = st.get(uk)
-            if not isinstance(ust, dict):
-                continue
-            for dk in ("DemandU1", "DemandU2", "Demand", "NextDemandU1", "NextDemandU2"):
-                if dk in ust:
-                    val = ust[dk]
-                    if isinstance(val, dict):
-                        has_dict_demand = True
-                        has_anomalies = True
-                        anomaly_count += 1
-                    elif isinstance(val, (list, tuple)):
-                        has_anomalies = True
-                        anomaly_count += 1
-
-    latest_summary = {}
-    if valid_ts:
-        last_snap = snaps.get(valid_ts[-1], {})
-        if isinstance(last_snap, dict):
-            u1 = last_snap.get("Unit1", {}) if isinstance(last_snap.get("Unit1"), dict) else {}
-            u2 = last_snap.get("Unit2", {}) if isinstance(last_snap.get("Unit2"), dict) else {}
-            u1_mw = safe_float(u1.get("Output", u1.get("ElectricOutputMW")), 0.0)
-            u2_mw = safe_float(u2.get("Output", u2.get("ElectricOutputMW")), 0.0)
-            u1_dem = format_demand_value(u1.get("DemandU1", u1.get("Demand")))
-            u2_dem = format_demand_value(u2.get("DemandU2", u2.get("Demand")))
-            latest_summary = {
-                "u1_mw": round(u1_mw, 1),
-                "u2_mw": round(u2_mw, 1),
-                "total_mw": round(u1_mw + u2_mw, 1),
-                "u1_aprm": safe_float(u1.get("APRM"), 0.0),
-                "u2_aprm": safe_float(u2.get("APRM"), 0.0),
-                "u1_demand": u1_dem,
-                "u2_demand": u2_dem,
-                "pps": safe_float(last_snap.get("Total points/second", 0.0), 0.0)
-            }
-
-    meta_dict = {
-        "job_id": job_id,
-        "jobId": job_id,
-        "id": server_info.get("id") or existing.get("id"),
-        "server_id": server_info.get("id") or existing.get("id"),
-        "snapshot_count": snapshot_count,
-        "is_private": is_private_val,
-        "privateServerOwnerId": owner_str_val if is_priv else None,
-        "server_type": server_type_str,
-        "place_id": place_id,
-        "player_count": player_count_val,
-        "max_players": max_players_val,
-        "fps": fps,
-        "ping": ping,
-        "start_timestamp": start_ts,
-        "first_seen_timestamp": existing.get("first_seen_timestamp", start_ts),
-        "last_heartbeat": last_hb,
-        "last_seen_timestamp": last_hb,
-        "uptime_seconds": round(uptime_sec, 1),
-        "uptime_formatted": uptime_fmt,
-        "last_archived_ts": existing.get("last_archived_ts", ""),
-        "has_dict_demand": has_dict_demand,
-        "has_anomalies": has_anomalies,
-        "anomaly_count": anomaly_count,
-        "latest_state_summary": latest_summary,
-        "updated_at": now_utc_str,
-    }
-    return meta_dict
-
-_sc_archives_meta_cache = {}
-
-def load_archives_meta():
-    global _sc_archives_meta_cache
-    if os.path.exists(ARCHIVES_META_FILE):
-        try:
-            with open(ARCHIVES_META_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                _sc_archives_meta_cache = {
-                    k: (float(v[0]), int(v[1]), int(v[2]), int(v[3]))
-                    for k, v in data.items()
-                    if isinstance(v, (list, tuple)) and len(v) >= 4
-                }
-        except Exception as e:
-            logger.error(f"Error loading archives meta cache from {ARCHIVES_META_FILE}: {e}")
-
-def save_archives_meta():
-    try:
-        data = {
-            k: list(v) for k, v in safe_dict_items(_sc_archives_meta_cache)
-        }
-        temp_path = f"{ARCHIVES_META_FILE}.{os.getpid()}_{time.time_ns()}.tmp"
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        os.replace(temp_path, ARCHIVES_META_FILE)
-    except Exception as e:
-        logger.error(f"Error saving archives meta cache to {ARCHIVES_META_FILE}: {e}")
-
-_sc_archive_server_index = {}
-
-def load_archive_server_index():
-    global _sc_archive_server_index
-    if os.path.exists(ARCHIVES_INDEX_FILE):
-        try:
-            with open(ARCHIVES_INDEX_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict) and data:
-                _sc_archive_server_index = data
-                return
-        except Exception as e:
-            logger.error(f"Error loading archive server index from {ARCHIVES_INDEX_FILE}: {e}")
-    rebuild_archive_server_index()
-
-def save_archive_server_index():
-    try:
-        temp_path = f"{ARCHIVES_INDEX_FILE}.{os.getpid()}_{time.time_ns()}.tmp"
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(_sc_archive_server_index, f)
-        os.replace(temp_path, ARCHIVES_INDEX_FILE)
-    except Exception as e:
-        logger.error(f"Error saving archive server index to {ARCHIVES_INDEX_FILE}: {e}")
-
-def rebuild_archive_server_index():
-    global _sc_archive_server_index
-    if not os.path.exists(ARCHIVES_DIR):
-        return
-    logger.info("Rebuilding archive server index from archives directory...")
-    new_index = {}
-    try:
-        for fname in sorted(os.listdir(ARCHIVES_DIR)):
-            if not fname.startswith("servers_"):
-                continue
-            is_gz = fname.endswith(".json.gz")
-            is_json = fname.endswith(".json") and not is_gz
-            if not (is_gz or is_json):
-                continue
-            date_str = fname[len("servers_"):-len(".json.gz")] if is_gz else fname[len("servers_"):-len(".json")]
-            rel_path = os.path.join("archives", fname)
-            day_data = get_sc_data(rel_path)
-            if isinstance(day_data, dict):
-                for jid in day_data.keys():
-                    new_index[jid] = date_str
-        _sc_archive_server_index = new_index
-        save_archive_server_index()
-        logger.info(f"Rebuilt archive server index: {len(_sc_archive_server_index)} servers indexed.")
-    except Exception as e:
-        logger.error(f"Error during archive server index rebuild: {e}")
-
-load_archives_meta()
-load_archive_server_index()
-
-def is_exact_job_or_server_id_match(query: str, job_id: str) -> bool:
-    """
-    Returns True ONLY if query is an exact match for:
-    1. The full Job ID (with or without hyphens).
-    2. The shortened Server ID (e.g. '77f6-4b2f' or '77f64b2f'), which is parts[1]-parts[2] of the UUID.
-    3. The first 8-character block of the UUID (e.g. '00109df1').
-    Partial queries (e.g. '77f6', 'b', '001') return False.
-    """
-    if not query or not job_id:
-        return False
-    q = query.strip().lower()
-    jid = job_id.strip().lower()
-    if not q or not jid:
-        return False
-
-    if q == jid:
-        return True
-
-    clean_jid = jid.replace("-", "")
-    clean_q = q.replace("-", "")
-    if len(clean_q) == 32 and clean_q == clean_jid:
-        return True
-
-    j_parts = [p for p in jid.split("-") if p]
-    if len(j_parts) >= 3:
-        short_id = f"{j_parts[1]}-{j_parts[2]}"
-        short_id_compact = f"{j_parts[1]}{j_parts[2]}"
-        if q == short_id or q == short_id_compact:
-            return True
-
-        q_parts = [p for p in q.split("-") if p]
-        if len(q_parts) == 2 and q_parts[0] == j_parts[1] and q_parts[1] == j_parts[2]:
-            return True
-
-    if len(j_parts) >= 1 and len(q) == 8 and q == j_parts[0]:
-        return True
-
-    return False
-
-def lookup_archive_server_date(query: str) -> tuple[str | None, str | None]:
-    """
-    Finds the matched full job_id and the archive date (YYYY-MM-DD) for a given query
-    (full UUID, clean UUID, or shortened server ID) using in-memory indices without
-    scanning archive files.
-    """
-    if not query:
-        return None, None
-
-    clean_q = query.strip()
-    clean_q_lower = clean_q.lower()
-
-    if clean_q in _sc_archive_server_index:
-        return clean_q, _sc_archive_server_index[clean_q]
-    if clean_q_lower in _sc_archive_server_index:
-        return clean_q_lower, _sc_archive_server_index[clean_q_lower]
-
-    meta = _sc_server_meta.get(clean_q) or _sc_server_meta.get(clean_q_lower)
-    if meta and isinstance(meta, dict):
-        st = meta.get("start_timestamp")
-        if st and len(st) >= 10 and st[4] == '-' and st[7] == '-':
-            return clean_q, st[:10]
-
-    for jid, date_str in safe_dict_items(_sc_archive_server_index):
-        if is_exact_job_or_server_id_match(clean_q, jid):
-            return jid, date_str
-
-    for jid, meta_entry in safe_dict_items(_sc_server_meta):
-        if is_exact_job_or_server_id_match(clean_q, jid):
-            st = meta_entry.get("start_timestamp") if isinstance(meta_entry, dict) else None
-            if st and len(st) >= 10 and st[4] == '-' and st[7] == '-':
-                return jid, st[:10]
-
-    return None, None
-
-def get_server_start_date(job_id: str, snaps: dict | None = None) -> str:
-    """
-    Returns the YYYY-MM-DD date when this server first started.
-    Checks server_meta, then earliest snapshot in snaps, then archive index, then archives, then today.
-    """
-    if not job_id:
-        return datetime.now(timezone.utc).strftime('%Y-%m-%d')
-        
-    meta = _sc_server_meta.get(job_id, {})
-    st_ts = meta.get("start_timestamp")
-    if st_ts and len(st_ts) >= 10 and st_ts[4] == '-' and st_ts[7] == '-':
-        return st_ts[:10]
-        
-    if snaps and isinstance(snaps, dict):
-        valid_ts = [k for k in safe_dict_keys(snaps) if not k.startswith('_')]
-        if valid_ts:
-            earliest_ts = min(valid_ts)
-            if len(earliest_ts) >= 10 and earliest_ts[4] == '-' and earliest_ts[7] == '-':
-                if job_id not in _sc_server_meta:
-                    _sc_server_meta[job_id] = {}
-                _sc_server_meta[job_id]["start_timestamp"] = earliest_ts
-                return earliest_ts[:10]
-            
-    if job_id in _sc_archive_server_index:
-        date_str = _sc_archive_server_index[job_id]
-        if job_id not in _sc_server_meta:
-            _sc_server_meta[job_id] = {}
-        _sc_server_meta[job_id]["start_timestamp"] = f"{date_str}T00:00:00Z"
-        return date_str
-
-    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
-
-def get_active_server_start_dates(current_data: dict | None = None) -> set:
-    """
-    Returns the set of start dates (YYYY-MM-DD) for servers currently in current_data
-    that are still ACTIVE (i.e. not historical).
-    """
-    active_dates = set()
-    if current_data is None:
-        current_data = get_sc_data("servers.json")
-    if not isinstance(current_data, dict):
-        return active_dates
-
-    now_utc = datetime.now(timezone.utc)
-    for s_id, snaps in safe_dict_items(current_data):
-        if not snaps or not isinstance(snaps, dict):
-            continue
-        valid_ts_keys = [k for k in safe_dict_keys(snaps) if not k.startswith('_')]
-        if not valid_ts_keys:
-            continue
-        latest_ts = max(valid_ts_keys)
-        latest_state = snaps.get(latest_ts, {})
-        age_sec = convert_ISO_to_secs(latest_ts, now=now_utc)
-        if not is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
-            start_date = get_server_start_date(s_id, snaps)
-            if start_date:
-                active_dates.add(start_date)
-    return active_dates
-
-def archive_expired_server_data(expired_by_date: dict, current_data: dict | None = None):
-    """
-    Saves/merges historical server snapshots into archive files in ARCHIVES_DIR.
-    - If a day still has active servers running in current_data, it is saved as uncompressed .json.
-    - If all servers from that day are historical (no active servers left), it is saved directly as .json.gz.
-    expired_by_date format:
-    {
-        "YYYY-MM-DD": {
-            "job_id": {
-                "timestamp_iso": { ... state ... },
-                ...
-            },
-            ...
-        }
-    }
-    """
-    if not expired_by_date:
-        return
-
-    os.makedirs(ARCHIVES_DIR, exist_ok=True)
-    active_dates = get_active_server_start_dates(current_data)
-    
-    for date_str, servers_dict in expired_by_date.items():
-        if not servers_dict:
-            continue
-            
-        base_name = f"servers_{date_str}"
-        json_filename = f"{base_name}.json"
-        gz_filename = f"{base_name}.json.gz"
-        
-        json_rel = os.path.join("archives", json_filename)
-        gz_rel = os.path.join("archives", gz_filename)
-        
-        json_full = os.path.join(ARCHIVES_DIR, json_filename)
-        gz_full = os.path.join(ARCHIVES_DIR, gz_filename)
-        
-        existing_archive = {}
-        
-        if os.path.exists(gz_full):
-            existing_archive = get_sc_data(gz_rel)
-        elif os.path.exists(json_full):
-            existing_archive = get_sc_data(json_rel)
-            
-        if not isinstance(existing_archive, dict):
-            existing_archive = {}
-        else:
-            existing_archive = dict(existing_archive)
-                
-        for job_id, snaps in servers_dict.items():
-            if job_id not in existing_archive:
-                existing_archive[job_id] = {}
-            else:
-                existing_archive[job_id] = dict(existing_archive[job_id])
-            existing_archive[job_id].update(snaps)
-            if job_id in _sc_server_meta:
-                existing_archive[job_id]["_meta"] = _sc_server_meta[job_id]
-            elif isinstance(snaps, dict) and "_meta" in snaps:
-                existing_archive[job_id]["_meta"] = snaps["_meta"]
-            _sc_archive_server_index[job_id] = date_str
-            
-        day_has_active_servers = (date_str in active_dates)
-        target_full = json_full if day_has_active_servers else gz_full
-        target_fname = json_filename if day_has_active_servers else gz_filename
-        alt_fname = gz_filename if day_has_active_servers else json_filename
-        
-        if day_has_active_servers:
-            save_sc_data(existing_archive, json_rel)
-            if os.path.exists(gz_full):
-                try:
-                    os.remove(gz_full)
-                    _invalidate_sc_cache(gz_rel)
-                except Exception:
-                    pass
-            logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {json_rel} (active day, uncompressed)")
-        else:
-            save_sc_data(existing_archive, gz_rel)
-            if os.path.exists(json_full):
-                try:
-                    os.remove(json_full)
-                    _invalidate_sc_cache(json_rel)
-                except Exception:
-                    pass
-            logger.info(f"Archived {sum(len(s) for s in servers_dict.values())} snapshot(s) for {date_str} to {gz_rel} (finalized, compressed)")
-
-        try:
-            mtime = os.path.getmtime(target_full)
-            size_b = os.path.getsize(target_full)
-            s_cnt = len(existing_archive)
-            snap_cnt = sum(len(snaps) for snaps in safe_dict_values(existing_archive) if isinstance(snaps, dict))
-            _sc_archives_meta_cache[target_fname] = (mtime, size_b, s_cnt, snap_cnt)
-            _sc_archives_meta_cache.pop(alt_fname, None)
-        except Exception:
-            pass
-
-    save_archive_server_index()
-    save_archives_meta()
-
-def get_archived_server_snapshots(query: str) -> tuple[str | None, dict | None]:
-    """
-    Looks up snapshots for a given job_id or short in-game ID across archive files in ARCHIVES_DIR.
-    Uses the archive server index to jump directly to the target archive file.
-    Returns (matched_job_id, snapshots) or (None, None).
-    """
-    if not query or not os.path.exists(ARCHIVES_DIR):
-        return None, None
-
-    clean_q = query.strip()
-
-    matched_job_id, date_str = lookup_archive_server_date(clean_q)
-    if matched_job_id and date_str:
-        gz_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json.gz")
-        json_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json")
-        target_rel = None
-        if os.path.exists(gz_path):
-            target_rel = os.path.join("archives", f"servers_{date_str}.json.gz")
-        elif os.path.exists(json_path):
-            target_rel = os.path.join("archives", f"servers_{date_str}.json")
-
-        if target_rel:
-            day_data = get_sc_data(target_rel)
-            if isinstance(day_data, dict) and matched_job_id in day_data:
-                snaps = day_data[matched_job_id]
-                if isinstance(snaps, dict):
-                    return matched_job_id, snaps
-
-    return None, None
-
-def format_file_size(size_bytes: int) -> str:
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.2f} MB"
-
-def get_all_archive_days_info(progress_callback=None) -> tuple[list[dict], dict]:
-    """
-    Returns (days_list, summary_stats) for all archived days in ARCHIVES_DIR.
-    Uses precomputed and persistent summary metadata cache to avoid reading files from disk.
-    Accepts optional progress_callback(current_idx, total_count, filename, percent).
-    """
-    if not os.path.exists(ARCHIVES_DIR):
-        return [], {"total_days": 0, "total_servers": 0, "total_snapshots": 0, "total_size_bytes": 0, "total_size_str": "0 B"}
-
-    archive_map = {}
-    try:
-        raw_filenames = sorted(os.listdir(ARCHIVES_DIR), reverse=True)
-    except Exception:
-        raw_filenames = []
-
-    valid_filenames = []
-    for fname in raw_filenames:
-        if not fname.startswith("servers_"):
-            continue
-        is_gz = fname.endswith(".json.gz")
-        is_json = fname.endswith(".json") and not is_gz
-        if not (is_gz or is_json):
-            continue
-        valid_filenames.append(fname)
-
-    meta_dirty = False
-    total_files = len(valid_filenames)
-    for idx, fname in enumerate(valid_filenames, 1):
-        is_gz = fname.endswith(".json.gz")
-        date_part = fname[len("servers_"):]
-        date_str = date_part[:-len(".json.gz")] if is_gz else date_part[:-len(".json")]
-
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            date_formatted = dt.strftime("%B %d, %Y")
-            day_of_week = dt.strftime("%A")
-        except Exception:
-            date_formatted = date_str
-            day_of_week = ""
-
-        full_path = os.path.join(ARCHIVES_DIR, fname)
-        size_bytes = os.path.getsize(full_path) if os.path.exists(full_path) else 0
-        try:
-            mtime = os.path.getmtime(full_path)
-        except OSError:
-            mtime = 0
-
-        cached = _sc_archives_meta_cache.get(fname)
-        if cached and cached[0] == mtime and cached[1] == size_bytes:
-            s_count, snap_count = cached[2], cached[3]
-        else:
-            rel_path = os.path.join("archives", fname)
-            day_data = get_sc_data(rel_path)
-            if isinstance(day_data, dict):
-                s_count = len(day_data)
-                snap_count = sum(len(snaps) for snaps in safe_dict_values(day_data) if isinstance(snaps, dict))
-                for jid in day_data.keys():
-                    _sc_archive_server_index[jid] = date_str
-            else:
-                s_count = 0
-                snap_count = 0
-            _sc_archives_meta_cache[fname] = (mtime, size_bytes, s_count, snap_count)
-            meta_dirty = True
-
-        if progress_callback:
-            pct = int((idx / total_files) * 100) if total_files > 0 else 100
-            try:
-                progress_callback(idx, total_files, fname, pct)
-            except Exception:
-                pass
-
-        if date_str in archive_map and not is_gz:
-            continue
-
-        archive_map[date_str] = {
-            "date": date_str,
-            "date_formatted": date_formatted,
-            "day_of_week": day_of_week,
-            "filename": fname,
-            "is_compressed": is_gz,
-            "size_bytes": size_bytes,
-            "size_str": format_file_size(size_bytes),
-            "server_count": s_count,
-            "snapshot_count": snap_count,
-            "rel_path": os.path.join("archives", fname)
-        }
-
-    if meta_dirty:
-        save_archives_meta()
-        save_archive_server_index()
-
-    days_list = sorted(archive_map.values(), key=lambda d: d["date"], reverse=True)
-    total_days = len(days_list)
-    total_servers = sum(d["server_count"] for d in days_list)
-    total_snapshots = sum(d["snapshot_count"] for d in days_list)
-    total_size_bytes = sum(d["size_bytes"] for d in days_list)
-
-    summary_stats = {
-        "total_days": total_days,
-        "total_servers": total_servers,
-        "total_snapshots": total_snapshots,
-        "total_size_bytes": total_size_bytes,
-        "total_size_str": format_file_size(total_size_bytes)
-    }
-
-    return days_list, summary_stats
-
-def compress_finalized_archives(current_data: dict | None = None):
-    """
-    Compresses archive JSON files into .json.gz once all servers started that day are historical.
-    Scans ARCHIVES_DIR for servers_YYYY-MM-DD.json files:
-    If no active servers from that date exist in current_data, it compresses the archive to .json.gz
-    and removes the uncompressed .json file.
-    """
-    if not os.path.exists(ARCHIVES_DIR):
-        return
-
-    active_start_dates = get_active_server_start_dates(current_data)
-
-    try:
-        for fname in os.listdir(ARCHIVES_DIR):
-            if not fname.startswith("servers_") or not fname.endswith(".json"):
-                continue
-            
-            date_part = fname[len("servers_"):-len(".json")]
-            if len(date_part) != 10 or date_part[4] != '-' or date_part[7] != '-':
-                continue
-
-            if date_part in active_start_dates:
-                continue
-
-            uncompressed_path = os.path.join(ARCHIVES_DIR, fname)
-            gz_filename = f"{fname}.gz"
-            gz_path = os.path.join(ARCHIVES_DIR, gz_filename)
-            json_rel = os.path.join("archives", fname)
-            gz_rel = os.path.join("archives", gz_filename)
-
-            try:
-                if os.path.exists(gz_path):
-                    day_json = get_sc_data(json_rel)
-                    day_gz = get_sc_data(gz_rel)
-                    if isinstance(day_json, dict) and isinstance(day_gz, dict):
-                        merged_gz = {jid: dict(snaps) for jid, snaps in safe_dict_items(day_gz)}
-                        for j_id, snaps in safe_dict_items(day_json):
-                            if j_id not in merged_gz:
-                                merged_gz[j_id] = {}
-                            else:
-                                merged_gz[j_id] = dict(merged_gz[j_id])
-                            merged_gz[j_id].update(snaps)
-                        save_sc_data(merged_gz, gz_rel)
-                    try:
-                        os.remove(uncompressed_path)
-                    except Exception:
-                        pass
-                else:
-                    data = get_sc_data(json_rel)
-                    if isinstance(data, dict) and data:
-                        save_sc_data(data, gz_rel)
-                    else:
-                        with open(uncompressed_path, "rb") as f_in:
-                            raw_data = f_in.read()
-                        compressed_data = gzip.compress(raw_data, compresslevel=9)
-                        temp_gz_path = f"{gz_path}.{os.getpid()}_{time.time_ns()}.tmp"
-                        with open(temp_gz_path, "wb") as f_out:
-                            f_out.write(compressed_data)
-                            f_out.flush()
-                        os.replace(temp_gz_path, gz_path)
-                    
-                    try:
-                        os.remove(uncompressed_path)
-                    except Exception:
-                        pass
-
-                _invalidate_sc_cache(json_rel)
-                _sc_archives_meta_cache.pop(fname, None)
-                try:
-                    gz_mtime = os.path.getmtime(gz_path)
-                    gz_size = os.path.getsize(gz_path)
-                    day_gz = get_sc_data(gz_rel)
-                    s_cnt = len(day_gz) if isinstance(day_gz, dict) else 0
-                    snap_cnt = sum(len(snaps) for snaps in safe_dict_values(day_gz) if isinstance(snaps, dict)) if isinstance(day_gz, dict) else 0
-                    _sc_archives_meta_cache[gz_filename] = (gz_mtime, gz_size, s_cnt, snap_cnt)
-                    save_archives_meta()
-                except Exception as comp_meta_err:
-                    logger.error(f"Error updating meta cache after compression of {gz_filename}: {comp_meta_err}")
-                    
-                logger.info(f"Compressed finalized archive {fname} -> {gz_filename} (all servers for {date_part} are historical)")
-            except Exception as comp_err:
-                logger.error(f"Failed to compress archive {fname}: {comp_err}")
-    except Exception as e:
-        logger.error(f"Error checking archives for compression: {e}")
-
-def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> bool:
-    """
-    Archives servers as soon as they become historical into files based on their start date (data/archives/servers_YYYY-MM-DD.json),
-    and removes non-persistent historical servers from current_data (servers.json).
-    Also compresses a day's archive into .json.gz once all servers that started that day are historical.
-    Returns True if current_data was modified (dirty), False otherwise.
-    """
-    if not current_data or not isinstance(current_data, dict):
-        return False
-
-    now_utc = datetime.now(timezone.utc)
-    cutoff_dt = now_utc - timedelta(hours=48)
-    cutoff_iso = cutoff_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:23] + 'Z'
-
-    servers_dirty = False
-    meta_dirty = False
-    archived_data_by_date = {}
-
-    def record_expired_snapshot(s_id, ts, s_data, server_start_date):
-        date_str = server_start_date or (ts[:10] if (ts and len(ts) >= 10 and ts[4] == '-' and ts[7] == '-') else now_utc.strftime('%Y-%m-%d'))
-        if date_str not in archived_data_by_date:
-            archived_data_by_date[date_str] = {}
-        if s_id not in archived_data_by_date[date_str]:
-            archived_data_by_date[date_str][s_id] = {}
-        archived_data_by_date[date_str][s_id][ts] = s_data
-
-    for s_id in list(current_data.keys()):
-        if s_id in persistent_ids:
-            snaps = current_data.get(s_id, {})
-            if snaps and isinstance(snaps, dict):
-                server_start_date = get_server_start_date(s_id, snaps)
-                valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
-                if valid_ts_keys:
-                    meta = _sc_server_meta.setdefault(s_id, {})
-                    last_archived_ts = meta.get("last_archived_ts", "")
-                    if not last_archived_ts and server_start_date:
-                        gz_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json.gz")
-                        json_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json")
-                        target_rel = None
-                        if os.path.exists(gz_path):
-                            target_rel = os.path.join("archives", f"servers_{server_start_date}.json.gz")
-                        elif os.path.exists(json_path):
-                            target_rel = os.path.join("archives", f"servers_{server_start_date}.json")
-                        if target_rel:
-                            arch_data = get_sc_data(target_rel)
-                            if isinstance(arch_data, dict) and s_id in arch_data:
-                                arch_snaps = arch_data[s_id]
-                                if isinstance(arch_snaps, dict) and arch_snaps:
-                                    valid_arch_keys = [k for k in arch_snaps.keys() if not k.startswith('_')]
-                                    if valid_arch_keys:
-                                        last_archived_ts = max(valid_arch_keys)
-                                        meta["last_archived_ts"] = last_archived_ts
-                                        meta_dirty = True
-
-                    unarchived_keys = [ts for ts in valid_ts_keys if ts > last_archived_ts]
-                    if unarchived_keys:
-                        for ts in unarchived_keys:
-                            record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
-                        meta["last_archived_ts"] = max(unarchived_keys)
-                        meta_dirty = True
-            
-            # Persistent servers are never deleted from servers.json
-            continue
-
-        snaps = current_data.get(s_id, {})
-        if not snaps:
-            del current_data[s_id]
-            servers_dirty = True
-            continue
-
-        valid_ts_keys = [k for k in snaps.keys() if not k.startswith('_')]
-        if not valid_ts_keys:
-            del current_data[s_id]
-            servers_dirty = True
-            continue
-
-        latest_ts = max(valid_ts_keys)
-        latest_state = snaps.get(latest_ts, {})
-        age_sec = convert_ISO_to_secs(latest_ts, now=now_utc)
-        server_start_date = get_server_start_date(s_id, snaps)
-
-        meta = _sc_server_meta.setdefault(s_id, {})
-        last_archived_ts = meta.get("last_archived_ts", "")
-        if not last_archived_ts and server_start_date:
-            gz_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json.gz")
-            json_path = os.path.join(ARCHIVES_DIR, f"servers_{server_start_date}.json")
-            target_rel = None
-            if os.path.exists(gz_path):
-                target_rel = os.path.join("archives", f"servers_{server_start_date}.json.gz")
-            elif os.path.exists(json_path):
-                target_rel = os.path.join("archives", f"servers_{server_start_date}.json")
-            if target_rel:
-                arch_data = get_sc_data(target_rel)
-                if isinstance(arch_data, dict) and s_id in arch_data:
-                    arch_snaps = arch_data[s_id]
-                    if isinstance(arch_snaps, dict) and arch_snaps:
-                        valid_arch_keys = [k for k in arch_snaps.keys() if not k.startswith('_')]
-                        if valid_arch_keys:
-                            last_archived_ts = max(valid_arch_keys)
-                            meta["last_archived_ts"] = last_archived_ts
-                            meta_dirty = True
-
-        if is_server_historical(s_id, snaps, latest_state=latest_state, age_sec=age_sec):
-            unarchived_keys = [ts for ts in valid_ts_keys if ts > last_archived_ts]
-            if unarchived_keys:
-                for ts in unarchived_keys:
-                    record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
-                meta["last_archived_ts"] = max(unarchived_keys)
-                meta_dirty = True
-
-            if latest_ts < cutoff_iso:
-                del current_data[s_id]
-                _sc_server_meta.pop(s_id, None)
-                servers_dirty = True
-                meta_dirty = True
-                logger.info(f"Purged expired historical server {s_id} (>48h inactive, started: {server_start_date}) from servers.json")
-            continue
-
-        earliest_ts = min(valid_ts_keys)
-        if earliest_ts < cutoff_iso:
-            expired_keys = [ts for ts in valid_ts_keys if ts < cutoff_iso]
-            if expired_keys:
-                for ts in expired_keys:
-                    record_expired_snapshot(s_id, ts, snaps[ts], server_start_date)
-                    del snaps[ts]
-                meta["last_archived_ts"] = max(meta.get("last_archived_ts", ""), max(expired_keys))
-                servers_dirty = True
-                meta_dirty = True
-
-    if archived_data_by_date:
-        archive_expired_server_data(archived_data_by_date, current_data)
-
-    if meta_dirty:
-        save_server_meta()
-
-    compress_finalized_archives(current_data)
-
-    return servers_dirty
-
-def update_public_roblox_servers():
-    base_url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
-    cursor = ""
-    public_ids = []
-    public_info = {}
-    
-    try:
-        for _ in range(5):
-            url = f"{base_url}&cursor={cursor}" if cursor else base_url
-            response = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=10)
-            if response.status_code != 200:
-                break
-            data = response.json()
-            for server in data.get('data', []):
-                s_id = server.get('id')
-                if s_id:
-                    public_ids.append(s_id)
-                    public_info[s_id] = {
-                        "playing": int(server.get("playing", 0)),
-                        "maxPlayers": int(server.get("maxPlayers", 12))
-                    }
-            cursor = data.get('nextPageCursor')
-            if not cursor:
-                break
-
-        if public_ids or public_info:
-            with _sc_lock:
-                global _sc_public_server_ids, _sc_public_servers_info
-                _sc_public_server_ids = list(public_ids)
-                _sc_public_servers_info = dict(public_info)
-
-                meta_dirty = False
-                for s_id in public_ids:
-                    if s_id not in _sc_server_meta or _sc_server_meta[s_id].get("is_private") is not False:
-                        if s_id not in _sc_server_meta:
-                            _sc_server_meta[s_id] = {}
-                        _sc_server_meta[s_id]["is_private"] = False
-                        meta_dirty = True
-                    p_num = public_info.get(s_id, {}).get("playing", 0)
-                    if p_num > 0:
-                        if s_id not in _sc_server_meta:
-                            _sc_server_meta[s_id] = {}
-                        _sc_server_meta[s_id]["last_player_count"] = p_num
-                        meta_dirty = True
-                if meta_dirty:
-                    save_server_meta()
-            return True
-        return False
-    except Exception as e:
-        logger.error(f"Error updating public Roblox servers: {e}")
-        return False
-
-def pull_server_checker_data():
-    urls = [
-        "https://hydrogen.realisticbwr.org/api/public/servers",
-        "https://realisticbwr.org/api/public/servers"
-    ]
-    response = None
-    for url in urls:
-        try:
-            resp = requests.get(url, headers={"User-Agent": "RBWR-Server-Checker/1.0 (RBWR Utilities)"}, timeout=60)
-            if resp.status_code == 200:
-                response = resp
-                break
-        except Exception as e:
-            logger.warning(f"Failed to fetch {url}: {e}")
-            continue
-
-    if not response or response.status_code != 200:
-        logger.warning("All server endpoints failed or timed out.")
-        return False
-
-    try:
-        resp_json = response.json()
-    except Exception as e:
-        logger.error(f"Failed to decode server response JSON: {e}")
-        return False
-
-    success_public = update_public_roblox_servers()
-
-    with _sc_lock:
-        raw_current = get_sc_data("servers.json") or {}
-        
-        current_data = {jid: dict(snaps) for jid, snaps in safe_dict_items(raw_current)}
-        found_new_server = False
-        servers_list = resp_json.get('data', {}).get('servers', [])
-
-        for server in servers_list:
-            job_id = server.get('jobId')
-            if job_id and job_id not in _sc_server_ids:
-                _sc_server_ids.append(job_id)
-                found_new_server = True
-
-        global _sc_latest_data
-        _sc_latest_data = resp_json
-        for s in _sc_latest_data.get('data', {}).get('servers', []):
-            st = s.get('state')
-            if isinstance(st, dict):
-                if isinstance(st.get('Unit2'), dict):
-                    ensure_unit_output_mw(st['Unit2'])
-                    ensure_unit_fuel_level('Unit2', st['Unit2'])
-                if isinstance(st.get('Unit1'), dict):
-                    ensure_unit_output_mw(st['Unit1'])
-                    ensure_unit_fuel_level('Unit1', st['Unit1'])
-
-        persistent_data = load_persistent_servers()
-        persistent_ids = set(persistent_data.get("persistent", {}).keys())
-        meta_dirty = False
-
-        for server in servers_list:
-            job_id = server.get('jobId')
-            if not job_id:
-                continue
-
-            if job_id not in current_data:
-                current_data[job_id] = {}
-
-            raw_state = server.get('state')
-            if not isinstance(raw_state, dict):
-                continue
-
-            state = raw_state.copy()
-            misc_data = state.get("Misc")
-            if isinstance(misc_data, dict):
-                tot_pps = misc_data.get("Total points/second")
-                if tot_pps is not None:
-                    state["Total points/second"] = tot_pps
-            if "Misc" in state:
-                del state["Misc"]
-
-            owner_id = server.get("privateServerOwnerId")
-            if owner_id not in (None, "", 0, "0", "None", "null", False):
-                owner_id = str(owner_id).strip()
-            else:
-                owner_id = None
-
-            if owner_id is not None:
-                is_priv = True
-                state["IsPrivate"] = True
-                state["privateServerOwnerId"] = owner_id
-                if server.get("id"):
-                    state["ServerId"] = server.get("id")
-                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv or _sc_server_meta[job_id].get("privateServerOwnerId") != owner_id:
-                    if job_id not in _sc_server_meta:
-                        _sc_server_meta[job_id] = {}
-                    _sc_server_meta[job_id]["is_private"] = True
-                    _sc_server_meta[job_id]["privateServerOwnerId"] = owner_id
-                    if server.get("id"):
-                        _sc_server_meta[job_id]["id"] = server.get("id")
-                    meta_dirty = True
-            elif _sc_public_server_ids:
-                is_priv = job_id not in _sc_public_server_ids
-                state["IsPrivate"] = is_priv
-                if is_priv:
-                    prev_oid = _sc_server_meta.get(job_id, {}).get("privateServerOwnerId")
-                    state["privateServerOwnerId"] = prev_oid or "private"
-                else:
-                    state["privateServerOwnerId"] = None
-                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != is_priv:
-                    if job_id not in _sc_server_meta:
-                        _sc_server_meta[job_id] = {}
-                    _sc_server_meta[job_id]["is_private"] = is_priv if is_priv else None
-                    if not is_priv:
-                        _sc_server_meta[job_id]["privateServerOwnerId"] = None
-                    if server.get("id"):
-                        _sc_server_meta[job_id]["id"] = server.get("id")
-                    meta_dirty = True
-            elif job_id in _sc_server_meta and "is_private" in _sc_server_meta[job_id]:
-                is_priv = bool(_sc_server_meta[job_id]["is_private"])
-                state["IsPrivate"] = is_priv
-                if is_priv:
-                    prev_oid = _sc_server_meta[job_id].get("privateServerOwnerId")
-                    state["privateServerOwnerId"] = prev_oid or "private"
-                else:
-                    state["privateServerOwnerId"] = None
-            else:
-                is_priv = False
-                state["IsPrivate"] = False
-                state["privateServerOwnerId"] = None
-
-            info = _sc_public_servers_info.get(job_id, {})
-            if is_priv:
-                if "PlayerCount" in state:
-                    del state["PlayerCount"]
-            else:
-                player_count = info.get("playing", 0) if job_id in _sc_public_servers_info else 0
-                state["PlayerCount"] = player_count
-                if player_count > 0:
-                    if job_id not in _sc_server_meta:
-                        _sc_server_meta[job_id] = {}
-                    _sc_server_meta[job_id]["last_player_count"] = player_count
-                    meta_dirty = True
-
-            for unit in ("Unit1", "Unit2"):
-                unit_state = state.get(unit)
-                if isinstance(unit_state, dict):
-                    unit_dict = {}
-                    for k, v in unit_state.items():
-                        if k in SERVER_CHECKER_PURGE_KEYS:
-                            continue
-                        if isinstance(v, (int, float)) and not isinstance(v, bool):
-                            prec = SERVER_CHECKER_FIELD_PRECISION.get(k, 2)
-                            unit_dict[k] = round(v, prec) if prec is not None else v
-                        else:
-                            unit_dict[k] = v
-                    ensure_unit_output_mw(unit_dict)
-                    ensure_unit_fuel_level(unit, unit_dict)
-                    state[unit] = unit_dict
-                else:
-                    state[unit] = {}
-
-            heartbeat = server.get('lastHeartbeat', datetime.now(timezone.utc).isoformat())
-            if job_id not in _sc_server_meta:
-                _sc_server_meta[job_id] = {}
-            if "start_timestamp" not in _sc_server_meta[job_id]:
-                _sc_server_meta[job_id]["start_timestamp"] = heartbeat
-                meta_dirty = True
-            current_data[job_id][heartbeat] = state
-
-            meta_record = build_server_metadata(
-                job_id=job_id,
-                snapshots=current_data[job_id],
-                server_raw=server,
-                existing_meta=_sc_server_meta.get(job_id)
-            )
-            current_data[job_id]["_meta"] = meta_record
-            _sc_server_meta[job_id] = meta_record
-            meta_dirty = True
-
-        for s_id, s_snaps in current_data.items():
-            if isinstance(s_snaps, dict) and "_meta" not in s_snaps:
-                m_rec = build_server_metadata(s_id, s_snaps, existing_meta=_sc_server_meta.get(s_id))
-                s_snaps["_meta"] = m_rec
-                _sc_server_meta[s_id] = m_rec
-                meta_dirty = True
-
-        servers_dirty = bool(servers_list)
-        pruned_dirty = prune_and_archive_servers_data(current_data, persistent_ids)
-        if pruned_dirty:
-            servers_dirty = True
-
-        if servers_dirty:
-            save_sc_data(current_data, "servers.json")
-        if meta_dirty:
-            save_server_meta()
-
-        raw_global = get_sc_data("global.json") or {}
-        global_data = dict(raw_global)
-        stats_payload = resp_json.get('data', {}).get('stats', {})
-        if stats_payload:
-            global_data[str(datetime.now(timezone.utc).isoformat())] = stats_payload
-            save_sc_data(global_data, "global.json")
-
-        return True
 
 def server_checker_worker():
     time.sleep(2)
     try:
-        compress_finalized_archives()
+        core.compress_finalized_archives()
     except Exception as e:
         logger.error(f"Error in initial archive compression: {e}")
     while True:
         try:
-            pull_server_checker_data()
+            core.pull_server_checker_data()
         except Exception as e:
             logger.error(f"Error in server_checker_worker: {e}")
         time.sleep(60)
@@ -3512,7 +1651,7 @@ def start_server_checker_worker():
     with _sc_worker_lock:
         if _sc_worker_started:
             return
-        
+
         if os.environ.get("DISABLE_SC_WORKER") == "1":
             return
         if "unittest" in sys.modules:
@@ -3521,7 +1660,7 @@ def start_server_checker_worker():
         is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
         if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
             return
-            
+
         _sc_worker_started = True
         _sc_worker_thread = threading.Thread(target=server_checker_worker, daemon=True, name="SCWorkerThread")
         _sc_worker_thread.start()
@@ -3531,869 +1670,6 @@ def start_server_checker_worker():
 def ensure_server_checker_worker():
     if not _sc_worker_started:
         start_server_checker_worker()
-
-def convert_ISO_to_secs(timestamp_str, now=None):
-    try:
-        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-        if now is None:
-            now = datetime.now(timezone.utc)
-        age_seconds = (now - dt).total_seconds()
-        return max(0, round(age_seconds))
-    except Exception:
-        return 0
-
-def format_uptime_duration(seconds: float) -> str:
-    s = max(0, int(round(seconds)))
-    if s < 60:
-        return f"{s}s"
-    if s < 3600:
-        m = s // 60
-        rem_s = s % 60
-        return f"{m}m {rem_s}s" if rem_s > 0 else f"{m}m"
-    h = s // 3600
-    rem_m = (s % 3600) // 60
-    return f"{h}h {rem_m}m" if rem_m > 0 else f"{h}h"
-
-def format_heartbeat_age(seconds: float) -> str:
-    """
-    Formats a heartbeat age (in seconds) into human-readable intervals:
-    seconds, minutes, hours, days, weeks, months (and years if >= 365d).
-    """
-    if seconds is None:
-        return "N/A"
-    try:
-        s = max(0, int(round(float(seconds))))
-    except (ValueError, TypeError):
-        return "N/A"
-
-    if s < 60:
-        return f"{s}s ago"
-    if s < 3600:
-        m = s // 60
-        rem_s = s % 60
-        return f"{m}m {rem_s}s ago" if rem_s > 0 else f"{m}m ago"
-    if s < 86400:
-        h = s // 3600
-        rem_m = (s % 3600) // 60
-        return f"{h}h {rem_m}m ago" if rem_m > 0 else f"{h}h ago"
-    if s < 604800:  # 7 days
-        d = s // 86400
-        rem_h = (s % 86400) // 3600
-        return f"{d}d {rem_h}h ago" if rem_h > 0 else f"{d}d ago"
-    if s < 2592000:  # 30 days
-        w = s // 604800
-        rem_d = (s % 604800) // 86400
-        return f"{w}w {rem_d}d ago" if rem_d > 0 else f"{w}w ago"
-    if s < 31536000:  # 365 days
-        mo = s // 2592000
-        rem_d = (s % 2592000) // 86400
-        rem_w = rem_d // 7
-        return f"{mo}mo {rem_w}w ago" if rem_w > 0 else (f"{mo}mo {rem_d}d ago" if rem_d > 0 else f"{mo}mo ago")
-    y = s // 31536000
-    rem_mo = (s % 31536000) // 2592000
-    return f"{y}y {rem_mo}mo ago" if rem_mo > 0 else f"{y}y ago"
-
-def get_server_uptime_seconds(snapshots, is_historical, age_sec=None):
-    if not snapshots or not isinstance(snapshots, dict):
-        return 0
-    try:
-        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        if not valid_ts_keys:
-            return 0
-        first_ts = min(valid_ts_keys)
-        latest_ts = max(valid_ts_keys)
-        first_sec_ago = convert_ISO_to_secs(first_ts)
-        latest_sec_ago = convert_ISO_to_secs(latest_ts) if age_sec is None else age_sec
-        if is_historical:
-            return max(0, first_sec_ago - latest_sec_ago)
-        return max(0, first_sec_ago)
-    except Exception:
-        return 0
-
-def is_server_historical(job_id, snapshots=None, latest_state=None, is_private=None, age_sec=None):
-    """
-    Determines if a server is historical.
-    - For private servers: marked historical if heartbeat age > 600s.
-    - For public servers: checked against the public servers list from the Roblox API.
-      If the Roblox API public list is loaded and the server is not there, or has 0 players,
-      or heartbeat age > 600s, it is marked historical.
-    """
-    if age_sec is None:
-        if snapshots and isinstance(snapshots, dict):
-            valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-            if valid_ts:
-                latest_ts = max(valid_ts)
-                age_sec = convert_ISO_to_secs(latest_ts)
-            else:
-                age_sec = 0
-        else:
-            age_sec = 0
-
-    if latest_state is None and snapshots and isinstance(snapshots, dict):
-        valid_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        if valid_ts:
-            latest_ts = max(valid_ts)
-            latest_state = snapshots.get(latest_ts, {})
-    if latest_state is None:
-        latest_state = {}
-
-    if is_private is None:
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-
-    if is_private:
-        return (age_sec > 600)
-
-    info = _sc_public_servers_info.get(job_id)
-    if _sc_public_server_ids:
-        if info is None or job_id not in _sc_public_servers_info:
-            return True
-        return info.get("playing", 0) == 0 or age_sec > 600
-
-    return (age_sec > 600) or (latest_state.get("PlayerCount", 0) == 0)
-
-def get_sc_latest_pps_map() -> dict[str, float]:
-    """
-    Extracts {jobId: float(Total points/second)} from the in-memory _sc_latest_data.
-    """
-    pps_map = {}
-    if _sc_latest_data and isinstance(_sc_latest_data, dict):
-        try:
-            for s in _sc_latest_data.get('data', {}).get('servers', []):
-                jid = s.get('jobId')
-                if jid:
-                    st = s.get('state') or {}
-                    misc = st.get('Misc') or {}
-                    pps = misc.get('Total points/second')
-                    if pps is not None:
-                        try:
-                            pps_map[jid] = float(pps)
-                        except (ValueError, TypeError):
-                            pass
-        except Exception:
-            pass
-    return pps_map
-
-def get_unit_output_mw(unit_dict):
-    """
-    Extracts electrical power generation (MW) from a unit state dictionary.
-    Handles Roblox RBWR field aliases:
-    - Unit 1 uses 'Output (MW)'
-    - Unit 2 uses 'PradDoSieci' (grid electrical power in MW)
-    - Fallbacks: 'Output', 'Power', 'megawatts', 'output_mw'
-    """
-    if not isinstance(unit_dict, dict):
-        return 0.0
-    for k in ("Output (MW)", "PradDoSieci", "Output", "Power", "megawatts", "output_mw"):
-        v = unit_dict.get(k)
-        if v is not None:
-            try:
-                return float(v)
-            except (ValueError, TypeError):
-                continue
-    return 0.0
-
-def calculate_server_points_rate(unit1, unit2, job_id=None, total_pps=None, latest_state=None, pps_map=None):
-    """
-    Calculates whether Unit 1 / Unit 2 are running (APRM > 5%)
-    and the points rate (pts/s) made by the server.
-
-    If available in _sc_latest_data (or passed via total_pps / latest_state / pps_map),
-    the exact 'Total points/second' reported by the game's server state is used.
-    Otherwise, falls back to calculating based on RBWR points rules.
-    """
-    if not isinstance(unit1, dict):
-        unit1 = {}
-    if not isinstance(unit2, dict):
-        unit2 = {}
-
-    try:
-        u1_aprm = float(unit1.get("APRM", 0) or 0)
-    except (ValueError, TypeError):
-        u1_aprm = 0.0
-
-    try:
-        u2_aprm = float(unit2.get("APRM", 0) or 0)
-    except (ValueError, TypeError):
-        u2_aprm = 0.0
-
-    u1_running = u1_aprm > 5.0
-    u2_running = u2_aprm > 5.0
-
-    resolved_total_pps = None
-    if total_pps is not None:
-        try:
-            resolved_total_pps = float(total_pps)
-        except (ValueError, TypeError):
-            pass
-
-    if resolved_total_pps is None and pps_map and job_id and job_id in pps_map:
-        resolved_total_pps = pps_map[job_id]
-
-    if resolved_total_pps is None and job_id and _sc_latest_data and isinstance(_sc_latest_data, dict):
-        try:
-            for s in _sc_latest_data.get('data', {}).get('servers', []):
-                if s.get('jobId') == job_id:
-                    st = s.get('state') or {}
-                    misc = st.get('Misc') or {}
-                    pps_val = misc.get('Total points/second')
-                    if pps_val is not None:
-                        resolved_total_pps = float(pps_val)
-                    break
-        except Exception:
-            pass
-
-    if resolved_total_pps is None and isinstance(latest_state, dict):
-        pps_val = latest_state.get("Total points/second")
-        if pps_val is None and isinstance(latest_state.get("Misc"), dict):
-            pps_val = latest_state["Misc"].get("Total points/second")
-        if pps_val is not None:
-            try:
-                resolved_total_pps = float(pps_val)
-            except (ValueError, TypeError):
-                pass
-
-    u1_rate = 0.0
-    u2_rate = 0.0
-    if unit1.get("PointsPerSecond") is not None:
-        try:
-            u1_rate = float(unit1.get("PointsPerSecond") or 0)
-        except (ValueError, TypeError):
-            u1_rate = 0.0
-    if unit2.get("PointsPerSecond") is not None:
-        try:
-            u2_rate = float(unit2.get("PointsPerSecond") or 0)
-        except (ValueError, TypeError):
-            u2_rate = 0.0
-
-    if resolved_total_pps is None and (u1_rate > 0 or u2_rate > 0):
-        resolved_total_pps = u1_rate + u2_rate
-
-    if resolved_total_pps is not None:
-        total_rate = max(0.0, resolved_total_pps)
-        demand_rate = max(0.0, total_rate - (u1_rate + u2_rate))
-        points_rate = round(total_rate, 2)
-        points_rate_str = f"{total_rate:.2f} pts/s"
-    else:
-        demand_rate = None
-        points_rate = None
-        points_rate_str = "N/A"
-
-    return {
-        "u1_running": u1_running,
-        "u2_running": u2_running,
-        "u1_aprm": u1_aprm,
-        "u2_aprm": u2_aprm,
-        "u1_rate": u1_rate,
-        "u2_rate": u2_rate,
-        "demand_rate": demand_rate,
-        "points_rate": points_rate,
-        "points_rate_str": points_rate_str,
-    }
-
-def get_active_cards_base(servers_data, persistent_ids):
-    global _sc_active_cards_base, _sc_active_cards_key
-    cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
-    with _sc_active_lock:
-        if _sc_active_cards_base is not None and _sc_active_cards_key == cache_key:
-            return _sc_active_cards_base
-
-    now_utc = datetime.now(timezone.utc)
-    pps_map = get_sc_latest_pps_map()
-    cards = []
-    server_items = safe_dict_items(servers_data)
-    server_items.sort(key=lambda x: str(x[0]))
-    for job_id, snapshots in server_items:
-        if not snapshots or not isinstance(snapshots, dict):
-            continue
-        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        if not valid_ts_keys:
-            continue
-        latest_timestamp = max(valid_ts_keys)
-        latest_state = snapshots.get(latest_timestamp)
-        if not latest_state or not isinstance(latest_state, dict):
-            continue
-        info = _sc_public_servers_info.get(job_id, {})
-        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
-        is_persistent = job_id in persistent_ids
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
-
-        meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
-        card_owner_id = (
-            meta.get("privateServerOwnerId")
-            or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
-        ) if is_private else None
-
-        if is_historical and not is_persistent:
-            continue
-
-        if is_private:
-            player_count = None
-            max_players = None
-        else:
-            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12) if info else 12
-
-        first_timestamp = min(valid_ts_keys)
-        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
-        uptime_str = format_uptime_duration(uptime_sec)
-
-        j_parts = [p for p in job_id.split("-") if p]
-        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-
-        unit1 = latest_state.get("Unit1", {})
-        unit2 = latest_state.get("Unit2", {})
-        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
-        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
-        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
-
-        cards.append({
-            "job_id": job_id,
-            "short_id": short_id,
-            "is_private": is_private,
-            "privateServerOwnerId": card_owner_id,
-            "is_persistent": is_persistent,
-            "is_historical": is_historical,
-            "is_archived": False,
-            "player_count": player_count,
-            "max_players": max_players,
-            "raw_timestamp": latest_timestamp,
-            "first_timestamp": first_timestamp,
-            "age_seconds": age_sec,
-            "latest_timestamp": format_heartbeat_age(age_sec),
-            "uptime_seconds": uptime_sec,
-            "uptime_str": uptime_str,
-            "snapshot_count": len(valid_ts_keys),
-            "points_rate": pts_info["points_rate"],
-            "points_rate_str": pts_info["points_rate_str"],
-            "top_score": top_score,
-            "u1_running": pts_info["u1_running"],
-            "u2_running": pts_info["u2_running"],
-            "unit1": {
-                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
-                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit1), 1),
-                "is_running": pts_info["u1_running"],
-                "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_stats["estimated_fuel"],
-                "kalman_fuel": u1_stats["kalman_fuel"],
-                "projected_fuel": u1_stats["projected_fuel"],
-                "uncertainty": u1_stats["uncertainty"],
-                "median_fuel": u1_stats["median_fuel"],
-                "weighted_fuel": u1_stats["weighted_fuel"],
-                "mean_fuel": u1_stats["mean_fuel"],
-                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
-            },
-            "unit2": {
-                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
-                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit2), 1),
-                "is_running": pts_info["u2_running"],
-                "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_stats["estimated_fuel"],
-                "kalman_fuel": u2_stats["kalman_fuel"],
-                "projected_fuel": u2_stats["projected_fuel"],
-                "uncertainty": u2_stats["uncertainty"],
-                "median_fuel": u2_stats["median_fuel"],
-                "weighted_fuel": u2_stats["weighted_fuel"],
-                "mean_fuel": u2_stats["mean_fuel"],
-                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
-            },
-        })
-
-    with _sc_active_lock:
-        _sc_active_cards_base = cards
-        _sc_active_cards_key = cache_key
-
-    return cards
-
-def build_server_cards(data, search_query=None, is_archived=False, exact_search_only=True):
-    if not data:
-        return []
-
-    persistent_data = load_persistent_servers()
-    persistent_ids = set(persistent_data.get("persistent", {}).keys())
-    clean_query = (search_query or "").strip()
-
-    if not clean_query and not is_archived:
-        return list(get_active_cards_base(data, persistent_ids))
-
-    cards = []
-    now_utc = datetime.now(timezone.utc)
-    pps_map = get_sc_latest_pps_map()
-    data_items = safe_dict_items(data)
-    data_items.sort(key=lambda x: str(x[0]))
-    for job_id, snapshots in data_items:
-        if not snapshots or not isinstance(snapshots, dict):
-            continue
-        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        if not valid_ts_keys:
-            continue
-        latest_timestamp = max(valid_ts_keys)
-        latest_state = snapshots.get(latest_timestamp)
-        if not latest_state or not isinstance(latest_state, dict):
-            continue
-        unit1 = latest_state.get("Unit1", {})
-        unit2 = latest_state.get("Unit2", {})
-
-        info = _sc_public_servers_info.get(job_id, {})
-        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
-        is_persistent = job_id in persistent_ids
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-
-        meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
-        card_owner_id = (
-            meta.get("privateServerOwnerId")
-            or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
-        ) if is_private else None
-
-        server_is_archived = is_archived or (isinstance(snapshots, dict) and bool(snapshots.get('_is_archived', False)))
-        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or server_is_archived
-        if is_private:
-            player_count = None
-            max_players = None
-        else:
-            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12) if info else 12
-
-        if (is_historical or server_is_archived) and not is_persistent:
-            if exact_search_only:
-                if not is_exact_job_or_server_id_match(clean_query, job_id):
-                    continue
-            elif clean_query:
-                j_parts = [p for p in job_id.split("-") if p]
-                short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-                clean_q_lower = clean_query.lower()
-                matches = (
-                    is_exact_job_or_server_id_match(clean_query, job_id) or
-                    clean_q_lower in job_id.lower() or
-                    (short_id and clean_q_lower in short_id.lower())
-                )
-                if not matches:
-                    continue
-
-        first_timestamp = min(valid_ts_keys)
-        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
-        uptime_str = format_uptime_duration(uptime_sec)
-
-        j_parts = [p for p in job_id.split("-") if p]
-        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
-        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
-        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
-
-        cards.append({
-            "job_id": job_id,
-            "short_id": short_id,
-            "is_private": is_private,
-            "privateServerOwnerId": card_owner_id,
-            "is_persistent": is_persistent,
-            "is_historical": is_historical,
-            "is_archived": server_is_archived,
-            "player_count": player_count,
-            "max_players": max_players,
-            "raw_timestamp": latest_timestamp,
-            "first_timestamp": first_timestamp,
-            "age_seconds": age_sec,
-            "latest_timestamp": format_heartbeat_age(age_sec),
-            "uptime_seconds": uptime_sec,
-            "uptime_str": uptime_str,
-            "snapshot_count": len(valid_ts_keys),
-            "points_rate": pts_info["points_rate"],
-            "points_rate_str": pts_info["points_rate_str"],
-            "top_score": top_score,
-            "u1_running": pts_info["u1_running"],
-            "u2_running": pts_info["u2_running"],
-            "unit1": {
-                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
-                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit1), 1),
-                "is_running": pts_info["u1_running"],
-                "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_stats["estimated_fuel"],
-                "kalman_fuel": u1_stats["kalman_fuel"],
-                "projected_fuel": u1_stats["projected_fuel"],
-                "uncertainty": u1_stats["uncertainty"],
-                "median_fuel": u1_stats["median_fuel"],
-                "weighted_fuel": u1_stats["weighted_fuel"],
-                "mean_fuel": u1_stats["mean_fuel"],
-                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
-            },
-            "unit2": {
-                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
-                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit2), 1),
-                "is_running": pts_info["u2_running"],
-                "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_stats["estimated_fuel"],
-                "kalman_fuel": u2_stats["kalman_fuel"],
-                "projected_fuel": u2_stats["projected_fuel"],
-                "uncertainty": u2_stats["uncertainty"],
-                "median_fuel": u2_stats["median_fuel"],
-                "weighted_fuel": u2_stats["weighted_fuel"],
-                "mean_fuel": u2_stats["mean_fuel"],
-                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
-            },
-        })
-    return cards
-
-def parse_label_seconds(label, fallback_idx=0):
-    try:
-        if isinstance(label, (int, float)):
-            return float(label)
-        return float(str(label).split()[0])
-    except Exception:
-        return float(fallback_idx)
-
-def lttb_indices(points, threshold=600):
-    """
-    Selects up to `threshold` point indices using Largest Triangle Three Buckets (LTTB) algorithm.
-    Guarantees first and last points are included.
-    Preserves visually significant peaks, valleys, and inflections.
-    """
-    n = len(points)
-    if n <= threshold or threshold <= 2:
-        return set(range(n))
-
-    sampled = {0, n - 1}
-    bucket_size = (n - 2) / (threshold - 2)
-    a = 0
-
-    for i in range(threshold - 2):
-        c_start = int((i + 1) * bucket_size) + 1
-        c_end = min(int((i + 2) * bucket_size) + 1, n)
-        if c_end <= c_start:
-            c_x, c_y = points[min(c_start, n - 1)]
-        else:
-            c_x = sum(points[k][0] for k in range(c_start, c_end)) / (c_end - c_start)
-            c_y = sum(points[k][1] for k in range(c_start, c_end)) / (c_end - c_start)
-
-        b_start = int(i * bucket_size) + 1
-        b_end = min(int((i + 1) * bucket_size) + 1, n)
-        ax, ay = points[a]
-
-        max_area = -1.0
-        max_idx = b_start
-        for j in range(b_start, b_end):
-            bx, by = points[j]
-            area = abs((ax - c_x) * (by - ay) - (ax - bx) * (c_y - ay))
-            if area > max_area:
-                max_area = area
-                max_idx = j
-
-        sampled.add(max_idx)
-        a = max_idx
-
-    return sampled
-
-def compress_flat_stretches(points, precision=2):
-    """
-    Compresses flat stretches where y remains constant.
-    Keeps the beginning and end of each flat stretch and inflection points.
-    """
-    n = len(points)
-    if n <= 2:
-        return list(points)
-    result = [points[0]]
-    for i in range(1, n - 1):
-        y_prev = round(points[i - 1][1], precision) if precision is not None else points[i - 1][1]
-        y_curr = round(points[i][1], precision) if precision is not None else points[i][1]
-        y_next = round(points[i + 1][1], precision) if precision is not None else points[i + 1][1]
-        if y_prev == y_curr == y_next:
-            continue
-        result.append(points[i])
-    result.append(points[-1])
-    return result
-
-MAX_CHART_POINTS = 600
-
-def compress_points(points, precision=2, max_points=MAX_CHART_POINTS):
-    """
-    Compress collinear/flat points and apply LTTB downsampling when point count exceeds max_points.
-    x is seconds_ago (float), y is metric value (float).
-    """
-    if not points:
-        return []
-    cleaned = compress_flat_stretches(points, precision=precision)
-    if len(cleaned) > max_points:
-        indices = lttb_indices(cleaned, threshold=max_points)
-        cleaned = [cleaned[i] for i in sorted(indices)]
-    return [
-        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
-        for x, y in cleaned
-    ]
-
-def compress_paired_points(u1_points, u2_points, precision=2, max_points=MAX_CHART_POINTS):
-    """
-    Compresses u1_points and u2_points (lists of (x, y) tuples) using synchronized timestamps.
-    Applies flat stretch elimination and paired LTTB decimation to bound point counts
-    while ensuring both units retain inflection points at shared timestamps.
-    """
-    if not u1_points and not u2_points:
-        return [], []
-    if not u1_points:
-        return [], compress_points(u2_points, precision=precision, max_points=max_points)
-    if not u2_points:
-        return compress_points(u1_points, precision=precision, max_points=max_points), []
-
-    c_u1 = compress_flat_stretches(u1_points, precision=precision)
-    c_u2 = compress_flat_stretches(u2_points, precision=precision)
-
-    if len(c_u1) > max_points or len(c_u2) > max_points:
-        idx1 = lttb_indices(c_u1, threshold=max_points)
-        idx2 = lttb_indices(c_u2, threshold=max_points)
-        kept_x = {round(c_u1[i][0], 1) for i in idx1} | {round(c_u2[i][0], 1) for i in idx2}
-    else:
-        kept_x = {round(x, 1) for x, _ in c_u1} | {round(x, 1) for x, _ in c_u2}
-
-    res_u1 = [
-        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
-        for x, y in u1_points
-        if round(x, 1) in kept_x
-    ]
-    res_u2 = [
-        {"x": round(x, 1), "y": (round(y, precision) if precision is not None else y)}
-        for x, y in u2_points
-        if round(x, 1) in kept_x
-    ]
-    return res_u1, res_u2
-
-def build_chart_payload(job_id, snapshots):
-    metrics = {
-        "Demand": ("3", "Electrical Demand (MW)", ["Demand", "DemandU1", "DemandU2"], 2),
-        "Output (MW)": ("3", "Electrical Output (MW)", ["Output (MW)", "PradDoSieci", "Output", "Power"], 2),
-        "APRM": ("3", "APRM (%)", ["APRM"], 4),
-        "RTP": ("2", "RTP (%)", ["RTP"], 4),
-        "Xenon": ("3", "Xenon (%)", ["Xenon"], 6, 100.0),
-        "Iodine": ("3", "Iodine (%)", ["Iodine"], 6, 100.0),
-        "Pressure": ("3", "Reactor Pressure (kPa)", ["Pressure"], 2),
-        "Reactor Temp": ("3", "Reactor Temperature (°C)", ["Reactor Temp"], 2),
-        "ReactorLevel": ("3", "Reactor Water Level (m)", ["ReactorLevel"], 2),
-        "Deareator Level": ("3", "Deaerator Level (m)", ["Deareator Level", "Deaerator Level"], 2),
-        "Hotwell Level": ("3", "Hotwell Level (m)", ["Hotwell Level"], 2),
-        "TurbineHealth": ("2", "Turbine Health (%)", ["TurbineHealth", "Turbine Health"], 2),
-        "GeneratorTemperature": ("2", "Generator Temperature (°C)", ["GeneratorTemperature", "Generator Temperature"], 2),
-        "CasingTemperature": ("2", "Casing Temperature (°C)", ["CasingTemperature", "Casing Temperature"], 4)
-    }
-    chart_payload = []
-    ordered_snapshots = []
-
-    if not snapshots:
-        return {
-            "job_id": job_id,
-            "last_heartbeat_age": 0,
-            "snapshots": [],
-            "charts": [],
-        }
-
-    valid_items = safe_dict_items(snapshots)
-    valid_items.sort(key=lambda x: str(x[0]))
-    for timestamp, state in valid_items:
-        sec_ago = convert_ISO_to_secs(timestamp)
-        ordered_snapshots.append({
-            "timestamp": timestamp,
-            "seconds_ago": sec_ago,
-            "display_time": f"{sec_ago} seconds ago",
-            "state": state,
-        })
-
-    is_private = get_server_visibility(job_id, snapshots)
-
-    if not is_private:
-        player_points = []
-        for entry in ordered_snapshots:
-            sec_ago = entry["seconds_ago"]
-            st = entry["state"]
-            p_val = st.get("PlayerCount")
-            if p_val is None:
-                p_val = st.get("Players")
-            if p_val is None:
-                p_val = st.get("playing")
-            if p_val is not None and isinstance(p_val, (int, float)):
-                player_points.append((sec_ago, float(p_val)))
-
-        if not player_points and ordered_snapshots:
-            cur_p = _sc_public_servers_info.get(job_id, {}).get("playing", 0)
-            player_points.append((ordered_snapshots[-1]["seconds_ago"], float(cur_p)))
-
-        if player_points:
-            c_players = compress_points(player_points, precision=0)
-            chart_payload.append({
-                "metric": "Player Count",
-                "datasets": [{
-                    "label": "Players",
-                    "data": c_players,
-                    "borderColor": "#10b981",
-                    "backgroundColor": "rgba(16, 185, 129, 0.08)",
-                }],
-                "total_points": len(player_points),
-            })
-
-    for metric_key, metric_cfg in metrics.items():
-        unit_type = metric_cfg[0]
-        metric_title = metric_cfg[1]
-        field_aliases = metric_cfg[2]
-        precision = metric_cfg[3] if len(metric_cfg) > 3 else 2
-        scale_factor = metric_cfg[4] if len(metric_cfg) > 4 else 1.0
-        u1_points = []
-        u2_points = []
-
-        for entry in ordered_snapshots:
-            sec_ago = entry["seconds_ago"]
-            u1_state = entry["state"].get("Unit1", {})
-            u2_state = entry["state"].get("Unit2", {})
-
-            if unit_type in ("1", "3"):
-                v1 = None
-                if metric_key == "Demand":
-                    v1 = u1_state.get("DemandU1") if u1_state.get("DemandU1") is not None else u1_state.get("Demand")
-                else:
-                    for alias in field_aliases:
-                        if alias in u1_state and u1_state[alias] is not None:
-                            v1 = u1_state[alias]
-                            break
-                if v1 is not None and isinstance(v1, (int, float)):
-                    u1_points.append((sec_ago, float(v1) * scale_factor))
-
-            if unit_type in ("2", "3"):
-                v2 = None
-                if metric_key == "Demand":
-                    v2 = u2_state.get("DemandU2") if u2_state.get("DemandU2") is not None else u2_state.get("Demand")
-                else:
-                    for alias in field_aliases:
-                        if alias in u2_state and u2_state[alias] is not None:
-                            v2 = u2_state[alias]
-                            break
-                if v2 is not None and isinstance(v2, (int, float)):
-                    u2_points.append((sec_ago, float(v2) * scale_factor))
-
-        datasets = []
-        if u1_points and u2_points and unit_type == "3":
-            c_u1, c_u2 = compress_paired_points(u1_points, u2_points, precision=precision)
-            datasets.append({
-                "label": "Unit 1",
-                "data": c_u1,
-                "borderColor": "#3b82f6",
-                "backgroundColor": "rgba(59, 130, 246, 0.08)",
-            })
-            datasets.append({
-                "label": "Unit 2",
-                "data": c_u2,
-                "borderColor": "#f59e0b",
-                "backgroundColor": "rgba(245, 158, 11, 0.08)",
-            })
-        else:
-            if u1_points and unit_type in ("1", "3"):
-                c_u1 = compress_points(u1_points, precision=precision)
-                datasets.append({
-                    "label": "Unit 1",
-                    "data": c_u1,
-                    "borderColor": "#3b82f6",
-                    "backgroundColor": "rgba(59, 130, 246, 0.08)",
-                })
-
-            if u2_points and unit_type in ("2", "3"):
-                c_u2 = compress_points(u2_points, precision=precision)
-                datasets.append({
-                    "label": "Unit 2",
-                    "data": c_u2,
-                    "borderColor": "#f59e0b",
-                    "backgroundColor": "rgba(245, 158, 11, 0.08)",
-                })
-
-        chart_payload.append({
-            "metric": metric_title,
-            "datasets": datasets,
-            "total_points": max(len(u1_points), len(u2_points)) if (u1_points or u2_points) else 0,
-        })
-
-    last_heartbeat_age = ordered_snapshots[-1]["seconds_ago"] if ordered_snapshots else 0
-
-    return {
-        "job_id": job_id,
-        "last_heartbeat_age": last_heartbeat_age,
-        "snapshots": ordered_snapshots,
-        "charts": chart_payload,
-    }
-
-def build_global_chart_payload(snapshots, max_history_seconds=7 * 24 * 3600):
-    chart_payload = []
-
-    if not snapshots:
-        return {
-            "snapshots": [],
-            "charts": [],
-        }
-
-    u1_points = []
-    u2_points = []
-
-    valid_ts_list = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-    valid_ts_list.sort()
-    for timestamp in valid_ts_list:
-        sec_ago = convert_ISO_to_secs(timestamp)
-        if max_history_seconds is not None and sec_ago > max_history_seconds:
-            continue
-        data_entry = snapshots.get(timestamp) or {}
-        unit1 = data_entry.get("unit1", {})
-        unit2 = data_entry.get("unit2", {})
-
-        v1 = unit1.get("megawatts")
-        v2 = unit2.get("megawatts")
-        if v1 is not None and isinstance(v1, (int, float)) and v1 > 0:
-            u1_points.append((sec_ago, float(v1)))
-        if v2 is not None and isinstance(v2, (int, float)) and v2 > 0:
-            u2_points.append((sec_ago, float(v2)))
-
-    datasets = []
-    if u1_points and u2_points:
-        c_u1, c_u2 = compress_paired_points(u1_points, u2_points, precision=2)
-        datasets.append({
-            "label": "Unit 1",
-            "data": c_u1,
-            "borderColor": "#3b82f6",
-            "backgroundColor": "rgba(59, 130, 246, 0.08)",
-        })
-        datasets.append({
-            "label": "Unit 2",
-            "data": c_u2,
-            "borderColor": "#f59e0b",
-            "backgroundColor": "rgba(245, 158, 11, 0.08)",
-        })
-    elif u1_points:
-        datasets.append({
-            "label": "Unit 1",
-            "data": compress_points(u1_points, precision=2),
-            "borderColor": "#3b82f6",
-            "backgroundColor": "rgba(59, 130, 246, 0.08)",
-        })
-    elif u2_points:
-        datasets.append({
-            "label": "Unit 2",
-            "data": compress_points(u2_points, precision=2),
-            "borderColor": "#f59e0b",
-            "backgroundColor": "rgba(245, 158, 11, 0.08)",
-        })
-
-    chart_payload.append({
-        "metric": "Global Power Output (MW)",
-        "datasets": datasets,
-    })
-
-    return {
-        "snapshots": [],
-        "charts": chart_payload,
-    }
 
 @app.route("/servers", methods=["GET"])
 def servers_page():
@@ -4421,8 +1697,8 @@ def server_detail_page(job_id):
     is_archived = False
 
     if snapshots is None:
-        if _sc_latest_data:
-            for s in _sc_latest_data.get('data', {}).get('servers', []):
+        if core._sc_latest_data:
+            for s in core._sc_latest_data.get('data', {}).get('servers', []):
                 if s.get('jobId') == job_id:
                     snapshots = {s.get('lastHeartbeat', datetime.now(timezone.utc).isoformat()): s.get('state', {})}
                     break
@@ -4444,8 +1720,8 @@ def server_detail_page(job_id):
         return redirect("/servers")
 
     server = None
-    if _sc_latest_data and not is_archived:
-        for s in _sc_latest_data.get('data', {}).get('servers', []):
+    if core._sc_latest_data and not is_archived:
+        for s in core._sc_latest_data.get('data', {}).get('servers', []):
             if s.get('jobId') == job_id:
                 server = s
                 break
@@ -4453,7 +1729,7 @@ def server_detail_page(job_id):
     persistent_data = load_persistent_servers()
     is_persistent = job_id in persistent_data.get("persistent", {})
 
-    info = _sc_public_servers_info.get(job_id, {})
+    info = core._sc_public_servers_info.get(job_id, {})
     valid_detail_ts = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')] if isinstance(snapshots, dict) else []
     latest_ts = max(valid_detail_ts) if valid_detail_ts else None
     latest_state = snapshots.get(latest_ts, {}) if latest_ts else {}
@@ -4462,7 +1738,7 @@ def server_detail_page(job_id):
     is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600 and not is_archived))
     is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec) or is_archived
 
-    meta = (snapshots.get("_meta") or _sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (_sc_server_meta.get(job_id, {}) or {})
+    meta = (snapshots.get("_meta") or core._sc_server_meta.get(job_id, {})) if isinstance(snapshots, dict) else (core._sc_server_meta.get(job_id, {}) or {})
     private_server_owner_id = (
         meta.get("privateServerOwnerId")
         or (latest_state.get("privateServerOwnerId") if isinstance(latest_state, dict) else None)
@@ -4625,8 +1901,8 @@ def server_detail_page(job_id):
 
     return render_template("server_detail.html", **payload, **summary)
 
-@app.route("/api/servers/active", methods=["GET"])
-def get_active_servers_api():
+@app.route("/servers/cards/active", methods=["GET"])
+def get_active_servers_cards():
     query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip()
     servers_data = get_sc_data("servers.json") or {}
     global_data = get_sc_data("global.json") or {}
@@ -4645,15 +1921,8 @@ def get_active_servers_api():
         "charts": global_payload.get("charts", [])
     })
 
-@app.route("/api/servers/latest", methods=["GET"])
-def get_latest_servers_api():
-    if _sc_latest_data:
-        return jsonify(_sc_latest_data)
-    servers_data = get_sc_data("servers.json")
-    return jsonify({"success": True, "servers": servers_data})
-
-@app.route("/api/servers/lookup", methods=["GET"])
-def lookup_server_api():
+@app.route("/servers/cards/lookup", methods=["GET"])
+def lookup_server_card():
     query = (request.args.get("q") or request.args.get("search") or request.args.get("jobId") or "").strip()
     if not query:
         return jsonify({"success": True, "found": False, "message": "Query parameter 'q' is required."})
@@ -4684,216 +1953,8 @@ def lookup_server_api():
         "card_html": card_html
     })
 
-def resolve_server_snapshots(query: str):
-    """Resolves server snapshots and canonical Job ID across live cache, servers.json, and archives."""
-    query = (query or "").strip()
-    if not query:
-        return None, None
-
-    servers_data = get_sc_data("servers.json") or {}
-    snapshots = servers_data.get(query)
-    matched_job_id = query
-
-    if not snapshots:
-        for jid, snaps in safe_dict_items(servers_data):
-            if is_exact_job_or_server_id_match(query, jid):
-                matched_job_id = jid
-                snapshots = snaps
-                break
-
-    if not snapshots and _sc_latest_data:
-        for s in _sc_latest_data.get('data', {}).get('servers', []):
-            s_jid = s.get('jobId', '')
-            if is_exact_job_or_server_id_match(query, s_jid):
-                matched_job_id = s_jid
-                snapshots = {s.get('lastHeartbeat', datetime.now(timezone.utc).isoformat()): s.get('state', {})}
-                break
-
-    if not snapshots:
-        archived_jid, archived_snaps = get_archived_server_snapshots(query)
-        if archived_jid and archived_snaps:
-            matched_job_id = archived_jid
-            snapshots = archived_snaps
-
-    return matched_job_id, snapshots
-
-@app.route("/api/servers/<job_id>/score_breakdown", methods=["GET"])
-def server_score_breakdown_api(job_id):
-    query = (job_id or "").strip()
-    if not query:
-        return jsonify({"success": False, "error": "Job ID is required"}), 400
-
-    matched_job_id, snapshots = resolve_server_snapshots(query)
-    if not snapshots or not matched_job_id:
-        return jsonify({"success": False, "error": f"Server '{query}' not found"}), 404
-
-    now_utc = datetime.now(timezone.utc)
-    score, breakdown = calculate_server_top_score(snapshots, now_utc=now_utc, return_breakdown=True)
-    breakdown["job_id"] = matched_job_id
-    j_parts = [p for p in matched_job_id.split("-") if p]
-    breakdown["short_id"] = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-
-    return jsonify({
-        "success": True,
-        "job_id": matched_job_id,
-        "score": score,
-        "breakdown": breakdown
-    })
-
-@app.route("/api/servers/<job_id>/snapshots", methods=["GET"])
-@app.route("/api/servers/snapshots", methods=["GET"])
-def server_snapshots_api(job_id=None):
-    query = (job_id or request.args.get("jobId") or request.args.get("q") or request.args.get("id") or "").strip()
-    if not query:
-        return jsonify({"success": False, "error": "Server Job ID or query parameter 'q' is required."}), 400
-
-    matched_job_id, snapshots = resolve_server_snapshots(query)
-    if not snapshots or not matched_job_id:
-        return jsonify({"success": False, "error": f"Server '{query}' not found."}), 404
-
-    clean_snapshots = {k: v for k, v in safe_dict_items(snapshots) if not str(k).startswith('_')}
-    return jsonify({
-        "success": True,
-        "job_id": matched_job_id,
-        "snapshot_count": len(clean_snapshots),
-        "snapshots": clean_snapshots
-    })
-
-@app.route("/api/servers/<job_id>/fuel", methods=["GET"])
-@app.route("/api/servers/fuel", methods=["GET"])
-def server_fuel_api(job_id=None):
-    query = (job_id or request.args.get("jobId") or request.args.get("q") or request.args.get("id") or "").strip()
-    if not query:
-        return jsonify({"success": False, "error": "Server Job ID or query parameter 'q' is required."}), 400
-
-    matched_job_id, snapshots = resolve_server_snapshots(query)
-    if not snapshots or not matched_job_id:
-        return jsonify({"success": False, "error": f"Server '{query}' not found."}), 404
-
-    clean_snapshots = {k: v for k, v in safe_dict_items(snapshots) if not str(k).startswith('_')}
-    fuel_eval = evaluate_server_fuel(clean_snapshots)
-    return jsonify({
-        "success": True,
-        "job_id": matched_job_id,
-        **fuel_eval.to_dict()
-    })
-
-def get_historical_cards_base(servers_data, persistent_ids):
-    global _sc_historical_cards_base, _sc_historical_cards_key
-    cache_key = (id(servers_data), len(servers_data), len(persistent_ids), len(_sc_public_server_ids))
-    with _sc_historical_lock:
-        if _sc_historical_cards_base is not None and _sc_historical_cards_key == cache_key:
-            return _sc_historical_cards_base
-
-    now_utc = datetime.now(timezone.utc)
-    pps_map = get_sc_latest_pps_map()
-    base_cards = []
-    for job_id, snapshots in safe_dict_items(servers_data):
-        if not snapshots or not isinstance(snapshots, dict):
-            continue
-        valid_ts_keys = [k for k in safe_dict_keys(snapshots) if not k.startswith('_')]
-        if not valid_ts_keys:
-            continue
-        latest_timestamp = max(valid_ts_keys)
-        latest_state = snapshots.get(latest_timestamp)
-        if not latest_state or not isinstance(latest_state, dict):
-            continue
-        age_sec = convert_ISO_to_secs(latest_timestamp, now=now_utc)
-
-        info = _sc_public_servers_info.get(job_id, {})
-        is_persistent = job_id in persistent_ids
-        is_private = get_server_visibility(job_id, snapshots, latest_state, is_active=(age_sec <= 600))
-
-        is_historical = is_server_historical(job_id, snapshots, latest_state, is_private=is_private, age_sec=age_sec)
-        if not is_historical:
-            continue
-
-        if is_private:
-            player_count = None
-            max_players = None
-        else:
-            player_count = get_server_player_count(job_id, snapshots, latest_state, is_private=False)
-            max_players = info.get("maxPlayers", 12) if info else 12
-
-        j_parts = [p for p in job_id.split("-") if p]
-        short_id = f"{j_parts[1]}-{j_parts[2]}" if len(j_parts) >= 3 else ""
-
-        first_timestamp = min(valid_ts_keys)
-        uptime_sec = get_server_uptime_seconds(snapshots, is_historical, age_sec)
-        uptime_str = format_uptime_duration(uptime_sec)
-
-        unit1 = latest_state.get("Unit1", {})
-        unit2 = latest_state.get("Unit2", {})
-        pts_info = calculate_server_points_rate(unit1, unit2, job_id=job_id, latest_state=latest_state, pps_map=pps_map)
-        top_score = calculate_server_top_score(snapshots, now_utc=now_utc)
-        u1_stats = get_card_unit_fuel_stats(snapshots, "Unit1", unit1)
-        u2_stats = get_card_unit_fuel_stats(snapshots, "Unit2", unit2)
-
-        base_cards.append({
-            "job_id": job_id,
-            "short_id": short_id,
-            "is_private": is_private,
-            "is_persistent": is_persistent,
-            "is_historical": True,
-            "is_archived": False,
-            "player_count": player_count,
-            "max_players": max_players,
-            "raw_timestamp": latest_timestamp,
-            "first_timestamp": first_timestamp,
-            "age_seconds": age_sec,
-            "latest_timestamp": format_heartbeat_age(age_sec),
-            "uptime_seconds": uptime_sec,
-            "uptime_str": uptime_str,
-            "snapshot_count": len(valid_ts_keys),
-            "points_rate": pts_info["points_rate"],
-            "points_rate_str": pts_info["points_rate_str"],
-            "top_score": top_score,
-            "u1_running": pts_info["u1_running"],
-            "u2_running": pts_info["u2_running"],
-            "unit1": {
-                "demand": safe_demand_numeric(unit1.get("DemandU1") if unit1.get("DemandU1") is not None else unit1.get("Demand")),
-                "demand_time_left": safe_float(unit1.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit1.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit1.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit1), 1),
-                "is_running": pts_info["u1_running"],
-                "points_rate": pts_info["u1_rate"],
-                "estimated_fuel": u1_stats["estimated_fuel"],
-                "kalman_fuel": u1_stats["kalman_fuel"],
-                "projected_fuel": u1_stats["projected_fuel"],
-                "uncertainty": u1_stats["uncertainty"],
-                "median_fuel": u1_stats["median_fuel"],
-                "weighted_fuel": u1_stats["weighted_fuel"],
-                "mean_fuel": u1_stats["mean_fuel"],
-                "instantaneous_fuel": u1_stats["instantaneous_fuel"],
-            },
-            "unit2": {
-                "demand": safe_demand_numeric(unit2.get("DemandU2") if unit2.get("DemandU2") is not None else unit2.get("Demand")),
-                "demand_time_left": safe_float(unit2.get("Demand Time Left", 0), 0.0),
-                "aprm": safe_float(unit2.get("APRM", 0), 0.0),
-                "reactor_temp": safe_float(unit2.get("Reactor Temp", 0), 0.0),
-                "output_mw": round(get_unit_output_mw(unit2), 1),
-                "is_running": pts_info["u2_running"],
-                "points_rate": pts_info["u2_rate"],
-                "estimated_fuel": u2_stats["estimated_fuel"],
-                "kalman_fuel": u2_stats["kalman_fuel"],
-                "projected_fuel": u2_stats["projected_fuel"],
-                "uncertainty": u2_stats["uncertainty"],
-                "median_fuel": u2_stats["median_fuel"],
-                "weighted_fuel": u2_stats["weighted_fuel"],
-                "mean_fuel": u2_stats["mean_fuel"],
-                "instantaneous_fuel": u2_stats["instantaneous_fuel"],
-            },
-        })
-
-    with _sc_historical_lock:
-        _sc_historical_cards_base = base_cards
-        _sc_historical_cards_key = cache_key
-
-    return base_cards
-
-@app.route("/api/servers/historical", methods=["GET"])
-def get_historical_servers_api():
+@app.route("/servers/cards/historical", methods=["GET"])
+def get_historical_servers_cards():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 21, type=int)
     if per_page <= 0 or per_page > 100:
@@ -4941,28 +2002,7 @@ def get_historical_servers_api():
         historical_cards = list(base_cards)
 
     sort_option = request.args.get("sort", "top_servers").strip().lower()
-    if sort_option == "players_desc":
-        historical_cards.sort(key=lambda c: (c.get("player_count") or 0, c.get("snapshot_count", 0)), reverse=True)
-    elif sort_option == "players_asc":
-        historical_cards.sort(key=lambda c: (c.get("player_count") or 0, c.get("snapshot_count", 0)))
-    elif sort_option == "snapshots_desc":
-        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0), reverse=True)
-    elif sort_option == "snapshots_asc":
-        historical_cards.sort(key=lambda c: (c.get("snapshot_count", 0), c.get("player_count") or 0))
-    elif sort_option == "points_desc":
-        historical_cards.sort(key=lambda c: (c.get("points_rate") or 0.0, c.get("uptime_seconds", 0)), reverse=True)
-    elif sort_option == "running_first":
-        historical_cards.sort(key=lambda c: (1 if (c.get("u1_running") or c.get("u2_running")) else 0, c.get("points_rate") or 0.0), reverse=True)
-    elif sort_option == "oldest":
-        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), c.get("player_count") or 0), reverse=True)
-    elif sort_option == "newest":
-        historical_cards.sort(key=lambda c: (c.get("uptime_seconds", 0), -(c.get("player_count") or 0)))
-    elif sort_option == "public_first":
-        historical_cards.sort(key=lambda c: (1 if c.get("is_private") else 0, -c.get("uptime_seconds", 0)))
-    elif sort_option == "private_first":
-        historical_cards.sort(key=lambda c: (0 if c.get("is_private") else 1, -c.get("uptime_seconds", 0)))
-    else:  # top_servers (default)
-        historical_cards.sort(key=lambda c: (c.get("top_score") or 0.0, c.get("points_rate") or 0.0, c.get("uptime_seconds", 0)), reverse=True)
+    sort_historical_cards(historical_cards, sort_option)
 
     total = len(historical_cards)
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
@@ -4987,16 +2027,6 @@ def get_historical_servers_api():
         "total_pages": total_pages,
         "cards_html": cards_html
     })
-
-@app.route("/api/servers/refresh", methods=["POST"])
-def refresh_servers_api():
-    if not is_session_authenticated():
-        req_json = request.get_json(silent=True)
-        captcha_ok, captcha_err = verify_turnstile_token(extract_turnstile_token(req_json), get_client_ip())
-        if not captcha_ok:
-            return jsonify({"success": False, "detail": captcha_err}), 400
-    success = pull_server_checker_data()
-    return jsonify({"success": success})
 
 @app.route("/archives", methods=["GET"])
 def browse_archives_page():
@@ -5067,208 +2097,6 @@ def view_archive_day_page(date_str):
         stats=stats
     )
 
-@app.route("/api/archives", methods=["GET"])
-def get_archives_api():
-    stream_requested = request.args.get("stream") == "1"
-    if stream_requested:
-        def generate():
-            q = queue.Queue()
-            done = object()
-
-            def worker():
-                try:
-                    def on_progress(cur, total, fname, pct):
-                        q.put({
-                            "type": "progress",
-                            "current": cur,
-                            "total": total,
-                            "filename": fname,
-                            "percent": pct,
-                            "status": f"Scanning archive {cur} of {total} ({fname})..."
-                        })
-                    days, stats = get_all_archive_days_info(progress_callback=on_progress)
-                    q.put({"type": "complete", "days": days, "stats": stats})
-                except Exception as e:
-                    q.put({"type": "error", "message": str(e)})
-                finally:
-                    q.put(done)
-
-            t = threading.Thread(target=worker, daemon=True)
-            t.start()
-
-            while True:
-                item = q.get()
-                if item is done:
-                    break
-                yield f"data: {json.dumps(item)}\n\n"
-
-        return Response(stream_with_context(generate()), mimetype="text/event-stream")
-    else:
-        days_list, summary_stats = get_all_archive_days_info()
-        return jsonify({
-            "success": True,
-            "days": days_list,
-            "stats": summary_stats
-        })
-
-@app.route("/api/archives/<date_str>", methods=["GET"])
-def get_archive_day_api(date_str):
-    date_str = date_str.strip()
-    gz_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json.gz")
-    json_path = os.path.join(ARCHIVES_DIR, f"servers_{date_str}.json")
-
-    target_rel = None
-    is_compressed = False
-    filename = None
-    if os.path.exists(gz_path):
-        target_rel = os.path.join("archives", f"servers_{date_str}.json.gz")
-        is_compressed = True
-        filename = f"servers_{date_str}.json.gz"
-    elif os.path.exists(json_path):
-        target_rel = os.path.join("archives", f"servers_{date_str}.json")
-        is_compressed = False
-        filename = f"servers_{date_str}.json"
-    else:
-        return jsonify({"success": False, "message": f"No archive found for date {date_str}."}), 404
-
-    day_data = get_sc_data(target_rel)
-    if not isinstance(day_data, dict):
-        return jsonify({"success": False, "message": "Failed to read archive data."}), 500
-
-    query = (request.args.get("q") or "").strip()
-    server_cards = build_server_cards(day_data, search_query=query, is_archived=True, exact_search_only=False)
-
-    return jsonify({
-        "success": True,
-        "date": date_str,
-        "filename": filename,
-        "is_compressed": is_compressed,
-        "total_servers": len(server_cards),
-        "servers": server_cards
-    })
-
-_servers_cache = {"data": None, "timestamp": 0, "content_type": "application/json", "status_code": 200}
-_cache_lock = threading.Lock()
-
-def get_public_servers_payload(public_only=False):
-    def _enrich_and_filter(raw_list):
-        enriched = []
-        for s in raw_list:
-            if not isinstance(s, dict):
-                continue
-            jid = s.get("jobId")
-            if not jid:
-                continue
-            is_priv = get_server_visibility(jid, is_active=True)
-            owner_id = s.get("privateServerOwnerId")
-            if not is_priv and owner_id not in (None, "", 0, "0", "None", "null", False):
-                is_priv = True
-            s_copy = dict(s)
-            if is_priv:
-                s_copy["is_private"] = True
-                clean_oid = str(owner_id).strip() if owner_id not in (None, "", 0, "0", "None", "null", False) else (_sc_server_meta.get(jid, {}).get("privateServerOwnerId") or "private")
-                s_copy["privateServerOwnerId"] = clean_oid
-            else:
-                s_copy["is_private"] = None
-                s_copy["privateServerOwnerId"] = None
-            if not is_priv:
-                p_count = get_server_player_count(jid, is_private=False)
-                if p_count is not None:
-                    s_copy["playerCount"] = p_count
-            if "top_score" not in s_copy:
-                score = None
-                if _sc_active_cards_base:
-                    for card in _sc_active_cards_base:
-                        if card.get("job_id") == jid and "top_score" in card:
-                            score = card["top_score"]
-                            break
-                if score is not None:
-                    s_copy["top_score"] = score
-            st = s_copy.get("state")
-            if isinstance(st, dict):
-                if isinstance(st.get("Unit2"), dict):
-                    ensure_unit_output_mw(st["Unit2"])
-                    ensure_unit_fuel_level("Unit2", st["Unit2"])
-                if isinstance(st.get("Unit1"), dict):
-                    ensure_unit_output_mw(st["Unit1"])
-                    ensure_unit_fuel_level("Unit1", st["Unit1"])
-            if public_only and is_priv:
-                continue
-            enriched.append(s_copy)
-        return enriched
-
-    if _sc_latest_data:
-        res_json = dict(_sc_latest_data)
-        if "success" not in res_json:
-            res_json["success"] = True
-        raw_servers = res_json.get("data", {}).get("servers", [])
-        res_json["data"] = dict(res_json.get("data", {}), servers=_enrich_and_filter(raw_servers))
-        return res_json
-
-    with _cache_lock:
-        if _servers_cache["data"] is not None:
-            try:
-                cached_json = _json_loads(_servers_cache["data"])
-                if isinstance(cached_json, dict) and "data" in cached_json:
-                    cached_json["data"] = dict(cached_json.get("data", {}), servers=_enrich_and_filter(cached_json.get("data", {}).get("servers", [])))
-                    return cached_json
-            except Exception:
-                pass
-
-    return {"success": True, "data": {"servers": []}}
-
-@app.route("/api/public-servers", methods=["GET"])
-@app.route("/public-servers", methods=["GET"])
-def proxy_public_servers():
-    public_only = request.args.get("public_only", "").lower() in ("1", "true", "yes") or request.args.get("only_public", "").lower() in ("1", "true", "yes")
-
-    payload = get_public_servers_payload(public_only=public_only)
-    if payload.get("data", {}).get("servers"):
-        return jsonify(payload)
-
-    primary_url = "https://hydrogen.realisticbwr.org/api/public/servers"
-    fallback_url = "https://realisticbwr.org/api/public/servers"
-
-    for url in [primary_url, fallback_url]:
-        try:
-            resp = requests.get(
-                url,
-                headers={"User-Agent": "RBWR-Operator-Tablet/1.0 (RBWR Thermal Calculator Utility)"},
-                timeout=10
-            )
-            if resp.status_code == 200:
-                try:
-                    res_json = resp.json()
-                    if isinstance(res_json, dict) and "success" not in res_json:
-                        res_json["success"] = True
-                    content = json.dumps(res_json).encode("utf-8")
-                except Exception:
-                    content = resp.content
-
-                with _cache_lock:
-                    _servers_cache["data"] = content
-                    _servers_cache["timestamp"] = time.time()
-                    _servers_cache["content_type"] = "application/json"
-                    _servers_cache["status_code"] = 200
-
-                payload = get_public_servers_payload(public_only=public_only)
-                return jsonify(payload)
-        except Exception as e:
-            logger.warning(f"Error fetching from {url}: {e}")
-
-    with _cache_lock:
-        if _servers_cache["data"] is not None:
-            return Response(_servers_cache["data"], status=_servers_cache["status_code"], content_type=_servers_cache["content_type"])
-    return jsonify({"success": False, "error": "Unable to reach game API"}), 500
-
-@app.route("/version", methods=["GET"])
-@app.route("/version/latest", methods=["GET"])
-@app.route("/api/version", methods=["GET"])
-@app.route("/api/version/latest", methods=["GET"])
-def get_latest_version():
-    release = get_github_latest_release()
-    return jsonify(release)
-
 @app.route("/tickets", methods=["GET", "POST"])
 def tickets_route():
     if request.method == "POST":
@@ -5286,25 +2114,7 @@ def tickets_route():
         is_admin=bool(session.get("admin_logged_in"))
     )
 
-@app.route("/suggestions", methods=["GET", "POST"])
-def suggestions_route():
-    if request.method == "POST":
-        return submit_ticket()
-    
-    if request.args.get("format") == "json" or request.headers.get("Accept") == "application/json":
-        return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
-        
-    return redirect("/tickets" + (f"?{request.query_string.decode('utf-8')}" if request.query_string else ""))
-
-@app.route("/api/tickets", methods=["GET"])
-def get_tickets_api():
-    return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
-
-@app.route("/api/suggestions", methods=["GET"])
-def get_suggestions_api():
-    return jsonify({"tickets": get_public_tickets(), "suggestions": get_public_tickets()})
-
-@app.route("/api/tickets/<int:ticket_id>/messages", methods=["GET"])
+@app.route("/tickets/<int:ticket_id>/messages", methods=["GET"])
 def get_ticket_messages_api(ticket_id):
     data = load_suggestions()
     suggestions = data.get("suggestions", [])
@@ -5329,7 +2139,8 @@ def get_ticket_messages_api(ticket_id):
 
     return jsonify({"ticket_id": ticket_id, "messages": target_ticket.get("messages", [])})
 
-@app.route("/api/tickets/<int:ticket_id>/messages", methods=["POST"])
+
+@app.route("/tickets/<int:ticket_id>/messages", methods=["POST"])
 def add_ticket_message_api(ticket_id):
     ip = request.remote_addr or "unknown"
     forwarded = request.headers.get("X-Forwarded-For")
@@ -5475,7 +2286,7 @@ def add_ticket_message_api(ticket_id):
         "messages": messages
     })
 
-@app.route("/api/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["PATCH", "PUT"])
+@app.route("/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["PATCH", "PUT"])
 def edit_ticket_message_api(ticket_id, message_id):
     if not session.get("admin_logged_in"):
         return jsonify({"detail": "Administrator authentication required."}), 403
@@ -5542,7 +2353,7 @@ def edit_ticket_message_api(ticket_id, message_id):
         "messages": messages
     })
 
-@app.route("/api/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["DELETE"])
+@app.route("/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["DELETE"])
 def delete_ticket_message_api(ticket_id, message_id):
     if not session.get("admin_logged_in"):
         return jsonify({"detail": "Administrator authentication required."}), 403
@@ -5900,7 +2711,6 @@ def delete_crash(username):
     return jsonify({"detail": "No matching crash reports found."}), 404
 
 @app.route("/admin/tickets/status", methods=["POST"])
-@app.route("/admin/suggestions/status", methods=["POST"])
 @admin_required
 def update_suggestion_status(username):
     if not has_permission(username, "suggestions"):
@@ -5967,7 +2777,6 @@ def update_suggestion_status(username):
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
 @app.route("/admin/tickets/comment", methods=["POST"])
-@app.route("/admin/suggestions/comment", methods=["POST"])
 @admin_required
 def update_suggestion_comment(username):
     if not has_permission(username, "suggestions"):
@@ -6010,7 +2819,6 @@ def update_suggestion_comment(username):
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
 @app.route("/admin/tickets/visibility", methods=["POST"])
-@app.route("/admin/suggestions/visibility", methods=["POST"])
 @admin_required
 def update_suggestion_visibility(username):
     if not has_permission(username, "suggestions"):
@@ -6035,7 +2843,6 @@ def update_suggestion_visibility(username):
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
 @app.route("/admin/tickets/delete", methods=["POST"])
-@app.route("/admin/suggestions/delete", methods=["POST"])
 @admin_required
 def delete_suggestion(username):
     if not has_permission(username, "suggestions"):
@@ -6093,7 +2900,6 @@ def delete_suggestion(username):
     return jsonify({"message": f"Ticket #{payload.id} deleted successfully.", "id": payload.id})
 
 @app.route("/admin/tickets/ban", methods=["POST"])
-@app.route("/admin/suggestions/ban", methods=["POST"])
 @admin_required
 def ban_ip(username):
     if not has_permission(username, "bans"):
@@ -6129,7 +2935,6 @@ def ban_ip(username):
     return jsonify({"message": f"IP {ip_to_ban} has been banned.", "ip": ip_to_ban})
 
 @app.route("/admin/tickets/unban", methods=["POST"])
-@app.route("/admin/suggestions/unban", methods=["POST"])
 @admin_required
 def unban_ip(username):
     if not has_permission(username, "bans"):
@@ -6153,7 +2958,6 @@ def unban_ip(username):
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
 
 @app.route("/admin/tickets", methods=["GET"])
-@app.route("/admin/suggestions", methods=["GET"])
 @admin_required
 def view_suggestions_dashboard(username):
     if not has_permission(username, "suggestions"):
@@ -6282,7 +3086,6 @@ def view_servers_dashboard(username):
     )
 
 @app.route("/admin/servers/persist", methods=["POST"])
-@app.route("/api/admin/servers/persist", methods=["POST"])
 @admin_required
 def toggle_server_persistence(username):
     if not has_permission(username, "servers"):
@@ -6320,7 +3123,6 @@ def toggle_server_persistence(username):
     return jsonify({"success": True, "message": msg, "job_id": job_id, "is_persistent": payload.persistent})
 
 @app.route("/admin/audit-logs", methods=["GET"])
-@app.route("/admin/auditlogs", methods=["GET"])
 @admin_required
 def view_audit_logs_dashboard(username):
     if not has_permission(username, "audit_logs"):
@@ -6338,7 +3140,7 @@ def view_audit_logs_dashboard(username):
         notifier=notifier_cfg,
     )
 
-@app.route("/api/admin/audit-logs", methods=["GET"])
+@app.route("/admin/audit-logs/data", methods=["GET"])
 @admin_required
 def api_get_audit_logs(username):
     if not has_permission(username, "audit_logs"):
@@ -6365,7 +3167,7 @@ def api_get_audit_logs(username):
     )
     return jsonify(data)
 
-@app.route("/api/admin/audit-logs/export", methods=["GET"])
+@app.route("/admin/audit-logs/export", methods=["GET"])
 @admin_required
 def api_export_audit_logs(username):
     if not has_permission(username, "audit_logs"):
@@ -6380,7 +3182,7 @@ def api_export_audit_logs(username):
     log_audit_event("audit.export", "system", f"Exported {len(logs)} audit logs", target="Audit Logs", username=username)
     return response
 
-@app.route("/api/admin/audit-logs/clear", methods=["POST"])
+@app.route("/admin/audit-logs/clear", methods=["POST"])
 @admin_required
 def api_clear_audit_logs(username):
     if not is_root_user(username):
@@ -6416,10 +3218,6 @@ class CreateAdminPayload(BaseModel):
 
 class DeleteAdminPayload(BaseModel):
     discord_id: str
-
-class NotifierConfigPayload(BaseModel):
-    enabled: bool
-    categories: list[str] = Field(default=["overlay", "point_graph", "server_checker", "general"])
 
 @app.route("/admin/accounts/create", methods=["POST"])
 @admin_required
@@ -6530,44 +3328,6 @@ def delete_admin_account(username):
         log_audit_event("accounts.delete", "accounts", f"Removed administrator account '{target_id}'", target=f"Admin {target_id}", details={"target_id": target_id, "key": key_to_delete}, username=username)
         return jsonify({"message": f"Admin account '{target_id}' removed successfully."})
     return jsonify({"detail": f"Admin account '{target_id}' not found."}), 404
-
-@app.route("/api/admin/notifier", methods=["GET"])
-@admin_required
-def get_notifier_api(username):
-    if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions"}), 403
-    discord_id = session.get("discord_id") or username
-    cfg = get_admin_notifier_config(discord_id)
-    return jsonify({"notifier": cfg, "discord_id": session.get("discord_id") or ""})
-
-@app.route("/api/admin/notifier", methods=["POST"])
-@admin_required
-def save_notifier_api(username):
-    if not has_permission(username, "suggestions"):
-        return jsonify({"detail": "Permission denied for suggestions"}), 403
-    try:
-        req_json = request.get_json() or {}
-        if not isinstance(req_json, dict):
-            return jsonify({"detail": "Invalid request body."}), 400
-        payload = NotifierConfigPayload(**req_json)
-    except ValidationError as e:
-        return jsonify({"detail": e.errors()}), 400
-    
-    discord_id = session.get("discord_id") or username
-    save_admin_notifier_config(discord_id, {
-        "enabled": payload.enabled,
-        "categories": payload.categories
-    })
-    log_audit_event("notifier.update", "notifier", f"Updated notification preferences (enabled: {payload.enabled})", target=f"Admin {discord_id}", details={"enabled": payload.enabled, "categories": payload.categories}, username=username)
-    return jsonify({"success": True, "message": "Notifier preferences saved successfully."})
-
-@app.route("/api/admin/notifier/test", methods=["POST"])
-@admin_required
-def test_notifier_api(username):
-    return jsonify({
-        "success": True,
-        "message": "Direct DMs have been retired in favor of automated Discord ticket channels under category 1547529007334162432."
-    })
 
 def analyze_server_state_anomalies(snapshots: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(snapshots, dict):
@@ -6815,14 +3575,14 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
     source_location = ""
     is_live = False
 
-    if _sc_latest_data and isinstance(_sc_latest_data, dict):
-        for s in _sc_latest_data.get('data', {}).get('servers', []):
+    if core._sc_latest_data and isinstance(core._sc_latest_data, dict):
+        for s in core._sc_latest_data.get('data', {}).get('servers', []):
             jid = str(s.get('jobId') or "")
             if jid.lower() == clean_q or jid.lower().startswith(clean_q) or clean_q in jid.lower():
                 matched_job_id = jid
                 hb = s.get('lastHeartbeat') or datetime.now(timezone.utc).isoformat()
                 snapshots[hb] = s.get('state') or {}
-                source_location = "Live Memory Cache (_sc_latest_data)"
+                source_location = "Live Memory Cache (core._sc_latest_data)"
                 is_live = True
                 break
 
@@ -6905,9 +3665,9 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
             "found": False,
             "query": query,
             "searched_locations": [
-                "Memory Cache (_sc_latest_data)",
+                "Memory Cache (core._sc_latest_data)",
                 "servers.json",
-                f"archives_index.json ({len(_sc_archive_server_index)} index entries)",
+                f"archives_index.json ({len(core._sc_archive_server_index)} index entries)",
                 f"data/archives/ ({len(os.listdir(ARCHIVES_DIR)) if os.path.exists(ARCHIVES_DIR) else 0} archive files)",
             ],
             "matching_errors": matching_errors,
@@ -6917,11 +3677,10 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
     analysis = analyze_server_state_anomalies(snapshots)
     persistent_data = load_persistent_servers()
     is_persistent = matched_job_id in persistent_data.get("persistent", {})
-    meta = snapshots.get("_meta") or _sc_server_meta.get(matched_job_id, {})
+    meta = snapshots.get("_meta") or core._sc_server_meta.get(matched_job_id, {})
     if not meta or not meta.get("snapshot_count"):
         meta = build_server_metadata(matched_job_id, snapshots, existing_meta=meta)
-        _sc_server_meta[matched_job_id] = meta
-
+        core._sc_server_meta[matched_job_id] = meta
     clean_snapshots = {k: v for k, v in snapshots.items() if not str(k).startswith('_')}
     fuel_eval = evaluate_server_fuel(clean_snapshots)
 
@@ -6959,7 +3718,7 @@ def view_debug_dashboard(username):
         initial_debug_job_id=initial_job_id,
     )
 
-@app.route("/api/admin/debug/server/<path:job_id>", methods=["GET"])
+@app.route("/admin/debug/server/<path:job_id>", methods=["GET"])
 @admin_required
 def api_debug_server(username, job_id):
     if not has_permission(username, "debug"):
@@ -6967,7 +3726,7 @@ def api_debug_server(username, job_id):
     result = diagnose_server_snapshots(job_id)
     return jsonify(result)
 
-@app.route("/api/admin/debug/analyze_payload", methods=["POST"])
+@app.route("/admin/debug/analyze_payload", methods=["POST"])
 @admin_required
 def api_debug_analyze_payload(username):
     if not has_permission(username, "debug"):
@@ -7168,16 +3927,6 @@ def discord_logout():
     if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
         next_url = "/tickets"
     return redirect(next_url)
-
-@app.route("/api/auth/me", methods=["GET"])
-def api_auth_me():
-    return jsonify({
-        "logged_in": bool(session.get("discord_user")),
-        "user": session.get("discord_user"),
-        "is_admin": bool(session.get("admin_logged_in")),
-        "is_root": bool(session.get("is_root")),
-        "discord_id": session.get("discord_id") or ""
-    })
 
 @app.route("/admin/contact/delete/<msg_id>", methods=["POST"])
 @admin_required
@@ -7426,6 +4175,218 @@ def start_console_handler():
     except Exception:
         pass
 
+# ==============================================================================
+# Standalone FastAPI REST Service Supervisor & /api/* Reverse Proxy
+# ==============================================================================
+
+API_SCRIPT_PATH = os.path.join(BASE_DIR, "api.py")
+_api_process = None
+_api_supervisor_thread = None
+_api_supervisor_started = False
+_api_shutting_down = False
+_api_supervisor_lock = threading.Lock()
+_HOP_BY_HOP_HEADERS = frozenset({
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "content-encoding",
+    "content-length",
+})
+
+def _get_api_port() -> int:
+    try:
+        return int(os.environ.get("API_PORT", "8401"))
+    except ValueError:
+        return 8401
+
+def _is_local_port_open(port: int, timeout: float = 0.25) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+def _stop_api_subprocess():
+    global _api_shutting_down, _api_process
+    _api_shutting_down = True
+    proc = _api_process
+    if proc is not None and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+atexit.register(_stop_api_subprocess)
+
+def _api_supervisor_loop():
+    global _api_process
+    backoff = 1.0
+    while not _api_shutting_down:
+        if not os.path.exists(API_SCRIPT_PATH):
+            return
+        api_host = os.environ.get("API_HOST", "0.0.0.0")
+        api_port = _get_api_port()
+        if _is_local_port_open(api_port):
+            logger.info(f"[REST API] Detected existing listener on 127.0.0.1:{api_port}; proxying /api/* to it.")
+            return
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "api:app",
+            "--host",
+            api_host,
+            "--port",
+            str(api_port),
+            "--log-level",
+            "warning",
+        ]
+        try:
+            proc = subprocess.Popen(cmd, cwd=BASE_DIR)
+            _api_process = proc
+            logger.info(f"[REST API] Started api.py Uvicorn subprocess (PID {proc.pid}) on {api_host}:{api_port}")
+            backoff = 1.0
+            exit_code = proc.wait()
+            if _api_shutting_down:
+                break
+            logger.warning(f"[REST API] Uvicorn subprocess exited with code {exit_code}; restarting in {backoff:.0f}s.")
+        except Exception as e:
+            logger.error(f"[REST API] Failed to launch api.py subprocess: {e}")
+
+        time.sleep(backoff)
+        backoff = min(backoff * 2, 15.0)
+
+def start_api_subprocess():
+    global _api_supervisor_started, _api_supervisor_thread
+    with _api_supervisor_lock:
+        if _api_supervisor_started:
+            return
+        if os.environ.get("DISABLE_API_PROCESS") == "1":
+            return
+        if "unittest" in sys.modules:
+            return
+        if not os.path.exists(API_SCRIPT_PATH):
+            return
+        is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
+        if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+            return
+
+        _api_supervisor_started = True
+        _api_supervisor_thread = threading.Thread(
+            target=_api_supervisor_loop,
+            daemon=True,
+            name="APISupervisorThread",
+        )
+        _api_supervisor_thread.start()
+
+@app.before_request
+def ensure_api_subprocess():
+    if not _api_supervisor_started:
+        start_api_subprocess()
+
+@app.route("/api", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+@app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+def proxy_api_request(subpath: str = ""):
+    if not _api_supervisor_started:
+        start_api_subprocess()
+
+    api_port = _get_api_port()
+    if _api_supervisor_started and not _is_local_port_open(api_port, timeout=0.15):
+        deadline = time.time() + 4.0
+        while time.time() < deadline:
+            if _is_local_port_open(api_port, timeout=0.2):
+                break
+            time.sleep(0.1)
+
+    target_path = f"/api/{subpath}" if subpath else "/api"
+    qs = request.query_string.decode("utf-8", errors="replace") if request.query_string else ""
+    upstream_url = f"http://127.0.0.1:{api_port}{target_path}"
+    if qs:
+        upstream_url = f"{upstream_url}?{qs}"
+
+    fwd_headers = {}
+    for k, v in request.headers.items():
+        lk = k.lower()
+        if lk in _HOP_BY_HOP_HEADERS or lk in ("host", "accept-encoding"):
+            continue
+        fwd_headers[k] = v
+
+    client_ip = get_client_ip()
+    existing_xff = request.headers.get("X-Forwarded-For", "").strip()
+    if existing_xff:
+        fwd_headers["X-Forwarded-For"] = existing_xff
+    elif client_ip:
+        fwd_headers["X-Forwarded-For"] = client_ip
+    fwd_headers["X-Forwarded-Host"] = request.host
+    fwd_headers["X-Forwarded-Proto"] = request.scheme
+    fwd_headers["Accept-Encoding"] = "identity"
+
+    try:
+        upstream_resp = requests.request(
+            method=request.method,
+            url=upstream_url,
+            headers=fwd_headers,
+            data=request.get_data(),
+            stream=True,
+            allow_redirects=False,
+            timeout=(5, 60),
+        )
+    except requests.RequestException as e:
+        logger.warning(f"[REST API Proxy] Failed reaching 127.0.0.1:{api_port}{target_path}: {e}")
+        return jsonify({
+            "success": False,
+            "detail": "REST API service is currently unavailable.",
+        }), 503
+
+    resp_headers = [
+        (k, v)
+        for k, v in upstream_resp.headers.items()
+        if k.lower() not in _HOP_BY_HOP_HEADERS
+    ]
+
+    content_type = upstream_resp.headers.get("Content-Type", "")
+    is_sse = "text/event-stream" in content_type.lower()
+
+    if is_sse:
+        def _stream_sse():
+            try:
+                for chunk in upstream_resp.iter_content(chunk_size=1):
+                    if chunk:
+                        yield chunk
+            finally:
+                upstream_resp.close()
+
+        return Response(
+            _stream_sse(),
+            status=upstream_resp.status_code,
+            headers=resp_headers,
+            direct_passthrough=True,
+        )
+
+    def _stream_body():
+        try:
+            for chunk in upstream_resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream_resp.close()
+
+    return Response(
+        _stream_body(),
+        status=upstream_resp.status_code,
+        headers=resp_headers,
+    )
+
 start_console_handler()
 
 if __name__ == "__main__":
@@ -7440,4 +4401,5 @@ if __name__ == "__main__":
         port = 8400
         
     start_server_checker_worker()
+    start_api_subprocess()
     app.run(host=host, port=port, debug=False)

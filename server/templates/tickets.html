@@ -1305,7 +1305,7 @@
         btn.disabled = true;
 
         try {
-            const res = await fetch(`/api/tickets/${ticketId}/messages`, {
+            const res = await fetch(`/tickets/${ticketId}/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msgText })
@@ -1369,7 +1369,7 @@
 
         const newText = textarea.value.trim();
         try {
-            const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+            const response = await fetch(`/tickets/${ticketId}/messages/${msgId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: newText })
@@ -1400,7 +1400,7 @@
             return;
         }
         try {
-            const response = await fetch(`/api/tickets/${ticketId}/messages/${msgId}`, {
+            const response = await fetch(`/tickets/${ticketId}/messages/${msgId}`, {
                 method: 'DELETE'
             });
             const data = await response.json();

@@ -45,7 +45,7 @@ ERROR_ALERT_PING_USER_ID = (os.getenv("DISCORD_ERROR_ALERT_PING_USER_ID", "").st
 CRASH_ALERT_CHANNEL_ID = int(os.getenv("DISCORD_CRASH_ALERT_CHANNEL_ID", "").strip() or "1562502830580048035")
 
 DEFAULT_SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "https://rbwr.hotment.dev").rstrip("/")
-RBWR_API_URL = os.getenv("RBWR_API_URL", f"{DEFAULT_SERVER_BASE_URL}/api/public-servers")
+RBWR_API_URL = os.getenv("RBWR_API_URL", f"{DEFAULT_SERVER_BASE_URL}/api/public/servers")
 LOCAL_SERVER_PORT = os.getenv("SERVER_PORT", "8400").strip() or "8400"
 
 logging.basicConfig(level=logging.INFO,

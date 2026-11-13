@@ -680,7 +680,7 @@
         if (!isTabFocused) return;
         const statusEl = document.getElementById('statusIndicator');
         try {
-            const res = await fetch('/api/public-servers');
+            const res = await fetch('/api/public/servers');
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const json = await res.json();
 
