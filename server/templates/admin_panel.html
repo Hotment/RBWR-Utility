@@ -980,7 +980,9 @@
                 </div>
             </div>
         </main>
+        {% endif %}
 
+        {% if permissions.audit_logs %}
         <main id="view-audit-logs"
             class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view not in ['audit-logs', 'auditlogs'] %}hidden{% endif %}">
             <header
@@ -1661,7 +1663,7 @@
         </main>
         {% endif %}
 
-        {% if is_root %}
+        {% if permissions.debug %}
         <main id="view-debug"
             class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'debug' %}hidden{% endif %}">
             <header
