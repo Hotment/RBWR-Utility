@@ -1727,12 +1727,14 @@
 
         if (globalChartInstance) {
             if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
-            globalChartInstance.options.scales.x.min = 0;
-            const limitMax = globalChartInstance._maxAvailableX || 0;
+            const limitMin = globalChartInstance._minAvailableX !== undefined ? globalChartInstance._minAvailableX : 0;
+            const limitMax = globalChartInstance._maxAvailableX;
+            globalChartInstance.options.scales.x.min = limitMin;
             if (seconds === null) {
-                globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+                globalChartInstance.options.scales.x.max = limitMax;
             } else {
-                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(seconds, limitMax) : seconds;
+                const targetMax = limitMin + seconds;
+                globalChartInstance.options.scales.x.max = (limitMax !== undefined && limitMax > limitMin) ? Math.min(targetMax, limitMax) : targetMax;
             }
             globalChartInstance.update('none');
 
@@ -1758,9 +1760,10 @@
 
         if (!globalChartInstance) return;
         if (globalChartInstance.resetZoom) globalChartInstance.resetZoom('none');
-        globalChartInstance.options.scales.x.min = 0;
-        const limitMax = globalChartInstance._maxAvailableX || 0;
-        globalChartInstance.options.scales.x.max = limitMax > 0 ? limitMax : undefined;
+        const limitMin = globalChartInstance._minAvailableX !== undefined ? globalChartInstance._minAvailableX : 0;
+        const limitMax = globalChartInstance._maxAvailableX;
+        globalChartInstance.options.scales.x.min = limitMin;
+        globalChartInstance.options.scales.x.max = limitMax;
         globalChartInstance.update('none');
     }
 
@@ -2086,6 +2089,7 @@
     }
 
     let totalGlobalPoints = 0;
+    let minGlobalX = null;
     let maxGlobalX = 0;
 
     const datasets = (chartData.datasets || []).map((ds, idx) => {
@@ -2103,6 +2107,7 @@
         totalGlobalPoints += points.length;
         points.forEach(p => {
             if (p.x > maxGlobalX) maxGlobalX = p.x;
+            if (minGlobalX === null || p.x < minGlobalX) minGlobalX = p.x;
         });
 
         return {
@@ -2140,6 +2145,9 @@
             }
         });
     }
+
+    const effectiveMinGlobalX = minGlobalX !== null ? minGlobalX : 0;
+    const effectiveMaxGlobalX = maxGlobalX > effectiveMinGlobalX ? maxGlobalX : (minGlobalX !== null ? effectiveMinGlobalX + 60 : undefined);
 
     globalChartInstance = new Chart(ctx, {
         type: 'line',
@@ -2190,7 +2198,7 @@
                         }
                     },
                     limits: {
-                        x: { min: 0, max: maxGlobalX > 0 ? maxGlobalX : undefined }
+                        x: { min: effectiveMinGlobalX, max: effectiveMaxGlobalX }
                     }
                 }
             },
@@ -2198,8 +2206,8 @@
                 x: {
                     type: 'linear',
                     reverse: true,
-                    min: 0,
-                    max: maxGlobalX > 0 ? maxGlobalX : undefined,
+                    min: effectiveMinGlobalX,
+                    max: effectiveMaxGlobalX,
                     ticks: {
                         color: '#9ca3af',
                         font: { family: 'JetBrains Mono', size: 10 },
@@ -2248,12 +2256,14 @@
         }
     });
 
-    globalChartInstance._maxAvailableX = maxGlobalX;
+    globalChartInstance._minAvailableX = effectiveMinGlobalX;
+    globalChartInstance._maxAvailableX = effectiveMaxGlobalX;
 
     window.updateGlobalChartData = function(newChartData) {
         if (!globalChartInstance || !newChartData || !newChartData.datasets) return;
 
         let newTotalGlobalPoints = 0;
+        let newMinGlobalX = null;
         let newMaxGlobalX = 0;
 
         const updatedDatasets = (newChartData.datasets || []).map((ds) => {
@@ -2271,6 +2281,7 @@
             newTotalGlobalPoints += points.length;
             points.forEach(p => {
                 if (p.x > newMaxGlobalX) newMaxGlobalX = p.x;
+                if (newMinGlobalX === null || p.x < newMinGlobalX) newMinGlobalX = p.x;
             });
 
             return {
@@ -2289,7 +2300,11 @@
         });
 
         totalGlobalPoints = newTotalGlobalPoints;
+        minGlobalX = newMinGlobalX;
         maxGlobalX = newMaxGlobalX;
+
+        const effectiveMin = minGlobalX !== null ? minGlobalX : 0;
+        const effectiveMax = maxGlobalX > effectiveMin ? maxGlobalX : (minGlobalX !== null ? effectiveMin + 60 : undefined);
 
         const pointsLabel = document.getElementById('globalPointsLabel');
         if (pointsLabel) {
@@ -2297,15 +2312,30 @@
         }
 
         globalChartInstance.data.datasets = updatedDatasets;
-        globalChartInstance._maxAvailableX = maxGlobalX;
+        globalChartInstance._minAvailableX = effectiveMin;
+        globalChartInstance._maxAvailableX = effectiveMax;
         if (globalChartInstance.options.plugins && globalChartInstance.options.plugins.zoom && globalChartInstance.options.plugins.zoom.limits) {
-            globalChartInstance.options.plugins.zoom.limits.x = { min: 0, max: maxGlobalX > 0 ? maxGlobalX : undefined };
+            globalChartInstance.options.plugins.zoom.limits.x = { min: effectiveMin, max: effectiveMax };
         }
 
+        const allBtn = document.getElementById('btnGlobalRangeAll');
+        const isAllActive = allBtn && allBtn.classList.contains('active');
         if (currentGlobalWindowSeconds === null) {
-            globalChartInstance.options.scales.x.max = maxGlobalX > 0 ? maxGlobalX : undefined;
+            if (isAllActive) {
+                globalChartInstance.options.scales.x.min = effectiveMin;
+                globalChartInstance.options.scales.x.max = effectiveMax;
+            } else {
+                const curMin = globalChartInstance.options.scales.x.min;
+                const curMax = globalChartInstance.options.scales.x.max;
+                const clampedMin = (typeof curMin === 'number') ? Math.max(effectiveMin, curMin) : effectiveMin;
+                const clampedMax = (typeof curMax === 'number' && effectiveMax !== undefined) ? Math.min(effectiveMax, Math.max(curMax, clampedMin + 1)) : effectiveMax;
+                globalChartInstance.options.scales.x.min = clampedMin;
+                globalChartInstance.options.scales.x.max = clampedMax;
+            }
         } else {
-            globalChartInstance.options.scales.x.max = maxGlobalX > 0 ? Math.min(currentGlobalWindowSeconds, maxGlobalX) : currentGlobalWindowSeconds;
+            globalChartInstance.options.scales.x.min = effectiveMin;
+            const targetMax = effectiveMin + currentGlobalWindowSeconds;
+            globalChartInstance.options.scales.x.max = (effectiveMax !== undefined && effectiveMax > effectiveMin) ? Math.min(targetMax, effectiveMax) : targetMax;
         }
 
         globalChartInstance.update('none');
@@ -2322,9 +2352,12 @@
             if (saved.isCustom && typeof saved.min === 'number' && typeof saved.max === 'number' && saved.max > saved.min) {
                 currentGlobalWindowSeconds = null;
                 document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
-                const limitMax = globalChartInstance._maxAvailableX || 0;
-                globalChartInstance.options.scales.x.min = Math.max(0, saved.min);
-                globalChartInstance.options.scales.x.max = limitMax > 0 ? Math.min(limitMax, saved.max) : saved.max;
+                const limitMin = globalChartInstance._minAvailableX !== undefined ? globalChartInstance._minAvailableX : 0;
+                const limitMax = globalChartInstance._maxAvailableX;
+                const targetMin = Math.max(limitMin, saved.min);
+                const targetMax = (limitMax !== undefined && limitMax > limitMin) ? Math.min(limitMax, Math.max(saved.max, targetMin + 1)) : Math.max(saved.max, targetMin + 1);
+                globalChartInstance.options.scales.x.min = targetMin;
+                globalChartInstance.options.scales.x.max = targetMax;
                 globalChartInstance.update('none');
                 return;
             } else if (saved.windowSeconds !== undefined) {
