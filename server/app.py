@@ -761,15 +761,17 @@ def is_website_admin_discord_id(discord_id: str | int) -> bool:
 
     return False
 
-# sections an admin can be given access to in Accounts. The original ones default to on,
-# the Discord bot sections added later default to off until a root admin ticks them.
+# sections an admin can be given access to in Accounts. All sections default to on when an
+# admin account is created or has no saved value for a section; a root admin unticks what
+# they don't want that admin to have. Clearing audit logs is a separate, hardcoded
+# root-only action and is never gated by the "audit_logs" permission (see api_clear_audit_logs).
 LEGACY_PERMISSION_SECTIONS = ["suggestions", "crashes", "contact", "bans", "servers"]
 BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"]
 ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
 
 
 def default_permission(section: str) -> bool:
-    return section in LEGACY_PERMISSION_SECTIONS
+    return True
 
 
 def normalize_permissions(perms: dict | None) -> dict:
