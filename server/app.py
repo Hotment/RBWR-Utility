@@ -427,7 +427,7 @@ def broadcast_update(data_type):
                     "data": get_accounts_payload_data()
                 }
             elif data_type == "audit_logs":
-                if uname and not is_root_user(uname):
+                if uname and not has_permission(uname, "audit_logs"):
                     continue
                 payload = {
                     "type": "audit_logs",
@@ -506,7 +506,7 @@ def admin_ws(ws):
             "type": "all",
             "dashboard": get_dashboard_payload_data(username),
             "accounts": get_accounts_payload_data() if is_root_user(username) else None,
-            "audit_logs": get_audit_logs_payload_data() if is_root_user(username) else None
+            "audit_logs": get_audit_logs_payload_data() if has_permission(username, "audit_logs") else None
         }
         ws.send(json.dumps(initial_payload))
     except Exception:
@@ -761,15 +761,17 @@ def is_website_admin_discord_id(discord_id: str | int) -> bool:
 
     return False
 
-# sections an admin can be given access to in Accounts. The original ones default to on,
-# the Discord bot sections added later default to off until a root admin ticks them.
+# sections an admin can be given access to in Accounts. All sections default to on when an
+# admin account is created or has no saved value for a section; a root admin unticks what
+# they don't want that admin to have. Clearing audit logs is a separate, hardcoded
+# root-only action and is never gated by the "audit_logs" permission (see api_clear_audit_logs).
 LEGACY_PERMISSION_SECTIONS = ["suggestions", "crashes", "contact", "bans", "servers"]
-BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors"]
+BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"]
 ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
 
 
 def default_permission(section: str) -> bool:
-    return section in LEGACY_PERMISSION_SECTIONS
+    return True
 
 
 def normalize_permissions(perms: dict | None) -> dict:
@@ -1688,16 +1690,18 @@ def submit_contact_message():
         return jsonify({"detail": "Access restricted."}), 403
 
     payload = request.get_json() or {}
-    message_text = payload.get("message", "").strip()
+    if not isinstance(payload, dict):
+        return jsonify({"detail": "Invalid request body."}), 400
+    message_text = str(payload.get("message", "")).strip()
     if not message_text:
         return jsonify({"detail": "Message body cannot be empty."}), 400
 
     if len(message_text) > 2000:
         return jsonify({"detail": "Message text exceeds maximum length of 2000 characters."}), 400
 
-    name = payload.get("name", "").strip() or "Anonymous"
-    contact_info = payload.get("contact_info", "").strip() or "N/A"
-    subject = payload.get("subject", "").strip() or "General Inquiry"
+    name = str(payload.get("name", "")).strip() or "Anonymous"
+    contact_info = str(payload.get("contact_info", "")).strip() or "N/A"
+    subject = str(payload.get("subject", "")).strip() or "General Inquiry"
 
     contact_data = load_contact_messages()
     messages = contact_data.get("messages", [])
@@ -5252,6 +5256,8 @@ def add_ticket_message_api(ticket_id):
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = TicketMessagePayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5525,6 +5531,8 @@ def submit_ticket():
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = TicketPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5676,6 +5684,8 @@ def submit_crash():
     
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CrashPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5733,6 +5743,8 @@ def update_crash_status(username):
         return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CrashStatusPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5769,6 +5781,8 @@ def delete_crash(username):
         return jsonify({"detail": "Permission denied for crash logs section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteCrashPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5804,6 +5818,8 @@ def update_suggestion_status(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = StatusUpdatePayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5869,6 +5885,8 @@ def update_suggestion_comment(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CommentPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5910,6 +5928,8 @@ def update_suggestion_visibility(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = VisibilitySuggestionPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5933,6 +5953,8 @@ def delete_suggestion(username):
         return jsonify({"detail": "Permission denied for tickets section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteSuggestionPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -5989,6 +6011,8 @@ def ban_ip(username):
         return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = BanPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6023,6 +6047,8 @@ def unban_ip(username):
         return jsonify({"detail": "Permission denied for bans section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = UnbanPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6174,6 +6200,8 @@ def toggle_server_persistence(username):
         return jsonify({"detail": "Permission denied for servers section"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = ServerPersistPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6206,7 +6234,7 @@ def toggle_server_persistence(username):
 @app.route("/admin/auditlogs", methods=["GET"])
 @admin_required
 def view_audit_logs_dashboard(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return redirect("/admin")
     discord_id = session.get("discord_id") or username
     notifier_cfg = get_admin_notifier_config(discord_id)
@@ -6215,7 +6243,7 @@ def view_audit_logs_dashboard(username):
         username=username,
         discord_id=session.get("discord_id") or "",
         active_view="audit-logs",
-        is_root=True,
+        is_root=is_root_user(username),
         permissions=get_user_permissions(username),
         me=admin_panel_identity(username),
         notifier=notifier_cfg,
@@ -6224,7 +6252,7 @@ def view_audit_logs_dashboard(username):
 @app.route("/api/admin/audit-logs", methods=["GET"])
 @admin_required
 def api_get_audit_logs(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     category = request.args.get("category")
     action = request.args.get("action")
@@ -6251,7 +6279,7 @@ def api_get_audit_logs(username):
 @app.route("/api/admin/audit-logs/export", methods=["GET"])
 @admin_required
 def api_export_audit_logs(username):
-    if not is_root_user(username):
+    if not has_permission(username, "audit_logs"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     logs = audit.load_raw_audit_logs()
     filename = f"rbwr_audit_logs_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
@@ -6311,6 +6339,8 @@ def create_admin_account(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = CreateAdminPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6351,6 +6381,8 @@ def update_admin_permissions(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = UpdateAdminPermissionsPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6383,6 +6415,8 @@ def delete_admin_account(username):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = DeleteAdminPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6424,6 +6458,8 @@ def save_notifier_api(username):
         return jsonify({"detail": "Permission denied for suggestions"}), 403
     try:
         req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
         payload = NotifierConfigPayload(**req_json)
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
@@ -6817,7 +6853,7 @@ def diagnose_server_snapshots(job_id_query: str) -> dict[str, Any]:
 @app.route("/admin/debug", methods=["GET"])
 @admin_required
 def view_debug_dashboard(username):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return redirect("/admin")
     discord_id = session.get("discord_id") or username
     notifier_cfg = get_admin_notifier_config(discord_id)
@@ -6827,7 +6863,7 @@ def view_debug_dashboard(username):
         username=username,
         discord_id=session.get("discord_id") or "",
         active_view="debug",
-        is_root=True,
+        is_root=is_root_user(username),
         permissions=get_user_permissions(username),
         me=admin_panel_identity(username),
         notifier=notifier_cfg,
@@ -6837,7 +6873,7 @@ def view_debug_dashboard(username):
 @app.route("/api/admin/debug/server/<path:job_id>", methods=["GET"])
 @admin_required
 def api_debug_server(username, job_id):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     result = diagnose_server_snapshots(job_id)
     return jsonify(result)
@@ -6845,7 +6881,7 @@ def api_debug_server(username, job_id):
 @app.route("/api/admin/debug/analyze_payload", methods=["POST"])
 @admin_required
 def api_debug_analyze_payload(username):
-    if not is_root_user(username):
+    if not has_permission(username, "debug"):
         return jsonify({"detail": "Forbidden - Root privileges required"}), 403
     try:
         req_json = request.get_json(silent=True) or {}

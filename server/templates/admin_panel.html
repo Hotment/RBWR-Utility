@@ -146,7 +146,8 @@
 </head>
 
 <body class="min-h-screen flex flex-col md:flex-row font-sans max-w-full overflow-x-hidden"
-    data-is-root="{{ is_root|lower }}">
+    data-is-root="{{ is_root|lower }}" data-can-audit="{{ (permissions.audit_logs or false)|lower }}"
+    data-can-debug="{{ (permissions.debug or false)|lower }}">
 
     <aside class="w-full md:w-64 md:sticky md:top-0 md:h-screen bg-surface border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0">
         <div class="p-6 border-b border-white/5 flex items-center gap-3">
@@ -271,7 +272,9 @@
                 </svg>
                 <span class="whitespace-nowrap">Accounts</span>
             </a>
+            {% endif %}
 
+            {% if permissions.audit_logs %}
             <a href="/admin/audit-logs" id="nav-audit-logs"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view in ['audit-logs', 'auditlogs'] %}bg-amber-600/10 text-amber-400 border border-amber-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition shrink-0" fill="none"
@@ -282,7 +285,9 @@
                 </svg>
                 <span class="whitespace-nowrap">Audit Logs</span>
             </a>
+            {% endif %}
 
+            {% if permissions.debug %}
             <a href="/admin/debug" id="nav-debug"
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'debug' %}bg-indigo-600/10 text-indigo-400 border border-indigo-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
                 <svg class="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition shrink-0" fill="none"
@@ -2017,6 +2022,8 @@
     <script src="/static/js/admin/admin-bot.js"></script>
     <script>
         const IS_ROOT = document.body.dataset.isRoot === 'true';
+        const CAN_AUDIT_LOGS = IS_ROOT || document.body.dataset.canAudit === 'true';
+        const CAN_DEBUG = IS_ROOT || document.body.dataset.canDebug === 'true';
         // sidebar search: filters the section links by name; Enter opens the first match, "/" focuses the box
         (function () {
             const input = document.getElementById('adm-nav-search');
@@ -2077,7 +2084,11 @@
             });
             if (IS_ROOT) {
                 bindNavLink('nav-accounts', 'accounts', '/admin/accounts');
+            }
+            if (CAN_AUDIT_LOGS) {
                 bindNavLink('nav-audit-logs', 'audit-logs', '/admin/audit-logs');
+            }
+            if (CAN_DEBUG) {
                 bindNavLink('nav-debug', 'debug', '/admin/debug');
             }
 
@@ -2126,6 +2137,8 @@
                         navigateToView('accounts', '/admin/accounts');
                     });
                 }
+            }
+            if (CAN_AUDIT_LOGS) {
                 const cardAud = document.getElementById('card-link-audit-logs');
                 if (cardAud) {
                     cardAud.addEventListener('click', (e) => {
@@ -2133,6 +2146,8 @@
                         navigateToView('audit-logs', '/admin/audit-logs');
                     });
                 }
+            }
+            if (CAN_DEBUG) {
                 const cardDbg = document.getElementById('card-link-debug');
                 if (cardDbg) {
                     cardDbg.addEventListener('click', (e) => {
@@ -2142,7 +2157,7 @@
                 }
             }
 
-            if (IS_ROOT && activeView === 'debug') {
+            if (CAN_DEBUG && activeView === 'debug') {
                 const initDbgId = '{{ initial_debug_job_id | default("") }}';
                 if (initDbgId) {
                     setDebugServerAndRun(initDbgId);
@@ -2192,13 +2207,13 @@
                     navigateToView('overview', '/admin', false);
                 }
             } else if (path === '/admin/audit-logs' || path === '/admin/auditlogs') {
-                if (IS_ROOT) {
+                if (CAN_AUDIT_LOGS) {
                     navigateToView('audit-logs', path, false);
                 } else {
                     navigateToView('overview', '/admin', false);
                 }
             } else if (path === '/admin/debug') {
-                if (IS_ROOT) {
+                if (CAN_DEBUG) {
                     navigateToView('debug', path, false);
                 } else {
                     navigateToView('overview', '/admin', false);
@@ -2244,10 +2259,10 @@
             if (latestData) {
                 updateStats(latestData);
             }
-            if (viewName === 'audit-logs' && IS_ROOT) {
+            if (viewName === 'audit-logs' && CAN_AUDIT_LOGS) {
                 loadAuditLogs(currentAuditPage);
             }
-            if (viewName === 'debug' && IS_ROOT) {
+            if (viewName === 'debug' && CAN_DEBUG) {
                 const initDbgId = '{{ initial_debug_job_id | default("") }}';
                 const inputEl = document.getElementById('debug-server-id');
                 if (initDbgId && inputEl) {
@@ -2869,7 +2884,7 @@
                         if (IS_ROOT && message.accounts) {
                             renderAccounts(message.accounts.admins);
                         }
-                        if (IS_ROOT && message.audit_logs) {
+                        if (CAN_AUDIT_LOGS && message.audit_logs) {
                             updateAuditStats(message.audit_logs);
                         }
                     } else if (message.type === 'dashboard') {
@@ -2886,7 +2901,7 @@
                             renderAccounts(message.data.admins);
                         }
                     } else if (message.type === 'audit_logs') {
-                        if (IS_ROOT) {
+                        if (CAN_AUDIT_LOGS) {
                             if (activeView === 'audit-logs' && currentAuditPage === 1 && !currentAuditQuery && currentAuditCategory === 'all') {
                                 loadAuditLogs(1, true);
                             } else if (message.data) {
@@ -4075,7 +4090,9 @@
                         { key: "crashes", label: "Crash Logs", desc: "Client crash stack traces and analysis" },
                         { key: "suggestions", label: "Suggestions", desc: "User suggestion inbox and review" },
                         { key: "contact", label: "Messages", desc: "Direct contact and support messages" },
-                        { key: "bans", label: "Banned IPs", desc: "IP bans and rate-limit access control" }
+                        { key: "bans", label: "Banned IPs", desc: "IP bans and rate-limit access control" },
+                        { key: "debug", label: "Debug Inspector", desc: "Inject and analyze raw server state payloads" },
+                        { key: "audit_logs", label: "Audit Logs", desc: "View, export, and clear administrator audit history" }
                     ]
                 },
                 {
@@ -4103,7 +4120,7 @@
                 }
             ];
 
-            const ALL_PERM_KEYS = ["servers", "crashes", "suggestions", "contact", "bans", "moderation", "automod", "dms", "embeds", "autorole", "welcome", "faq", "commands", "errors"];
+            const ALL_PERM_KEYS = ["servers", "crashes", "suggestions", "contact", "bans", "moderation", "automod", "dms", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"];
 
             window.applyPermPreset = function(dId, preset) {
                 let targetKeys = [];
@@ -4286,6 +4303,8 @@
                         faq: getVal('faq'),
                         commands: getVal('commands'),
                         errors: getVal('errors'),
+                        debug: getVal('debug'),
+                        audit_logs: getVal('audit_logs'),
                     }
                 };
 
@@ -4407,7 +4426,7 @@
         }
 
         async function loadAuditLogs(page = 1, silent = false) {
-            if (!IS_ROOT) return;
+            if (!CAN_AUDIT_LOGS) return;
             currentAuditPage = page;
             const loadingIndicator = document.getElementById('audit-loading-indicator');
             const tbody = document.getElementById('audit-logs-table-body');
