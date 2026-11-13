@@ -38,7 +38,7 @@ try:
     )
 except ImportError:
     from scoring import calculate_server_top_score
-    from server.calculator import calculate_reactor_metrics
+    from calculator import calculate_reactor_metrics
     from fuel import (
         approximate_fuel_from_snapshots,
         calculate_u1_fuel_level,
