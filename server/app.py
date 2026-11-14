@@ -4171,6 +4171,67 @@ def start_console_handler():
             except Exception as ex:
                 safe_print(f"[ERROR] Failed to execute test notification: {ex}")
 
+        @handler.command(name="api_status", description="Shows status, PID, port, and live health of the FastAPI subservice.")
+        def api_status_cmd():
+            st = get_api_subservice_status(probe_http=True)
+            mode = "managed" if st["managed_process_running"] else ("external" if st["port_open"] else "stopped")
+            safe_print(
+                f"[API] mode={mode} | port={st['port']} (open={st['port_open']}) | "
+                f"pid={st['pid']} | supervisor={st['supervisor_active']} | disabled={st['disabled']}"
+            )
+            if st["health"]:
+                h = st["health"]
+                safe_print(
+                    f"[API] health={h.get('status')} | version={h.get('version')} | uptime={h.get('uptime')}"
+                )
+            elif st["health_error"]:
+                safe_print(f"[API] health_error={st['health_error']}")
+
+        @handler.command(name="api_health", description="Probes /api/status, /api/grid/summary, and /api/openapi.json with latency.")
+        def api_health_cmd():
+            port = _get_api_port()
+            for ep in ("/api/status", "/api/grid/summary", "/api/openapi.json"):
+                t0 = time.perf_counter()
+                try:
+                    resp = requests.get(f"http://127.0.0.1:{port}{ep}", timeout=3.0)
+                    ms = round((time.perf_counter() - t0) * 1000, 1)
+                    safe_print(f"[API] GET {ep} -> HTTP {resp.status_code} ({ms} ms)")
+                except Exception as ex:
+                    ms = round((time.perf_counter() - t0) * 1000, 1)
+                    safe_print(f"[API] GET {ep} -> ERROR ({ms} ms): {ex}")
+
+        @handler.command(name="api_start", description="Starts the managed FastAPI subservice if not already running.")
+        def api_start_cmd():
+            ok, msg = start_api_subservice()
+            safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
+
+        @handler.command(name="api_stop", description="Stops the managed FastAPI subservice and pauses auto-restart.")
+        def api_stop_cmd():
+            ok, msg = stop_api_subservice()
+            safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
+
+        @handler.command(name="api_restart", description="Restarts the managed FastAPI subservice.")
+        def api_restart_cmd():
+            ok, msg = restart_api_subservice()
+            safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
+
+        @handler.command(name="api_refresh", description="Triggers POST /api/servers/refresh using API_REFRESH_KEY.")
+        def api_refresh_cmd():
+            port = _get_api_port()
+            key = (os.environ.get("API_REFRESH_KEY") or os.environ.get("RBWR_API_KEY") or "").strip()
+            if not key:
+                safe_print("[ERROR] API_REFRESH_KEY is not configured in environment.")
+                return
+            try:
+                resp = requests.post(
+                    f"http://127.0.0.1:{port}/api/servers/refresh",
+                    headers={"X-API-Key": key},
+                    timeout=15.0,
+                )
+                safe_print(f"[API] POST /api/servers/refresh -> HTTP {resp.status_code}: {resp.text[:200]}")
+            except Exception as ex:
+                safe_print(f"[ERROR] Failed to reach API refresh endpoint: {ex}")
+
         handler.start()
     except Exception:
         pass
@@ -4184,6 +4245,7 @@ _api_process = None
 _api_supervisor_thread = None
 _api_supervisor_started = False
 _api_shutting_down = False
+_api_immediate_restart = False
 _api_supervisor_lock = threading.Lock()
 _HOP_BY_HOP_HEADERS = frozenset({
     "connection",
@@ -4224,20 +4286,27 @@ def _stop_api_subprocess():
                 proc.kill()
             except Exception:
                 pass
+    _api_process = None
 
 atexit.register(_stop_api_subprocess)
 
 def _api_supervisor_loop():
-    global _api_process
+    global _api_process, _api_immediate_restart, _api_supervisor_started
     backoff = 1.0
+    spawned_once = False
     while not _api_shutting_down:
         if not os.path.exists(API_SCRIPT_PATH):
-            return
+            break
         api_host = os.environ.get("API_HOST", "0.0.0.0")
         api_port = _get_api_port()
-        if _is_local_port_open(api_port):
-            logger.info(f"[REST API] Detected existing listener on 127.0.0.1:{api_port}; proxying /api/* to it.")
-            return
+        if not spawned_once:
+            if _is_local_port_open(api_port):
+                logger.info(f"[REST API] Detected existing listener on 127.0.0.1:{api_port}; proxying /api/* to it.")
+                break
+        else:
+            close_deadline = time.time() + 2.0
+            while _is_local_port_open(api_port, timeout=0.1) and time.time() < close_deadline:
+                time.sleep(0.1)
 
         cmd = [
             sys.executable,
@@ -4254,17 +4323,126 @@ def _api_supervisor_loop():
         try:
             proc = subprocess.Popen(cmd, cwd=BASE_DIR)
             _api_process = proc
+            spawned_once = True
             logger.info(f"[REST API] Started api.py Uvicorn subprocess (PID {proc.pid}) on {api_host}:{api_port}")
             backoff = 1.0
             exit_code = proc.wait()
             if _api_shutting_down:
                 break
+            if _api_immediate_restart:
+                _api_immediate_restart = False
+                logger.info("[REST API] Restarting api.py Uvicorn subprocess...")
+                continue
             logger.warning(f"[REST API] Uvicorn subprocess exited with code {exit_code}; restarting in {backoff:.0f}s.")
         except Exception as e:
             logger.error(f"[REST API] Failed to launch api.py subprocess: {e}")
 
         time.sleep(backoff)
         backoff = min(backoff * 2, 15.0)
+    with _api_supervisor_lock:
+        _api_supervisor_started = False
+
+
+def get_api_subservice_status(probe_http: bool = True) -> dict:
+    port = _get_api_port()
+    proc = _api_process
+    pid = proc.pid if proc is not None else None
+    running = proc is not None and proc.poll() is None
+    returncode = None if proc is None else proc.poll()
+    port_open = _is_local_port_open(port, timeout=0.3)
+
+    info = {
+        "host": os.environ.get("API_HOST", "0.0.0.0"),
+        "port": port,
+        "script_exists": os.path.exists(API_SCRIPT_PATH),
+        "disabled": os.environ.get("DISABLE_API_PROCESS") == "1",
+        "supervisor_active": bool(_api_supervisor_started and _api_supervisor_thread and _api_supervisor_thread.is_alive()),
+        "shutting_down": _api_shutting_down,
+        "managed_process_running": running,
+        "pid": pid,
+        "returncode": returncode,
+        "port_open": port_open,
+        "health": None,
+        "health_error": None,
+    }
+    if probe_http and port_open:
+        try:
+            resp = requests.get(f"http://127.0.0.1:{port}/api/status", timeout=2.0)
+            if resp.status_code == 200:
+                info["health"] = resp.json()
+            else:
+                info["health_error"] = f"HTTP {resp.status_code}"
+        except Exception as e:
+            info["health_error"] = str(e)
+    return info
+
+
+def start_api_subservice() -> tuple[bool, str]:
+    global _api_shutting_down, _api_supervisor_started
+    if os.environ.get("DISABLE_API_PROCESS") == "1":
+        return False, "API subprocess is disabled via DISABLE_API_PROCESS=1."
+    if not os.path.exists(API_SCRIPT_PATH):
+        return False, f"api.py not found at {API_SCRIPT_PATH}."
+    port = _get_api_port()
+    with _api_supervisor_lock:
+        _api_shutting_down = False
+        if _api_process is not None and _api_process.poll() is None:
+            return True, f"API subservice is already running (PID {_api_process.pid}, port {port})."
+        if _is_local_port_open(port, timeout=0.25):
+            return True, f"External API listener already active on 127.0.0.1:{port}."
+        if _api_supervisor_thread is None or not _api_supervisor_thread.is_alive():
+            _api_supervisor_started = False
+
+    start_api_subprocess()
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if _is_local_port_open(port, timeout=0.2):
+            pid = _api_process.pid if _api_process else None
+            return True, f"API subservice started (PID {pid}, port {port})."
+        time.sleep(0.15)
+    return False, f"API subservice launch requested, but 127.0.0.1:{port} did not open within 5s."
+
+
+def stop_api_subservice() -> tuple[bool, str]:
+    proc = _api_process
+    pid = proc.pid if proc is not None else None
+    was_running = proc is not None and proc.poll() is None
+    _stop_api_subprocess()
+    if was_running:
+        return True, f"Stopped managed API subservice (PID {pid})."
+    port = _get_api_port()
+    if _is_local_port_open(port, timeout=0.2):
+        return False, f"No managed API subprocess was running, but an external process is still listening on 127.0.0.1:{port}."
+    return True, "API subservice is already stopped."
+
+
+def restart_api_subservice() -> tuple[bool, str]:
+    global _api_immediate_restart, _api_shutting_down
+    if os.environ.get("DISABLE_API_PROCESS") == "1":
+        return False, "API subprocess is disabled via DISABLE_API_PROCESS=1."
+    port = _get_api_port()
+    proc = _api_process
+    if proc is not None and proc.poll() is None and _api_supervisor_thread is not None and _api_supervisor_thread.is_alive():
+        _api_shutting_down = False
+        _api_immediate_restart = True
+        old_pid = proc.pid
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            new_proc = _api_process
+            if new_proc is not None and new_proc.pid != old_pid and new_proc.poll() is None and _is_local_port_open(port, timeout=0.2):
+                return True, f"Restarted API subservice (old PID {old_pid} -> new PID {new_proc.pid}, port {port})."
+            time.sleep(0.15)
+        return False, f"Terminated old API process (PID {old_pid}), waiting for port {port} to reopen."
+
+    return start_api_subservice()
 
 def start_api_subprocess():
     global _api_supervisor_started, _api_supervisor_thread
