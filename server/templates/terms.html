@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service | RBWR Utility{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://rbwr.hotment.dev/terms">
+{% endblock %}
+
+{% block breadcrumbs %}
+{% from "_breadcrumbs.html" import breadcrumb_schema %}
+{{ breadcrumb_schema([{"name": "Terms of Service", "url": "https://rbwr.hotment.dev/terms"}]) }}
+{% endblock %}
+
+{% block meta_tags %}
+<meta name="description" content="Read the RBWR Utility Terms of Service covering the web platform, public REST API, RBWR Utility desktop application, and Discord bot.">
+<meta name="theme-color" content="#3b82f6">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RBWR Utility">
+<meta property="og:title" content="RBWR Utility - Terms of Service">
+<meta property="og:description" content="Terms of Service for the RBWR Utility web platform, REST API, desktop application, and Discord bot.">
+<meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RBWR Utility - Terms of Service">
+<meta name="twitter:description" content="Terms of Service for the RBWR Utility web platform, REST API, desktop application, and Discord bot.">
+<meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
+
+{% from "_discord_embed.html" import standard_component_embed %}
+{{ standard_component_embed(
+    title="RBWR Utility Terms of Service",
+    subtitle="Web Platform, Desktop App & Discord Bot",
+    description="Terms of Service governing the RBWR Utility website, public REST API, desktop application, and Discord bot.",
+    accent_color="#3b82f6",
+    primary_label="View Terms of Service",
+    primary_url=request.url if request else url_for('terms_page', _external=True),
+    secondary_label="Privacy Policy",
+    secondary_url=url_for('privacy_page', _external=True),
+    icon_url=url_for('static', filename='favicon.png', _external=True)
+) }}
+{% endblock %}
+
+{% block content %}
+<main class="max-w-4xl mx-auto px-4 py-6 sm:py-10 overflow-x-hidden">
+
+    <div class="bg-surfaceElevated border border-border p-5 sm:p-10 rounded-2xl shadow-xl backdrop-blur-md">
+        <div class="border-b border-white/10 pb-6 mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                Terms of Service
+            </h1>
+            <p class="text-xs font-mono text-zinc-400 mt-2 whitespace-nowrap">
+                RBWR Utility &bull; Last updated: {{ last_updated or 'November 2026' }}
+            </p>
+        </div>
+
+        <div class="space-y-8 text-sm text-gray-300 leading-relaxed">
+            <div>
+                <p>
+                    Welcome to RBWR Utility. These Terms of Service ("Terms") govern your access to and use of the
+                    RBWR Utility website (<code class="text-blue-300 font-mono">rbwr.hotment.dev</code>), public REST
+                    API, the downloadable <a href="https://github.com/Hotment/RBWR-Utility" target="_blank"
+                        rel="noopener" class="text-blue-400 hover:underline">RBWR Utility Desktop Application</a>
+                    (including the RBWR APRM Calculator and Operator Tablet client), and the RBWR Utility Discord Bot
+                    (collectively, the "Services"). By accessing or using any of the Services, you agree to be bound by
+                    these Terms and our <a href="/privacy" class="text-blue-400 hover:underline">Privacy Policy</a>.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    1. Independent Project &amp; No Affiliation
+                </h2>
+                <p class="text-zinc-400">
+                    RBWR Utility is an independent, community-built companion project. It is not affiliated with,
+                    endorsed by, sponsored by, or officially connected to Roblox Corporation, Realistic Boiling Water
+                    Reactor (RBWR), or the developers of RBWR. All game names, trademarks, and in-game data formats
+                    belong to their respective owners.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    2. Desktop Application (RBWR Utility / Overlay)
+                </h2>
+                <div class="space-y-3 text-zinc-400">
+                    <p>
+                        The desktop application is provided for personal, non-commercial use as an informational
+                        companion tool (reactor physics calculations, local point history graphing, and Operator Tablet
+                        viewing).
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1.5">
+                        <li>You are solely responsible for complying with the Roblox Terms of Use and any RBWR server or
+                            game rules when running the desktop client.</li>
+                        <li>You may not redistribute modified builds of the application under the RBWR Utility name in a
+                            way that misleads users or bundles malware.</li>
+                        <li>Optional crash reports or feedback submitted from the desktop client are handled in
+                            accordance with our <a href="/privacy" class="text-blue-400 hover:underline">Privacy
+                                Policy</a>.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    3. Discord Bot
+                </h2>
+                <div class="space-y-3 text-zinc-400">
+                    <p>
+                        Use of the RBWR Utility Discord Bot is also subject to the <a
+                            href="https://discord.com/terms" target="_blank" rel="noopener"
+                            class="text-blue-400 hover:underline">Discord Terms of Service</a> and <a
+                            href="https://discord.com/guidelines" target="_blank" rel="noopener"
+                            class="text-blue-400 hover:underline">Discord Community Guidelines</a>.
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1.5">
+                        <li>Server administrators who invite or configure the bot are responsible for how commands,
+                            alerts, moderation features, and notifications are used within their Discord servers.</li>
+                        <li>You may not abuse bot commands, attempt to spam or overload the bot, or exploit webhook,
+                            DM, or notification features to harass other users.</li>
+                        <li>We reserve the right to restrict or revoke bot access for any user or Discord server that
+                            abuses the Service or violates Discord policies.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    4. Web Platform, REST API &amp; Acceptable Use
+                </h2>
+                <div class="space-y-3 text-zinc-400">
+                    <p>
+                        You may use the web tools and public REST API (<code
+                            class="text-blue-300 font-mono">/api/*</code>) within published rate limits for personal
+                        dashboards, Discord bots, or community tools. When using the Services, you agree NOT to:
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1.5">
+                        <li>Bypass or circumvent IP rate limits, Cloudflare Turnstile CAPTCHA checks, authentication
+                            controls, or <code class="text-blue-300 font-mono">X-API-Key</code> protections.</li>
+                        <li>Perform denial-of-service attacks, aggressive scraping, or automated spam submissions on
+                            ticket, feedback, or contact forms.</li>
+                        <li>Attempt unauthorized access to administrative endpoints, server files, or private user
+                            data.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    5. User Submissions &amp; Moderation
+                </h2>
+                <p class="text-zinc-400">
+                    When you submit support tickets, bug reports, feature suggestions, or contact messages, you confirm
+                    that the content does not contain unlawful, abusive, or malicious material. Public tickets and
+                    associated replies may be displayed publicly on the website and synced to our community Discord
+                    channels. We reserve the right to edit, close, hide, or remove submissions and to restrict or ban
+                    users or IP addresses that engage in spam or abuse.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    6. Third-Party Services &amp; Data Sources
+                </h2>
+                <p class="text-zinc-400">
+                    The Services integrate with external platforms and endpoints (including Discord, GitHub, Cloudflare
+                    Turnstile, and upstream RBWR server data feeds). We do not control those third-party services and
+                    are not responsible for their availability, accuracy, or interruptions.
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    7. Disclaimer of Warranties &amp; Limitation of Liability
+                </h2>
+                <div class="space-y-3 text-zinc-400">
+                    <p>
+                        THE SERVICES ARE PROVIDED <strong class="text-zinc-200">"AS IS"</strong> AND <strong
+                            class="text-zinc-200">"AS AVAILABLE"</strong> WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+                        IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
+                    </p>
+                    <p>
+                        Reactor calculations, fuel estimates, incident logs, and performance scores are approximations
+                        derived from available operational data and may differ from live in-game behavior. To the
+                        maximum extent permitted by law, the developer of RBWR Utility shall not be liable for any
+                        direct, indirect, incidental, or consequential damages resulting from your use of or inability
+                        to use the Services.
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    8. Changes to These Terms &amp; Contact
+                </h2>
+                <p class="text-zinc-400">
+                    We may update these Terms or modify/discontinue any part of the Services at any time without prior
+                    notice. Continued use of the Services after changes are posted constitutes acceptance of the
+                    updated Terms. Questions or concerns can be sent via the <a href="/contact"
+                        class="text-blue-400 hover:underline">Contact page</a> or our <a
+                        href="https://discord.gg/4eUQQcuv87" target="_blank" rel="noopener"
+                        class="text-blue-400 hover:underline">Discord server</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

@@ -1424,6 +1424,10 @@ def sitemap_xml():
             "lastmod": _get_file_lastmod_iso(os.path.join(TEMPLATES_DIR, "privacy.html")),
         },
         {
+            "loc": f"{base_url}/terms",
+            "lastmod": _get_file_lastmod_iso(os.path.join(TEMPLATES_DIR, "terms.html")),
+        },
+        {
             "loc": f"{base_url}/credits",
             "lastmod": _get_file_lastmod_iso(os.path.join(TEMPLATES_DIR, "credits.html")),
         },
@@ -1468,6 +1472,16 @@ def privacy_page():
     else:
         last_updated = datetime.now(timezone.utc).strftime("%B %d, %Y")
     return render_template("privacy.html", last_updated=last_updated)
+
+@app.route("/terms", methods=["GET"])
+def terms_page():
+    terms_file = os.path.join(TEMPLATES_DIR, "terms.html")
+    if os.path.exists(terms_file):
+        mtime = os.path.getmtime(terms_file)
+        last_updated = datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%B %d, %Y")
+    else:
+        last_updated = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    return render_template("terms.html", last_updated=last_updated)
 
 @app.route("/contact", methods=["GET"])
 def contact_page():

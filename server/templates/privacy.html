@@ -12,30 +12,30 @@
 {% endblock %}
 
 {% block meta_tags %}
-<meta name="description" content="Read the RBWR Utility Privacy Policy. Learn how we handle client-side data security, local metrics logs processing, crash reports, and user feedback.">
+<meta name="description" content="Read the RBWR Utility Privacy Policy. Learn how we handle local Roblox log reading, desktop crash reports, tickets, Discord bot data, Cloudflare Turnstile, and REST API rate limiting.">
 <meta name="theme-color" content="#3b82f6">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RBWR Utility">
 <meta property="og:title" content="RBWR Utility - Privacy Policy">
-<meta property="og:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.">
+<meta property="og:description" content="Privacy Policy for RBWR Utility. Details on local Roblox log reading, Discord bot data, Turnstile verification, crash reports, and data retention.">
 <meta property="og:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="RBWR Utility - Privacy Policy">
-<meta name="twitter:description" content="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.">
+<meta name="twitter:description" content="Privacy Policy for RBWR Utility. Details on local Roblox log reading, Discord bot data, Turnstile verification, crash reports, and data retention.">
 <meta name="twitter:image" content="{{ url_for('static', filename='favicon.png', _external=True) }}">
 
 {% from "_discord_embed.html" import standard_component_embed %}
 {{ standard_component_embed(
     title="RBWR Utility Privacy Policy",
     subtitle="Data Handling & Privacy Safeguards",
-    description="Privacy Policy for RBWR Utility. Details on client-side privacy, data retention, feedback, and operational diagnostics.",
+    description="Privacy Policy for RBWR Utility. Details on local Roblox log reading, Discord bot data, Turnstile verification, crash reports, and data retention.",
     accent_color="#3b82f6",
     primary_label="View Privacy Policy",
     primary_url=request.url if request else url_for('privacy_page', _external=True),
-    secondary_label="Server Browser",
-    secondary_url=url_for('servers_page', _external=True),
+    secondary_label="Terms of Service",
+    secondary_url=url_for('terms_page', _external=True),
     icon_url=url_for('static', filename='favicon.png', _external=True)
 ) }}
 {% endblock %}
@@ -49,7 +49,7 @@
                 Privacy Policy
             </h1>
             <p class="text-xs font-mono text-zinc-400 mt-2 whitespace-nowrap">
-                RBWR Utility &bull; Last updated: {{ last_updated or 'August 2026' }}
+                RBWR Utility &bull; Last updated: {{ last_updated or 'November 2026' }}
             </p>
         </div>
 
@@ -57,50 +57,92 @@
             <div>
                 <p>
                     I am the sole developer of RBWR Utility (including the downloadable <a
-                        href="https://github.com/Hotment/RBWR-Utility" target="_blank"
-                        class="text-blue-400 hover:underline">RBWR APRM Calculator</a> desktop app and the RBWR Utility
-                    web platform). This Privacy Policy explains
-                    what data is collected when you use the RBWR Utility website, Web Calculator, Operator Tablet, and
-                    RBWR APRM Calculator desktop application, how that data is used, and how your privacy is protected.
+                        href="https://github.com/Hotment/RBWR-Utility" target="_blank" rel="noopener"
+                        class="text-blue-400 hover:underline">RBWR Utility</a> .NET 8 / Avalonia desktop application,
+                    the RBWR Utility web platform &amp; public REST API, and the RBWR Utility Discord Bot). This
+                    Privacy Policy explains what data is processed when you use these services and how your privacy is
+                    protected. By using our services, you also agree to our <a href="/terms"
+                        class="text-blue-400 hover:underline">Terms of Service</a>.
                 </p>
             </div>
 
             <div>
                 <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
-                    1. Information Collected & Processed
+                    1. Information Collected &amp; Processed
                 </h2>
 
                 <div class="space-y-4">
                     <div>
                         <h3 class="font-semibold text-zinc-200 mb-1">Public Game Server Data</h3>
                         <p class="text-zinc-400">
-                            The Operator Tablet, Web Calculator, and Desktop Overlay fetch in-game data from
+                            The Operator Tablet, Web Calculator, REST API, and Desktop Overlay fetch in-game data from
                             public RBWR server endpoints (<code
-                                class="text-blue-300 font-mono">realisticbwr.org/api/public/servers</code>). This data
-                            consists strictly of public plant parameters (such as APRM setpoints, reactor temperature,
-                            turbine RPM, and demand timer values) and contains no personal user data or Roblox account
-                            identifiers.
+                                class="text-blue-300 font-mono">hydrogen.realisticbwr.org/api/public/servers</code>
+                            and <code class="text-blue-300 font-mono">rbwr.hotment.dev/api/public/servers</code>). This
+                            data consists strictly of public plant parameters (such as APRM setpoints, reactor
+                            temperature, turbine RPM, and demand timer values) and contains no personal user data or
+                            Roblox account identifiers.
                         </p>
                     </div>
 
                     <div>
-                        <h3 class="font-semibold text-zinc-200 mb-1">Suggestions & Feedback Submissions</h3>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Desktop Overlay &amp; Local Roblox Log Reading</h3>
                         <p class="text-zinc-400">
-                            When you submit a suggestion or bug report, the system saves your submission details (title,
-                            description, category), an optional contact handle/Discord username if provided voluntarily,
-                            and an anonymized hash of your IP address. The hashed IP address is used solely for rate
-                            limiting to prevent spam and cannot be linked back to your identity.
+                            To automatically detect when you join or leave an RBWR server, the desktop overlay reads
+                            your local Roblox client log files in <strong class="text-zinc-200">read-only</strong> mode
+                            (specifically the tail of recent non-crash <code class="text-blue-300 font-mono">*.log</code>
+                            files in <code class="text-blue-300 font-mono">%LocalAppData%\Roblox\logs</code> or a
+                            user-configured directory). It extracts <strong class="text-zinc-200">only</strong> the
+                            public server <code class="text-blue-300 font-mono">JobId</code>, <code
+                                class="text-blue-300 font-mono">PlaceId</code>, and local disconnect markers. The
+                            overlay does <strong class="text-zinc-200">not</strong> read, store, or upload chat logs,
+                            Roblox usernames, account IDs, or raw Roblox log contents. The matched Job ID stays on your
+                            device to sync with public server data and, if enabled by you, update your local Discord
+                            Rich Presence.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Support Tickets, Contact Messages &amp; Discord
+                            OAuth2</h3>
+                        <p class="text-zinc-400">
+                            When you submit a support ticket, bug report, feature suggestion, or private contact message,
+                            the server stores your submission details (title, description, category, and any replies)
+                            along with an optional contact handle. If you choose to sign in with Discord OAuth2, we
+                            receive and store your Discord user ID, username, and avatar to associate you with your
+                            tickets or authorized admin sessions. Public tickets and replies may be displayed on the
+                            website and synced to configured community Discord channels. We also process IP addresses
+                            and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse bans.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">Discord Bot</h3>
+                        <p class="text-zinc-400">
+                            When you interact with the RBWR Utility Discord Bot or invite it to a Discord server, it
+                            processes Discord identifiers (user IDs, server/guild IDs, channel IDs, and role IDs) as
+                            needed to run commands, enforce server-configured moderation/automod/autorole/welcome/FAQ
+                            settings, dispatch notification DMs, and sync ticket or operational alert threads.
                         </p>
                     </div>
 
                     <div>
                         <h3 class="font-semibold text-zinc-200 mb-1">Desktop Application Error Reports</h3>
                         <p class="text-zinc-400">
-                            If the desktop overlay application encounters an unhandled crash and you explicitly choose
-                            to click <strong class="text-white">"Send Report"</strong>, an anonymous error payload
-                            containing the application version, python runtime exception traceback, and sanitized log
-                            output is submitted. Reports contain no personal files or private system data and are used
-                            exclusively to fix software bugs.
+                            If the .NET 8 / Avalonia desktop overlay application encounters an unhandled crash and you
+                            explicitly choose to click <strong class="text-white">"Send Report"</strong>, an anonymous
+                            error payload containing the application version, .NET runtime exception traceback, and
+                            sanitized local log output is submitted. Reports contain no personal files or private system
+                            data and are used exclusively to diagnose and fix software bugs.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-zinc-200 mb-1">REST API Rate Limiting</h3>
+                        <p class="text-zinc-400">
+                            The public REST API (<code class="text-blue-300 font-mono">/api/*</code>) temporarily tracks
+                            request timestamps per client IP address in memory to enforce burst and per-minute rate
+                            limits. These in-memory counters expire automatically and are not used for profiling.
                         </p>
                     </div>
 
@@ -118,39 +160,51 @@
 
             <div>
                 <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
-                    2. Cookies & Third-Party Analytics
+                    2. Cookies, Turnstile Verification &amp; Third-Party Services
+                </h2>
+                <div class="space-y-3 text-zinc-400">
+                    <p>
+                        I do not use advertising networks, third-party tracking cookies, or web analytics tools (such as
+                        Google Analytics). The website uses only <strong class="text-zinc-200">essential session
+                            cookies</strong> when you sign in via Discord OAuth2 or access the admin portal.
+                    </p>
+                    <p>
+                        Unauthenticated <code class="text-blue-300 font-mono">POST</code> actions (such as submitting
+                        tickets, sending contact messages, or downloading server archives) are protected by <strong
+                            class="text-zinc-200">Cloudflare Turnstile</strong> to prevent automated spam. Turnstile
+                        evaluates verification signals in your browser under Cloudflare's Privacy Policy.
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
+                    3. Data Security &amp; Disclosure
                 </h2>
                 <p class="text-zinc-400">
-                    I do not use tracking cookies, advertising networks, or third-party web analytics tools (such as
-                    Google Analytics). The site and tools are designed purely as functional utilities without user
-                    tracking.
+                    Submitted tickets, contact messages, bot configurations, and crash reports are stored in internal
+                    data files on the server. I do not sell, trade, or rent any user data to third parties.
                 </p>
             </div>
 
             <div>
                 <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
-                    3. Data Security & Disclosure
-                </h2>
-                <p class="text-zinc-400">
-                    Submitted suggestions and crash reports are stored in secure internal data files on the server. I do
-                    not sell, trade, or share any user data with third parties.
-                </p>
-            </div>
-
-            <div>
-                <h2 class="text-base font-bold text-white border-b border-white/5 pb-2 mb-3">
-                    4. Data Deletion & Private Contact
+                    4. Data Deletion &amp; Private Contact
                 </h2>
                 <p class="text-zinc-400 mb-4">
-                    If you have submitted a suggestion or report and would like it removed, or if you have questions
-                    regarding privacy, you can send a confidential message directly through the <a href="/contact"
-                        class="text-blue-400 hover:underline">Private Contact Form</a>.
+                    If you have submitted a ticket, contact message, or crash report and would like it removed, or if you
+                    have questions regarding privacy, you can send a confidential message directly through the <a
+                        href="/contact" class="text-blue-400 hover:underline">Private Contact Form</a>.
                 </p>
 
                 <div class="flex flex-wrap gap-3 pt-2">
                     <a href="/contact"
                         class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold font-display transition-all whitespace-nowrap">
                         Private Contact Form
+                    </a>
+                    <a href="/terms"
+                        class="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-semibold font-display transition-all whitespace-nowrap">
+                        Terms of Service
                     </a>
                 </div>
             </div>
