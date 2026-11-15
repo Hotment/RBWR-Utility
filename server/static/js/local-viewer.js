@@ -82,6 +82,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const inputMissionSearch = document.getElementById("inputMissionSearch");
     const localMissionsList = document.getElementById("localMissionsList");
 
+    const localValMissionStreak = document.getElementById("localValMissionStreak");
+    const localSubMissionStreak = document.getElementById("localSubMissionStreak");
+    const localValTotalMissions = document.getElementById("localValTotalMissions");
+    const localSubTotalMissions = document.getElementById("localSubTotalMissions");
+    const localValActiveDays = document.getElementById("localValActiveDays");
+    const localSubActiveDays = document.getElementById("localSubActiveDays");
+    const localValUniqueServers = document.getElementById("localValUniqueServers");
+    const localSubUniqueServers = document.getElementById("localSubUniqueServers");
+
+    const mStatCurrentStreak = document.getElementById("mStatCurrentStreak");
+    const mStatCurrentStreakSub = document.getElementById("mStatCurrentStreakSub");
+    const mStatBestStreak = document.getElementById("mStatBestStreak");
+    const mStatBestStreakSub = document.getElementById("mStatBestStreakSub");
+    const mStatQualifyingDays = document.getElementById("mStatQualifyingDays");
+    const mStatQualifyingDaysSub = document.getElementById("mStatQualifyingDaysSub");
+    const mStatBestDay = document.getElementById("mStatBestDay");
+    const mStatBestDaySub = document.getElementById("mStatBestDaySub");
+    const localMissionDailySection = document.getElementById("localMissionDailySection");
+    const localMissionDailyList = document.getElementById("localMissionDailyList");
+    const mDailySummaryNote = document.getElementById("mDailySummaryNote");
+
     const localDatapointModal = document.getElementById("localDatapointModal");
     const btnCloseLocalDatapointModal = document.getElementById("btnCloseLocalDatapointModal");
     const btnCloseLocalDatapointModalBtn = document.getElementById("btnCloseLocalDatapointModalBtn");
@@ -390,6 +411,275 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentTotalMissionPoints = 0;
     let currentMissionsFilter = "all";
     let currentMissionsSearch = "";
+
+    const SAR_DAY_RESET_UTC_HOUR = 8;
+
+    function addDaysToDateKey(dateKey, deltaDays) {
+        const parts = dateKey.split("-").map(Number);
+        const utcMs = Date.UTC(parts[0], parts[1] - 1, parts[2] + deltaDays);
+        const d = new Date(utcMs);
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    }
+
+    function getUtcSarDayKey(dateOrIso) {
+        const dt = dateOrIso instanceof Date ? dateOrIso : new Date(dateOrIso);
+        if (Number.isNaN(dt.getTime())) return null;
+        const shifted = new Date(dt.getTime() - SAR_DAY_RESET_UTC_HOUR * 3600 * 1000);
+        return shifted.toISOString().slice(0, 10);
+    }
+
+    function computeMissionAndActivityInsights(pointLogs) {
+        const dailyMap = new Map();
+        const uniqueServers = new Set();
+        let totalCompleted = 0;
+        let totalAutoClaimed = 0;
+        let totalMissionPts = 0;
+        let totalPoints = 0;
+        let peakEventAmt = 0;
+        let peakEventDay = null;
+
+        (pointLogs || []).forEach(log => {
+            if (!log || !log.createdAt) return;
+            const dayKey = getUtcSarDayKey(log.createdAt);
+            if (!dayKey) return;
+
+            if (!dailyMap.has(dayKey)) {
+                dailyMap.set(dayKey, {
+                    dateKey: dayKey,
+                    points: 0,
+                    events: 0,
+                    missionsCompleted: 0,
+                    missionsAutoClaimed: 0,
+                    totalMissions: 0,
+                    missionPoints: 0
+                });
+            }
+            const day = dailyMap.get(dayKey);
+            const changeAmt = parseInt(log.changeAmount || 0, 10);
+            day.points += changeAmt;
+            day.events += 1;
+            totalPoints += changeAmt;
+
+            if (changeAmt > peakEventAmt) {
+                peakEventAmt = changeAmt;
+                peakEventDay = dayKey;
+            }
+            if (log.serverId && String(log.serverId).trim()) {
+                uniqueServers.add(String(log.serverId).trim());
+            }
+
+            let breakdownDict = {};
+            if (log.breakdown) {
+                if (typeof log.breakdown === "string") {
+                    try { breakdownDict = JSON.parse(log.breakdown); } catch (e) { breakdownDict = {}; }
+                } else if (typeof log.breakdown === "object") {
+                    breakdownDict = log.breakdown;
+                }
+            }
+
+            Object.entries(breakdownDict).forEach(([cat, amt]) => {
+                const num = Number(amt);
+                if (!Number.isFinite(num) || num <= 0) return;
+                const trimmed = String(cat || "").trim();
+                if (/^mission\s*completed(?:\s*:|\s+)/i.test(trimmed)) {
+                    day.missionsCompleted += 1;
+                    day.totalMissions += 1;
+                    day.missionPoints += num;
+                    totalCompleted += 1;
+                    totalMissionPts += num;
+                } else if (/^mission\s*auto[- ]?claimed(?:\s*:|\s+)/i.test(trimmed)) {
+                    day.missionsAutoClaimed += 1;
+                    day.totalMissions += 1;
+                    day.missionPoints += num;
+                    totalAutoClaimed += 1;
+                    totalMissionPts += num;
+                }
+            });
+        });
+
+        const allDaysSorted = Array.from(dailyMap.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+        const qualifyingDaysList = allDaysSorted.filter(d => d.totalMissions >= 3);
+        const qualifyingSet = new Set(qualifyingDaysList.map(d => d.dateKey));
+
+        let bestStreak = 0;
+        let bestStart = null;
+        let bestEnd = null;
+        let runLen = 0;
+        let runStart = null;
+        let prevKey = null;
+
+        qualifyingDaysList.forEach(d => {
+            if (prevKey && addDaysToDateKey(prevKey, 1) === d.dateKey) {
+                runLen += 1;
+            } else {
+                runLen = 1;
+                runStart = d.dateKey;
+            }
+            if (runLen > bestStreak) {
+                bestStreak = runLen;
+                bestStart = runStart;
+                bestEnd = d.dateKey;
+            }
+            prevKey = d.dateKey;
+        });
+
+        const todayKey = getUtcSarDayKey(new Date());
+        const yesterdayKey = addDaysToDateKey(todayKey, -1);
+        const todayMissions = dailyMap.has(todayKey) ? dailyMap.get(todayKey).totalMissions : 0;
+
+        let currentStreak = 0;
+        let anchorKey = null;
+        if (qualifyingSet.has(todayKey)) {
+            anchorKey = todayKey;
+        } else if (qualifyingSet.has(yesterdayKey)) {
+            anchorKey = yesterdayKey;
+        }
+        if (anchorKey) {
+            let cursor = anchorKey;
+            while (qualifyingSet.has(cursor)) {
+                currentStreak += 1;
+                cursor = addDaysToDateKey(cursor, -1);
+            }
+        }
+
+        let bestMissionsDay = null;
+        let bestPointsDay = null;
+        let missionActiveDays = 0;
+        allDaysSorted.forEach(d => {
+            if (d.totalMissions > 0) missionActiveDays += 1;
+            if (!bestMissionsDay || d.totalMissions > bestMissionsDay.totalMissions) {
+                bestMissionsDay = d;
+            }
+            if (!bestPointsDay || d.points > bestPointsDay.points) {
+                bestPointsDay = d;
+            }
+        });
+
+        return {
+            totalActiveDays: allDaysSorted.length,
+            missionActiveDays,
+            qualifyingDays: qualifyingDaysList.length,
+            currentStreak,
+            bestStreak,
+            bestStart,
+            bestEnd,
+            todayKey,
+            todayMissions,
+            todayQualified: qualifyingSet.has(todayKey),
+            totalCompleted,
+            totalAutoClaimed,
+            totalMissions: totalCompleted + totalAutoClaimed,
+            totalMissionPts,
+            totalPoints,
+            avgPointsPerDay: allDaysSorted.length > 0 ? Math.round(totalPoints / allDaysSorted.length) : 0,
+            uniqueServersCount: uniqueServers.size,
+            peakEventAmt,
+            peakEventDay,
+            bestMissionsDay,
+            bestPointsDay,
+            daysDesc: allDaysSorted.slice().reverse()
+        };
+    }
+
+    function renderActivityAndMissionInsights(ins) {
+        if (!ins) return;
+        const fmtDays = (n) => `${n} day${n !== 1 ? "s" : ""}`;
+
+        if (localValMissionStreak) localValMissionStreak.textContent = fmtDays(ins.currentStreak);
+        if (localSubMissionStreak) {
+            localSubMissionStreak.textContent = `Best: ${fmtDays(ins.bestStreak)} · Today: ${ins.todayMissions}/3`;
+        }
+
+        if (localValTotalMissions) localValTotalMissions.textContent = ins.totalMissions.toLocaleString();
+        if (localSubTotalMissions) {
+            localSubTotalMissions.textContent = `${ins.totalCompleted.toLocaleString()} completed · ${ins.totalAutoClaimed.toLocaleString()} auto-claimed`;
+        }
+
+        if (localValActiveDays) localValActiveDays.textContent = fmtDays(ins.totalActiveDays);
+        if (localSubActiveDays) {
+            const bestDayStr = ins.bestPointsDay ? ` · Best: +${ins.bestPointsDay.points.toLocaleString()}` : "";
+            localSubActiveDays.textContent = `avg +${ins.avgPointsPerDay.toLocaleString()} pts/day${bestDayStr}`;
+        }
+
+        if (localValUniqueServers) {
+            localValUniqueServers.textContent = `${ins.uniqueServersCount} server${ins.uniqueServersCount !== 1 ? "s" : ""}`;
+        }
+        if (localSubUniqueServers) {
+            localSubUniqueServers.textContent = ins.peakEventAmt > 0
+                ? `Peak update: +${ins.peakEventAmt.toLocaleString()} pts (${ins.peakEventDay})`
+                : "No server updates";
+        }
+
+        if (mStatCurrentStreak) mStatCurrentStreak.textContent = fmtDays(ins.currentStreak);
+        if (mStatCurrentStreakSub) {
+            if (ins.todayQualified) {
+                mStatCurrentStreakSub.textContent = `Today secured (${ins.todayMissions}/3 before 08:00 UTC)`;
+            } else if (ins.currentStreak > 0) {
+                const need = Math.max(0, 3 - ins.todayMissions);
+                mStatCurrentStreakSub.textContent = `Need ${need} more before 08:00 UTC (${ins.todayMissions}/3)`;
+            } else {
+                mStatCurrentStreakSub.textContent = `Today: ${ins.todayMissions}/3 · Resets 08:00 UTC`;
+            }
+        }
+
+        if (mStatBestStreak) mStatBestStreak.textContent = fmtDays(ins.bestStreak);
+        if (mStatBestStreakSub) {
+            mStatBestStreakSub.textContent = ins.bestStreak > 0
+                ? `${ins.bestStart} to ${ins.bestEnd}`
+                : "No 3+ mission streak yet";
+        }
+
+        if (mStatQualifyingDays) mStatQualifyingDays.textContent = fmtDays(ins.qualifyingDays);
+        if (mStatQualifyingDaysSub) {
+            mStatQualifyingDaysSub.textContent = `${ins.missionActiveDays} active mission day${ins.missionActiveDays !== 1 ? "s" : ""}`;
+        }
+
+        if (mStatBestDay) {
+            const bestCount = ins.bestMissionsDay ? ins.bestMissionsDay.totalMissions : 0;
+            mStatBestDay.textContent = `${bestCount} mission${bestCount !== 1 ? "s" : ""}`;
+        }
+        if (mStatBestDaySub) {
+            mStatBestDaySub.textContent = ins.bestMissionsDay && ins.bestMissionsDay.totalMissions > 0
+                ? `${ins.bestMissionsDay.dateKey} (+${ins.bestMissionsDay.missionPoints.toLocaleString()} pts)`
+                : "No missions recorded";
+        }
+
+        if (localMissionDailySection && localMissionDailyList) {
+            const missionDays = ins.daysDesc.filter(d => d.totalMissions > 0);
+            if (missionDays.length === 0) {
+                localMissionDailySection.style.display = "none";
+                localMissionDailyList.innerHTML = "";
+            } else {
+                localMissionDailySection.style.display = "block";
+                if (mDailySummaryNote) {
+                    mDailySummaryNote.textContent = `${ins.qualifyingDays} of ${missionDays.length} mission days reached 3+`;
+                }
+                localMissionDailyList.innerHTML = missionDays.map(d => {
+                    const hit = d.totalMissions >= 3;
+                    const border = hit ? "rgba(16, 185, 129, 0.35)" : "rgba(255, 255, 255, 0.08)";
+                    const bg = hit ? "rgba(16, 185, 129, 0.08)" : "rgba(255, 255, 255, 0.03)";
+                    const badge = hit
+                        ? `<span style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid rgba(16,185,129,0.35);">3+ STREAK</span>`
+                        : `<span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #9ca3af;">${d.totalMissions}/3</span>`;
+                    return `
+                        <div style="padding: 8px 10px; border-radius: 10px; border: 1px solid ${border}; background: ${bg}; display: flex; flex-direction: column; gap: 4px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                                <span style="font-family: var(--font-mono); font-size: 0.76rem; color: #f4f4f5; font-weight: 600;">${d.dateKey}</span>
+                                ${badge}
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #a1a1aa;">
+                                <span>${d.totalMissions} mission${d.totalMissions !== 1 ? "s" : ""}</span>
+                                <span style="color: #60a5fa; font-family: var(--font-mono);">+${d.missionPoints.toLocaleString()} pts</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            }
+        }
+    }
 
     function renderMissionsTab(missionsList, totalMissionPoints) {
         currentMissionsData = missionsList || [];
@@ -862,6 +1152,9 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             renderMissionsTab([], 0);
         }
+
+        const insights = computeMissionAndActivityInsights(pointLogs);
+        renderActivityAndMissionInsights(insights);
 
         if (localDropzoneSection) localDropzoneSection.style.display = "none";
         if (localDashboardContent) localDashboardContent.style.display = "flex";

@@ -222,6 +222,29 @@
             </div>
         </section>
 
+        <section class="mission-stats-grid" id="localActivityInsightsGrid">
+            <div class="m-stat-box">
+                <span class="m-stat-label">3+ Mission Streak (08:00 UTC)</span>
+                <span class="m-stat-val text-emerald-400" id="localValMissionStreak">0 days</span>
+                <span class="m-stat-sub" id="localSubMissionStreak">Best: 0 days · Today: 0/3</span>
+            </div>
+            <div class="m-stat-box">
+                <span class="m-stat-label">Total Missions</span>
+                <span class="m-stat-val text-blue-400" id="localValTotalMissions">0</span>
+                <span class="m-stat-sub" id="localSubTotalMissions">0 completed · 0 auto-claimed</span>
+            </div>
+            <div class="m-stat-box">
+                <span class="m-stat-label">Active Days &amp; Daily Avg</span>
+                <span class="m-stat-val text-white" id="localValActiveDays">0 days</span>
+                <span class="m-stat-sub" id="localSubActiveDays">avg +0 pts/day</span>
+            </div>
+            <div class="m-stat-box">
+                <span class="m-stat-label">Servers &amp; Peak Update</span>
+                <span class="m-stat-val text-cyan-300" id="localValUniqueServers">0 servers</span>
+                <span class="m-stat-sub" id="localSubUniqueServers">Peak update: +0 pts</span>
+            </div>
+        </section>
+
         <section class="chart-section">
             <div class="chart-card">
                 <div class="chart-top-bar">
@@ -431,6 +454,37 @@
                             <span class="m-stat-val text-amber-300" id="mStatAutoClaimPct">0%</span>
                             <span class="m-stat-sub">of all mission points</span>
                         </div>
+                    </div>
+
+                    <div class="mission-stats-grid" style="margin-top: 12px;">
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Current 3+ Streak</span>
+                            <span class="m-stat-val text-emerald-400" id="mStatCurrentStreak">0 days</span>
+                            <span class="m-stat-sub" id="mStatCurrentStreakSub">Day resets 08:00 UTC</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Longest 3+ Streak</span>
+                            <span class="m-stat-val text-cyan-300" id="mStatBestStreak">0 days</span>
+                            <span class="m-stat-sub" id="mStatBestStreakSub">No qualifying run yet</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Days With 3+ Missions</span>
+                            <span class="m-stat-val text-white" id="mStatQualifyingDays">0 days</span>
+                            <span class="m-stat-sub" id="mStatQualifyingDaysSub">0 active mission days</span>
+                        </div>
+                        <div class="m-stat-box">
+                            <span class="m-stat-label">Best Single Day</span>
+                            <span class="m-stat-val text-blue-400" id="mStatBestDay">0 missions</span>
+                            <span class="m-stat-sub" id="mStatBestDaySub">--</span>
+                        </div>
+                    </div>
+
+                    <div id="localMissionDailySection" style="margin-top: 14px; display: none;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 0.78rem; font-weight: 600; color: #e4e4e7;">Daily Mission Log (Day ends 08:00 UTC)</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);" id="mDailySummaryNote">Showing days with missions</span>
+                        </div>
+                        <div id="localMissionDailyList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px;"></div>
                     </div>
 
                     <div class="missions-toolbar">
@@ -699,5 +753,5 @@
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="{{ url_for('static', filename='js/chart.js') }}?v=8"></script>
-<script src="{{ url_for('static', filename='js/local-viewer.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/local-viewer.js') }}?v=9"></script>
 {% endblock %}
