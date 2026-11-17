@@ -454,8 +454,11 @@ def get_server_visibility(job_id: str, snapshots: Any = None, latest_state: Any 
     if job_id in _sc_public_server_ids:
         return False
     meta = _sc_server_meta.get(job_id)
-    if meta is not None and "is_private" in meta:
-        return bool(meta["is_private"])
+    if meta is not None:
+        if (meta.get("last_player_count") or 0) > 0 and meta.get("privateServerOwnerId") in (None, "", "private"):
+            return False
+        if "is_private" in meta:
+            return bool(meta["is_private"])
     if latest_state and "IsPrivate" in latest_state:
         return bool(latest_state["IsPrivate"])
     if snapshots:
@@ -841,9 +844,9 @@ def build_server_metadata(
         is_priv = True
     elif _sc_public_server_ids and job_id in _sc_public_server_ids:
         is_priv = False
+    elif (existing.get("last_player_count") or 0) > 0 or existing.get("server_type") == "Public Server" or existing.get("is_private") is False:
+        is_priv = False
     elif existing.get("is_private") is True:
-        is_priv = True
-    elif _sc_public_server_ids and job_id not in _sc_public_server_ids:
         is_priv = True
     else:
         found_in_snaps = False
@@ -853,8 +856,8 @@ def build_server_metadata(
                 is_priv = bool(st["IsPrivate"])
                 found_in_snaps = True
                 break
-        if not found_in_snaps:
-            is_priv = bool(existing.get("is_private"))
+        if not found_in_snaps and _sc_public_server_ids:
+            is_priv = job_id not in _sc_public_server_ids
 
     if is_priv:
         is_private_val = True
@@ -1550,7 +1553,7 @@ def prune_and_archive_servers_data(current_data: dict, persistent_ids: set) -> b
     return servers_dirty
 
 def update_public_roblox_servers() -> bool:
-    base_url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100"
+    base_url = "https://games.roblox.com/v1/games/11765852158/servers/Public?limit=100&excludeFullGames=false"
     cursor = ""
     public_ids: list[str] = []
     public_info: dict[str, dict] = {}
@@ -1687,11 +1690,19 @@ def pull_server_checker_data() -> bool:
                         _sc_server_meta[job_id]["id"] = server.get("id")
                     meta_dirty = True
             elif _sc_public_server_ids:
-                is_priv = job_id not in _sc_public_server_ids
+                existing_meta = _sc_server_meta.get(job_id, {})
+                was_public = (
+                    existing_meta.get("server_type") == "Public Server"
+                    or existing_meta.get("is_private") is False
+                    or (existing_meta.get("last_player_count") or 0) > 0
+                    or (existing_meta.get("is_private") is None and (existing_meta.get("snapshot_count") or 0) > 0)
+                )
+                is_priv = False if (job_id in _sc_public_server_ids or was_public) else True
                 state["IsPrivate"] = is_priv
-                state["privateServerOwnerId"] = (_sc_server_meta.get(job_id, {}).get("privateServerOwnerId") or "private") if is_priv else None
-                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != (is_priv if is_priv else None):
-                    _sc_server_meta.setdefault(job_id, {})["is_private"] = is_priv if is_priv else None
+                state["privateServerOwnerId"] = (existing_meta.get("privateServerOwnerId") or "private") if is_priv else None
+                target_meta_priv = True if is_priv else None
+                if job_id not in _sc_server_meta or _sc_server_meta[job_id].get("is_private") != target_meta_priv:
+                    _sc_server_meta.setdefault(job_id, {})["is_private"] = target_meta_priv
                     if not is_priv:
                         _sc_server_meta[job_id]["privateServerOwnerId"] = None
                     if server.get("id"):
