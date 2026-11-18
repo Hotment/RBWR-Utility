@@ -8,7 +8,7 @@ public sealed record FetchResult(bool Ok, string? Error, List<TabletServer> Serv
 
 public sealed class TabletApiClient : IDisposable
 {
-    private const string Url = "https://rbwr.hotment.dev/api/public-servers";
+    private const string Url = "https://rbwr.hotment.dev/api/public/servers";
     private readonly HttpClient _http;
 
     public TabletApiClient()
