@@ -28,7 +28,11 @@ if _BASE_DIR not in sys.path:
 
 try:
     from server.scoring import calculate_server_top_score
-    from server.calculator import calculate_reactor_metrics
+    from server.calculator import (
+        calculate_reactor_metrics,
+        estimate_next_recirc_for_unit,
+        extract_unit_recirc_history,
+    )
     from server.fuel import (
         approximate_fuel_from_snapshots,
         calculate_u1_fuel_level,
@@ -38,7 +42,11 @@ try:
     )
 except ImportError:
     from scoring import calculate_server_top_score
-    from calculator import calculate_reactor_metrics
+    from calculator import (
+        calculate_reactor_metrics,
+        estimate_next_recirc_for_unit,
+        extract_unit_recirc_history,
+    )
     from fuel import (
         approximate_fuel_from_snapshots,
         calculate_u1_fuel_level,
@@ -1643,13 +1651,21 @@ def pull_server_checker_data() -> bool:
         _sc_latest_data = resp_json
         for s in _sc_latest_data.get("data", {}).get("servers", []):
             st = s.get("state")
+            jid_s = s.get("jobId")
+            snaps_s = current_data.get(jid_s) if jid_s else None
             if isinstance(st, dict):
                 if isinstance(st.get("Unit2"), dict):
                     ensure_unit_output_mw(st["Unit2"])
                     ensure_unit_fuel_level("Unit2", st["Unit2"])
+                    est_u2 = estimate_next_recirc_for_unit(st["Unit2"], 2, snapshots=snaps_s)
+                    if est_u2 is not None:
+                        st["Unit2"]["estimated_next_recirc"] = est_u2
                 if isinstance(st.get("Unit1"), dict):
                     ensure_unit_output_mw(st["Unit1"])
                     ensure_unit_fuel_level("Unit1", st["Unit1"])
+                    est_u1 = estimate_next_recirc_for_unit(st["Unit1"], 1, snapshots=snaps_s)
+                    if est_u1 is not None:
+                        st["Unit1"]["estimated_next_recirc"] = est_u1
         save_sc_data(_sc_latest_data, LATEST_SERVERS_CACHE_FILE)
 
         persistent_data = load_persistent_servers()

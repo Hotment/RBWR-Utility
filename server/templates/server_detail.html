@@ -1529,6 +1529,7 @@
         const payload = {
             unit: sdSelectedUnit,
             recirc_override: sdRecircOverride,
+            job_id: typeof sdJobId !== 'undefined' ? sdJobId : null,
             ...params
         };
 

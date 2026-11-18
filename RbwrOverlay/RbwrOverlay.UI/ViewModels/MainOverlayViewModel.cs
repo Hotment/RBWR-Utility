@@ -25,7 +25,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.2.1";
+    public const string AppVersion = "2.3.0";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -603,7 +603,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 double genLoad = _calc.CalcGenLoad(thermal);
 
                 var uCalc = _calc.SelectedUnit == 1 ? _calc.UsageCalc1 : _calc.UsageCalc2;
-                _calc.Usage = uCalc.CalculateUsage(flow, thermal, _calc.RecircOverride);
+                _calc.Usage = uCalc.CalculateUsage(flow, thermal, _calc.RecircOverride ?? _calc.EstimatedNextRecirc, _calc.LiveAprm, _calc.LiveRecirc);
 
                 double demand = Math.Max(0.0, Math.Round(genLoad - _calc.Usage));
                 DemandInput = ((int)Math.Round(demand)).ToString(CultureInfo.InvariantCulture);
@@ -767,6 +767,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         if (_activeServer != null)
         {
             var uState = unit == 1 ? _activeServer.Unit1 : _activeServer.Unit2;
+            ApplyServerRecircContext(uState, _nextDemandSwitched);
             if (uState != null)
             {
                 double? targetDem = _nextDemandSwitched ? uState.NextDemand : uState.Demand;
@@ -1088,6 +1089,20 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void ApplyServerRecircContext(UnitState? uState, bool useNextEstimate)
+    {
+        if (uState == null)
+        {
+            _calc.LiveAprm = null;
+            _calc.LiveRecirc = null;
+            _calc.EstimatedNextRecirc = null;
+            return;
+        }
+        _calc.LiveAprm = uState.CurrentAprm;
+        _calc.LiveRecirc = uState.CurrentRecirc;
+        _calc.EstimatedNextRecirc = useNextEstimate ? uState.EstimatedNextRecirc : null;
+    }
+
     internal void OnServerConnected(ServerInfo server, string? syncStatus = null)
     {
         _activeServer = server;
@@ -1098,6 +1113,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         UpdateSyncVisuals();
 
         var uState = _calc.SelectedUnit == 1 ? server.Unit1 : server.Unit2;
+        ApplyServerRecircContext(uState, _nextDemandSwitched);
         _initialDtl = uState?.DemandTimeLeft ?? 0.0;
         double? curDem = uState?.Demand;
         double? nextDem = uState?.NextDemand;

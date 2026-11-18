@@ -280,94 +280,47 @@
 
 {% block scripts %}
 <script>
-    const APRMtoRecircTable = {
-        0: 0, 10: 28, 20: 28, 30: 28, 40: 38, 50: 50,
-        60: 70, 70: 85, 80: 94, 90: 97, 100: 100, 110: 100
+    const calc = {
+        usage: 61.32,
+        selected_unit: 1,
+        recirc_override: null
     };
+    let calcRequestSeq = 0;
+    let calcAbortController = null;
 
-    function getRecircPumpSpeed(aprm) {
-        const keys = Object.keys(APRMtoRecircTable).map(Number).sort((a, b) => a - b);
-        for (let k of keys) {
-            if (k >= aprm) return APRMtoRecircTable[k];
+    async function fetchCalculatorApi(params) {
+        const seq = ++calcRequestSeq;
+        if (calcAbortController) {
+            calcAbortController.abort();
         }
-        return APRMtoRecircTable[keys[keys.length - 1]];
+        calcAbortController = new AbortController();
+
+        const payload = {
+            unit: calc.selected_unit,
+            recirc_override: calc.recirc_override,
+            job_id: (typeof activeCalcServer !== 'undefined' && activeCalcServer && activeCalcServer.jobId) ? activeCalcServer.jobId : null,
+            ...params
+        };
+
+        try {
+            const res = await fetch('/api/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: calcAbortController.signal
+            });
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (seq === calcRequestSeq && json.success && json.data) {
+                return json.data;
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('Calculation error:', e);
+            }
+        }
+        return null;
     }
-
-    class UsageCalculator {
-        constructor(unit) {
-            this.unit = unit;
-            if (unit === 1) {
-                this.feedwater_usage = 0.014;
-                this.condenser_usage = 0.007;
-                this.condenser_circ_usage = 6.5;
-                this.recirculation_usage = 0.028;
-            } else {
-                this.feedwater_usage = 0.013;
-                this.condenser_usage = 3.1850;
-                this.condenser_circ_usage = 6.5;
-                this.recirculation_usage = 0.01;
-                this.tower_makeup_usage = 0.5;
-            }
-        }
-
-        calculateUsage(feedwater_flow, aprm, override_speed = null) {
-            let feedwater_usage = this.feedwater_usage * feedwater_flow;
-            let condenser_usage = this.unit === 2 ? this.condenser_usage : this.condenser_usage * feedwater_flow;
-            let speed = override_speed !== null ? override_speed : getRecircPumpSpeed(aprm);
-            let recirculation_usage = this.recirculation_usage * speed * 10;
-            return feedwater_usage + condenser_usage + this.condenser_circ_usage * 2 + recirculation_usage;
-        }
-    }
-
-    class Calculator {
-        constructor() {
-            this.usage = 61.32;
-            this.selected_unit = 1;
-            this.usage_calc1 = new UsageCalculator(1);
-            this.usage_calc2 = new UsageCalculator(2);
-            this.recirc_override = null;
-        }
-
-        calcFlow(thermal) {
-            if (this.selected_unit === 1) {
-                return Math.max(0.0, 82.8 + (13.7 * thermal) + (5.87 * 10 ** -3 * (thermal ** 2))) + 2;
-            } else {
-                return Math.max(0.0, 160.0 + (11.6 * thermal) + (0.0249 * (thermal ** 2))) + 2;
-            }
-        }
-
-        calcGenLoad(thermal) {
-            if (this.selected_unit === 1) {
-                return Math.max(0.0, -135 + (13 * thermal) + (5.33 * 10 ** -3 * (thermal ** 2)));
-            } else {
-                return Math.max(0.0, -82.3 + (10.9 * thermal) + (0.0238 * (thermal ** 2)));
-            }
-        }
-
-        calcThermal(demand) {
-            let current_usage = this.usage;
-            let thermal = 0.0;
-            for (let i = 0; i < 5; i++) {
-                if (this.selected_unit === 1) {
-                    let inner = 169 + 0.02132 * (demand + 135 + current_usage);
-                    if (inner < 0) thermal = 0.0;
-                    else thermal = Math.max(0.0, (-13 + Math.sqrt(inner)) / 0.01066);
-                } else {
-                    let inner = 118.81 + 0.0952 * (82.3 + demand + current_usage);
-                    if (inner < 0) thermal = 0.0;
-                    else thermal = Math.max(0.0, (-10.9 + Math.sqrt(inner)) / 0.0476);
-                }
-                let flow = this.calcFlow(thermal);
-                let u_calc = this.selected_unit === 1 ? this.usage_calc1 : this.usage_calc2;
-                current_usage = u_calc.calculateUsage(flow, thermal, this.recirc_override);
-            }
-            this.usage = current_usage;
-            return thermal;
-        }
-    }
-
-    const calc = new Calculator();
-    let isUpdating = false;
 
     function selectUnit(unit) {
         calc.selected_unit = unit;
@@ -470,62 +423,42 @@
         onInputDemand();
     }
 
-    function onInputDemand() {
-        if (isUpdating) return;
-        isUpdating = true;
+    async function onInputDemand() {
+        const demandInput = document.getElementById('web-demand');
+        const rtpInput = document.getElementById('web-rtp');
 
-        try {
-            const demandInput = document.getElementById('web-demand');
-            const rtpInput = document.getElementById('web-rtp');
+        let demandVal = parseFloat(demandInput.value);
+        if (isNaN(demandVal) || demandVal < 0) demandVal = 0.0;
 
-            let demandVal = parseFloat(demandInput.value);
-            if (isNaN(demandVal) || demandVal < 0) demandVal = 0.0;
+        const data = await fetchCalculatorApi({ demand: demandVal });
+        if (!data) return;
 
-            const thermal = calc.calcThermal(demandVal);
-            const flow = calc.calcFlow(thermal);
-            const genLoad = calc.calcGenLoad(thermal);
-
-            rtpInput.value = thermal.toFixed(3);
-            renderWebOutputs(thermal, flow, genLoad);
-        } finally {
-            isUpdating = false;
-        }
+        calc.usage = data.station_usage_mwe;
+        rtpInput.value = data.thermal_percent.toFixed(3);
+        renderWebOutputs(data.thermal_percent, data.flow_kg_s, data.gen_load_mwe, data.scram_limit_percent);
     }
 
-    function onInputRTP() {
-        if (isUpdating) return;
-        isUpdating = true;
+    async function onInputRTP() {
+        const demandInput = document.getElementById('web-demand');
+        const rtpInput = document.getElementById('web-rtp');
 
-        try {
-            const demandInput = document.getElementById('web-demand');
-            const rtpInput = document.getElementById('web-rtp');
-
-            let thermalVal = parseFloat(rtpInput.value);
-            if (isNaN(thermalVal) || thermalVal < 0) {
-                thermalVal = 0.0;
-            } else if (thermalVal > 250) {
-                thermalVal = 250.0;
-                rtpInput.value = "250";
-            }
-
-            const flow = calc.calcFlow(thermalVal);
-            const genLoad = calc.calcGenLoad(thermalVal);
-            const uCalc = calc.selected_unit === 1 ? calc.usage_calc1 : calc.usage_calc2;
-
-            calc.usage = uCalc.calculateUsage(flow, thermalVal, calc.recirc_override);
-
-            let demand = genLoad - calc.usage;
-            if (demand < 0) demand = 0.0;
-
-            demandInput.value = demand.toFixed(2);
-            renderWebOutputs(thermalVal, flow, genLoad);
-        } finally {
-            isUpdating = false;
+        let thermalVal = parseFloat(rtpInput.value);
+        if (isNaN(thermalVal) || thermalVal < 0) {
+            thermalVal = 0.0;
+        } else if (thermalVal > 250) {
+            thermalVal = 250.0;
+            rtpInput.value = "250";
         }
+
+        const data = await fetchCalculatorApi({ thermal: thermalVal });
+        if (!data) return;
+
+        calc.usage = data.station_usage_mwe;
+        demandInput.value = data.net_output_mwe.toFixed(2);
+        renderWebOutputs(data.thermal_percent, data.flow_kg_s, data.gen_load_mwe, data.scram_limit_percent);
     }
 
-    function renderWebOutputs(thermal, flow, genLoad) {
-        const limit = 108;
+    function renderWebOutputs(thermal, flow, genLoad, limit = 108) {
 
         const displayRtp = document.getElementById('display-rtp');
         const displaySub = document.getElementById('display-status-sub');

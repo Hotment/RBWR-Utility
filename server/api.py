@@ -241,6 +241,9 @@ class CalculateRequest(BaseModel):
     demand: Optional[float] = Field(None, description="Target electrical demand (MW).")
     thermal: Optional[float] = Field(None, description="Reactor thermal power / APRM / RTP (%).")
     recirc_override: Optional[float] = Field(None, description="Optional recirculation flow override (%).")
+    job_id: Optional[str] = Field(None, description="Optional server Job ID to anchor recirculation estimate to server snapshots.")
+    current_aprm: Optional[float] = Field(None, description="Optional live APRM (%) to anchor recirculation estimate.")
+    current_recirc: Optional[float] = Field(None, description="Optional live recirculation pump speed (%) to anchor estimate.")
 
 class ReactorMetrics(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -255,6 +258,7 @@ class ReactorMetrics(BaseModel):
     station_usage_mwe: float
     net_output_mwe: float
     recirc_pump_speed: float
+    estimated_next_recirc: float
     is_recirc_overridden: bool
     scram_risk: bool
     scram_limit_percent: float
@@ -382,6 +386,8 @@ class UnitSnapshot(BaseModel):
     xenon: float
     iodine: float
     recirc: float
+    estimated_next_recirc: Optional[float] = None
+    next_demand: Optional[float] = None
     scram: bool
     turbine_trip: bool
     offsite_power: Optional[Any] = None
@@ -551,19 +557,32 @@ def _get_latest_snapshot_from_dict(snapshots: dict) -> tuple[Optional[str], dict
 def _extract_unit_snapshot(unit_dict: Any, unit_num: int, snapshots: Optional[dict] = None) -> dict[str, Any]:
     u = unit_dict if isinstance(unit_dict, dict) else {}
     demand_key = "DemandU1" if unit_num == 1 else "DemandU2"
+    next_demand_key = "NextDemandU1" if unit_num == 1 else "NextDemandU2"
     demand_val = core.safe_demand_numeric(u.get(demand_key) if u.get(demand_key) is not None else u.get("Demand"))
+    next_demand_val = core.safe_demand_numeric(
+        u.get(next_demand_key) if u.get(next_demand_key) is not None else u.get("Next Demand")
+    )
     aprm_val = core.safe_float(u.get("APRM"), 0.0)
     rtp_val = core.safe_float(u.get("RTP"), aprm_val)
     output_mw = round(core.get_unit_output_mw(u), 2)
     fuel_stats = core.get_card_unit_fuel_stats(snapshots, f"Unit{unit_num}", u) if snapshots else {
         "estimated_fuel": core.safe_demand_numeric(u.get("EstimatedFuel")),
     }
+    est_next_recirc = u.get("estimated_next_recirc")
+    if est_next_recirc is None:
+        est_next_recirc = core.estimate_next_recirc_for_unit(
+            u,
+            unit_num,
+            next_demand=next_demand_val if (next_demand_val is not None and next_demand_val >= 0) else None,
+            snapshots=snapshots,
+        )
     return {
         "unit": unit_num,
         "running": aprm_val > 5.0,
         "aprm": aprm_val,
         "rtp": rtp_val,
         "demand": demand_val,
+        "next_demand": next_demand_val,
         "demand_label": core.format_demand_value(demand_val),
         "demand_time_left": core.safe_float(u.get("Demand Time Left"), 0.0),
         "output_mw": output_mw,
@@ -575,6 +594,7 @@ def _extract_unit_snapshot(unit_dict: Any, unit_num: int, snapshots: Optional[di
         "xenon": core.safe_float(u.get("Xenon"), 0.0),
         "iodine": core.safe_float(u.get("Iodine"), 0.0),
         "recirc": core.safe_float(u.get(f"Recirc{unit_num}"), 0.0),
+        "estimated_next_recirc": est_next_recirc,
         "scram": bool(u.get("SCRAM") or u.get("Reactor Scram State")),
         "turbine_trip": bool(u.get("TurbineTrip") or u.get("Turbine Trip")),
         "offsite_power": u.get("Offsite Power"),
@@ -788,14 +808,37 @@ def _execute_calculation(
     demand: Optional[float],
     thermal: Optional[float],
     recirc_override: Optional[float],
+    job_id: Optional[str] = None,
+    current_aprm: Optional[float] = None,
+    current_recirc: Optional[float] = None,
 ) -> dict:
     clean_unit = unit if unit in (1, 2) else 1
+    recirc_history = None
+    cur_a = current_aprm
+    cur_r = current_recirc
+
+    if job_id:
+        _, snaps = core.resolve_server_snapshots(job_id)
+        if snaps:
+            recirc_history = core.extract_unit_recirc_history(snaps, clean_unit)
+            if (cur_a is None or cur_r is None):
+                _, latest_st = _get_latest_snapshot_from_dict(snaps)
+                u_key = "Unit2" if clean_unit == 2 else "Unit1"
+                u_raw = latest_st.get(u_key, {}) if isinstance(latest_st, dict) else {}
+                if cur_a is None and u_raw.get("APRM") is not None:
+                    cur_a = core.safe_float(u_raw.get("APRM"))
+                if cur_r is None and u_raw.get("Recirc1") is not None and u_raw.get("Recirc2") is not None:
+                    cur_r = (core.safe_float(u_raw.get("Recirc1")) + core.safe_float(u_raw.get("Recirc2"))) / 2.0
+
     try:
         metrics = core.calculate_reactor_metrics(
             unit=clean_unit,
             demand=demand,
             thermal=thermal,
             recirc_override=recirc_override,
+            current_aprm=cur_a,
+            current_recirc=cur_r,
+            snapshots=recirc_history,
         )
         return {"success": True, "data": metrics}
     except ValueError as ve:
@@ -821,8 +864,11 @@ def calculate_get(
     demand: Optional[float] = Query(None, description="Target electrical demand in MW."),
     thermal: Optional[float] = Query(None, description="Thermal power / APRM / RTP percentage."),
     recirc_override: Optional[float] = Query(None, description="Manual recirculation pump speed override (%)."),
+    job_id: Optional[str] = Query(None, description="Optional server Job ID to anchor recirculation estimate."),
+    current_aprm: Optional[float] = Query(None, description="Optional live APRM (%) to anchor recirculation estimate."),
+    current_recirc: Optional[float] = Query(None, description="Optional live recirculation speed (%) to anchor estimate."),
 ):
-    return _execute_calculation(unit, demand, thermal, recirc_override)
+    return _execute_calculation(unit, demand, thermal, recirc_override, job_id, current_aprm, current_recirc)
 
 @app.post(
     "/api/calculate",
@@ -837,7 +883,15 @@ def calculate_get(
     description="JSON POST counterpart to `GET /api/calculate` for programmatic reactor metric calculations.",
 )
 def calculate_post(body: CalculateRequest):
-    return _execute_calculation(body.unit, body.demand, body.thermal, body.recirc_override)
+    return _execute_calculation(
+        body.unit,
+        body.demand,
+        body.thermal,
+        body.recirc_override,
+        body.job_id,
+        body.current_aprm,
+        body.current_recirc,
+    )
 
 def _filter_public_servers_payload(
     payload: dict,

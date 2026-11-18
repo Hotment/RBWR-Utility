@@ -12,12 +12,119 @@ UNIT_2_APRM_TO_RECIRC_TABLE = {
 }
 
 
-def get_recirc_pump_speed(aprm: float) -> float:
-    keys = sorted(APRM_TO_RECIRC_TABLE.keys())
-    for k in keys:
-        if k >= aprm:
-            return float(APRM_TO_RECIRC_TABLE[k])
-    return float(APRM_TO_RECIRC_TABLE[keys[-1]])
+def get_recirc_pump_speed(aprm: float, unit: int = 1) -> float:
+    table = UNIT_2_APRM_TO_RECIRC_TABLE if unit == 2 else UNIT_1_APRM_TO_RECIRC_TABLE
+    keys = sorted(table.keys())
+    if aprm <= keys[0]:
+        return float(table[keys[0]])
+    if aprm >= keys[-1]:
+        return float(table[keys[-1]])
+    for i in range(len(keys) - 1):
+        k0, k1 = keys[i], keys[i + 1]
+        if k0 <= aprm <= k1:
+            t = (aprm - k0) / (k1 - k0)
+            return float(table[k0] + t * (table[k1] - table[k0]))
+    return float(table[keys[-1]])
+
+def extract_unit_recirc_history(snapshots: Any, unit_num: int) -> list[tuple[float, float]]:
+    if not isinstance(snapshots, dict):
+        return []
+    unit_key = "Unit2" if unit_num == 2 else "Unit1"
+    points: list[tuple[float, float]] = []
+    for ts in sorted(k for k in snapshots.keys() if not str(k).startswith("_")):
+        snap = snapshots.get(ts)
+        if not isinstance(snap, dict):
+            continue
+        u = snap.get(unit_key)
+        if not isinstance(u, dict) or u.get("SCRAM"):
+            continue
+        try:
+            aprm = float(u.get("APRM"))  # pyright: ignore[reportArgumentType]
+            r1 = float(u.get("Recirc1"))  # pyright: ignore[reportArgumentType]
+            r2 = float(u.get("Recirc2"))  # pyright: ignore[reportArgumentType]
+        except (TypeError, ValueError):
+            continue
+        if aprm > 5.0 and r1 >= 10.0 and r2 >= 10.0:
+            points.append((aprm, (r1 + r2) / 2.0))
+    return points
+
+def estimate_recirc_pump_speed(
+    target_aprm: float,
+    unit: int = 1,
+    current_aprm: float | None = None,
+    current_recirc: float | None = None,
+    snapshots: list[tuple[float, float]] | None = None,
+) -> float:
+    base_target = get_recirc_pump_speed(target_aprm, unit)
+    if (
+        current_aprm is not None
+        and current_recirc is not None
+        and current_aprm > 5.0
+        and current_recirc >= 10.0
+    ):
+        delta = base_target - get_recirc_pump_speed(current_aprm, unit)
+        return max(0.0, min(100.0, float(current_recirc) + delta))
+
+    if snapshots:
+        for ha, hr in reversed(snapshots):
+            if ha > 5.0 and hr >= 10.0:
+                delta = base_target - get_recirc_pump_speed(ha, unit)
+                return max(0.0, min(100.0, float(hr) + delta))
+
+    return base_target
+
+
+def estimate_next_recirc_for_unit(
+    unit_state: Any,
+    unit_num: int,
+    next_demand: float | None = None,
+    snapshots: Any = None,
+) -> float | None:
+    u = unit_state if isinstance(unit_state, dict) else {}
+    target_demand = next_demand
+    if target_demand is None:
+        nd_keys = ("NextDemandU1", "Next Demand", "next_demand") if unit_num == 1 else ("NextDemandU2", "Next Demand", "next_demand")
+        d_keys = ("DemandU1", "Demand", "demand") if unit_num == 1 else ("DemandU2", "Demand", "demand")
+        for k in nd_keys + d_keys:
+            val = u.get(k)
+            if val is not None:
+                try:
+                    num = float(val)
+                    if num >= 0:
+                        target_demand = num
+                        break
+                except (TypeError, ValueError):
+                    continue
+    if target_demand is None or target_demand < 0:
+        return None
+
+    cur_aprm: float | None = None
+    cur_recirc: float | None = None
+    try:
+        if u.get("APRM") is not None:
+            cur_aprm = float(u["APRM"])
+        if u.get("Recirc1") is not None and u.get("Recirc2") is not None:
+            cur_recirc = (float(u["Recirc1"]) + float(u["Recirc2"])) / 2.0
+    except (TypeError, ValueError):
+        cur_aprm = None
+        cur_recirc = None
+
+    hist = extract_unit_recirc_history(snapshots, unit_num) if snapshots else None
+    calc = ReactorCalculator(unit=unit_num)
+    solved_thermal = calc.calc_thermal(
+        target_demand,
+        current_aprm=cur_aprm,
+        current_recirc=cur_recirc,
+        snapshots=hist,
+    )
+    est = estimate_recirc_pump_speed(
+        solved_thermal,
+        unit=unit_num,
+        current_aprm=cur_aprm,
+        current_recirc=cur_recirc,
+        snapshots=hist,
+    )
+    return round(est, 1)
 
 
 # =========================================================================
@@ -245,10 +352,28 @@ class UsageCalculator:
             self.recirculation_usage = 0.01
             self.tower_makeup_usage = 0.5
 
-    def calculate_usage(self, feedwater_flow: float, aprm: float, override_speed: float | None = None) -> float:
+    def calculate_usage(
+        self,
+        feedwater_flow: float,
+        aprm: float,
+        override_speed: float | None = None,
+        current_aprm: float | None = None,
+        current_recirc: float | None = None,
+        snapshots: list[tuple[float, float]] | None = None,
+    ) -> float:
         feedwater_usage = self.feedwater_usage * feedwater_flow
         condenser_usage = self.condenser_usage if self.unit == 2 else self.condenser_usage * feedwater_flow
-        speed = override_speed if override_speed is not None else get_recirc_pump_speed(aprm)
+        speed = (
+            override_speed
+            if override_speed is not None
+            else estimate_recirc_pump_speed(
+                aprm,
+                self.unit,
+                current_aprm=current_aprm,
+                current_recirc=current_recirc,
+                snapshots=snapshots,
+            )
+        )
         recirculation_usage = self.recirculation_usage * speed * 10
         const_usage = (self.condenser_circ_usage * 2) + (self.tower_makeup_usage if self.unit == 2 else 0)
         total = feedwater_usage + condenser_usage + const_usage + recirculation_usage
@@ -311,7 +436,13 @@ class ReactorCalculator:
                 return 0.0
             return max(0.0, (-b + math.sqrt(inner)) / (2 * a))
 
-    def calc_thermal(self, demand: float) -> float:
+    def calc_thermal(
+        self,
+        demand: float,
+        current_aprm: float | None = None,
+        current_recirc: float | None = None,
+        snapshots: list[tuple[float, float]] | None = None,
+    ) -> float:
         current_usage = self.usage
         thermal = 0.0
         for _ in range(5):
@@ -319,7 +450,14 @@ class ReactorCalculator:
             thermal = self._solve_thermal_from_load(target_gross)
             flow = self.calc_flow(thermal)
             u_calc = self.usage_calc1 if self.selected_unit == 1 else self.usage_calc2
-            current_usage = u_calc.calculate_usage(flow, thermal, override_speed=self.recirc_override)
+            current_usage = u_calc.calculate_usage(
+                flow,
+                thermal,
+                override_speed=self.recirc_override,
+                current_aprm=current_aprm,
+                current_recirc=current_recirc,
+                snapshots=snapshots,
+            )
 
         self.usage = current_usage
         return thermal
@@ -330,6 +468,9 @@ def calculate_reactor_metrics(
     demand: float | None = None,
     thermal: float | None = None,
     recirc_override: float | None = None,
+    current_aprm: float | None = None,
+    current_recirc: float | None = None,
+    snapshots: list[tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     """
     Computes reactor operational metrics for Unit 1 or Unit 2.
@@ -351,7 +492,12 @@ def calculate_reactor_metrics(
 
     if demand is not None:
         demand_val = max(0.0, float(demand))
-        solved_thermal = calc.calc_thermal(demand_val)
+        solved_thermal = calc.calc_thermal(
+            demand_val,
+            current_aprm=current_aprm,
+            current_recirc=current_recirc,
+            snapshots=snapshots,
+        )
         flow = calc.calc_flow(solved_thermal)
         gen_load = calc.calc_gen_load(solved_thermal)
         usage = calc.usage
@@ -363,12 +509,29 @@ def calculate_reactor_metrics(
         flow = calc.calc_flow(thermal_val)
         gen_load = calc.calc_gen_load(thermal_val)
         u_calc = calc.usage_calc1 if selected_unit == 1 else calc.usage_calc2
-        calc.usage = u_calc.calculate_usage(flow, thermal_val, override_speed=override_val)
+        calc.usage = u_calc.calculate_usage(
+            flow,
+            thermal_val,
+            override_speed=override_val,
+            current_aprm=current_aprm,
+            current_recirc=current_recirc,
+            snapshots=snapshots,
+        )
         usage = calc.usage
         net_output = max(0.0, gen_load - usage)
         demand_val = net_output
 
-    speed = override_val if override_val is not None else get_recirc_pump_speed(solved_thermal)
+    speed = (
+        override_val
+        if override_val is not None
+        else estimate_recirc_pump_speed(
+            solved_thermal,
+            selected_unit,
+            current_aprm=current_aprm,
+            current_recirc=current_recirc,
+            snapshots=snapshots,
+        )
+    )
     scram_limit = 108.0
     scram_risk = solved_thermal > scram_limit
 
@@ -386,6 +549,7 @@ def calculate_reactor_metrics(
         "station_usage_mwe": round(usage, 2),
         "net_output_mwe": round(net_output, 2),
         "recirc_pump_speed": round(speed, 1),
+        "estimated_next_recirc": round(speed, 1),
         "is_recirc_overridden": override_val is not None,
         "scram_risk": scram_risk,
         "scram_limit_percent": scram_limit,

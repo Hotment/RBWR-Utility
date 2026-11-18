@@ -9,6 +9,9 @@ public class UnitState
     public double? Demand { get; set; }
     public double? NextDemand { get; set; }
     public double? TurbineHealth { get; set; }
+    public double? CurrentAprm { get; set; }
+    public double? CurrentRecirc { get; set; }
+    public double? EstimatedNextRecirc { get; set; }
 
     public static UnitState FromJsonElement(JsonElement element)
     {
@@ -27,6 +30,17 @@ public class UnitState
 
         if (TryGetDoubleProperty(element, out double turbineHealth, "TurbineHealth", "Turbine Health", "turbine_health", "Turbine_Health", "turbineHealth"))
             result.TurbineHealth = turbineHealth;
+
+        if (TryGetDoubleProperty(element, out double curAprm, "APRM", "aprm"))
+            result.CurrentAprm = curAprm;
+
+        if (TryGetDoubleProperty(element, out double r1, "Recirc1") && TryGetDoubleProperty(element, out double r2, "Recirc2"))
+            result.CurrentRecirc = (r1 + r2) / 2.0;
+        else if (TryGetDoubleProperty(element, out double curRecirc, "recirc", "current_recirc"))
+            result.CurrentRecirc = curRecirc;
+
+        if (TryGetDoubleProperty(element, out double estNextRecirc, "estimated_next_recirc", "EstimatedNextRecirc"))
+            result.EstimatedNextRecirc = estNextRecirc;
 
         return result;
     }

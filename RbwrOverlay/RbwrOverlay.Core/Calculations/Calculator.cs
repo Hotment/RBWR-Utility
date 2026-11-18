@@ -309,6 +309,9 @@ UNIT_2_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
     public double Usage { get; set; }
     public int SelectedUnit { get; set; } = 1;
     public double? RecircOverride { get; set; }
+    public double? LiveAprm { get; set; }
+    public double? LiveRecirc { get; set; }
+    public double? EstimatedNextRecirc { get; set; }
 
     public UsageCalculator UsageCalc1 { get; }
     public UsageCalculator UsageCalc2 { get; }
@@ -430,7 +433,8 @@ UNIT_2_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
             thermal = SolveThermalFromLoad(targetGross);
             double flow = CalcFlow(thermal);
             UsageCalculator uCalc = (SelectedUnit == 1) ? UsageCalc1 : UsageCalc2;
-            currentUsage = uCalc.CalculateUsage(flow, thermal, RecircOverride);
+            double? effectiveOverride = RecircOverride ?? EstimatedNextRecirc;
+            currentUsage = uCalc.CalculateUsage(flow, thermal, effectiveOverride, LiveAprm, LiveRecirc);
         }
 
         Usage = currentUsage;
