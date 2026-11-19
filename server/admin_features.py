@@ -898,20 +898,26 @@ def init_app(app: Flask, **hooks) -> None:
     @route("/api/admin/community/starboard", ["PUT"], "community")
     def set_starboard(user):
         payload = body(StarboardIn)
+        emoji = payload.emoji.strip()
+        if not emoji:
+            raise ApiError(400, "Reaction emoji cannot be empty.")
         channel_id = _check_post_channel(payload.channel_id, required=payload.enabled)
         bc.save_starboard(dict(
-            enabled=payload.enabled, channel_id=channel_id, emoji=payload.emoji.strip(), threshold=payload.threshold,
+            enabled=payload.enabled, channel_id=channel_id, emoji=emoji, threshold=payload.threshold,
             self_star=payload.self_star, bots=payload.bots,
             ignored_channels=[c for c in payload.ignored_channels if c.isdigit()]))
         ctx.log_audit(user, "community.starboard", "bot",
-                      f"{'Enabled' if payload.enabled else 'Disabled'} the starboard ({payload.threshold} x {payload.emoji.strip()})",
+                      f"{'Enabled' if payload.enabled else 'Disabled'} the starboard ({payload.threshold} x {emoji})",
                       target="Starboard")
         return bc.panel_state()
 
     @route("/api/admin/community/starboard/setup", ["POST"], "community")
     def setup_starboard(user):
         payload = body(StarboardSetupIn)
-        name = bc.panel_setup_starboard(display_name(user), payload.emoji.strip(), payload.threshold)
+        emoji = payload.emoji.strip()
+        if not emoji:
+            raise ApiError(400, "Reaction emoji cannot be empty.")
+        name = bc.panel_setup_starboard(display_name(user), emoji, payload.threshold)
         ctx.log_audit(user, "community.starboard_setup", "bot", f"Set up the starboard in #{name}", target="Starboard")
         return bc.panel_state()
 
@@ -940,6 +946,8 @@ def init_app(app: Flask, **hooks) -> None:
 
     @route("/api/admin/community/serverstats/counters/<kind>", ["DELETE"], "community")
     def remove_stats_counter(user, kind):
+        if kind not in bc.COUNTERS:
+            raise ApiError(400, "Unknown counter.")
         if not bc.panel_remove_counter(kind, display_name(user)):
             raise ApiError(404, f"There's no {kind} counter.")
         ctx.log_audit(user, "community.counter_remove", "bot", f"Removed the {kind} counter", target="Server stats")

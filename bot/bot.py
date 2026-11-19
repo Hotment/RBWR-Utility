@@ -4876,20 +4876,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         sender_discord_id = str(message.author.id)
 
         assert ticket_bridge.is_website_admin is not None
-        in_ticket_channel = str(target_ticket.get("discord_channel_id", "")) == ch_id
-        if (in_ticket_channel and ticket_bridge.is_any_website_admin
-                and ticket_bridge.is_any_website_admin(sender_discord_id)
-                and not ticket_bridge.is_website_admin(sender_discord_id)):
-            try:
-                await message.delete()
-                await message.channel.send(
-                    f"{message.author.mention} you don't have the Tickets permission, so you can't write in ticket channels. "
-                    "Ask a root admin to enable it in Accounts.",
-                    delete_after=10, allowed_mentions=disnake.AllowedMentions(users=[message.author]))
-            except disnake.HTTPException as ex:
-                log.warning(f"[Disnake Bot] Could not remove a message from an admin without the Tickets permission: {ex}")
-            return
-        if not ticket_bridge.is_website_admin(sender_discord_id):
+        has_role_ticket_access = bot_features.role_allows(message.author, "panel")
+        if not ticket_bridge.is_website_admin(sender_discord_id) and not has_role_ticket_access:
             log.info(
                 f"[Disnake Bot] Ignored message from non-website-admin {message.author} "
                 f"(ID: {sender_discord_id}) in #{getattr(message.channel, 'name', ch_id)}: "
@@ -4963,6 +4951,11 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             )
         except Exception as dm_err:
             log.warning(f"[Disnake Bot] Failed to send author DM on Discord admin message: {dm_err}")
+
+        try:
+            await message.add_reaction("📨")
+        except disnake.HTTPException as react_err:
+            log.warning(f"[Disnake Bot] Could not add forwarded reaction to message {d_msg_id}: {react_err}")
 
     @b.event
     async def on_message_edit(before: disnake.Message, after: disnake.Message):
@@ -5079,21 +5072,24 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             )
         log.info(f"[Disnake Bot] Synchronized deleted message {d_msg_id} for ticket #{target_ticket.get('id')}")
 
+_ticket_merge_lock = threading.Lock()
+
 def apply_ticket_merge(source_id: int, target_id: int, by: str) -> tuple[dict[str, Any], dict[str, Any]]:
     if not ticket_bridge.load_suggestions or not ticket_bridge.save_suggestions:
         raise ticket_merge.MergeError("Ticket bridge is not configured.")
-    data = ticket_bridge.load_suggestions()
-    source, target, previous = ticket_merge.merge(data, source_id, target_id, by)
-    messages = source.setdefault("messages", [])
-    notice = {
-        "id": (max([m.get("id", 0) for m in messages]) if messages else 0) + 1,
-        "sender_type": "admin",
-        "sender_name": by,
-        "message": ticket_merge.merge_notice(source, target),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    messages.append(notice)
-    ticket_bridge.save_suggestions(data)
+    with _ticket_merge_lock:
+        data = ticket_bridge.load_suggestions()
+        source, target, previous = ticket_merge.merge(data, source_id, target_id, by)
+        messages = source.setdefault("messages", [])
+        notice = {
+            "id": (max([m.get("id", 0) for m in messages]) if messages else 0) + 1,
+            "sender_type": "admin",
+            "sender_name": by,
+            "message": ticket_merge.merge_notice(source, target),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        messages.append(notice)
+        ticket_bridge.save_suggestions(data)
 
     if ticket_bridge.broadcast_dashboard:
         ticket_bridge.broadcast_dashboard()

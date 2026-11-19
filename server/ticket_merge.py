@@ -30,7 +30,7 @@ def merge(data: dict[str, Any], source_id: int, target_id: int, by: str) -> tupl
         seen.add(target["id"])
         following = _find(data, target["merged_into"])
         if following is None:
-            break
+            raise MergeError(f"Ticket #{target['id']} was already merged into #{target['merged_into']}, which no longer exists.")
         target = following
     if target["id"] == source_id:
         raise MergeError("A ticket can't be merged into itself.")

@@ -181,8 +181,13 @@ window.RoleCommands = (() => {
             }
             const copy = e.target.closest("[data-copy-role]");
             if (copy) {
-                navigator.clipboard?.writeText(copy.dataset.copyRole);
-                toast("Role ID copied.");
+                if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(copy.dataset.copyRole)
+                        .then(() => toast("Role ID copied."))
+                        .catch(() => toast("Could not copy role ID.", "error"));
+                } else {
+                    toast("Clipboard is unavailable in this browser context.", "error");
+                }
                 return;
             }
             const id = card.dataset.roleCard;

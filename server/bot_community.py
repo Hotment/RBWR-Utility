@@ -146,15 +146,16 @@ def _save_post(message_id: int, star_id: int, channel_id: int, count: int) -> No
         data.setdefault("posts", {})[str(message_id)] = {"star_id": str(star_id), "channel_id": str(channel_id), "count": count}
 
 
-async def _update_star(bot: commands.InteractionBot, payload) -> None:
+async def _update_star(bot: commands.InteractionBot, payload, *, check_emoji: bool = True) -> None:
     config = star_config()
     if not config["enabled"] or not config.get("channel_id") or not payload.guild_id:
         return
     if bf.hooks.guild_id and payload.guild_id != bf.hooks.guild_id:
         return
-    if str(payload.emoji) != config["emoji"]:
+    if check_emoji and hasattr(payload, "emoji") and str(payload.emoji) != config["emoji"]:
         return
-    if payload.channel_id == int(config["channel_id"]) or str(payload.channel_id) in map(str, config["ignored_channels"]):
+    ignored_ids = set(map(str, config["ignored_channels"]))
+    if payload.channel_id == int(config["channel_id"]) or str(payload.channel_id) in ignored_ids:
         return
     guild = bot.get_guild(payload.guild_id)
     if not guild:
@@ -162,6 +163,9 @@ async def _update_star(bot: commands.InteractionBot, payload) -> None:
     star_channel = guild.get_channel(int(config["channel_id"]))
     source = guild.get_channel_or_thread(payload.channel_id)
     if not isinstance(star_channel, disnake.TextChannel) or source is None:
+        return
+    parent_id = getattr(source, "parent_id", None)
+    if parent_id and str(parent_id) in ignored_ids:
         return
     if getattr(source, "nsfw", False) and not star_channel.nsfw:
         return
@@ -235,7 +239,7 @@ def _star_view_embed(guild: disnake.Guild) -> disnake.Embed:
     embed.add_field(name="Own reaction counts", value="Yes" if c["self_star"] else "No", inline=True)
     embed.add_field(name="Bot messages", value="Yes" if c["bots"] else "No", inline=True)
     embed.add_field(name="On the board", value=str(len(starboard_store.load().get("posts", {}))), inline=True)
-    ignored = [guild.get_channel(int(i)) for i in c["ignored_channels"]]
+    ignored = [guild.get_channel(int(i)) for i in c["ignored_channels"] if str(i).isdigit()]
     embed.add_field(name="Ignored channels", value=", ".join(ch.mention for ch in ignored if ch) or "None", inline=False)
     if channel:
         missing = _missing_perms(channel, guild.me, "view_channel", "send_messages", "embed_links", "read_message_history")
@@ -289,7 +293,7 @@ def _counter_value(kind: str, guild: disnake.Guild, bot: commands.InteractionBot
     if kind == "channels":
         return str(len(guild.text_channels) + len(guild.voice_channels))
     if kind == "roles":
-        return str(len(guild.roles) - 1)
+        return str(max(0, len(guild.roles) - 1))
     if kind == "tickets":
         return str(open_ticket_count())
     if kind == "version":
@@ -481,7 +485,11 @@ def save_serverstats(enabled: bool, templates: dict[str, str]) -> None:
 
 def panel_setup_starboard(by: str, emoji: str, threshold: int) -> str:
     async def _go():
-        channel = await create_starboard_channel(bf._panel_guild(), by, emoji, threshold)
+        guild = bf._panel_guild()
+        existing_id = star_config().get("channel_id")
+        if existing_id and str(existing_id).isdigit() and guild.get_channel(int(existing_id)):
+            raise bf.BotActionError("Starboard channel is already configured.")
+        channel = await create_starboard_channel(guild, by, emoji, threshold)
         save_starboard(dict(enabled=True, channel_id=str(channel.id), emoji=emoji, threshold=threshold))
         return channel.name
     return bf._run(_go, timeout=15)
@@ -546,6 +554,20 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         except Exception:
             log.exception("Starboard update failed")
 
+    @bot.listen("on_raw_reaction_clear")
+    async def _star_clear(payload: disnake.RawReactionClearEvent):
+        try:
+            await _update_star(bot, payload, check_emoji=False)
+        except Exception:
+            log.exception("Starboard clear update failed")
+
+    @bot.listen("on_raw_reaction_clear_emoji")
+    async def _star_clear_emoji(payload: disnake.RawReactionClearEmojiEvent):
+        try:
+            await _update_star(bot, payload)
+        except Exception:
+            log.exception("Starboard clear emoji update failed")
+
     @bot.listen("on_raw_message_delete")
     async def _star_source_deleted(payload: disnake.RawMessageDeleteEvent):
         try:
@@ -570,16 +592,17 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         if not guild:
             return
         await inter.response.defer(ephemeral=True)
+        clean_emoji = emoji.strip() or "⭐"
         if channel is None:
             try:
-                channel = await create_starboard_channel(guild, str(inter.author), emoji.strip(), threshold)
+                channel = await create_starboard_channel(guild, str(inter.author), clean_emoji, threshold)
             except disnake.HTTPException as exc:
                 await inter.followup.send(f"I couldn't create the channel: {exc}. Give me **Manage Channels** or pick a channel.", ephemeral=True)
                 return
-        save_starboard(dict(enabled=True, channel_id=str(channel.id), emoji=emoji.strip(), threshold=threshold))
+        save_starboard(dict(enabled=True, channel_id=str(channel.id), emoji=clean_emoji, threshold=threshold))
         embed = _star_view_embed(guild)
         embed.title = "Starboard is ready"
-        embed.description = f"Messages with **{threshold}** × {emoji.strip()} now appear in {channel.mention}."
+        embed.description = f"Messages with **{threshold}** × {clean_emoji} now appear in {channel.mention}."
         await inter.followup.send(embed=embed, ephemeral=True)
 
     @starboard_command.sub_command(name="settings", description="Change how the starboard works")
@@ -594,7 +617,8 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         guild = await _staff_guild(inter, "starboard")
         if not guild:
             return
-        changes = {k: v for k, v in dict(emoji=emoji.strip() if emoji else None, threshold=threshold, self_star=self_star,
+        clean_emoji = (emoji.strip() or None) if emoji is not None else None
+        changes = {k: v for k, v in dict(emoji=clean_emoji, threshold=threshold, self_star=self_star,
                                           bots=bots, channel_id=str(channel.id) if channel else None).items() if v is not None}
         save_starboard(changes)
         embed = _star_view_embed(guild)
@@ -669,7 +693,7 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
     async def serverstats_add(
         inter: disnake.ApplicationCommandInteraction,
         counter: str = commands.Param(choices=counter_choices, description="What to count"),
-        name: str = commands.Param(default=None, description="Channel name, {value} = the number, e.g. 'Operators: {value}'"),
+        name: str = commands.Param(default=None, max_length=90, description="Channel name, {value} = the number, e.g. 'Operators: {value}'"),
     ):
         guild = await _staff_guild(inter, "serverstats")
         if not guild:
@@ -703,7 +727,7 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
     async def serverstats_rename(
         inter: disnake.ApplicationCommandInteraction,
         counter: str = commands.Param(choices=counter_choices, description="Which counter"),
-        name: str = commands.Param(description="New name, {value} = the number, e.g. 'Operators: {value}'"),
+        name: str = commands.Param(max_length=90, description="New name, {value} = the number, e.g. 'Operators: {value}'"),
     ):
         guild = await _staff_guild(inter, "serverstats")
         if not guild:

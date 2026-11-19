@@ -2826,7 +2826,6 @@ def merge_suggestion(username):
         source, target = apply_ticket_merge(payload.id, payload.into, f"{username} (via Website)")
     except ticket_merge.MergeError as exc:
         return jsonify({"detail": str(exc)}), 400
-    broadcast_update("dashboard")
     log_audit_event("tickets.merge", "tickets", f"Merged ticket #{payload.id} into #{target['id']}",
                     target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "into": target["id"]}, username=username)
     return jsonify({"message": f"Ticket #{payload.id} was merged into #{target['id']}.", "id": payload.id,

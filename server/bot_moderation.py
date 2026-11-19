@@ -169,7 +169,18 @@ async def _run_timers() -> None:
         until = bf._parse_time(lock.get("until"))
         if not until or until > now:
             continue
-        channel = await bf._get_channel(int(channel_id))
+        if not bf._bot or not bf._bot.is_ready():
+            continue
+        try:
+            cid = int(channel_id)
+            channel = bf._bot.get_channel(cid) or await bf._bot.fetch_channel(cid)
+        except disnake.NotFound:
+            with bf.modstate_store.edit() as data:
+                data.setdefault("locks", {}).pop(channel_id, None)
+            continue
+        except disnake.HTTPException as exc:
+            log.warning("Could not fetch locked channel %s to unlock: %s", channel_id, exc)
+            continue
         if not isinstance(channel, disnake.TextChannel):
             with bf.modstate_store.edit() as data:
                 data.setdefault("locks", {}).pop(channel_id, None)
@@ -303,6 +314,9 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
             await inter.followup.send("I'm missing the **Manage Nicknames** permission, or my role is below theirs "
                                       "(the server owner's nickname can't be changed by bots).", ephemeral=True)
             return
+        except disnake.HTTPException as exc:
+            await inter.followup.send(f"Discord refused: {exc.text or exc}", ephemeral=True)
+            return
         await inter.followup.send(f"{member.mention} — {text}.", ephemeral=True, allowed_mentions=disnake.AllowedMentions.none())
 
     @bot.slash_command(name="tempban", description="Ban a member for a limited time (lifted automatically)",
@@ -341,6 +355,9 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         except disnake.Forbidden:
             await inter.followup.send("I'm missing the **Ban Members** permission (or my role is too low).", ephemeral=True)
             return
+        except disnake.HTTPException as exc:
+            await inter.followup.send(f"Discord refused: {exc.text or exc}", ephemeral=True)
+            return
         with bf.modstate_store.edit() as data:
             data.setdefault("tempbans", {})[str(member.id)] = {
                 "guild_id": str(member.guild.id), "until": until.isoformat(), "reason": (reason or "")[:400],
@@ -367,8 +384,12 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         if member.bot:
             await inter.response.send_message("Notes are for members, not bots.", ephemeral=True)
             return
+        clean_text = text.strip()
+        if not clean_text:
+            await inter.response.send_message("Note text cannot be empty.", ephemeral=True)
+            return
         try:
-            note = add_note(member, text.strip(), inter.author)
+            note = add_note(member, clean_text, inter.author)
         except bf.BotActionError as exc:
             await inter.response.send_message(str(exc), ephemeral=True)
             return
@@ -454,22 +475,32 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
             if problem:
                 await inter.response.send_message(problem, ephemeral=True)
                 return
-        left = _cooldown_left("purge", inter.author.id, 5)
-        if left:
-            await inter.response.send_message(f"Wait {left:.0f}s before purging again.", ephemeral=True)
-            return
-
-        what = f"{amount} message{'s' if amount != 1 else ''}" + (f" from {member.mention}" if member else "") \
-            + (f" containing “{contains}”" if contains else "")
         if amount > PURGE_CONFIRM_ABOVE:
+            now = time.monotonic()
+            left = _cooldowns.get(("purge", inter.author.id), 0) - now
+            if left > 0:
+                await inter.response.send_message(f"Wait {left:.0f}s before purging again.", ephemeral=True)
+                return
+            what = f"{amount} message{'s' if amount != 1 else ''}" + (f" from {member.mention}" if member else "") \
+                + (f" containing “{contains}”" if contains else "")
             view = _ConfirmView(inter.author.id, f"Delete {amount}")
             await inter.response.send_message(f"Delete up to {what} in {channel.mention}? This can't be undone.",  # pyright: ignore[reportAttributeAccessIssue]
                                               view=view, ephemeral=True, allowed_mentions=disnake.AllowedMentions.none())
             if await view.wait() or not view.value:
                 if view.value is None:
-                    await inter.edit_original_response(content="Timed out — nothing was deleted.", view=None)
+                    try:
+                        await inter.edit_original_response(content="Timed out — nothing was deleted.", view=None)
+                    except disnake.HTTPException:
+                        pass
                 return
+            _cooldown_left("purge", inter.author.id, 5)
         else:
+            left = _cooldown_left("purge", inter.author.id, 5)
+            if left:
+                await inter.response.send_message(f"Wait {left:.0f}s before purging again.", ephemeral=True)
+                return
+            what = f"{amount} message{'s' if amount != 1 else ''}" + (f" from {member.mention}" if member else "") \
+                + (f" containing “{contains}”" if contains else "")
             await inter.response.defer(ephemeral=True)
 
         needle = (contains or "").lower()

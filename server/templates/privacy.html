@@ -111,8 +111,11 @@
                             along with an optional contact handle. If you choose to sign in with Discord OAuth2, we
                             receive and store your Discord user ID, username, and avatar to associate you with your
                             tickets or authorized admin sessions. Public tickets and replies may be displayed on the
-                            website and synced to configured community Discord channels. We also process IP addresses
-                            and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse bans.
+                            website and synced to configured community Discord channels. If an administrator merges a
+                            duplicate ticket into another ticket, your Discord ID and display name may be recorded on
+                            the target ticket as a follower so you remain linked to the merged thread. We also process
+                            IP addresses and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse
+                            bans.
                         </p>
                     </div>
 
@@ -120,9 +123,15 @@
                         <h3 class="font-semibold text-zinc-200 mb-1">Discord Bot</h3>
                         <p class="text-zinc-400">
                             When you interact with the RBWR Utility Discord Bot or invite it to a Discord server, it
-                            processes Discord identifiers (user IDs, server/guild IDs, channel IDs, and role IDs) as
-                            needed to run commands, enforce server-configured moderation/automod/autorole/welcome/FAQ
-                            settings, dispatch notification DMs, and sync ticket or operational alert threads.
+                            processes Discord identifiers (user IDs, server/guild IDs, channel IDs, message IDs, and
+                            role IDs) as needed to run commands, enforce server-configured moderation, automod,
+                            autorole, welcome, FAQ, and role-based command permission settings, dispatch notification
+                            DMs, and sync ticket or operational alert threads. When moderation or community features are
+                            enabled by server administrators, the bot also stores moderation records (warnings, private
+                            moderator notes, temporary ban expiration timers, channel lock states, and a rolling
+                            moderation action log), starboard post mappings (message IDs, channel IDs, and reaction
+                            counts), and server statistics channel configurations (including public member/channel
+                            counts and latest GitHub release version numbers).
                         </p>
                     </div>
 
@@ -182,8 +191,9 @@
                     3. Data Security &amp; Disclosure
                 </h2>
                 <p class="text-zinc-400">
-                    Submitted tickets, contact messages, bot configurations, and crash reports are stored in internal
-                    data files on the server. I do not sell, trade, or rent any user data to third parties.
+                    Submitted tickets, contact messages, bot configurations, moderation/community state files, and crash
+                    reports are stored in internal data files on the server. I do not sell, trade, or rent any user data
+                    to third parties.
                 </p>
             </div>
 
