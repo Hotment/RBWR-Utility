@@ -181,7 +181,7 @@ class RBWRClient:
     async def fetch(self, public_only: bool = True) -> dict[str, Any]:
         if self.data_supplier is not None:
             try:
-                res = self.data_supplier(public_only)
+                res = await asyncio.to_thread(self.data_supplier, public_only)
                 if isinstance(res, dict):
                     servers = res.get("data", {}).get("servers", [])
                     if isinstance(servers, list):

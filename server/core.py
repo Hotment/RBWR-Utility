@@ -712,6 +712,150 @@ def get_memory_report() -> dict[str, Any]:
         "servers_payload_cache_kb": servers_cache_kb,
     }
 
+def get_process_cpu_times(pid: Optional[int] = None) -> Optional[tuple[float, float]]:
+    target_pid = pid or os.getpid()
+    if sys.platform.startswith("linux"):
+        try:
+            with open(f"/proc/{target_pid}/stat", "r", encoding="utf-8") as f:
+                stat_text = f.read()
+            rparen = stat_text.rfind(")")
+            if rparen == -1:
+                return None
+            fields = stat_text[rparen + 2:].split()
+            if len(fields) < 13:
+                return None
+            clk_tck = float(os.sysconf("SC_CLK_TCK"))
+            utime = int(fields[11]) / clk_tck
+            stime = int(fields[12]) / clk_tck
+            return (utime, stime)
+        except Exception:
+            return None
+    elif sys.platform == "win32":
+        try:
+            class _FILETIME(ctypes.Structure):
+                _fields_ = [("dwLowDateTime", ctypes.c_ulong), ("dwHighDateTime", ctypes.c_ulong)]
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+            kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+            kernel32.OpenProcess.restype = ctypes.c_void_p
+            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+            kernel32.GetProcessTimes.argtypes = [
+                ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p
+            ]
+            kernel32.GetProcessTimes.restype = ctypes.c_int
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            if target_pid == os.getpid():
+                handle = kernel32.GetCurrentProcess()
+                close_handle = False
+            else:
+                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, int(target_pid))
+                close_handle = True
+            if not handle:
+                return None
+            try:
+                ct, et, kt, ut = _FILETIME(), _FILETIME(), _FILETIME(), _FILETIME()
+                if kernel32.GetProcessTimes(handle, ctypes.byref(ct), ctypes.byref(et), ctypes.byref(kt), ctypes.byref(ut)):
+                    sys_s = ((kt.dwHighDateTime << 32) | kt.dwLowDateTime) / 1e7
+                    usr_s = ((ut.dwHighDateTime << 32) | ut.dwLowDateTime) / 1e7
+                    return (usr_s, sys_s)
+            finally:
+                if close_handle:
+                    kernel32.CloseHandle(handle)
+        except Exception:
+            return None
+    return None
+
+def get_cpu_report(sample_seconds: float = 0.25, extra_pids: Optional[dict[str, int]] = None) -> dict[str, Any]:
+    interval = max(0.05, min(2.0, float(sample_seconds)))
+    pids: dict[str, int] = {"web": os.getpid()}
+    if extra_pids:
+        for label, p in extra_pids.items():
+            if p:
+                pids[label] = int(p)
+
+    t0_map = {label: get_process_cpu_times(p) for label, p in pids.items()}
+    wall_start = time.monotonic()
+    time.sleep(interval)
+    wall_elapsed = max(1e-6, time.monotonic() - wall_start)
+    t1_map = {label: get_process_cpu_times(p) for label, p in pids.items()}
+
+    proc_stats: dict[str, dict[str, Any]] = {}
+    for label, p in pids.items():
+        a, b = t0_map.get(label), t1_map.get(label)
+        if a and b:
+            delta_cpu = max(0.0, (b[0] + b[1]) - (a[0] + a[1]))
+            pct = round((delta_cpu / wall_elapsed) * 100.0, 1)
+            total_s = round(b[0] + b[1], 2)
+        else:
+            pct = None
+            total_s = None
+        proc_stats[label] = {"pid": p, "cpu_percent": pct, "cpu_time_s": total_s}
+
+    load_avg = None
+    if hasattr(os, "getloadavg"):
+        try:
+            load_avg = tuple(round(x, 2) for x in os.getloadavg())
+        except OSError:
+            load_avg = None
+
+    threads = threading.enumerate()
+    return {
+        "cpu_count": os.cpu_count() or 1,
+        "load_avg": load_avg,
+        "thread_count": len(threads),
+        "processes": proc_stats,
+    }
+
+def get_thread_stacks() -> list[dict[str, Any]]:
+    frames = sys._current_frames()
+    result = []
+    for th in sorted(threading.enumerate(), key=lambda t: t.name):
+        frame = frames.get(th.ident) if th.ident is not None else None
+        if frame is not None:
+            fname = os.path.basename(frame.f_code.co_filename)
+            loc = f"{fname}:{frame.f_lineno} in {frame.f_code.co_name}"
+        else:
+            loc = "<no frame>"
+        result.append({
+            "name": th.name,
+            "ident": th.ident,
+            "daemon": th.daemon,
+            "location": loc,
+        })
+    return result
+
+def sample_hot_threads(duration: float = 2.0, interval: float = 0.02, top_n: int = 10) -> dict[str, Any]:
+    dur = max(0.5, min(15.0, float(duration)))
+    step = max(0.005, min(0.1, float(interval)))
+    limit = max(1, min(30, int(top_n)))
+    self_tid = threading.get_ident()
+    counts: dict[str, int] = {}
+    total_samples = 0
+    end_time = time.monotonic() + dur
+
+    while time.monotonic() < end_time:
+        frames = sys._current_frames()
+        for tid, frame in frames.items():
+            if tid == self_tid:
+                continue
+            fname = os.path.basename(frame.f_code.co_filename)
+            key = f"{fname}:{frame.f_lineno} in {frame.f_code.co_name}"
+            counts[key] = counts.get(key, 0) + 1
+            total_samples += 1
+        time.sleep(step)
+
+    ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+    return {
+        "duration_s": round(dur, 2),
+        "total_samples": total_samples,
+        "hotspots": [
+            {"location": loc, "hits": hits, "percent": round((hits / total_samples) * 100.0, 1) if total_samples else 0.0}
+            for loc, hits in ranked
+        ],
+    }
+
 _sc_historical_cards_base = None
 _sc_historical_cards_key = None
 _sc_historical_lock = threading.Lock()

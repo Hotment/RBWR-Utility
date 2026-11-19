@@ -4399,6 +4399,58 @@ def start_console_handler():
             for idx, st in enumerate(stats, 1):
                 safe_print(f"  {idx:>2}. {st}")
 
+        @handler.command(name="cpu", description="Shows CPU usage (%), core count, load avg, and thread count for Web & API.")
+        @handler.command(name="cpu_status", description="Alias for cpu.")
+        def cpu_status_cmd(sample_s: str = "0.25"):
+            try:
+                dur = float(sample_s)
+            except ValueError:
+                dur = 0.25
+            extra = {}
+            api_proc = _api_process
+            if api_proc is not None and api_proc.poll() is None:
+                extra["api"] = api_proc.pid
+            rep = core.get_cpu_report(sample_seconds=dur, extra_pids=extra)
+            web = rep["processes"]["web"]
+            web_pct = f"{web['cpu_percent']:.1f}%" if web["cpu_percent"] is not None else "n/a"
+            web_time = f"{web['cpu_time_s']:.1f}s" if web["cpu_time_s"] is not None else "n/a"
+            if "api" in rep["processes"]:
+                ap = rep["processes"]["api"]
+                api_pct = f"{ap['cpu_percent']:.1f}%" if ap["cpu_percent"] is not None else "n/a"
+                api_time = f"{ap['cpu_time_s']:.1f}s" if ap["cpu_time_s"] is not None else "n/a"
+                api_str = f"{api_pct} (PID {ap['pid']}, total {api_time})"
+            else:
+                api_str = "stopped"
+            load_str = f" | load={rep['load_avg']}" if rep["load_avg"] is not None else ""
+            safe_print(
+                f"[CPU] Web PID {web['pid']}: {web_pct} (total {web_time}) | API: {api_str} | "
+                f"cores={rep['cpu_count']} | threads={rep['thread_count']}{load_str}"
+            )
+
+        @handler.command(name="cpu_threads", description="Lists all active Python threads and their current executing frame.")
+        def cpu_threads_cmd():
+            stacks = core.get_thread_stacks()
+            safe_print(f"[CPU] Active threads ({len(stacks)}):")
+            for th in stacks:
+                kind = "daemon" if th["daemon"] else "main"
+                safe_print(f"  - {th['name']} ({kind}) -> {th['location']}")
+
+        @handler.command(name="cpu_top", description="Samples all Python threads to find hot code paths: cpu_top [seconds] [count]")
+        def cpu_top_cmd(seconds: str = "2.0", count: str = "10"):
+            try:
+                dur = float(seconds)
+            except ValueError:
+                dur = 2.0
+            try:
+                limit = int(count)
+            except ValueError:
+                limit = 10
+            safe_print(f"[CPU] Sampling threads for {max(0.5, min(15.0, dur)):.1f}s...")
+            res = core.sample_hot_threads(duration=dur, top_n=limit)
+            safe_print(f"[CPU] Top {len(res['hotspots'])} thread frames ({res['total_samples']} samples over {res['duration_s']}s):")
+            for idx, item in enumerate(res["hotspots"], 1):
+                safe_print(f"  {idx:>2}. {item['percent']:5.1f}% ({item['hits']} hits) - {item['location']}")
+
         handler.start()
     except Exception:
         pass
