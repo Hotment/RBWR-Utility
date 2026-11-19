@@ -4019,13 +4019,42 @@ def toggle_read_contact_message(username, msg_id):
     return jsonify({"success": True})
 
 _login_attempts = {}
+_login_attempts_last_gc = 0.0
+
+def prune_login_attempts(clear_all: bool = False) -> int:
+    global _login_attempts_last_gc
+    if clear_all:
+        removed = len(_login_attempts)
+        _login_attempts.clear()
+        _login_attempts_last_gc = time.monotonic()
+        return removed
+    now = datetime.now(timezone.utc)
+    cutoff = timedelta(minutes=1)
+    stale_ips = []
+    for ip, attempts in list(_login_attempts.items()):
+        fresh = [t for t in attempts if now - t < cutoff]
+        if fresh:
+            _login_attempts[ip] = fresh
+        else:
+            stale_ips.append(ip)
+    for ip in stale_ips:
+        _login_attempts.pop(ip, None)
+    _login_attempts_last_gc = time.monotonic()
+    return len(stale_ips)
 
 def is_login_rate_limited(ip: str) -> bool:
     if ip == "unknown":
         return False
+    if time.monotonic() - _login_attempts_last_gc > 300.0:
+        prune_login_attempts()
     now = datetime.now(timezone.utc)
-    attempts = _login_attempts.setdefault(ip, [])
+    attempts = _login_attempts.get(ip)
+    if not attempts:
+        return False
     attempts[:] = [t for t in attempts if now - t < timedelta(minutes=1)]
+    if not attempts:
+        _login_attempts.pop(ip, None)
+        return False
     return len(attempts) >= 5
 
 def record_login_attempt(ip: str):
@@ -4287,6 +4316,89 @@ def start_console_handler():
             except Exception as ex:
                 safe_print(f"[ERROR] Failed to reach API refresh endpoint: {ex}")
 
+        @handler.command(name="mem", description="Shows memory usage (RSS), GC stats, and in-memory cache sizes.")
+        def mem_status_cmd():
+            rep = core.get_memory_report()
+            rss_str = f"{rep['rss_mb']:.2f} MiB" if rep["rss_mb"] is not None else "unavailable"
+            api_proc = _api_process
+            api_rss_str = "stopped"
+            if api_proc is not None and api_proc.poll() is None:
+                api_rss = core.get_process_rss_mb(api_proc.pid)
+                api_rss_str = f"{api_rss:.2f} MiB (PID {api_proc.pid})" if api_rss is not None else f"running (PID {api_proc.pid})"
+            ws_count = len(active_connections) if "active_connections" in globals() else 0
+            safe_print(
+                f"[MEM] Web PID {rep['pid']}: RSS={rss_str} | API: {api_rss_str} | "
+                f"GC={rep['gc_counts']} | WS={ws_count} | login_ips={len(_login_attempts)}"
+            )
+            safe_print(
+                f"[MEM] Caches: files={rep['file_cache_count']} ({', '.join(rep['file_cache_keys']) or 'none'}) | "
+                f"archives={rep['archive_cache_count']} ({', '.join(rep['archive_cache_keys']) or 'none'})"
+            )
+            safe_print(
+                f"[MEM] Meta/Cards: server_meta={rep['server_meta_count']} | "
+                f"active_cards={rep['active_cards_cached']} | historical_cards={rep['historical_cards_cached']} | "
+                f"servers_payload={rep['servers_payload_cache_kb']} KB"
+            )
+            if rep["tracemalloc_active"]:
+                safe_print(
+                    f"[MEM] tracemalloc: current={rep['tracemalloc_current_mb']:.2f} MiB | "
+                    f"peak={rep['tracemalloc_peak_mb']:.2f} MiB"
+                )
+
+        @handler.command(name="mem_gc", description="Runs full Python garbage collection and trims unused OS heap pages.")
+        def mem_gc_cmd():
+            pruned_ips = prune_login_attempts()
+            res = core.trim_process_memory(run_gc=True)
+            before = f"{res['rss_before_mb']:.2f}" if res["rss_before_mb"] is not None else "?"
+            after = f"{res['rss_after_mb']:.2f}" if res["rss_after_mb"] is not None else "?"
+            freed = f"{res['freed_mb']:+.2f} MiB" if res["freed_mb"] is not None else "n/a"
+            safe_print(
+                f"[MEM] GC collected={res['gc_collected']} objs | pruned_login_ips={pruned_ips} | "
+                f"malloc_trim={res['malloc_trimmed']} | RSS: {before} -> {after} MiB (delta {freed})"
+            )
+
+        @handler.command(name="mem_clear", description="Clears in-memory caches and runs GC: mem_clear [all|archives|cards|files]")
+        def mem_clear_cmd(scope: str = "all"):
+            clean_scope = (scope or "all").strip().lower()
+            if clean_scope not in ("all", "archives", "cards", "files"):
+                safe_print("Usage: mem_clear [all|archives|cards|files]")
+                return
+            pruned_ips = prune_login_attempts(clear_all=(clean_scope == "all"))
+            res = core.clear_memory_caches(scope=clean_scope, run_gc=True)
+            before = f"{res['rss_before_mb']:.2f}" if res["rss_before_mb"] is not None else "?"
+            after = f"{res['rss_after_mb']:.2f}" if res["rss_after_mb"] is not None else "?"
+            freed = f"{res['freed_mb']:+.2f} MiB" if res["freed_mb"] is not None else "n/a"
+            safe_print(
+                f"[MEM] Cleared scope={clean_scope} ({res['cleared']}, login_ips={pruned_ips}) | "
+                f"GC={res['gc_collected']} | RSS: {before} -> {after} MiB (delta {freed})"
+            )
+
+        @handler.command(name="mem_top", description="Profiles top Python allocations via tracemalloc: mem_top [count|stop]")
+        def mem_top_cmd(arg: str = "10"):
+            import tracemalloc
+            token = (arg or "10").strip().lower()
+            if token == "stop":
+                if tracemalloc.is_tracing():
+                    tracemalloc.stop()
+                    safe_print("[MEM] tracemalloc stopped.")
+                else:
+                    safe_print("[MEM] tracemalloc is not running.")
+                return
+            if not tracemalloc.is_tracing():
+                tracemalloc.start(10)
+                safe_print("[MEM] tracemalloc started (run 'mem_top' again after traffic, or 'mem_top stop' to disable).")
+                return
+            try:
+                limit = max(1, min(30, int(token)))
+            except ValueError:
+                limit = 10
+            snap = tracemalloc.take_snapshot()
+            stats = snap.statistics("lineno")[:limit]
+            cur, peak = tracemalloc.get_traced_memory()
+            safe_print(f"[MEM] Top {len(stats)} allocations (traced={cur / 1048576:.2f} MiB, peak={peak / 1048576:.2f} MiB):")
+            for idx, st in enumerate(stats, 1):
+                safe_print(f"  {idx:>2}. {st}")
+
         handler.start()
     except Exception:
         pass
@@ -4299,6 +4411,7 @@ API_SCRIPT_PATH = os.path.join(BASE_DIR, "api.py")
 _api_process = None
 _api_supervisor_thread = None
 _api_supervisor_started = False
+_api_external_detected = False
 _api_shutting_down = False
 _api_immediate_restart = False
 _api_supervisor_lock = threading.Lock()
@@ -4346,7 +4459,7 @@ def _stop_api_subprocess():
 atexit.register(_stop_api_subprocess)
 
 def _api_supervisor_loop():
-    global _api_process, _api_immediate_restart, _api_supervisor_started
+    global _api_process, _api_immediate_restart, _api_supervisor_started, _api_external_detected
     backoff = 1.0
     spawned_once = False
     while not _api_shutting_down:
@@ -4356,7 +4469,9 @@ def _api_supervisor_loop():
         api_port = _get_api_port()
         if not spawned_once:
             if _is_local_port_open(api_port):
-                logger.info(f"[REST API] Detected existing listener on 127.0.0.1:{api_port}; proxying /api/* to it.")
+                if not _api_external_detected:
+                    _api_external_detected = True
+                    logger.info(f"[REST API] Detected existing listener on 127.0.0.1:{api_port}; proxying /api/* to it.")
                 break
         else:
             close_deadline = time.time() + 2.0
@@ -4436,7 +4551,7 @@ def get_api_subservice_status(probe_http: bool = True) -> dict:
 
 
 def start_api_subservice() -> tuple[bool, str]:
-    global _api_shutting_down, _api_supervisor_started
+    global _api_shutting_down, _api_supervisor_started, _api_external_detected
     if os.environ.get("DISABLE_API_PROCESS") == "1":
         return False, "API subprocess is disabled via DISABLE_API_PROCESS=1."
     if not os.path.exists(API_SCRIPT_PATH):
@@ -4444,9 +4559,11 @@ def start_api_subservice() -> tuple[bool, str]:
     port = _get_api_port()
     with _api_supervisor_lock:
         _api_shutting_down = False
+        _api_external_detected = False
         if _api_process is not None and _api_process.poll() is None:
             return True, f"API subservice is already running (PID {_api_process.pid}, port {port})."
         if _is_local_port_open(port, timeout=0.25):
+            _api_external_detected = True
             return True, f"External API listener already active on 127.0.0.1:{port}."
         if _api_supervisor_thread is None or not _api_supervisor_thread.is_alive():
             _api_supervisor_started = False
@@ -4527,13 +4644,13 @@ def start_api_subprocess():
 
 @app.before_request
 def ensure_api_subprocess():
-    if not _api_supervisor_started:
+    if not _api_supervisor_started and not _api_external_detected:
         start_api_subprocess()
 
 @app.route("/api", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 @app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 def proxy_api_request(subpath: str = ""):
-    if not _api_supervisor_started:
+    if not _api_supervisor_started and not _api_external_detected:
         start_api_subprocess()
 
     api_port = _get_api_port()

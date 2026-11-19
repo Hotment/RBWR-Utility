@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import gc
 import gzip
 import json
 import logging
@@ -7,6 +9,7 @@ import os
 import sys
 import threading
 import time
+import tracemalloc
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional
@@ -333,7 +336,6 @@ def save_persistent_servers(data: dict) -> None:
 _sc_lock = threading.RLock()
 _sc_public_server_ids: list[str] = []
 _sc_public_servers_info: dict[str, dict] = {}
-_sc_server_ids: list[str] = []
 _sc_latest_data: dict[str, Any] = {}
 _sc_server_meta: dict[str, dict] = {}
 
@@ -503,29 +505,212 @@ def get_server_player_count(job_id: str, snapshots: Any = None, latest_state: An
 
 _sc_file_cache: dict[str, tuple[float, Any]] = {}
 _sc_archive_cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
+_sc_cache_last_access: dict[str, float] = {}
 _sc_max_archive_cache_entries = 2
 _sc_cache_lock = threading.Lock()
 _sc_file_io_lock = threading.RLock()
+COLD_CACHE_IDLE_SECONDS = 600.0
+_COLD_FILE_CACHE_KEYS = frozenset({"archives_index.json", "server_meta.json", "global.json"})
+_last_cache_eviction_ts = 0.0
 
 def is_archive_filename(filename: str) -> bool:
     normalized = filename.replace("\\", "/").strip()
     return normalized.startswith("archives/") or "servers_" in normalized
 
 def _update_sc_cache(filename: str, mtime: float, data: dict) -> None:
+    now = time.monotonic()
     with _sc_cache_lock:
         if is_archive_filename(filename):
             _sc_archive_cache[filename] = (mtime, data)
             _sc_archive_cache.move_to_end(filename)
+            _sc_cache_last_access[filename] = now
             while len(_sc_archive_cache) > _sc_max_archive_cache_entries:
-                _sc_archive_cache.popitem(last=False)
+                evicted_key, _ = _sc_archive_cache.popitem(last=False)
+                _sc_cache_last_access.pop(evicted_key, None)
             _sc_file_cache.pop(filename, None)
         else:
             _sc_file_cache[filename] = (mtime, data)
+            _sc_cache_last_access[filename] = now
 
 def _invalidate_sc_cache(filename: str) -> None:
     with _sc_cache_lock:
         _sc_file_cache.pop(filename, None)
         _sc_archive_cache.pop(filename, None)
+        _sc_cache_last_access.pop(filename, None)
+
+def get_process_rss_mb(pid: Optional[int] = None) -> Optional[float]:
+    """Return resident set size (RSS) in MiB for the given PID (default: current process)."""
+    target_pid = pid or os.getpid()
+    if sys.platform.startswith("linux"):
+        try:
+            with open(f"/proc/{target_pid}/status", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        kb = int(line.split()[1])
+                        return round(kb / 1024.0, 2)
+        except Exception:
+            return None
+    elif sys.platform == "win32":
+        try:
+            class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                _fields_ = [
+                    ("cb", ctypes.c_ulong),
+                    ("PageFaultCount", ctypes.c_ulong),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            kernel32 = ctypes.windll.kernel32
+            psapi = ctypes.windll.psapi
+            kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+            kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+            kernel32.OpenProcess.restype = ctypes.c_void_p
+            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+            psapi.GetProcessMemoryInfo.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong]
+            psapi.GetProcessMemoryInfo.restype = ctypes.c_int
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            PROCESS_VM_READ = 0x0010
+            if target_pid == os.getpid():
+                handle = kernel32.GetCurrentProcess()
+                close_handle = False
+            else:
+                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, 0, int(target_pid))
+                close_handle = True
+            if not handle:
+                return None
+            try:
+                counters = _PROCESS_MEMORY_COUNTERS()
+                counters.cb = ctypes.sizeof(counters)
+                if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                    return round(counters.WorkingSetSize / (1024.0 * 1024.0), 2)
+            finally:
+                if close_handle:
+                    kernel32.CloseHandle(handle)
+        except Exception:
+            return None
+    return None
+
+def trim_process_memory(run_gc: bool = True) -> dict[str, Any]:
+    """Run Python GC and ask the OS allocator to release unused heap pages."""
+    rss_before = get_process_rss_mb()
+    collected = gc.collect() if run_gc else 0
+    trimmed = False
+    if sys.platform.startswith("linux"):
+        try:
+            libc = ctypes.CDLL("libc.so.6")
+            trimmed = bool(libc.malloc_trim(0))
+        except Exception:
+            trimmed = False
+    rss_after = get_process_rss_mb()
+    freed = round(rss_before - rss_after, 2) if (rss_before is not None and rss_after is not None) else None
+    return {
+        "rss_before_mb": rss_before,
+        "rss_after_mb": rss_after,
+        "freed_mb": freed,
+        "gc_collected": collected,
+        "malloc_trimmed": trimmed,
+    }
+
+def evict_stale_caches(max_idle_seconds: float = COLD_CACHE_IDLE_SECONDS) -> dict[str, int]:
+    """Evict idle decompressed archives and large cold files from in-memory caches."""
+    now = time.monotonic()
+    evicted_archives = 0
+    evicted_files = 0
+    with _sc_cache_lock:
+        for key in list(_sc_archive_cache.keys()):
+            last_used = _sc_cache_last_access.get(key, 0.0)
+            if (now - last_used) >= max_idle_seconds:
+                _sc_archive_cache.pop(key, None)
+                _sc_cache_last_access.pop(key, None)
+                evicted_archives += 1
+        for key in list(_sc_file_cache.keys()):
+            if key in _COLD_FILE_CACHE_KEYS:
+                last_used = _sc_cache_last_access.get(key, 0.0)
+                if (now - last_used) >= max_idle_seconds:
+                    _sc_file_cache.pop(key, None)
+                    _sc_cache_last_access.pop(key, None)
+                    evicted_files += 1
+    return {"archives": evicted_archives, "files": evicted_files}
+
+def clear_memory_caches(scope: str = "all", run_gc: bool = True) -> dict[str, Any]:
+    """Clear selected in-memory caches and optionally run GC + OS heap trim."""
+    clean_scope = (scope or "all").strip().lower()
+    cleared: dict[str, int] = {}
+
+    if clean_scope in ("all", "archives"):
+        with _sc_cache_lock:
+            n = len(_sc_archive_cache)
+            for k in list(_sc_archive_cache.keys()):
+                _sc_cache_last_access.pop(k, None)
+            _sc_archive_cache.clear()
+            cleared["archives"] = n
+
+    if clean_scope in ("all", "files"):
+        with _sc_cache_lock:
+            n = len(_sc_file_cache)
+            for k in list(_sc_file_cache.keys()):
+                _sc_cache_last_access.pop(k, None)
+            _sc_file_cache.clear()
+            cleared["files"] = n
+
+    if clean_scope in ("all", "cards"):
+        invalidate_historical_cards_cache()
+        cleared["cards"] = 1
+
+    if clean_scope == "all":
+        with _cache_lock:
+            _servers_cache["data"] = None
+            _servers_cache["timestamp"] = 0
+        with _github_version_lock:
+            _github_version_cache["data"] = None
+            _github_version_cache["timestamp"] = 0.0
+        cleared["api_caches"] = 2
+
+    trim = trim_process_memory(run_gc=run_gc)
+    return {"scope": clean_scope, "cleared": cleared, **trim}
+
+def get_memory_report() -> dict[str, Any]:
+    """Return a snapshot of process memory and core in-memory cache sizes."""
+    with _sc_cache_lock:
+        file_keys = sorted(_sc_file_cache.keys())
+        archive_keys = list(_sc_archive_cache.keys())
+    with _sc_active_lock:
+        active_cards_count = len(_sc_active_cards_base) if isinstance(_sc_active_cards_base, list) else 0
+    with _sc_historical_lock:
+        hist_cards_count = len(_sc_historical_cards_base) if isinstance(_sc_historical_cards_base, list) else 0
+    with _cache_lock:
+        servers_cache_kb = round(len(_servers_cache["data"]) / 1024.0, 1) if isinstance(_servers_cache.get("data"), (bytes, bytearray)) else 0.0
+
+    tm_current_mb = None
+    tm_peak_mb = None
+    if tracemalloc.is_tracing():
+        cur, peak = tracemalloc.get_traced_memory()
+        tm_current_mb = round(cur / (1024.0 * 1024.0), 2)
+        tm_peak_mb = round(peak / (1024.0 * 1024.0), 2)
+
+    return {
+        "pid": os.getpid(),
+        "rss_mb": get_process_rss_mb(),
+        "gc_counts": gc.get_count(),
+        "tracemalloc_active": tracemalloc.is_tracing(),
+        "tracemalloc_current_mb": tm_current_mb,
+        "tracemalloc_peak_mb": tm_peak_mb,
+        "file_cache_count": len(file_keys),
+        "file_cache_keys": file_keys,
+        "archive_cache_count": len(archive_keys),
+        "archive_cache_keys": archive_keys,
+        "server_meta_count": len(_sc_server_meta),
+        "active_cards_cached": active_cards_count,
+        "historical_cards_cached": hist_cards_count,
+        "servers_payload_cache_kb": servers_cache_kb,
+    }
 
 _sc_historical_cards_base = None
 _sc_historical_cards_key = None
@@ -678,10 +863,12 @@ def get_sc_data(filename: str, max_retries: int = 8) -> dict:
                 cached_entry = _sc_archive_cache.get(filename)
                 if cached_entry and cached_entry[0] == current_mtime:
                     _sc_archive_cache.move_to_end(filename)
+                    _sc_cache_last_access[filename] = time.monotonic()
                     return cached_entry[1]
             else:
                 cached_entry = _sc_file_cache.get(filename)
                 if cached_entry and cached_entry[0] == current_mtime:
+                    _sc_cache_last_access[filename] = time.monotonic()
                     return cached_entry[1]
 
     for attempt in range(max_retries):
@@ -1644,11 +1831,6 @@ def pull_server_checker_data() -> bool:
         current_data = {jid: dict(snaps) for jid, snaps in safe_dict_items(raw_current)}
         servers_list = resp_json.get("data", {}).get("servers", [])
 
-        for server in servers_list:
-            job_id = server.get("jobId")
-            if job_id and job_id not in _sc_server_ids:
-                _sc_server_ids.append(job_id)
-
         global _sc_latest_data
         _sc_latest_data = resp_json
         for s in _sc_latest_data.get("data", {}).get("servers", []):
@@ -1799,6 +1981,14 @@ def pull_server_checker_data() -> bool:
         if stats_payload:
             global_data[str(datetime.now(timezone.utc).isoformat())] = stats_payload
             save_sc_data(global_data, "global.json")
+
+        global _last_cache_eviction_ts
+        mono_now = time.monotonic()
+        if mono_now - _last_cache_eviction_ts >= 300.0:
+            _last_cache_eviction_ts = mono_now
+            evicted = evict_stale_caches()
+            if evicted["archives"] or evicted["files"]:
+                trim_process_memory(run_gc=True)
 
         return True
 
