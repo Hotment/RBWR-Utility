@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -133,7 +134,6 @@ public static class TooltipBehaviors
 
             _titleBlock = new TextBlock
             {
-                Foreground = new SolidColorBrush(Color.Parse("#00f0ff")),
                 FontFamily = TooltipFont,
                 FontWeight = FontWeight.Bold,
                 FontSize = 10,
@@ -141,22 +141,25 @@ public static class TooltipBehaviors
                 TextAlignment = TextAlignment.Left,
                 TextWrapping = TextWrapping.Wrap
             };
+            _titleBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("NeonCyan");
+            _titleBlock[!TextBlock.FontFamilyProperty] = new DynamicResourceExtension("AppFontFamily");
 
             var divider = new Border
             {
-                Height = 1,
-                Background = new SolidColorBrush(Color.Parse("#1b253b"))
+                Height = 1
             };
+            divider[!Border.BackgroundProperty] = new DynamicResourceExtension("CyberBorder");
 
             _descBlock = new TextBlock
             {
-                Foreground = new SolidColorBrush(Color.Parse("#dce6f5")),
                 FontFamily = TooltipFont,
                 FontSize = 9.5,
                 LineHeight = 13.5,
                 TextAlignment = TextAlignment.Left,
                 TextWrapping = TextWrapping.Wrap
             };
+            _descBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TooltipBodyBrush");
+            _descBlock[!TextBlock.FontFamilyProperty] = new DynamicResourceExtension("AppFontFamily");
 
             var contentStack = new StackPanel
             {
@@ -173,8 +176,6 @@ public static class TooltipBehaviors
 
             var cardBorder = new Border
             {
-                Background = new SolidColorBrush(Color.Parse("#f7080d18")),
-                BorderBrush = new SolidColorBrush(Color.Parse("#8c00f0ff")),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(10, 7),
@@ -182,6 +183,8 @@ public static class TooltipBehaviors
                 IsHitTestVisible = false,
                 Child = contentStack
             };
+            cardBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("TooltipBg");
+            cardBorder[!Border.BorderBrushProperty] = new DynamicResourceExtension("TooltipBorder");
 
             _scaleTransform = new ScaleTransform(1.0, 1.0);
             var scaleWrapper = new LayoutTransformControl

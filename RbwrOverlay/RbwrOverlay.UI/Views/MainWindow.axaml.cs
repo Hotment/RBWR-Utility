@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private CustomMessageWindow? _messageWindow;
     private UpdateWindow? _updateWindow;
     private Tablet.Views.TabletWindow? _tabletWindow;
+    private ThemeSelectorWindow? _themeSelectorWindow;
 
     public MainWindow()
     {
@@ -33,6 +34,7 @@ public partial class MainWindow : Window
             vm.RequestShowUpdate += OnShowUpdate;
             vm.RequestQuit += OnQuit;
             vm.RequestOpenTablet += OnOpenTablet;
+            vm.RequestOpenThemeSelector += OnOpenThemeSelector;
 
             UpdateWindowSize(vm.IsCompact);
         }
@@ -64,7 +66,7 @@ public partial class MainWindow : Window
     {
         for (var current = visual; current != null && current is not Window; current = current.GetVisualParent())
         {
-            if (current is Button or TextBox or Slider or AutoCompleteBox or CheckBox or MenuItem)
+            if (current is Button or TextBox or Slider or AutoCompleteBox or CheckBox or ComboBox or ComboBoxItem or MenuItem)
             {
                 return true;
             }
@@ -166,8 +168,40 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnOpenThemeSelector()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_themeSelectorWindow != null)
+            {
+                if (_themeSelectorWindow.WindowState == WindowState.Minimized)
+                    _themeSelectorWindow.WindowState = WindowState.Normal;
+                _themeSelectorWindow.Activate();
+                return;
+            }
+
+            if (DataContext is not MainOverlayViewModel vm) return;
+
+            _themeSelectorWindow = new ThemeSelectorWindow
+            {
+                DataContext = vm.CreateThemeSelectorViewModel()
+            };
+            _themeSelectorWindow.Closed += (_, _) => _themeSelectorWindow = null;
+
+            if (IsVisible)
+            {
+                _themeSelectorWindow.Show(this);
+            }
+            else
+            {
+                _themeSelectorWindow.Show();
+            }
+        });
+    }
+
     private void OnQuit()
     {
+        _themeSelectorWindow?.Close();
         _tabletWindow?.Close();
         Close();
         Environment.Exit(0);

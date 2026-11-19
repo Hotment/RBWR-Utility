@@ -1,11 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:conv="using:RbwrOverlay.UI.Converters"
         x:Class="RbwrOverlay.UI.Views.FeedbackWindow"
         x:DataType="vm:FeedbackViewModel"
         Title="Tickets &amp; Community Feedback"
         Icon="/Assets/icon.ico"
-        Background="{DynamicResource CyberCardBg}"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         WindowDecorations="None"
         CanResize="False"
         Topmost="True"
@@ -13,14 +15,14 @@
         Height="270"
         WindowStartupLocation="CenterOwner">
 
-    <Border BorderBrush="{DynamicResource NeonCyan}"
-            BorderThickness="1"
-            CornerRadius="4">
+    <Border Name="RootBorder"
+            Classes="overlay-shell popup-shell">
 
         <Grid RowDefinitions="Auto,*">
 
             <Border Grid.Row="0"
-                    Background="{DynamicResource CyberHeaderBg}"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
                     Padding="10,6">
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0"
@@ -72,20 +74,17 @@
                             FontWeight="SemiBold" />
                 </Grid>
 
-                <Border Background="{DynamicResource DarkPanelBg}"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="3"
+                <Border Classes="hud-card sub-panel"
                         Padding="8,6">
                     <StackPanel Spacing="3">
                         <TextBlock Text="Web: rbwr.hotment.dev/tickets"
                                    Foreground="{DynamicResource TextMuted}"
                                    FontSize="8"
-                                   FontFamily="Consolas" />
+                                   FontFamily="{DynamicResource AppMonoFontFamily}" />
                         <TextBlock Text="Discord: discord.gg/4eUQQcuv87"
                                    Foreground="{DynamicResource TextMuted}"
                                    FontSize="8"
-                                   FontFamily="Consolas" />
+                                   FontFamily="{DynamicResource AppMonoFontFamily}" />
                     </StackPanel>
                 </Border>
 

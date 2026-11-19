@@ -1,0 +1,323 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:conv="using:RbwrOverlay.UI.Converters"
+        xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
+        x:Class="RbwrOverlay.UI.Views.ThemeSelectorWindow"
+        x:DataType="vm:ThemeSelectorViewModel"
+        Title="Theme Manager"
+        Icon="/Assets/icon.ico"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        CanResize="False"
+        Topmost="True"
+        Width="540"
+        Height="520"
+        WindowStartupLocation="CenterOwner">
+
+    <Panel x:Name="RootHostPanel">
+        <Border Name="RootBorder"
+                Classes="overlay-shell popup-shell">
+
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+
+                <Border Grid.Row="0"
+                        Name="HeaderBorder"
+                        Classes="hud-header"
+                        CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
+                        Padding="14,10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                            <Border Width="3"
+                                    Height="13"
+                                    CornerRadius="1.5"
+                                    Background="{DynamicResource NeonCyan}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Text="THEME MANAGER"
+                                       Foreground="{DynamicResource NeonCyan}"
+                                       FontWeight="Bold"
+                                       FontSize="11"
+                                       LetterSpacing="1.1"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="• RBWR OVERLAY"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontSize="9"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Classes="cyber-close-btn"
+                                Content="X"
+                                Command="{Binding CloseCommand}"
+                                behaviors:TooltipBehaviors.Key="ThemeManagerClose"
+                                FontSize="10"
+                                FontWeight="Bold"
+                                Padding="7,3" />
+                    </Grid>
+                </Border>
+
+                <Rectangle Grid.Row="1"
+                           Fill="{DynamicResource CyberBorder}"
+                           Height="1" />
+
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="*,Auto"
+                      Margin="14,10,14,6">
+                    <TextBox Grid.Column="0"
+                             Classes="cyber"
+                             Text="{Binding SearchQuery}"
+                             PlaceholderText="Search themes by name, author, id, or description..."
+                             TextAlignment="Left"
+                             HorizontalContentAlignment="Left"
+                             Padding="8,4"
+                             FontSize="11"
+                             behaviors:TooltipBehaviors.Key="ThemeManagerSearch" />
+                    <Border Grid.Column="1"
+                            Classes="hud-card"
+                            Padding="8,4"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ThemeCountText}"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   FontSize="10"
+                                   FontWeight="Bold" />
+                    </Border>
+                </Grid>
+
+                <ScrollViewer Grid.Row="3"
+                              Margin="14,4,10,6"
+                              Padding="0,0,4,0">
+                    <ItemsControl ItemsSource="{Binding FilteredThemes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ThemeEntryViewModel">
+                                <Border Classes="hud-card"
+                                        Padding="11,9"
+                                        Margin="0,0,0,8"
+                                        Cursor="Hand"
+                                        PointerPressed="OnThemeCardPointerPressed"
+                                        behaviors:TooltipBehaviors.Key="ThemeEntryDetails">
+                                    <StackPanel Spacing="8">
+
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0"
+                                                        Spacing="3"
+                                                        VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="6"
+                                                            VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="{DynamicResource TextLight}"
+                                                               FontWeight="Bold"
+                                                               FontSize="12"
+                                                               VerticalAlignment="Center" />
+
+                                                    <Border Background="{DynamicResource DarkPanelBg}"
+                                                            BorderBrush="{DynamicResource CyberBorder}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="5,1"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding VersionText}"
+                                                                   Foreground="{DynamicResource NeonGold}"
+                                                                   FontSize="9"
+                                                                   FontWeight="Bold" />
+                                                    </Border>
+
+                                                    <Border Background="{DynamicResource DarkPanelBg}"
+                                                            BorderBrush="{DynamicResource NeonCyan}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="5,1"
+                                                            IsVisible="{Binding IsActive}"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="ACTIVE"
+                                                                   Foreground="{DynamicResource NeonCyan}"
+                                                                   FontSize="8.5"
+                                                                   FontWeight="Bold" />
+                                                    </Border>
+
+                                                    <Border Background="{DynamicResource DarkPanelBg}"
+                                                            BorderBrush="{DynamicResource CyberBorder}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="5,1"
+                                                            IsVisible="{Binding !IsActive}"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding BadgeText}"
+                                                                   Foreground="{DynamicResource TextMuted}"
+                                                                   FontSize="8.5"
+                                                                   FontWeight="SemiBold" />
+                                                    </Border>
+
+                                                    <Border Background="{DynamicResource DarkPanelBg}"
+                                                            BorderBrush="{DynamicResource NeonGold}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="5,1"
+                                                            IsVisible="{Binding IsVersionWarning}"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding VersionWarningText}"
+                                                                   Foreground="{DynamicResource NeonGold}"
+                                                                   FontSize="8.5"
+                                                                   FontWeight="Bold" />
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <TextBlock Text="{Binding AuthorText}"
+                                                           Foreground="{DynamicResource TextMuted}"
+                                                           FontSize="10" />
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="6"
+                                                        VerticalAlignment="Center"
+                                                        Margin="8,0,0,0">
+                                                <Button Classes="cyber"
+                                                        Classes.active="{Binding IsActive}"
+                                                        Content="{Binding ApplyButtonText}"
+                                                        Command="{Binding ApplyCommand}"
+                                                        IsEnabled="{Binding !IsActive}"
+                                                        Padding="10,4"
+                                                        FontSize="10"
+                                                        behaviors:TooltipBehaviors.Key="ThemeEntryApply" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Border IsVisible="{Binding IsExpanded}"
+                                                Classes="hud-card sub-panel"
+                                                Padding="10,8">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="{Binding DescriptionText}"
+                                                           Foreground="{DynamicResource TooltipBodyBrush}"
+                                                           FontSize="10"
+                                                           LineHeight="14"
+                                                           TextWrapping="Wrap" />
+
+                                                <Grid ColumnDefinitions="Auto,*,Auto,*"
+                                                      RowDefinitions="Auto,Auto">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="ID:" Foreground="{DynamicResource TextMuted}" FontSize="9" Margin="0,0,6,2" />
+                                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Id}" Foreground="{DynamicResource TextLight}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="9" Margin="0,0,12,2" />
+
+                                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="MIN APP:" Foreground="{DynamicResource TextMuted}" FontSize="9" Margin="0,0,6,2" />
+                                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding MinAppVersionText}" Foreground="{DynamicResource TextLight}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="9" Margin="0,0,0,2" />
+
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="PATH:" Foreground="{DynamicResource TextMuted}" FontSize="9" Margin="0,2,6,0" />
+                                                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding LocationText}" Foreground="{DynamicResource TextMuted}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="8.5" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                </Grid>
+
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="6">
+                                                    <Button Classes="cyber-green"
+                                                            Content="Apply Theme"
+                                                            Command="{Binding ApplyCommand}"
+                                                            IsVisible="{Binding !IsActive}"
+                                                            Padding="9,3"
+                                                            FontSize="9.5"
+                                                            behaviors:TooltipBehaviors.Key="ThemeEntryApply" />
+
+                                                    <Button Classes="cyber"
+                                                            Content="Reload"
+                                                            Command="{Binding ReloadEntryCommand}"
+                                                            IsVisible="{Binding CanManageFiles}"
+                                                            Padding="8,3"
+                                                            FontSize="9.5"
+                                                            behaviors:TooltipBehaviors.Key="ThemeReloadButton" />
+
+                                                    <Button Classes="cyber"
+                                                            Content="Edit AXAML"
+                                                            Command="{Binding EditAxamlCommand}"
+                                                            IsVisible="{Binding CanManageFiles}"
+                                                            Padding="8,3"
+                                                            FontSize="9.5"
+                                                            behaviors:TooltipBehaviors.Key="ThemeEntryEdit" />
+
+                                                    <Button Classes="cyber"
+                                                            Content="Folder"
+                                                            Command="{Binding OpenEntryFolderCommand}"
+                                                            IsVisible="{Binding CanManageFiles}"
+                                                            Padding="8,3"
+                                                            FontSize="9.5"
+                                                            behaviors:TooltipBehaviors.Key="ThemeEntryFolder" />
+
+                                                    <Button Classes="cyber-red"
+                                                            Content="{Binding DeleteButtonText}"
+                                                            Command="{Binding DeleteCommand}"
+                                                            IsVisible="{Binding CanManageFiles}"
+                                                            Padding="8,3"
+                                                            FontSize="9.5"
+                                                            behaviors:TooltipBehaviors.Key="ThemeEntryDelete" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Grid.Row="4"
+                           Text="{Binding StatusMessage}"
+                           Foreground="{Binding StatusBrush}"
+                           IsVisible="{Binding HasStatusMessage}"
+                           FontSize="9.5"
+                           Margin="14,0,14,6"
+                           TextWrapping="Wrap" />
+
+                <Border Grid.Row="5"
+                        Classes="hud-header"
+                        BorderBrush="{DynamicResource CyberBorder}"
+                        BorderThickness="0,1,0,0"
+                        CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.BottomOnly}}"
+                        Padding="14,10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Spacing="6">
+                            <Button Classes="cyber-blue"
+                                    Content="Install Pack"
+                                    Command="{Binding InstallThemeCommand}"
+                                    Padding="9,4"
+                                    FontSize="10"
+                                    behaviors:TooltipBehaviors.Key="ThemeInstallButton" />
+                            <Button Classes="cyber"
+                                    Content="Reload All"
+                                    Command="{Binding ReloadAllCommand}"
+                                    Padding="9,4"
+                                    FontSize="10"
+                                    behaviors:TooltipBehaviors.Key="ThemeReloadButton" />
+                            <Button Classes="cyber"
+                                    Content="New Template"
+                                    Command="{Binding CreateTemplateCommand}"
+                                    Padding="9,4"
+                                    FontSize="10"
+                                    behaviors:TooltipBehaviors.Key="ThemeTemplateButton" />
+                            <Button Classes="cyber"
+                                    Content="Themes Folder"
+                                    Command="{Binding OpenThemesFolderCommand}"
+                                    Padding="9,4"
+                                    FontSize="10"
+                                    behaviors:TooltipBehaviors.Key="ThemeFolderButton" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Classes="cyber"
+                                Content="Close"
+                                Command="{Binding CloseCommand}"
+                                Padding="12,4"
+                                FontSize="10"
+                                behaviors:TooltipBehaviors.Key="ThemeManagerClose" />
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Border>
+    </Panel>
+</Window>

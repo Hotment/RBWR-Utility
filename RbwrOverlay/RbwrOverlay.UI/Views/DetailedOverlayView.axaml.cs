@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using RbwrOverlay.UI.Behaviors;
 using RbwrOverlay.UI.ViewModels;
@@ -11,6 +12,8 @@ namespace RbwrOverlay.UI.Views;
 
 public partial class DetailedOverlayView : UserControl
 {
+    private MainOverlayViewModel? _subscribedVm;
+
     public DetailedOverlayView()
     {
         InitializeComponent();
@@ -42,6 +45,53 @@ public partial class DetailedOverlayView : UserControl
         foreach (var acb in this.GetVisualDescendants().OfType<AutoCompleteBox>())
         {
             AutoCompleteBehaviors.ApplyJobIdFilter(acb);
+        }
+
+        if (DataContext is MainOverlayViewModel vm && !ReferenceEquals(_subscribedVm, vm))
+        {
+            if (_subscribedVm != null)
+            {
+                _subscribedVm.RequestInstallThemePicker -= OnRequestInstallThemePicker;
+            }
+            _subscribedVm = vm;
+            _subscribedVm.RequestInstallThemePicker += OnRequestInstallThemePicker;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_subscribedVm != null)
+        {
+            _subscribedVm.RequestInstallThemePicker -= OnRequestInstallThemePicker;
+            _subscribedVm = null;
+        }
+    }
+
+    private async void OnRequestInstallThemePicker()
+    {
+        if (DataContext is not MainOverlayViewModel vm) return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Install RBWR Overlay Theme",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Theme Files (*.zip, *.axaml, theme.json)")
+                {
+                    Patterns = new[] { "*.zip", "*.axaml", "*.xaml", "theme.json" }
+                }
+            }
+        });
+
+        var file = files.FirstOrDefault();
+        string? localPath = file?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath))
+        {
+            vm.InstallThemeFromPath(localPath);
         }
     }
 

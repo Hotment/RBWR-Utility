@@ -4,6 +4,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.UI.Services;
 
 namespace RbwrOverlay.UI.ViewModels;
 
@@ -25,7 +26,7 @@ public partial class FeedbackViewModel : ViewModelBase
     private string _statusMessage = string.Empty;
 
     [ObservableProperty]
-    private IBrush _statusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+    private IBrush _statusBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
     [ObservableProperty]
     private bool _isSubmitting;
@@ -89,13 +90,13 @@ public partial class FeedbackViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(FeedbackContent))
         {
             StatusMessage = "Error: Feedback details cannot be empty.";
-            StatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            StatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
             return;
         }
 
         IsSubmitting = true;
         StatusMessage = "Sending feedback...";
-        StatusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+        StatusBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
         bool success = await _apiClient.SubmitSuggestionAsync(AuthorName, FeedbackContent, IsAnonymous);
         IsSubmitting = false;
@@ -103,7 +104,7 @@ public partial class FeedbackViewModel : ViewModelBase
         if (success)
         {
             StatusMessage = "Feedback submitted successfully!";
-            StatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+            StatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
             FeedbackContent = string.Empty;
             await Task.Delay(1500);
             RequestClose?.Invoke(this, EventArgs.Empty);
@@ -111,7 +112,7 @@ public partial class FeedbackViewModel : ViewModelBase
         else
         {
             StatusMessage = "Error: Connection to server failed.";
-            StatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            StatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
         }
     }
 

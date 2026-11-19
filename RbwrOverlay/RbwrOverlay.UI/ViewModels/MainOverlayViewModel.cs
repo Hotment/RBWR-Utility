@@ -35,7 +35,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private readonly IApiClient _apiClient;
     private readonly IProcessMonitor _processMonitor;
     private readonly ILoggingService _logger;
+    private readonly IThemeService _themeService;
     private readonly AppSettings _settings;
+    private bool _isInitializingThemes;
 
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     public int MaxConnectionRetries { get; set; } = 2;
@@ -123,10 +125,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private double _thermalPowerPercent;
 
     [ObservableProperty]
-    private IBrush _mainPowerBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+    private IBrush _mainPowerBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
     [ObservableProperty]
-    private IBrush _powerBarBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+    private IBrush _powerBarBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
     [ObservableProperty]
     private string _compactRtpText = "0.0% APRM";
@@ -266,7 +268,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _connectionStatusText = "UNSYNCED";
 
     [ObservableProperty]
-    private IBrush _connectionStatusBrush = new SolidColorBrush(Color.Parse("#73839c"));
+    private IBrush _connectionStatusBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
 
     [ObservableProperty]
     private string _heartbeatAgeText = "No Server Connected";
@@ -305,13 +307,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _hasSyncIssue = true;
 
     [ObservableProperty]
-    private IBrush _compactCounterBrush = new SolidColorBrush(Color.Parse("#73839c"));
+    private IBrush _compactCounterBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
 
     [ObservableProperty]
-    private IBrush _compactErrorIndicatorBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+    private IBrush _compactErrorIndicatorBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
 
     [ObservableProperty]
-    private IBrush _serverDtlBrush = new SolidColorBrush(Color.Parse("#73839c"));
+    private IBrush _serverDtlBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
 
     [ObservableProperty]
     private double _demandTimeLeftSeconds;
@@ -329,7 +331,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _syncStatusMessage = string.Empty;
 
     [ObservableProperty]
-    private IBrush _syncStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _syncStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
     [ObservableProperty]
     private double _turbineHealthValue = 100.0;
@@ -338,7 +340,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _turbineHealthText = "Turbine Health: --%";
 
     [ObservableProperty]
-    private IBrush _turbineHealthBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _turbineHealthBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
 
     [ObservableProperty]
@@ -357,13 +359,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _topmostStatusText = "ENABLED";
 
     [ObservableProperty]
-    private IBrush _topmostStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _topmostStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
     [ObservableProperty]
     private string _turbineAlertStatusText = "DISABLED";
 
     [ObservableProperty]
-    private IBrush _turbineAlertStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+    private IBrush _turbineAlertStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
 
     [ObservableProperty]
     private bool _showTooltips = true;
@@ -375,13 +377,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _discordPresenceStatusText = "ENABLED";
 
     [ObservableProperty]
-    private IBrush _discordPresenceStatusBrush = Brushes.LimeGreen;
+    private IBrush _discordPresenceStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
     [ObservableProperty]
     private string _tooltipsStatusText = "ENABLED";
 
     [ObservableProperty]
-    private IBrush _tooltipsStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _tooltipsStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
     [ObservableProperty]
     private bool _autoSyncOnJoin = true;
@@ -390,7 +392,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _autoSyncOnJoinStatusText = "ENABLED";
 
     [ObservableProperty]
-    private IBrush _autoSyncOnJoinStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _autoSyncOnJoinStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
 
     [ObservableProperty]
@@ -406,7 +408,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _feedbackStatusMessage = string.Empty;
 
     [ObservableProperty]
-    private IBrush _feedbackStatusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+    private IBrush _feedbackStatusBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
     [ObservableProperty]
     private bool _isSubmittingFeedback;
@@ -429,10 +431,26 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _downloadFileName = string.Empty;
 
+    public ObservableCollection<InstalledThemeInfo> AvailableThemes { get; } = new();
+
+    [ObservableProperty]
+    private InstalledThemeInfo? _selectedThemeItem;
+
+    [ObservableProperty]
+    private string _themeStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasThemeStatusMessage;
+
+    [ObservableProperty]
+    private IBrush _themeStatusBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+
     public event Action<string, string, bool>? RequestShowMessage;
     public event Action<UpdateInfo>? RequestShowUpdate;
     public event Action? RequestQuit;
     public event Action? RequestOpenTablet;
+    public event Action? RequestOpenThemeSelector;
+    public event Action? RequestInstallThemePicker;
     public bool IsTabletOpen { get; set; }
     public IApiClient ApiClient => _apiClient;
 
@@ -446,13 +464,15 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         ISettingsService? settingsService = null,
         IApiClient? apiClient = null,
         IProcessMonitor? processMonitor = null,
-        ILoggingService? logger = null)
+        ILoggingService? logger = null,
+        IThemeService? themeService = null)
     {
         _logger = logger ?? LoggingService.Instance;
         _settingsService = settingsService ?? new SettingsService(_logger);
         _settings = _settingsService.LoadSettings();
         _apiClient = apiClient ?? new ApiClient(logger: _logger);
         _processMonitor = processMonitor ?? ProcessMonitorFactory.Create(_logger);
+        _themeService = themeService ?? new ThemeService(_logger);
 
         _calc = new Calculator(_settings.Usage)
         {
@@ -486,6 +506,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         UpdateUnitVisuals();
         UpdateSettingsVisuals();
         UpdateSyncVisuals();
+        InitializeThemes();
 
         _dtlTimer = new DispatcherTimer
         {
@@ -667,22 +688,22 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         {
             IsOverpowerRisk = true;
             MainStatusSubText = $"SCRAM OVERPOWER RISK (>{limit:F0}%)";
-            MainPowerBrush = new SolidColorBrush(Color.Parse("#ff003c"));
-            PowerBarBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            MainPowerBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
+            PowerBarBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
         }
         else if (thermal >= 95.0)
         {
             IsOverpowerRisk = false;
             MainStatusSubText = "APPROACHING PEAK LOAD";
-            MainPowerBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-            PowerBarBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+            MainPowerBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
+            PowerBarBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
         }
         else
         {
             IsOverpowerRisk = false;
             MainStatusSubText = isTcr ? "MAIN STEAM SEALING & OIL COOLING STATUS" : "APRM REACTOR POWER STATUS";
-            MainPowerBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
-            PowerBarBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+            MainPowerBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+            PowerBarBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
         }
 
         UpdateRecircIndicator();
@@ -706,8 +727,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         DetailedLoadValueText = "ERROR";
         DetailedBottomRightText = "Aux Usage: ---";
         ThermalPowerPercent = 0;
-        MainPowerBrush = new SolidColorBrush(Color.Parse("#ff003c"));
-        PowerBarBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+        MainPowerBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
+        PowerBarBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
         UpdateRecircIndicator();
     }
 
@@ -950,7 +971,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 retriesAttempted++;
                 SetSyncStatus($"Connection lost with server. Retrying (attempt {retriesAttempted}/{MaxConnectionRetries})...", "#ffaa00");
                 ConnectionStatusText = "RETRYING";
-                ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+                ConnectionStatusBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
                 UpdateSyncVisuals();
 
                 if (ConnectionRetryDelayMs > 0)
@@ -993,7 +1014,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                             HasSyncIssue = true;
                             SetSyncStatus($"Sync Warning: Missing {string.Join(", ", missing)}", "#ffaa00");
                             ConnectionStatusText = "DESYNCED";
-                            ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+                            ConnectionStatusBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
                             UpdateSyncVisuals();
                         }
                     }
@@ -1005,7 +1026,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                         HasSyncIssue = true;
                         SetSyncStatus($"Server '{CurrentJobId}' not found in public list", "#ff003c");
                         ConnectionStatusText = "DESYNCED";
-                        ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+                        ConnectionStatusBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
                         UpdateSyncVisuals();
                     }
                 }
@@ -1017,7 +1038,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                     HasSyncIssue = true;
                     SetSyncStatus("No active servers found on API", "#ff003c");
                     ConnectionStatusText = "UNSYNCED";
-                    ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+                    ConnectionStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
                     UpdateSyncVisuals();
                 }
             }
@@ -1028,7 +1049,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                 IsSyncError = true;
                 HasSyncIssue = true;
                 ConnectionStatusText = "UNSYNCED";
-                ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+                ConnectionStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
 
                 switch (fetchResult.ErrorKind)
                 {
@@ -1080,7 +1101,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             HasSyncIssue = true;
             SetSyncStatus($"Error syncing server: {ex.Message}", "#ff003c");
             ConnectionStatusText = "UNSYNCED";
-            ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            ConnectionStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
             UpdateSyncVisuals();
         }
         finally
@@ -1119,7 +1140,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         double? nextDem = uState?.NextDemand;
 
         ConnectionStatusText = "SYNCED";
-        ConnectionStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+        ConnectionStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
         var now = DateTimeOffset.UtcNow;
         var hb = _heartbeatTimestamp ?? now;
@@ -1194,8 +1215,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             TurbineHealthValue = Math.Clamp(tHealth.Value, 0.0, 100.0);
             TurbineHealthText = $"Turbine Health: {tHealth.Value:F1}%";
             TurbineHealthBrush = tHealth.Value > _settings.TurbineHealthThreshold
-                ? new SolidColorBrush(Color.Parse("#39ff14"))
-                : new SolidColorBrush(Color.Parse("#ff003c"));
+                ? ThemeService.ResolveBrush("NeonGreen", "#39ff14")
+                : ThemeService.ResolveBrush("NeonRed", "#ff003c");
 
             if (tHealth.Value > _settings.TurbineHealthThreshold)
             {
@@ -1521,10 +1542,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private string _lastSyncStatusHex = "#39ff14";
+
     private void SetSyncStatus(string msg, string hexColor)
     {
         SyncStatusMessage = msg;
-        SyncStatusBrush = new SolidColorBrush(Color.Parse(hexColor));
+        _lastSyncStatusHex = hexColor;
+        SyncStatusBrush = ThemeService.ResolveBrushForHex(hexColor);
     }
 
 
@@ -1677,13 +1701,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(FeedbackContent))
         {
             FeedbackStatusMessage = "Error: Suggestion text cannot be empty.";
-            FeedbackStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            FeedbackStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
             return;
         }
 
         IsSubmittingFeedback = true;
         FeedbackStatusMessage = "Transmitting to RBWR server...";
-        FeedbackStatusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
+        FeedbackStatusBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
         bool success = await _apiClient.SubmitSuggestionAsync(FeedbackAuthor, FeedbackContent, FeedbackIsAnonymous);
         IsSubmittingFeedback = false;
@@ -1691,13 +1715,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         if (success)
         {
             FeedbackStatusMessage = "Feedback submitted successfully!";
-            FeedbackStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+            FeedbackStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
             FeedbackContent = string.Empty;
         }
         else
         {
             FeedbackStatusMessage = "Error: Failed to reach feedback server.";
-            FeedbackStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+            FeedbackStatusBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
         }
     }
 
@@ -1804,14 +1828,18 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     private void UpdateSyncVisuals()
     {
+        var gold = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
+        var red = ThemeService.ResolveBrush("NeonRed", "#ff003c");
+        var muted = ThemeService.ResolveBrush("TextMuted", "#73839c");
+
         if (_activeServer == null)
         {
             HasSyncIssue = true;
             if (ConnectionStatusText == "RETRYING")
             {
-                CompactErrorIndicatorBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-                CompactCounterBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-                ServerDtlBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+                CompactErrorIndicatorBrush = gold;
+                CompactCounterBrush = gold;
+                ServerDtlBrush = gold;
                 ServerDtlText = "RETRY";
                 CompactServerDtlText = "RETRY";
                 CompactCounterTooltip = string.IsNullOrWhiteSpace(SyncStatusMessage)
@@ -1822,9 +1850,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             }
             else if (IsSyncError)
             {
-                CompactErrorIndicatorBrush = new SolidColorBrush(Color.Parse("#ff003c"));
-                CompactCounterBrush = new SolidColorBrush(Color.Parse("#ff003c"));
-                ServerDtlBrush = new SolidColorBrush(Color.Parse("#ff003c"));
+                CompactErrorIndicatorBrush = red;
+                CompactCounterBrush = red;
+                ServerDtlBrush = red;
                 ServerDtlText = "ERR";
                 CompactServerDtlText = "ERR";
                 CompactCounterTooltip = string.IsNullOrWhiteSpace(SyncStatusMessage)
@@ -1835,9 +1863,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                CompactErrorIndicatorBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-                CompactCounterBrush = new SolidColorBrush(Color.Parse("#73839c"));
-                ServerDtlBrush = new SolidColorBrush(Color.Parse("#73839c"));
+                CompactErrorIndicatorBrush = gold;
+                CompactCounterBrush = muted;
+                ServerDtlBrush = muted;
                 ServerDtlText = "---";
                 CompactServerDtlText = "--";
                 CompactCounterTooltip = ShowNextDemandInCompact
@@ -1850,9 +1878,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         else
         {
             HasSyncIssue = false;
-            CompactErrorIndicatorBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-            CompactCounterBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-            ServerDtlBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+            CompactErrorIndicatorBrush = gold;
+            CompactCounterBrush = gold;
+            ServerDtlBrush = gold;
         }
     }
 
@@ -1865,8 +1893,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
 
         HasSyncIssue = false;
-        CompactCounterBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
-        ServerDtlBrush = new SolidColorBrush(Color.Parse("#ffaa00"));
+        var gold = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
+        CompactCounterBrush = gold;
+        ServerDtlBrush = gold;
 
         if (ShowNextDemandInCompact)
         {
@@ -1931,20 +1960,288 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     private void UpdateSettingsVisuals()
     {
+        var green = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+        var red = ThemeService.ResolveBrush("NeonRed", "#ff003c");
+
         TopmostStatusText = TopmostOnRoblox ? "ENABLED" : "DISABLED";
-        TopmostStatusBrush = TopmostOnRoblox ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        TopmostStatusBrush = TopmostOnRoblox ? green : red;
 
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
-        TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        TurbineAlertStatusBrush = EnableTurbineHealthAlert ? green : red;
 
         DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
-        DiscordPresenceStatusBrush = EnableDiscordPresence ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        DiscordPresenceStatusBrush = EnableDiscordPresence ? green : red;
 
         AutoSyncOnJoinStatusText = AutoSyncOnJoin ? "ENABLED" : "DISABLED";
-        AutoSyncOnJoinStatusBrush = AutoSyncOnJoin ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        AutoSyncOnJoinStatusBrush = AutoSyncOnJoin ? green : red;
 
         TooltipsStatusText = ShowTooltips ? "ENABLED" : "DISABLED";
-        TooltipsStatusBrush = ShowTooltips ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        TooltipsStatusBrush = ShowTooltips ? green : red;
+    }
+
+    private void InitializeThemes()
+    {
+        RefreshThemeList(_settings.SelectedThemeId);
+        if (!string.IsNullOrWhiteSpace(_settings.SelectedThemeId)
+            && !string.Equals(_settings.SelectedThemeId, ThemeService.DefaultThemeId, StringComparison.OrdinalIgnoreCase))
+        {
+            var result = _themeService.ApplyTheme(_settings.SelectedThemeId);
+            if (!result.Success)
+            {
+                SetThemeStatus($"Saved theme '{_settings.SelectedThemeId}' failed: {result.ErrorMessage}", isError: true);
+                _themeService.ApplyTheme(ThemeService.DefaultThemeId);
+                _settings.SelectedThemeId = ThemeService.DefaultThemeId;
+                _settingsService.SaveSettings(_settings);
+                RefreshThemeList(ThemeService.DefaultThemeId);
+            }
+            else
+            {
+                RefreshThemeDynamicBrushes();
+            }
+        }
+    }
+
+    private void RefreshThemeList(string? targetThemeId)
+    {
+        _isInitializingThemes = true;
+        try
+        {
+            IReadOnlyList<InstalledThemeInfo> themes;
+            try
+            {
+                themes = _themeService.DiscoverThemes();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"Theme discovery failed; keeping built-in default: {ex.Message}");
+                themes = Array.Empty<InstalledThemeInfo>();
+            }
+
+            AvailableThemes.Clear();
+            bool hasDefault = themes.Any(t => string.Equals(t.Id, ThemeService.DefaultThemeId, StringComparison.OrdinalIgnoreCase));
+            if (!hasDefault)
+            {
+                AvailableThemes.Add(ThemeService.CreateDefaultThemeInfo());
+            }
+            foreach (var t in themes)
+            {
+                AvailableThemes.Add(t);
+            }
+
+            SelectedThemeItem = AvailableThemes.FirstOrDefault(
+                t => string.Equals(t.Id, targetThemeId, StringComparison.OrdinalIgnoreCase))
+                ?? AvailableThemes.FirstOrDefault(t => string.Equals(t.Id, ThemeService.DefaultThemeId, StringComparison.OrdinalIgnoreCase))
+                ?? AvailableThemes.FirstOrDefault();
+        }
+        finally
+        {
+            _isInitializingThemes = false;
+        }
+    }
+
+    partial void OnSelectedThemeItemChanged(InstalledThemeInfo? value)
+    {
+        if (_isInitializingThemes) return;
+        if (value == null)
+        {
+            var fallback = AvailableThemes.FirstOrDefault(t => string.Equals(t.Id, _themeService.ActiveThemeId, StringComparison.OrdinalIgnoreCase))
+                ?? AvailableThemes.FirstOrDefault(t => string.Equals(t.Id, ThemeService.DefaultThemeId, StringComparison.OrdinalIgnoreCase))
+                ?? AvailableThemes.FirstOrDefault();
+            if (fallback != null)
+            {
+                _isInitializingThemes = true;
+                try { SelectedThemeItem = fallback; }
+                finally { _isInitializingThemes = false; }
+            }
+            return;
+        }
+        ApplyThemeAndSave(value.Id);
+    }
+
+    public ThemeApplyResult ApplyThemeAndSave(string themeId)
+    {
+        var result = _themeService.ApplyTheme(themeId);
+        if (result.Success)
+        {
+            _settings.SelectedThemeId = result.ThemeId;
+            _settingsService.SaveSettings(_settings);
+            RefreshThemeDynamicBrushes();
+
+            var activeInfo = AvailableThemes.FirstOrDefault(
+                t => string.Equals(t.Id, result.ThemeId, StringComparison.OrdinalIgnoreCase));
+            string displayName = result.ThemeId == ThemeService.DefaultThemeId
+                ? "Cyberpunk (Built-in)"
+                : (activeInfo?.Name ?? SelectedThemeItem?.Name ?? result.ThemeId);
+
+            if (!ThemeService.IsCompatibleWithAppVersion(activeInfo?.Manifest?.MinAppVersion, AppVersion))
+            {
+                SetThemeStatus(
+                    $"Active: {displayName} (targets v{activeInfo!.Manifest!.MinAppVersion}+; current is v{AppVersion})",
+                    isError: false,
+                    isWarning: true);
+            }
+            else
+            {
+                SetThemeStatus($"Active: {displayName}", isError: false);
+            }
+        }
+        else
+        {
+            SetThemeStatus($"Theme error: {result.ErrorMessage}", isError: true);
+        }
+        return result;
+    }
+
+    private void RefreshThemeDynamicBrushes()
+    {
+        var gold = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
+        var cyan = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+        var red = ThemeService.ResolveBrush("NeonRed", "#ff003c");
+        var green = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+        var muted = ThemeService.ResolveBrush("TextMuted", "#73839c");
+
+        UpdateSettingsVisuals();
+        UpdateSyncVisuals();
+
+        if (IsError || ThermalPowerPercent > 108.0)
+        {
+            MainPowerBrush = red;
+            PowerBarBrush = red;
+        }
+        else if (ThermalPowerPercent >= 95.0)
+        {
+            MainPowerBrush = gold;
+            PowerBarBrush = gold;
+        }
+        else
+        {
+            MainPowerBrush = cyan;
+            PowerBarBrush = cyan;
+        }
+
+        ConnectionStatusBrush = ConnectionStatusText switch
+        {
+            "SYNCED" => green,
+            "RETRYING" or "DESYNCED" => gold,
+            _ => IsSyncError ? red : muted
+        };
+
+        TurbineHealthBrush = TurbineHealthValue > _settings.TurbineHealthThreshold ? green : red;
+        SyncStatusBrush = ThemeService.ResolveBrushForHex(_lastSyncStatusHex);
+
+        if (!string.IsNullOrWhiteSpace(FeedbackStatusMessage))
+        {
+            FeedbackStatusBrush = FeedbackStatusMessage.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
+                ? red
+                : FeedbackStatusMessage.StartsWith("Transmitting", StringComparison.OrdinalIgnoreCase)
+                    ? cyan
+                    : green;
+        }
+        else
+        {
+            FeedbackStatusBrush = cyan;
+        }
+    }
+
+    private void SetThemeStatus(string message, bool isError, bool isWarning = false)
+    {
+        ThemeStatusMessage = message;
+        HasThemeStatusMessage = !string.IsNullOrWhiteSpace(message);
+        ThemeStatusBrush = isError
+            ? ThemeService.ResolveBrush("NeonRed", "#ff003c")
+            : isWarning
+                ? ThemeService.ResolveBrush("NeonGold", "#ffaa00")
+                : ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+    }
+
+    [RelayCommand]
+    public void InstallTheme() => RequestInstallThemePicker?.Invoke();
+
+    [RelayCommand]
+    public void OpenThemeSelector() => RequestOpenThemeSelector?.Invoke();
+
+    internal ThemeSelectorViewModel CreateThemeSelectorViewModel() => new(
+        _themeService,
+        themeId =>
+        {
+            RefreshThemeList(themeId);
+            return ApplyThemeAndSave(themeId);
+        },
+        path =>
+        {
+            var (success, installed, error) = _themeService.InstallTheme(path);
+            if (!success || installed == null)
+            {
+                SetThemeStatus($"Install failed: {error}", isError: true);
+                return (false, error);
+            }
+            RefreshThemeList(installed.Id);
+            var applyRes = ApplyThemeAndSave(installed.Id);
+            return (applyRes.Success, applyRes.ErrorMessage);
+        },
+        ReloadThemes,
+        () => RefreshThemeList(SelectedThemeItem?.Id ?? _settings.SelectedThemeId),
+        TryCreateTemplateTheme,
+        OpenThemesFolder);
+
+    public void InstallThemeFromPath(string sourcePath)
+    {
+        var (success, installed, error) = _themeService.InstallTheme(sourcePath);
+        if (!success || installed == null)
+        {
+            SetThemeStatus($"Install failed: {error}", isError: true);
+            return;
+        }
+
+        RefreshThemeList(installed.Id);
+        ApplyThemeAndSave(installed.Id);
+    }
+
+    [RelayCommand]
+    public void ReloadThemes()
+    {
+        string currentId = SelectedThemeItem?.Id ?? _settings.SelectedThemeId;
+        RefreshThemeList(currentId);
+        ApplyThemeAndSave(SelectedThemeItem?.Id ?? ThemeService.DefaultThemeId);
+    }
+
+    [RelayCommand]
+    public void CreateTemplateTheme() => TryCreateTemplateTheme();
+
+    private (bool Success, string? ErrorMessage) TryCreateTemplateTheme()
+    {
+        try
+        {
+            var template = _themeService.CreateTemplateTheme();
+            RefreshThemeList(template.Id);
+            var applyRes = ApplyThemeAndSave(template.Id);
+            if (!applyRes.Success)
+            {
+                return (false, applyRes.ErrorMessage);
+            }
+            SetThemeStatus($"Created & applied '{template.Name}' in themes/{template.Id}/", isError: false);
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            SetThemeStatus($"Template creation failed: {ex.Message}", isError: true);
+            return (false, ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    public void OpenThemesFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(_themeService.ThemesDirectory);
+            Process.Start(new ProcessStartInfo(_themeService.ThemesDirectory) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Failed to open themes folder", ex);
+            SetThemeStatus($"Could not open folder: {ex.Message}", isError: true);
+        }
     }
 
     public void Dispose()

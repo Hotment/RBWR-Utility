@@ -17,7 +17,7 @@
                 <Border Height="1"
                         Background="{DynamicResource CyberBorder}" />
                 <TextBlock Text="{Binding Description}"
-                           Foreground="#dce6f5"
+                           Foreground="{DynamicResource TooltipBodyBrush}"
                            FontSize="9.5"
                            LineHeight="13.5"
                            TextAlignment="Left"

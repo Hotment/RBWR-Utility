@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:conv="using:RbwrOverlay.UI.Converters"
         xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
         x:Class="RbwrOverlay.UI.Views.UpdateWindow"
         x:DataType="vm:UpdateViewModel"
@@ -17,17 +18,14 @@
 
     <Panel x:Name="RootHostPanel">
         <Border Name="RootBorder"
-                Background="#f7070a12"
-                BorderBrush="{DynamicResource NeonCyan}"
-                BorderThickness="1"
-                CornerRadius="8">
+                Classes="overlay-shell popup-shell">
 
             <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 
                 <Border Grid.Row="0"
                         Name="HeaderBorder"
-                        Background="{DynamicResource CyberHeaderBg}"
-                        CornerRadius="8,8,0,0"
+                        Classes="hud-header"
+                        CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
                         Padding="16,11">
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0"
@@ -73,10 +71,7 @@
                             Margin="16,14"
                             Spacing="12">
 
-                    <Border Background="#0b101d"
-                            BorderBrush="{DynamicResource CyberBorder}"
-                            BorderThickness="1"
-                            CornerRadius="6"
+                    <Border Classes="hud-card"
                             Padding="14,11">
                         <Grid ColumnDefinitions="*,Auto,*"
                               VerticalAlignment="Center">
@@ -90,16 +85,13 @@
                                            FontWeight="Bold"
                                            LetterSpacing="0.7" />
                                 <TextBlock Text="{Binding CurrentVersion, StringFormat='v{0}'}"
-                                           Foreground="#8e9eb8"
+                                           Foreground="{DynamicResource TextMuted}"
                                            FontWeight="Bold"
                                            FontSize="16" />
                             </StackPanel>
 
                             <Border Grid.Column="1"
-                                    Background="#111a2c"
-                                    BorderBrush="{DynamicResource CyberBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
+                                    Classes="hud-card sub-panel"
                                     Padding="8,3"
                                     Margin="12,0"
                                     VerticalAlignment="Center">
@@ -111,10 +103,8 @@
                             </Border>
 
                             <Border Grid.Column="2"
-                                    Background="#0f1d33"
-                                    BorderBrush="#5500f0ff"
-                                    BorderThickness="1"
-                                    CornerRadius="5"
+                                    Classes="hud-card sub-panel"
+                                    BorderBrush="{DynamicResource NeonCyan}"
                                     Padding="12,6"
                                     HorizontalAlignment="Stretch">
                                 <StackPanel Spacing="1"
@@ -126,7 +116,7 @@
                                                LetterSpacing="0.7"
                                                HorizontalAlignment="Right" />
                                     <TextBlock Text="{Binding LatestVersion, StringFormat='v{0}'}"
-                                               Foreground="#ffffff"
+                                               Foreground="{DynamicResource TextLight}"
                                                FontWeight="Bold"
                                                FontSize="19"
                                                HorizontalAlignment="Right" />
@@ -150,16 +140,13 @@
                                        FontSize="8.5" />
                         </Grid>
 
-                        <Border Background="#080c15"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="5"
+                        <Border Classes="hud-card sub-panel"
                                 Padding="12,10"
                                 MinHeight="78"
                                 MaxHeight="190">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <TextBlock Text="{Binding EffectiveReleaseNotes}"
-                                           Foreground="#dce6f5"
+                                           Foreground="{DynamicResource TooltipBodyBrush}"
                                            FontSize="11"
                                            LineHeight="17"
                                            TextWrapping="Wrap" />
@@ -167,10 +154,8 @@
                         </Border>
                     </StackPanel>
 
-                    <Border Background="#0c1526"
-                            BorderBrush="#4000f0ff"
-                            BorderThickness="1"
-                            CornerRadius="5"
+                    <Border Classes="hud-card sub-panel"
+                            BorderBrush="{DynamicResource NeonCyan}"
                             Padding="12,8"
                             IsVisible="{Binding HasDownloadStatus}">
                         <StackPanel Spacing="6">
@@ -208,8 +193,8 @@
 
                 <Border Grid.Row="4"
                         Name="FooterBorder"
-                        Background="#060911"
-                        CornerRadius="0,0,8,8"
+                        Classes="hud-header"
+                        CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.BottomOnly}}"
                         Padding="16,10">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Button Grid.Column="0"

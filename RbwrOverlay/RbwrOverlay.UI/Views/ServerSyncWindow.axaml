@@ -1,12 +1,14 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:conv="using:RbwrOverlay.UI.Converters"
         xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
         x:Class="RbwrOverlay.UI.Views.ServerSyncWindow"
         x:DataType="vm:ServerSyncViewModel"
         Title="Live Server Sync &amp; DTL Calibration"
         Icon="/Assets/icon.ico"
-        Background="{DynamicResource CyberCardBg}"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         WindowDecorations="None"
         CanResize="False"
         Topmost="True"
@@ -14,14 +16,14 @@
         Height="270"
         WindowStartupLocation="CenterOwner">
 
-    <Border BorderBrush="{DynamicResource NeonCyan}"
-            BorderThickness="1"
-            CornerRadius="4">
+    <Border Name="RootBorder"
+            Classes="overlay-shell popup-shell">
 
         <Grid RowDefinitions="Auto,*">
 
             <Border Grid.Row="0"
-                    Background="{DynamicResource CyberHeaderBg}"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
                     Padding="10,6">
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0"
@@ -53,7 +55,7 @@
                                      Text="{Binding JobIdInput}"
                                      behaviors:AutoCompleteBehaviors.JobIdFilter="True"
                                      FontSize="12"
-                                     FontFamily="Consolas, monospace"
+                                     FontFamily="{DynamicResource AppMonoFontFamily}"
                                      Margin="0,0,6,0" />
 
                     <Button Grid.Column="1"
@@ -63,10 +65,7 @@
                             Padding="12,4" />
                 </Grid>
 
-                <Border Background="{DynamicResource CyberMainBg}"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
+                <Border Classes="hud-card sub-panel"
                         Padding="10,8"
                         Margin="0,4,0,0">
 

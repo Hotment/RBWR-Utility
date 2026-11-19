@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using RbwrOverlay.UI.Behaviors;
+using RbwrOverlay.UI.Services;
 
 namespace RbwrOverlay.UI.Views;
 
@@ -105,27 +106,24 @@ public partial class CustomMessageWindow : Window
             TurbineHealthBar.Value = 40;
         }
 
-        Color accentColor;
+        IBrush accentBrush;
         string conditionText;
         string statusLabel;
 
         if (healthVal <= 45.0)
         {
-            accentColor = Color.Parse("#ff003c"); // Neon Red
+            accentBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
             conditionText = "CRITICAL DEGRADATION";
             statusLabel = "CRITICAL LOW";
         }
         else
         {
-            accentColor = Color.Parse("#ffaa00"); // Neon Gold / Warning
+            accentBrush = ThemeService.ResolveBrush("NeonGold", "#ffaa00");
             conditionText = "LOW HEALTH";
             statusLabel = "BELOW SAFE LIMIT";
         }
 
-        var accentBrush = new SolidColorBrush(accentColor);
-        var badgeBgBrush = healthVal <= 45.0
-            ? new SolidColorBrush(Color.Parse("#290e14"))
-            : new SolidColorBrush(Color.Parse("#261b0a"));
+        var badgeBgBrush = ThemeService.ResolveBrush("DarkPanelBg", "#111726");
 
         RootBorder.BorderBrush = accentBrush;
 
@@ -152,8 +150,7 @@ public partial class CustomMessageWindow : Window
         TitleText.Text = title.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase) ? title.ToUpperInvariant() : $"ERROR: {title.ToUpperInvariant()}";
         MessageText.Text = message;
 
-        var redColor = Color.Parse("#ff003c");
-        var redBrush = new SolidColorBrush(redColor);
+        var redBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
 
         RootBorder.BorderBrush = redBrush;
 
@@ -170,8 +167,7 @@ public partial class CustomMessageWindow : Window
         TitleText.Text = title.StartsWith("INFO", StringComparison.OrdinalIgnoreCase) ? title.ToUpperInvariant() : $"INFO: {title.ToUpperInvariant()}";
         MessageText.Text = message;
 
-        var cyanColor = Color.Parse("#00f0ff");
-        var cyanBrush = new SolidColorBrush(cyanColor);
+        var cyanBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
         RootBorder.BorderBrush = cyanBrush;
 

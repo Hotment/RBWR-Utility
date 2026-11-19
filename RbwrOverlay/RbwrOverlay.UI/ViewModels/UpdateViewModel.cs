@@ -4,13 +4,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.UI.Services;
 
 namespace RbwrOverlay.UI.ViewModels;
 
 public partial class UpdateViewModel : ViewModelBase
 {
-    private static readonly IBrush CyanStatusBrush = new SolidColorBrush(Color.Parse("#00f0ff"));
-    private static readonly IBrush RedStatusBrush = new SolidColorBrush(Color.Parse("#ff003c"));
 
     private readonly IApiClient _apiClient;
     private readonly ILoggingService _logger;
@@ -48,7 +47,9 @@ public partial class UpdateViewModel : ViewModelBase
 
     public bool IsDownloadError => DownloadStatus.StartsWith("Update failed", StringComparison.OrdinalIgnoreCase);
 
-    public IBrush DownloadStatusBrush => IsDownloadError ? RedStatusBrush : CyanStatusBrush;
+    public IBrush DownloadStatusBrush => IsDownloadError
+        ? ThemeService.ResolveBrush("NeonRed", "#ff003c")
+        : ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
 
     public string EffectiveReleaseNotes => string.IsNullOrWhiteSpace(ReleaseNotes)
         ? "Performance improvements, stability fixes, and operational refinements."

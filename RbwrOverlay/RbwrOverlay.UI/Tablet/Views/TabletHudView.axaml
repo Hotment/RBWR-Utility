@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RbwrOverlay.UI.Tablet.ViewModels"
+             xmlns:conv="using:RbwrOverlay.UI.Converters"
              xmlns:m="using:RbwrOverlay.UI.Tablet.Models"
              x:Class="RbwrOverlay.UI.Tablet.Views.TabletHudView"
              x:DataType="vm:TabletViewModel"
@@ -8,7 +9,7 @@
 
     <UserControl.Styles>
         <Style Selector="TextBlock.cyber-head">
-            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="FontSize" Value="10" />
@@ -23,7 +24,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="FontFamily" Value="Consolas, 'Segoe UI', monospace" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -39,17 +40,6 @@
         <Style Selector="Slider.cyber-slider">
             <Setter Property="MinHeight" Value="24" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Style.Resources>
-                <SolidColorBrush x:Key="SliderTrackFill" Color="#1b253b" />
-                <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#1b253b" />
-                <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#1b253b" />
-                <SolidColorBrush x:Key="SliderTrackValueFill" Color="#00f0ff" />
-                <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#00f0ff" />
-                <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#00f0ff" />
-                <SolidColorBrush x:Key="SliderThumbBackground" Color="#00f0ff" />
-                <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#5ff5ff" />
-                <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#a0faff" />
-            </Style.Resources>
         </Style>
 
         <Style Selector="ScrollViewer">
@@ -60,10 +50,10 @@
             <Setter Property="AllowAutoHide" Value="False" />
         </Style>
         <Style Selector="ScrollBar:vertical /template/ Grid#Root">
-            <Setter Property="Background" Value="#070a12" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ScrollBar:vertical /template/ Rectangle#TrackRect">
-            <Setter Property="Fill" Value="#070a12" />
+            <Setter Property="Fill" Value="{DynamicResource DarkPanelBg}" />
             <Setter Property="Stroke" Value="{DynamicResource CyberBorder}" />
             <Setter Property="Opacity" Value="1" />
         </Style>
@@ -71,7 +61,7 @@
             <Setter Property="Background" Value="{DynamicResource CyberBorder}" />
         </Style>
         <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
-            <Setter Property="Background" Value="#243352" />
+            <Setter Property="Background" Value="{DynamicResource NeonCyan}" />
         </Style>
         <Style Selector="ScrollBar:vertical /template/ Thumb:pressed">
             <Setter Property="Background" Value="{DynamicResource NeonCyan}" />
@@ -83,19 +73,16 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Background="{DynamicResource CyberMainBg}"
-            BorderBrush="{DynamicResource CyberBorderGlow}"
-            BorderThickness="1"
-            CornerRadius="8"
-            BoxShadow="0 0 24 0 #2800f0ff, 0 16 40 -8 #F0000000">
-        <Border CornerRadius="7" ClipToBounds="True">
-            <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Border Name="RootBorder"
+            Classes="overlay-shell popup-shell">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-                <Border Grid.Row="0"
-                        Background="{DynamicResource CyberHeaderBg}"
-                        Padding="12,8"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="0,0,0,1">
+            <Border Grid.Row="0"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
+                    Padding="12,8"
+                    BorderBrush="{DynamicResource CyberBorder}"
+                    BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,*">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"
                                     VerticalAlignment="Center">
@@ -118,10 +105,7 @@
                 </Border>
 
                 <Border Grid.Row="1"
-                        Background="{DynamicResource CyberCardBg}"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
+                        Classes="hud-card nav-bar"
                         Margin="12,10,12,0">
                     <Grid ColumnDefinitions="*,*,*,*">
                         <Button Grid.Column="0" Classes="cyber-nav" Content="UNIT 01" Classes.active="{Binding IsU1}"
@@ -160,8 +144,8 @@
                                            TextWrapping="Wrap">
                                     <Run Text="{Binding EmptyPrefix}" />
                                     <InlineUIContainer>
-                                        <Border Background="#141f33" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1"
-                                                CornerRadius="3" Padding="6,1"
+                                        <Border Classes="status-pill"
+                                                Padding="6,1"
                                                 RenderTransform="translateY(2px)"
                                                 IsVisible="{Binding HasEmptyJobId}">
                                             <TextBlock Text="{Binding EmptyJobId}" Foreground="{DynamicResource NeonGold}"
@@ -178,11 +162,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="m:TabletRow">
-                                        <Border Classes="cyber-data-row"
-                                                Background="{DynamicResource CyberCardBg}"
-                                                BorderBrush="{DynamicResource CyberBorder}"
-                                                BorderThickness="1"
-                                                CornerRadius="4"
+                                        <Border Classes="hud-card cyber-data-row"
                                                 Padding="12,5">
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <TextBlock Text="{Binding Label}"
@@ -191,10 +171,7 @@
                                                            FontSize="13"
                                                            VerticalAlignment="Center" />
                                                 <Border Grid.Column="1"
-                                                        Background="#070a12"
-                                                        BorderBrush="{DynamicResource CyberBorder}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="3"
+                                                        Classes="hud-card sub-panel"
                                                         Width="210"
                                                         Padding="10,4">
                                                     <TextBlock Text="{Binding Value}"
@@ -261,7 +238,6 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
-            </Grid>
-        </Border>
+        </Grid>
     </Border>
 </UserControl>

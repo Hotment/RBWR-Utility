@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
+using RbwrOverlay.UI.Services;
 
 namespace RbwrOverlay.UI.ViewModels;
 
@@ -31,7 +32,7 @@ public partial class ServerSyncViewModel : ViewModelBase
     private string _syncStatusText = string.Empty;
 
     [ObservableProperty]
-    private IBrush _syncStatusBrush = new SolidColorBrush(Color.Parse("#39ff14"));
+    private IBrush _syncStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
 
     [ObservableProperty]
     private bool _isSyncing;
@@ -104,6 +105,6 @@ public partial class ServerSyncViewModel : ViewModelBase
     public void SetStatus(string message, string hexColor)
     {
         SyncStatusText = message;
-        SyncStatusBrush = new SolidColorBrush(Color.Parse(hexColor));
+        SyncStatusBrush = ThemeService.ResolveBrushForHex(hexColor);
     }
 }

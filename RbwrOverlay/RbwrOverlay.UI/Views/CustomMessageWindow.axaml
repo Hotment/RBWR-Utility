@@ -15,10 +15,8 @@
 
     <Panel x:Name="RootHostPanel">
     <Border Name="RootBorder"
-            Background="{DynamicResource CyberMainBg}"
-            BorderBrush="{DynamicResource NeonRed}"
-            BorderThickness="1"
-            CornerRadius="8">
+            Classes="overlay-shell popup-shell"
+            BorderBrush="{DynamicResource NeonRed}">
 
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 
@@ -60,10 +58,7 @@
                         Spacing="10">
 
                 <Border Name="TurbineDiagnosticsCard"
-                        Background="{DynamicResource CyberCardBg}"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
+                        Classes="hud-card"
                         Padding="12,10"
                         IsVisible="False">
                     <StackPanel Spacing="8">
@@ -78,10 +73,8 @@
                                            FontWeight="Bold"
                                            LetterSpacing="0.5" />
                                 <Border Name="TurbineUnitBadge"
-                                        Background="#141f33"
+                                        Classes="status-pill"
                                         BorderBrush="{DynamicResource NeonCyan}"
-                                        BorderThickness="1"
-                                        CornerRadius="3"
                                         Padding="5,1">
                                     <TextBlock Name="TurbineUnitText"
                                                Text="UNIT 2"
@@ -92,13 +85,11 @@
                             </StackPanel>
 
                             <Border Name="TurbineConditionBadge"
+                                    Classes="status-pill"
                                     Grid.Column="1"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
-                                    Background="#290e14"
                                     BorderBrush="{DynamicResource NeonRed}"
-                                    BorderThickness="1"
-                                    CornerRadius="3"
                                     Padding="6,2">
                                 <TextBlock Name="TurbineConditionText"
                                            Text="LOW HEALTH"
@@ -119,7 +110,7 @@
                                            Foreground="{DynamicResource NeonRed}"
                                            FontWeight="Bold"
                                            FontSize="22"
-                                           FontFamily="Consolas, 'Segoe UI', monospace" />
+                                           FontFamily="{DynamicResource AppFontFamily}" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="2">
@@ -151,10 +142,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="#0b101c"
-                        BorderBrush="{DynamicResource CyberBorder}"
-                        BorderThickness="1"
-                        CornerRadius="4"
+                <Border Classes="hud-card sub-panel"
                         Padding="12,10">
                     <TextBlock Name="MessageText"
                                Foreground="{DynamicResource TextLight}"

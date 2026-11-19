@@ -67,5 +67,8 @@ public class AppSettings
     [JsonPropertyName("enable_discord_presence")]
     public bool EnableDiscordPresence { get; set; } = true;
 
+    [JsonPropertyName("selected_theme_id")]
+    public string SelectedThemeId { get; set; } = "default";
+
     public static AppSettings CreateDefault() => new();
 }

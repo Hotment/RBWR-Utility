@@ -1,0 +1,108 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Styles.Resources>
+        <FontFamily x:Key="AppFontFamily">Consolas, 'Segoe UI', Inter, monospace</FontFamily>
+        <FontFamily x:Key="AppMonoFontFamily">Consolas, monospace</FontFamily>
+
+        <Color x:Key="CyberMainColor">#120c05</Color>
+        <Color x:Key="CyberCardColor">#1f1509</Color>
+        <Color x:Key="CyberHeaderColor">#0d0803</Color>
+        <Color x:Key="CyberBorderColor">#4a3214</Color>
+        <Color x:Key="CyberBorderGlowColor">#ffb000</Color>
+
+        <Color x:Key="NeonCyanColor">#ffb000</Color>
+        <Color x:Key="NeonGreenColor">#7dff5a</Color>
+        <Color x:Key="NeonRedColor">#ff4040</Color>
+        <Color x:Key="NeonGoldColor">#ffd54f</Color>
+        <Color x:Key="NeonPurpleColor">#ff8a3d</Color>
+
+        <Color x:Key="TextLightColor">#fff3d6</Color>
+        <Color x:Key="TextMutedColor">#b59862</Color>
+
+        <SolidColorBrush x:Key="CyberMainBg" Color="#120c05" Opacity="0.95" />
+        <SolidColorBrush x:Key="CyberCardBg" Color="#1f1509" Opacity="0.88" />
+        <SolidColorBrush x:Key="CyberHeaderBg" Color="#0d0803" Opacity="0.97" />
+        <SolidColorBrush x:Key="DarkPanelBg" Color="#171006" Opacity="0.92" />
+        <SolidColorBrush x:Key="CyberBorder" Color="#4a3214" />
+        <SolidColorBrush x:Key="CyberBorderGlow" Color="#ffb000" />
+
+        <SolidColorBrush x:Key="NeonCyan" Color="#ffb000" />
+        <SolidColorBrush x:Key="NeonGreen" Color="#7dff5a" />
+        <SolidColorBrush x:Key="NeonRed" Color="#ff4040" />
+        <SolidColorBrush x:Key="NeonGold" Color="#ffd54f" />
+        <SolidColorBrush x:Key="NeonPurple" Color="#ff8a3d" />
+        <SolidColorBrush x:Key="TextLight" Color="#fff3d6" />
+        <SolidColorBrush x:Key="TextMuted" Color="#b59862" />
+
+        <SolidColorBrush x:Key="TooltipBg" Color="#f5120c05" />
+        <SolidColorBrush x:Key="TooltipBorder" Color="#99ffb000" />
+        <SolidColorBrush x:Key="TooltipBodyBrush" Color="#ffe8ba" />
+
+        <SolidColorBrush x:Key="ControlHoverBg" Color="#2e1f0c" />
+        <SolidColorBrush x:Key="ControlActiveBg" Color="#3d290e" />
+        <SolidColorBrush x:Key="ControlPressedBg" Color="#1f1509" />
+        <SolidColorBrush x:Key="TextBoxFocusBg" Color="#261a0a" />
+
+        <SolidColorBrush x:Key="SliderTrackFill" Color="#4a3214" />
+        <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#63431b" />
+        <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#63431b" />
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="#ffb000" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#ffc133" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#ff8a00" />
+        <SolidColorBrush x:Key="SliderThumbBackground" Color="#ffb000" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#ffd54f" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#ffe8ba" />
+    </Styles.Resources>
+
+    <Style Selector="Border.overlay-shell">
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Border.compact-shell">
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Border.hud-card">
+        <Setter Property="CornerRadius" Value="2" />
+    </Style>
+
+    <Style Selector="Button.cyber-nav:pointerover">
+        <Setter Property="Background" Value="#2a1d0b" />
+    </Style>
+    <Style Selector="Button.cyber-nav.active">
+        <Setter Property="Background" Value="#36240c" />
+    </Style>
+
+    <Style Selector="Button.cyber:pointerover">
+        <Setter Property="Background" Value="#2e1f0c" />
+    </Style>
+    <Style Selector="Button.cyber.active">
+        <Setter Property="Background" Value="#3d290e" />
+    </Style>
+
+    <Style Selector="Button.cyber-preset">
+        <Setter Property="Background" Value="#1f1509" />
+    </Style>
+    <Style Selector="Button.cyber-preset:pointerover">
+        <Setter Property="Background" Value="#2e1f0c" />
+    </Style>
+    <Style Selector="Button.cyber-preset.active">
+        <Setter Property="Background" Value="#3d290e" />
+    </Style>
+
+    <Style Selector="ComboBox.cyber ComboBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2e1f0c" />
+    </Style>
+    <Style Selector="ComboBox.cyber ComboBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3d290e" />
+    </Style>
+
+    <Style Selector="ProgressBar.cyber-power">
+        <Setter Property="CornerRadius" Value="1" />
+    </Style>
+
+    <Style Selector="ScrollBar:vertical /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="#ffb000" />
+    </Style>
+
+</Styles>

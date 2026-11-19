@@ -1,21 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+             xmlns:models="using:RbwrOverlay.Core.Models"
              xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
              x:Class="RbwrOverlay.UI.Views.DetailedOverlayView"
              x:DataType="vm:MainOverlayViewModel">
 
-    <Border Background="{DynamicResource CyberMainBg}"
-            BorderBrush="{DynamicResource CyberBorderGlow}"
-            BorderThickness="1"
-            CornerRadius="8"
-            Padding="12"
+    <Border x:Name="DetailedShell"
+            Classes="overlay-shell"
             Width="470"
             Height="455">
 
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Grid x:Name="DetailedRootGrid" RowDefinitions="Auto,Auto,*">
 
-            <Grid Grid.Row="0"
+            <Grid x:Name="HeaderBar"
+                  Grid.Row="0"
                   ColumnDefinitions="Auto,*,Auto"
                   Margin="0,0,0,10">
 
@@ -23,7 +22,9 @@
                             Orientation="Horizontal"
                             Spacing="8"
                             VerticalAlignment="Center">
-                    <TextBlock Text="RBWR OVERLAY"
+                    <TextBlock x:Name="OverlayTitle"
+                               Classes="overlay-title"
+                               Text="RBWR OVERLAY"
                                Foreground="{DynamicResource NeonCyan}"
                                FontWeight="Bold"
                                FontSize="12"
@@ -32,10 +33,9 @@
                                behaviors:TooltipBehaviors.Key="DragHandle"
                                VerticalAlignment="Center" />
 
-                    <Border Background="#101828"
+                    <Border x:Name="SyncBadge"
+                            Classes="status-pill sync-pill"
                             BorderBrush="{Binding ConnectionStatusBrush}"
-                            BorderThickness="1"
-                            CornerRadius="10"
                             Padding="6,2"
                             behaviors:TooltipBehaviors.Key="SyncBadge">
                         <StackPanel Orientation="Horizontal" Spacing="4">
@@ -52,10 +52,8 @@
                             Spacing="4"
                             VerticalAlignment="Center">
 
-                    <Border Background="#261b0a"
+                    <Border Classes="status-pill"
                             BorderBrush="{DynamicResource NeonGold}"
-                            BorderThickness="1"
-                            CornerRadius="3"
                             Padding="5,1"
                             behaviors:TooltipBehaviors.Key="RecircBadge"
                             IsVisible="{Binding IsRecircOverrideActive}">
@@ -82,11 +80,9 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Row="1"
-                    Background="{DynamicResource CyberCardBg}"
-                    BorderBrush="{DynamicResource CyberBorder}"
-                    BorderThickness="1"
-                    CornerRadius="4"
+            <Border x:Name="NavBar"
+                    Classes="hud-card nav-bar"
+                    Grid.Row="1"
                     Margin="0,0,0,10">
 
                 <Grid ColumnDefinitions="*,*,*,*">
@@ -167,30 +163,34 @@
                                 HorizontalAlignment="Stretch" />
                     </Grid>
 
-                    <Border Grid.Row="1"
-                            Background="{DynamicResource CyberCardBg}"
+                    <Border x:Name="PowerBanner"
+                            Classes="hud-card power-banner"
+                            Grid.Row="1"
                             BorderBrush="{Binding MainPowerBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
                             Padding="12,8"
                             behaviors:TooltipBehaviors.Item="{Binding MainBannerTooltip}"
                             Margin="0,0,0,8">
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="{Binding MainStatusPowerText}"
+                            <TextBlock x:Name="MainPowerReadout"
+                                       Classes="power-readout"
+                                       Text="{Binding MainStatusPowerText}"
                                        Foreground="{Binding MainPowerBrush}"
                                        FontWeight="Bold"
                                        FontSize="24"
                                        HorizontalAlignment="Center" />
 
-                            <ProgressBar Classes="cyber-power"
+                            <ProgressBar x:Name="MainPowerBar"
+                                         Classes="cyber-power"
                                          Value="{Binding ThermalPowerPercent}"
                                          Minimum="0"
                                          Maximum="120"
                                          Foreground="{Binding PowerBarBrush}"
                                          Margin="10,2" />
 
-                            <TextBlock Text="{Binding MainStatusSubText}"
+                            <TextBlock x:Name="MainPowerSubtext"
+                                       Classes="power-subtext"
+                                       Text="{Binding MainStatusSubText}"
                                        Foreground="{DynamicResource TextMuted}"
                                        FontWeight="Bold"
                                        FontSize="9"
@@ -198,11 +198,9 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CyberCardBg}"
-                            BorderBrush="{DynamicResource CyberBorder}"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                    <Border x:Name="DemandPresetCard"
+                            Classes="hud-card preset-card"
+                            Grid.Row="2"
                             Padding="8,6"
                             behaviors:TooltipBehaviors.Key="DemandSlider"
                             Margin="0,0,0,8">
@@ -291,16 +289,15 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid Grid.Row="3"
+                    <Grid x:Name="MonitorMetricsGrid"
+                          Grid.Row="3"
                           ColumnDefinitions="*,*"
                           RowDefinitions="*,*"
                           Margin="0,0,0,8">
 
-                        <Border Grid.Row="0" Grid.Column="0"
-                                Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border x:Name="DemandInputCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="0" Grid.Column="0"
                                 Padding="8,6"
                                 behaviors:TooltipBehaviors.Key="DemandInput"
                                 Margin="0,0,4,4">
@@ -316,11 +313,9 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="0" Grid.Column="1"
-                                Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border x:Name="CorePowerCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="0" Grid.Column="1"
                                 Padding="8,6"
                                 behaviors:TooltipBehaviors.Key="RtpInput"
                                 Margin="4,0,0,4">
@@ -333,11 +328,9 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Grid.Column="0"
-                                Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border x:Name="GenLoadCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="1" Grid.Column="0"
                                 Padding="8,6"
                                 behaviors:TooltipBehaviors.Item="{Binding DetailedLoadTooltip}"
                                 Margin="0,4,4,0">
@@ -347,11 +340,9 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Grid.Column="1"
-                                Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border x:Name="FlowCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="1" Grid.Column="1"
                                 Padding="8,6"
                                 behaviors:TooltipBehaviors.Item="{Binding DetailedFlowTooltip}"
                                 Margin="4,4,0,0">
@@ -362,11 +353,9 @@
                         </Border>
                     </Grid>
 
-                    <Border Grid.Row="4"
-                            Background="#111726"
-                            BorderBrush="{DynamicResource CyberBorder}"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                    <Border x:Name="StatusFooterBar"
+                            Classes="hud-footer"
+                            Grid.Row="4"
                             Padding="8,5">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <StackPanel Grid.Column="0"
@@ -402,10 +391,7 @@
                 <ScrollViewer IsVisible="{Binding IsSyncTabActive}">
                     <StackPanel Spacing="10">
 
-                        <Border Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border Classes="hud-card sync-card"
                                 Padding="10,8"
                                 behaviors:TooltipBehaviors.Key="SyncNowButton">
                             <Grid ColumnDefinitions="*,Auto">
@@ -429,13 +415,10 @@
                                              behaviors:AutoCompleteBehaviors.JobIdFilter="True"
                                              behaviors:TooltipBehaviors.Key="JobIdInput"
                                              FontSize="11"
-                                             FontFamily="Consolas, monospace" />
+                                             FontFamily="{DynamicResource AppMonoFontFamily}" />
                         </StackPanel>
 
-                        <Border Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border Classes="hud-card sync-card"
                                 Padding="10,8"
                                 behaviors:TooltipBehaviors.Key="DtlPanel">
                             <StackPanel Spacing="8">
@@ -457,10 +440,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}"
-                                BorderBrush="{DynamicResource CyberBorder}"
-                                BorderThickness="1"
-                                CornerRadius="4"
+                        <Border Classes="hud-card sync-card"
                                 Padding="10,8"
                                 behaviors:TooltipBehaviors.Key="TurbineHealthPanel">
                             <StackPanel Spacing="6">
@@ -483,7 +463,49 @@
                 <ScrollViewer IsVisible="{Binding IsSettingsTabActive}">
                     <StackPanel Spacing="10" Margin="0,0,6,0">
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="HudOpacity">
+                        <Border x:Name="ThemeConfigCard"
+                                Classes="hud-card config-card"
+                                Padding="10,6"
+                                behaviors:TooltipBehaviors.Key="ThemeSelectorConfig">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBlock Grid.Column="0" Text="Theme:" VerticalAlignment="Center" FontSize="11" />
+                                    <ComboBox Grid.Column="1"
+                                              Classes="cyber"
+                                              Width="195"
+                                              ItemsSource="{Binding AvailableThemes}"
+                                              SelectedItem="{Binding SelectedThemeItem, Mode=TwoWay}"
+                                              behaviors:TooltipBehaviors.Key="ThemeDropdown">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="models:InstalledThemeInfo">
+                                                <TextBlock Text="{Binding DisplayName}" FontSize="11" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="2"
+                                            Classes="cyber-blue"
+                                            Content="Manage"
+                                            Command="{Binding OpenThemeSelectorCommand}"
+                                            behaviors:TooltipBehaviors.Key="ThemeManageButton"
+                                            Margin="6,0,0,0"
+                                            Padding="8,4"
+                                            FontSize="10" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,*,*,*">
+                                    <Button Grid.Column="0" Classes="cyber" Content="Install" Command="{Binding InstallThemeCommand}" behaviors:TooltipBehaviors.Key="ThemeInstallButton" Margin="0,0,2,0" FontSize="10" Padding="4,3" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="Reload" Command="{Binding ReloadThemesCommand}" behaviors:TooltipBehaviors.Key="ThemeReloadButton" Margin="2,0" FontSize="10" Padding="4,3" />
+                                    <Button Grid.Column="2" Classes="cyber" Content="Template" Command="{Binding CreateTemplateThemeCommand}" behaviors:TooltipBehaviors.Key="ThemeTemplateButton" Margin="2,0" FontSize="10" Padding="4,3" />
+                                    <Button Grid.Column="3" Classes="cyber" Content="Folder" Command="{Binding OpenThemesFolderCommand}" behaviors:TooltipBehaviors.Key="ThemeFolderButton" Margin="2,0,0,0" FontSize="10" Padding="4,3" />
+                                </Grid>
+                                <TextBlock Text="{Binding ThemeStatusMessage}"
+                                           Foreground="{Binding ThemeStatusBrush}"
+                                           IsVisible="{Binding HasThemeStatusMessage}"
+                                           FontSize="9"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="hud-card config-card" Padding="10,4" behaviors:TooltipBehaviors.Key="HudOpacity">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="HUD Opacity:" VerticalAlignment="Center" FontSize="11" />
@@ -493,7 +515,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="FullHudScale">
+                        <Border Classes="hud-card config-card" Padding="10,4" behaviors:TooltipBehaviors.Key="FullHudScale">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="UI Scale (Full HUD):" VerticalAlignment="Center" FontSize="11" />
@@ -510,7 +532,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" behaviors:TooltipBehaviors.Key="CompactHudScale">
+                        <Border Classes="hud-card config-card" Padding="10,4" behaviors:TooltipBehaviors.Key="CompactHudScale">
                             <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="Compact Mode Scale:" VerticalAlignment="Center" FontSize="11" />
@@ -527,35 +549,35 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="HoverTooltipsToggle">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="HoverTooltipsToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Hover Help Tooltips:" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding TooltipsStatusText}" Foreground="{Binding TooltipsStatusBrush}" Command="{Binding ToggleTooltipsCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="DiscordPresenceToggle">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="DiscordPresenceToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Discord Rich Presence:" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding DiscordPresenceStatusText}" Foreground="{Binding DiscordPresenceStatusBrush}" Command="{Binding ToggleDiscordPresenceCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RobloxTopmostToggle">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="RobloxTopmostToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Topmost on Roblox (Auto-Detect):" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding TopmostStatusText}" Foreground="{Binding TopmostStatusBrush}" Command="{Binding ToggleRobloxTopmostCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="AutoSyncOnJoinToggle">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="AutoSyncOnJoinToggle">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Auto-Sync on Roblox Join:" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="{Binding AutoSyncOnJoinStatusText}" Foreground="{Binding AutoSyncOnJoinStatusBrush}" Command="{Binding ToggleAutoSyncOnJoinCommand}" Padding="10,3" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="RecircOverrideConfig">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="RecircOverrideConfig">
                             <Grid ColumnDefinitions="*,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="Recirc Override (%):" VerticalAlignment="Center" FontSize="11" />
                                 <TextBox Grid.Column="1" Classes="cyber" Text="{Binding RecircOverrideInput}" Width="45" Padding="2,0" Margin="0,0,4,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
@@ -563,14 +585,14 @@
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="NextDemandTimerConfig">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="NextDemandTimerConfig">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Next Demand Switch Timer (s):" VerticalAlignment="Center" FontSize="11" />
                                 <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandThresholdSecondsInput}" Width="45" Padding="2,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
                             </Grid>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="TurbineAlarmConfig">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="TurbineAlarmConfig">
                             <StackPanel Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="Turbine Health Alarm:" VerticalAlignment="Center" FontSize="11" />
@@ -583,7 +605,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" behaviors:TooltipBehaviors.Key="OpenLogButton">
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="OpenLogButton">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="Diagnostics &amp; Log File:" VerticalAlignment="Center" FontSize="11" />
                                 <Button Grid.Column="1" Classes="cyber" Content="Open Log" Command="{Binding OpenLogCommand}" behaviors:TooltipBehaviors.Key="OpenLogButton" Padding="8,3" />
@@ -602,7 +624,7 @@
                 <ScrollViewer IsVisible="{Binding IsFeedbackTabActive}">
                     <StackPanel Spacing="10" Margin="0,0,6,0">
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                        <Border Classes="hud-card feedback-card" Padding="12,10">
                             <StackPanel Spacing="8">
                                 <TextBlock Text="COMMUNITY TICKETS &amp; FEEDBACK" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" />
 
@@ -638,22 +660,22 @@
                                             FontWeight="SemiBold" />
                                 </Grid>
 
-                                <Border Background="{DynamicResource DarkPanelBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,2,0,0">
+                                <Border Classes="hud-card sub-panel" Padding="8,6" Margin="0,2,0,0">
                                     <StackPanel Spacing="3">
                                         <TextBlock Text="Web Portal: rbwr.hotment.dev/tickets"
                                                    Foreground="{DynamicResource TextMuted}"
                                                    FontSize="8"
-                                                   FontFamily="Consolas" />
+                                                   FontFamily="{DynamicResource AppMonoFontFamily}" />
                                         <TextBlock Text="Discord Community: discord.gg/4eUQQcuv87"
                                                    Foreground="{DynamicResource TextMuted}"
                                                    FontSize="8"
-                                                   FontFamily="Consolas" />
+                                                   FontFamily="{DynamicResource AppMonoFontFamily}" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource CyberCardBg}" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" behaviors:TooltipBehaviors.Key="CheckUpdatesButton">
+                        <Border Classes="hud-card feedback-card" Padding="10,8" behaviors:TooltipBehaviors.Key="CheckUpdatesButton">
                             <StackPanel Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="SYSTEM UPDATES" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />

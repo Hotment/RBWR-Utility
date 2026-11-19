@@ -1,11 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RbwrOverlay.UI.ViewModels"
+        xmlns:conv="using:RbwrOverlay.UI.Converters"
         x:Class="RbwrOverlay.UI.Views.CrashReportWindow"
         x:DataType="vm:CrashReportViewModel"
         Title="Application Crash Detected"
         Icon="/Assets/icon.ico"
-        Background="{DynamicResource CyberMainBg}"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         WindowDecorations="None"
         CanResize="False"
         Topmost="True"
@@ -13,14 +15,15 @@
         Height="400"
         WindowStartupLocation="CenterScreen">
 
-    <Border BorderBrush="{DynamicResource NeonRed}"
-            BorderThickness="1"
-            CornerRadius="4">
+    <Border Name="RootBorder"
+            Classes="overlay-shell popup-shell"
+            BorderBrush="{DynamicResource NeonRed}">
 
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 
             <Border Grid.Row="0"
-                    Background="{DynamicResource CyberHeaderBg}"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.TopOnly}}"
                     Padding="12,8">
                 <TextBlock Text="CRITICAL EXCEPTION ENCOUNTERED"
                            Foreground="{DynamicResource NeonRed}"
@@ -36,16 +39,13 @@
                        TextWrapping="Wrap" />
 
             <Border Grid.Row="2"
-                    Background="{DynamicResource CyberCardBg}"
-                    BorderBrush="{DynamicResource CyberBorder}"
-                    BorderThickness="1"
-                    CornerRadius="4"
+                    Classes="hud-card"
                     Margin="15,0,15,10"
                     Padding="6">
                 <TextBox Text="{Binding Traceback}"
                          IsReadOnly="True"
                          AcceptsReturn="True"
-                         FontFamily="Consolas, monospace"
+                         FontFamily="{DynamicResource AppMonoFontFamily}"
                          FontSize="10"
                          Background="Transparent"
                          Foreground="{DynamicResource TextLight}"

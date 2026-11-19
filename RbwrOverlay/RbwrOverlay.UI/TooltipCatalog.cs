@@ -267,6 +267,62 @@ public static class TooltipCatalog
             Title: "DIAGNOSTIC LOG FILE",
             Description: "Opens the local application log file to inspect sync events and troubleshooting details."
         ),
+        ["ThemeSelectorConfig"] = new(
+            Title: "CUSTOM THEMES (AXAML)",
+            Description: "Customize fonts, colors, spacing, scale, and element placement using Level 2 AXAML theme packs."
+        ),
+        ["ThemeDropdown"] = new(
+            Title: "ACTIVE THEME SELECTOR",
+            Description: "Choose between the built-in themes or any installed custom themes. Applies live with no restart."
+        ),
+        ["ThemeInstallButton"] = new(
+            Title: "INSTALL CUSTOM THEME",
+            Description: "Opens a file picker to import a .zip theme pack, theme.json manifest folder, or standalone .axaml stylesheet."
+        ),
+        ["ThemeReloadButton"] = new(
+            Title: "RELOAD THEMES FROM DISK",
+            Description: "Rescans the themes directory and re-applies the active theme from disk so you can preview edits immediately."
+        ),
+        ["ThemeTemplateButton"] = new(
+            Title: "CREATE STARTER TEMPLATE",
+            Description: "Generates an editable Arctic Slate starter theme inside themes/custom-template/ and activates it."
+        ),
+        ["ThemeFolderButton"] = new(
+            Title: "OPEN THEMES FOLDER",
+            Description: "Opens the local themes/ directory where theme packs, theme.axaml files, and custom fonts are stored."
+        ),
+        ["ThemeManageButton"] = new(
+            Title: "OPEN THEME MANAGER",
+            Description: "Opens the dedicated Theme Manager window showing every theme's author, version, expandable description, and per-theme actions."
+        ),
+        ["ThemeManagerSearch"] = new(
+            Title: "FILTER THEMES",
+            Description: "Type to filter installed themes by name, author, ID, or description."
+        ),
+        ["ThemeManagerClose"] = new(
+            Title: "CLOSE THEME MANAGER",
+            Description: "Closes the Theme Manager window (or press Escape)."
+        ),
+        ["ThemeEntryApply"] = new(
+            Title: "APPLY THEME",
+            Description: "Activates this theme live across the overlay and saves your selection."
+        ),
+        ["ThemeEntryDetails"] = new(
+            Title: "EXPAND THEME DETAILS",
+            Description: "Click this theme card to expand or collapse its description, ID, compatibility metadata, and file management buttons."
+        ),
+        ["ThemeEntryEdit"] = new(
+            Title: "EDIT THEME STYLESHEET",
+            Description: "Opens this theme's entry .axaml file in your default editor."
+        ),
+        ["ThemeEntryFolder"] = new(
+            Title: "OPEN THEME FOLDER",
+            Description: "Opens this specific theme's directory containing its manifest, assets, and fonts."
+        ),
+        ["ThemeEntryDelete"] = new(
+            Title: "DELETE CUSTOM THEME",
+            Description: "Removes this custom theme directory from disk. Reverts to Cyberpunk (Built-in) if currently active."
+        ),
 
         // --- Feedback & Updates Tab ---
         ["OpenTicketsButton"] = new(

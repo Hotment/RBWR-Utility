@@ -169,13 +169,17 @@ public partial class SettingsViewModel : ViewModelBase
     private void UpdateTopmostVisual()
     {
         TopmostStatusText = TopmostOnRoblox ? "ENABLED" : "DISABLED";
-        TopmostStatusBrush = TopmostOnRoblox ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        TopmostStatusBrush = TopmostOnRoblox
+            ? Services.ThemeService.ResolveBrush("NeonGreen", "#39ff14")
+            : Services.ThemeService.ResolveBrush("NeonRed", "#ff003c");
     }
 
     private void UpdateTurbineAlertVisual()
     {
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
-        TurbineAlertStatusBrush = EnableTurbineHealthAlert ? new SolidColorBrush(Color.Parse("#39ff14")) : new SolidColorBrush(Color.Parse("#ff003c"));
+        TurbineAlertStatusBrush = EnableTurbineHealthAlert
+            ? Services.ThemeService.ResolveBrush("NeonGreen", "#39ff14")
+            : Services.ThemeService.ResolveBrush("NeonRed", "#ff003c");
     }
 
     private void SaveAndNotify()
