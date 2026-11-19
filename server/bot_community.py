@@ -29,11 +29,13 @@ COUNTERS = {
     "channels": ("Channels: {value}", "Text and voice channels"),
     "roles": ("Roles: {value}", "Roles on the server"),
     "tickets": ("Open tickets: {value}", "Suggestions and bug reports still open on the website"),
+    "version": ("Version: {value}", "Latest RBWR Utility release on GitHub (updates by itself)"),
 }
-DEFAULT_COUNTERS = ("members", "humans", "bots", "boosts")
+DEFAULT_COUNTERS = ("members", "humans", "bots", "boosts", "version")
 CLOSED_STATUSES = {"implemented", "declined", "fixed", "invalid", "resolved", "closed", "accepted", "rejected", "completed"}
 
 _tasks: dict[str, asyncio.Task] = {}
+_latest_version: str | None = None
 _star_locks: dict[int, asyncio.Lock] = {}
 
 
@@ -258,6 +260,21 @@ def stats_config() -> dict:
     return {**serverstats_store.default["config"], **serverstats_store.load().get("config", {})}
 
 
+async def _update_version() -> None:
+    global _latest_version
+    try:
+        try:
+            from server import core
+        except ImportError:
+            import core  # pyright: ignore[reportMissingImports]
+        release = await asyncio.to_thread(core.get_github_latest_release)
+        version = str(release.get("version") or "").strip()
+        if version and version != "unknown":
+            _latest_version = version
+    except Exception as exc:
+        log.warning("Could not read the latest release for the version counter: %s", exc)
+
+
 def _counter_value(kind: str, guild: disnake.Guild, bot: commands.InteractionBot) -> str:
     if kind == "members":
         return f"{guild.member_count or len(guild.members):,}"
@@ -275,6 +292,8 @@ def _counter_value(kind: str, guild: disnake.Guild, bot: commands.InteractionBot
         return str(len(guild.roles) - 1)
     if kind == "tickets":
         return str(open_ticket_count())
+    if kind == "version":
+        return _latest_version or "—"
     return "?"
 
 
@@ -296,6 +315,8 @@ async def refresh_stats(bot: commands.InteractionBot, guild: disnake.Guild | Non
     guild = guild or (bot.get_guild(gid) if gid else None)
     if not config["enabled"] or not guild:
         return 0
+    if any(c.get("type") == "version" for c in config["counters"]):
+        await _update_version()
     renamed = 0
     for counter in config["counters"]:
         channel = guild.get_channel(int(counter["channel_id"])) if counter.get("channel_id") else None
@@ -323,6 +344,8 @@ async def _stats_loop(bot: commands.InteractionBot) -> None:
 
 async def _create_counter(guild: disnake.Guild, category: disnake.CategoryChannel, kind: str, template: str | None,
                           bot: commands.InteractionBot) -> dict:
+    if kind == "version" and not _latest_version:
+        await _update_version()
     counter = {"type": kind, "template": template or COUNTERS[kind][0]}
     channel = await guild.create_voice_channel(_counter_name(counter, guild, bot), category=category,
                                                overwrites=_locked_overwrites(guild), reason="Server stats")

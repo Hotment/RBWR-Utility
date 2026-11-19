@@ -107,7 +107,7 @@ window.Community = (() => {
             </div>` : ""}` : `
             <div class="btn-row" style="align-items:center">
                 <button type="button" class="btn-gold" data-act="ss-setup" ${offline()}>Quick setup</button>
-                <span class="adm-hint">Creates the category with Members, Humans, Bots and Boosts. Add Open tickets and more afterwards.</span>
+                <span class="adm-hint">Creates the category with Members, Humans, Bots, Boosts and the latest Version from GitHub. Add Open tickets and more afterwards.</span>
             </div>`}
             ${st.members_intent === false ? '<p class="adm-hint">Humans and Bots need the <strong>Server Members Intent</strong> in the Discord Developer Portal.</p>' : ""}
         </div>`;
