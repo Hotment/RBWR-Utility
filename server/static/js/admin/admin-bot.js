@@ -765,6 +765,8 @@ window.AdminBot = (() => {
         if (view === "automod" && can("automod")) window.Automod?.open();
         if (view === "embeds" && can("embeds")) window.EmbedBuilder?.open();
         if (view === "autorole" && can("autorole")) loadAutorole(true);
+        if (view === "community" && can("community")) window.Community?.open();
+        if (view === "accounts") window.RoleCommands?.open();
         if (["welcome", "faq", "commands"].includes(view) && can(view)) window.BotConfig?.open(view);
         if (view === "errors" && can("errors")) { renderErrors(); loadErrors(); }
     }

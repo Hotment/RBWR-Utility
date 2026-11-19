@@ -34,6 +34,12 @@
         }
     </script>
     <style>
+        @media (prefers-reduced-motion: no-preference) {
+            @view-transition { navigation: auto; }
+        }
+        ::view-transition-old(root),
+        ::view-transition-new(root) { animation-duration: 0.28s; animation-timing-function: ease; }
+
         html {
             scrollbar-gutter: stable;
             scroll-behavior: smooth;
@@ -364,6 +370,14 @@
             </a>
             {% endif %}
 
+            {% if permissions.community %}
+            <a href="/admin/community" id="nav-community"
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-mono tracking-wider transition group {% if active_view == 'community' %}bg-blue-600/10 text-blue-500 border border-blue-500/20{% else %}text-slate-400 hover:text-white hover:bg-white/5 border border-transparent{% endif %}">
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M15 14.5a5 5 0 0 1 6.5 4.5"/></svg>
+                <span class="whitespace-nowrap">Community</span>
+            </a>
+            {% endif %}
+
             <div id="adm-nav-empty" class="hidden px-4 py-2 text-xs font-mono text-slate-500">No matching sections.</div>
 
             <div class="h-px bg-white/5 my-2"></div>
@@ -575,6 +589,13 @@
                     <div class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 4 4-4 4M12 16h7"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg></div>
                     <h2 class="text-xl font-bold tracking-wide font-display text-white">Custom Commands</h2>
                     <p class="text-sm text-gray-400 leading-relaxed">Prefix commands like !bug that post a saved text or embed.</p>
+                </a>
+                {% endif %}
+                {% if permissions.community %}
+                <a href="/admin/community" data-nav="community" class="cyber-panel hover-glow p-5 sm:p-8 rounded-xl flex flex-col gap-4 text-left group">
+                    <div class="w-12 h-12 rounded-lg bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 shrink-0"><svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M15 14.5a5 5 0 0 1 6.5 4.5"/></svg></div>
+                    <h2 class="text-xl font-bold tracking-wide font-display text-white">Community</h2>
+                    <p class="text-sm text-gray-400 leading-relaxed">A starboard for the best messages and live server stats in channel names.</p>
                 </a>
                 {% endif %}
 
@@ -978,6 +999,14 @@
                         <p class="text-xs text-slate-500 italic font-mono">Loading accounts...</p>
                     </div>
                 </div>
+            </div>
+
+            <div class="cyber-panel p-6 rounded-xl border border-white/5">
+                <h3 class="text-xs font-bold tracking-wider text-amber-400 font-display mb-2 uppercase">Commands for Discord roles</h3>
+                <p class="text-[11px] text-slate-500 font-mono mb-4">Everyone with the picked role can use the ticked staff commands, without being an administrator here.
+                    Commands for everyone (/faq, /server, /calc...) are always open. Discord only lists a command for people with its Discord permission;
+                    to show it to the role anyway, allow it in Server Settings &rarr; Integrations &rarr; RBWR Utility.</p>
+                <div id="role-cmds-body"><p class="text-xs text-slate-500 italic font-mono">Loading roles...</p></div>
             </div>
         </main>
 
@@ -1454,6 +1483,20 @@
                 <div id="wl-alert"></div>
                 <div class="wl-grid" id="wl-forms"></div>
                 <p class="adm-hint" style="margin-top:12px">Placeholders (in the text and the template): <code>{user}</code> mention, <code>{name}</code> display name, <code>{username}</code> username, <code>{server}</code> server name, <code>{member_count}</code> number of members. Only the welcome message pings the member. Bots are never greeted.</p>
+        </main>
+        {% endif %}
+
+        {% if permissions.community %}
+        <main id="view-community" class="view-section grow p-4 sm:p-6 md:p-8 flex flex-col gap-6 overflow-y-auto max-h-screen {% if active_view != 'community' %}hidden{% endif %}">
+            <header class="cyber-panel glow-cyan p-4 sm:p-6 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide text-pink-400 font-display whitespace-nowrap">Community</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1">Starboard and server stats on Discord. The same settings as /starboard and /serverstats.</p>
+                </div>
+                <span class="bot-status font-mono text-xs"><span class="dot"></span><span>Discord bot</span></span>
+            </header>
+            <div id="cm-alert"></div>
+            <div id="cm-body"></div>
         </main>
         {% endif %}
 
@@ -2018,6 +2061,8 @@
     <script src="/static/js/admin/embeds.js"></script>
     <script src="/static/js/admin/botconfig.js"></script>
     <script src="/static/js/admin/automod.js"></script>
+    <script src="/static/js/admin/community.js"></script>
+    <script src="/static/js/admin/role-commands.js"></script>
     <script>window.ADMIN_PERMISSIONS = {{ permissions | tojson | safe }};</script>
     <script src="/static/js/admin/admin-bot.js"></script>
     <script>
@@ -2078,7 +2123,7 @@
             bindNavLink('nav-contact', 'contact', '/admin/contact');
             bindNavLink('nav-bans', 'bans', '/admin/bans');
             bindNavLink('nav-servers', 'servers', '/admin/servers');
-            ['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'].forEach(v => {
+            ['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'community', 'errors'].forEach(v => {
                 bindNavLink('nav-' + v, v, '/admin/' + v);
                 document.querySelectorAll('[data-nav="' + v + '"]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); navigateToView(v, '/admin/' + v); }));
             });
@@ -2196,7 +2241,7 @@
                 navigateToView('contact', path, false);
             } else if (path === '/admin/bans') {
                 navigateToView('bans', path, false);
-            } else if (['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'].some(v => path === '/admin/' + v)) {
+            } else if (['dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'community', 'errors'].some(v => path === '/admin/' + v)) {
                 navigateToView(path.split('/').pop(), path, false);
             } else if (path === '/admin/servers') {
                 navigateToView('servers', path, false);
@@ -2273,7 +2318,7 @@
         }
 
         function resetNavStyles() {
-            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'audit-logs', 'debug', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'errors'];
+            const views = ['overview', 'suggestions', 'crashes', 'contact', 'bans', 'servers', 'accounts', 'audit-logs', 'debug', 'dms', 'moderation', 'automod', 'embeds', 'autorole', 'welcome', 'faq', 'commands', 'community', 'errors'];
             views.forEach(v => {
                 const link = document.getElementById('nav-' + v);
                 if (link) {
@@ -3275,6 +3320,8 @@
                                 ${typeBadge}
                                 ${targetTag}
                                 ${hiddenTag}
+                                ${s.merged_into ? `<span class="px-2 py-0.5 bg-cyan-950/50 text-cyan-300 text-[10px] rounded font-bold uppercase border border-cyan-500/30 font-mono" title="Merged by ${escapeHtml(s.merged_by || 'an admin')}">Merged into #${Number(s.merged_into)}</span>` : ''}
+                                ${(s.merged_from || []).length ? `<span class="px-2 py-0.5 bg-cyan-950/30 text-cyan-400 text-[10px] rounded font-bold uppercase border border-cyan-500/20 font-mono">Merged in: ${s.merged_from.map(i => '#' + Number(i)).join(', ')}</span>` : ''}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${badgeClass}">${s.status}</span>
                             </div>
@@ -3309,6 +3356,7 @@
                                     <span></span> ${hasComment ? 'Edit Note' : 'Add Note'}
                                 </button>
                                 ${visibilityBtn}
+                                ${s.merged_into ? '' : `<button onclick="mergeSuggestion(${s.id})" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition" title="Merge this ticket into another one about the same thing">Merge</button>`}
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Ticket</button>
@@ -3421,6 +3469,28 @@
                 }
             } catch (err) {
                 alert('Network error updating visibility.');
+            }
+        }
+
+        async function mergeSuggestion(id) {
+            const raw = prompt(`Merge ticket #${id} into which ticket? Enter the number of the ticket that stays open.\n\nYou decide they are about the same thing; #${id} gets closed and its author follows the other ticket.`);
+            if (raw === null) return;
+            const into = parseInt(String(raw).replace('#', '').trim(), 10);
+            if (!into || into === id) {
+                alert('Enter the number of a different ticket.');
+                return;
+            }
+            if (!confirm(`Merge ticket #${id} into #${into}? This closes #${id}.`)) return;
+            try {
+                const response = await fetch('/admin/tickets/merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, into })
+                });
+                const data = await response.json().catch(() => ({}));
+                alert(response.ok ? (data.message || 'Tickets merged.') : (typeof data.detail === 'string' ? data.detail : 'Failed to merge tickets.'));
+            } catch (err) {
+                alert('Network error merging tickets.');
             }
         }
 
@@ -4088,7 +4158,7 @@
                     items: [
                         { key: "servers", label: "Servers", desc: "View and manage active/historical servers" },
                         { key: "crashes", label: "Crash Logs", desc: "Client crash stack traces and analysis" },
-                        { key: "suggestions", label: "Suggestions", desc: "User suggestion inbox and review" },
+                        { key: "suggestions", label: "Tickets", desc: "Suggestions and bug reports, writing in Discord ticket channels, /panel and /merge" },
                         { key: "contact", label: "Messages", desc: "Direct contact and support messages" },
                         { key: "bans", label: "Banned IPs", desc: "IP bans and rate-limit access control" },
                         { key: "debug", label: "Debug Inspector", desc: "Inject and analyze raw server state payloads" },
@@ -4100,7 +4170,7 @@
                     badge: "MOD",
                     badgeClass: "text-amber-400 border-amber-500/30 bg-amber-500/10",
                     items: [
-                        { key: "moderation", label: "Moderation", desc: "Member timeouts, kicks, and warnings" },
+                        { key: "moderation", label: "Moderation", desc: "/mod, /warn, /nick, /tempban, /note, /modlog, /purge, /slowmode, /lock" },
                         { key: "automod", label: "AutoMod", desc: "Discord native and bot AutoMod rules" },
                         { key: "dms", label: "Direct Messages", desc: "Direct bot chat with Discord users" }
                     ]
@@ -4117,17 +4187,25 @@
                         { key: "commands", label: "Commands", desc: "Custom prefix bot commands" },
                         { key: "errors", label: "Errors", desc: "Bot exceptions and tracebacks" }
                     ]
+                },
+                {
+                    name: "Discord Community",
+                    badge: "COM",
+                    badgeClass: "text-pink-400 border-pink-500/30 bg-pink-500/10",
+                    items: [
+                        { key: "community", label: "Community", desc: "Starboard and server stats, /starboard and /serverstats" }
+                    ]
                 }
             ];
 
-            const ALL_PERM_KEYS = ["servers", "crashes", "suggestions", "contact", "bans", "moderation", "automod", "dms", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"];
+            const ALL_PERM_KEYS = ["servers", "crashes", "suggestions", "contact", "bans", "moderation", "automod", "dms", "embeds", "autorole", "welcome", "faq", "commands", "community", "errors", "debug", "audit_logs"];
 
             window.applyPermPreset = function(dId, preset) {
                 let targetKeys = [];
                 if (preset === 'all') targetKeys = ALL_PERM_KEYS;
-                else if (preset === 'mod') targetKeys = ["moderation", "automod", "dms", "faq", "commands"];
+                else if (preset === 'mod') targetKeys = ["moderation", "automod", "dms", "faq", "commands", "community"];
                 else if (preset === 'ops') targetKeys = ["servers", "crashes", "suggestions", "contact", "bans"];
-                else if (preset === 'bot') targetKeys = ["embeds", "autorole", "welcome", "faq", "commands", "errors"];
+                else if (preset === 'bot') targetKeys = ["embeds", "autorole", "welcome", "faq", "commands", "community", "errors"];
                 else if (preset === 'clear') targetKeys = [];
 
                 ALL_PERM_KEYS.forEach(k => {
@@ -4302,6 +4380,7 @@
                         welcome: getVal('welcome'),
                         faq: getVal('faq'),
                         commands: getVal('commands'),
+                        community: getVal('community'),
                         errors: getVal('errors'),
                         debug: getVal('debug'),
                         audit_logs: getVal('audit_logs'),

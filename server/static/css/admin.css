@@ -1511,3 +1511,83 @@ button.eb-item.active {
         grid-template-columns: 1fr;
     }
 }
+
+.cm-checklist {
+    max-height: 220px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.cm-checklist [hidden] {
+    display: none;
+}
+
+/* ---------- overview tiles ---------- */
+.cyber-panel.hover-glow {
+    --tone: #60a5fa;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.3s ease;
+}
+.cyber-panel.hover-glow:has(> div.text-rose-400) { --tone: #fb7185; }
+.cyber-panel.hover-glow:has(> div.text-blue-400) { --tone: #60a5fa; }
+.cyber-panel.hover-glow:has(> div.text-amber-400) { --tone: #fbbf24; }
+.cyber-panel.hover-glow:has(> div.text-indigo-400) { --tone: #818cf8; }
+.cyber-panel.hover-glow:has(> div.text-emerald-400) { --tone: #34d399; }
+.cyber-panel.hover-glow:has(> div.text-purple-400) { --tone: #c084fc; }
+.cyber-panel.hover-glow:has(> div.text-pink-400) { --tone: #f472b6; }
+.cyber-panel.hover-glow:has(> div.text-cyan-400) { --tone: #22d3ee; }
+.cyber-panel.hover-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(320px 180px at 0% 0%, color-mix(in srgb, var(--tone) 16%, transparent), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+.cyber-panel.hover-glow::after {
+    content: "\2192";
+    position: absolute;
+    top: 26px;
+    right: 24px;
+    font-size: 1.1rem;
+    color: var(--tone);
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+.cyber-panel.hover-glow > * { position: relative; }
+.cyber-panel.hover-glow > div:first-child { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease; }
+.cyber-panel.hover-glow:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--tone) 40%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 44px -20px rgba(0, 0, 0, 0.9),
+        0 18px 50px -30px color-mix(in srgb, var(--tone) 70%, transparent);
+}
+.cyber-panel.hover-glow:hover::before { opacity: 1; }
+.cyber-panel.hover-glow:hover::after { opacity: 1; transform: none; }
+.cyber-panel.hover-glow:hover > div:first-child { transform: scale(1.06) rotate(-3deg); }
+.cyber-panel.hover-glow:active { transform: translateY(-1px) scale(0.99); }
+
+/* ---------- view switch ---------- */
+@keyframes adm-view-in {
+    from { opacity: 0; transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .view-section:not(.hidden) { animation: adm-view-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cyber-panel.hover-glow,
+    .cyber-panel.hover-glow::after,
+    .cyber-panel.hover-glow > div:first-child { transition: none; }
+    .cyber-panel.hover-glow:hover,
+    .cyber-panel.hover-glow:active,
+    .cyber-panel.hover-glow:hover > div:first-child { transform: none; }
+}
