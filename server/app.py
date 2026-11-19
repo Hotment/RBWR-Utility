@@ -4381,20 +4381,23 @@ def _api_supervisor_loop():
             _api_process = proc
             spawned_once = True
             logger.info(f"[REST API] Started api.py Uvicorn subprocess (PID {proc.pid}) on {api_host}:{api_port}")
-            backoff = 1.0
+            started_at = time.monotonic()
             exit_code = proc.wait()
             if _api_shutting_down:
                 break
             if _api_immediate_restart:
                 _api_immediate_restart = False
+                backoff = 1.0
                 logger.info("[REST API] Restarting api.py Uvicorn subprocess...")
                 continue
+            if time.monotonic() - started_at >= 30:
+                backoff = 1.0
             logger.warning(f"[REST API] Uvicorn subprocess exited with code {exit_code}; restarting in {backoff:.0f}s.")
         except Exception as e:
             logger.error(f"[REST API] Failed to launch api.py subprocess: {e}")
 
         time.sleep(backoff)
-        backoff = min(backoff * 2, 15.0)
+        backoff = min(backoff * 2, 60.0)
     with _api_supervisor_lock:
         _api_supervisor_started = False
 
