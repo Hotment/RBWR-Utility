@@ -265,6 +265,8 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
             "is_author": is_author,
             "messages": ticket_messages,
             "messages_count": messages_count,
+            "merged_into": s.get("merged_into"),
+            "merged_from": s.get("merged_from", []),
         })
     return public_list
 
