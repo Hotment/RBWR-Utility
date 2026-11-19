@@ -98,6 +98,8 @@ commands_store = JsonStore("custom_commands.json", {"prefix": "!", "commands": {
                 "template": "", "role_id": "", "cooldown": 10, "reply": True, "delete_trigger": False, "enabled": True, "uses": 0},
 }})
 automod_store = JsonStore("automod.json", {"config": {}, "incidents": [], "last_id": 0})
+role_commands_store = JsonStore("role_commands.json", {"roles": {}})
+modstate_store = JsonStore("moderation.json", {"notes": [], "last_note_id": 0, "tempbans": {}, "locks": {}, "history": []})
 errors_store = JsonStore("errors.json", {"errors": [], "last_id": 0})
 
 
@@ -198,6 +200,7 @@ class _Hooks:
 
     def __init__(self):
         self.is_admin: Callable[[str], bool] = lambda _id: False
+        self.has_section: Callable[[str, str], bool] = lambda _id, _section: False
         self.is_owner: Callable[[str], bool] = lambda _id: False
         self.admin_name: Callable[[str], str | None] = lambda _id: None
         self.site_url: str = os.getenv("SERVER_BASE_URL", "https://rbwr.hotment.dev").rstrip("/")
@@ -213,10 +216,12 @@ _bot: commands.InteractionBot | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 
 
-def configure(is_admin=None, is_owner=None, admin_name=None, site_url: str | None = None) -> None:
+def configure(is_admin=None, is_owner=None, admin_name=None, site_url: str | None = None, has_section=None) -> None:
     """Called by the web server: who counts as a website admin / owner (root) and their display name."""
     if is_admin:
         hooks.is_admin = is_admin
+    if has_section:
+        hooks.has_section = has_section
     if is_owner:
         hooks.is_owner = is_owner
     if admin_name:
@@ -347,6 +352,50 @@ def can_manage_server(user: disnake.User | disnake.Member) -> bool:
         return True
     perms = getattr(user, "guild_permissions", None)
     return bool(perms and perms.administrator)
+
+
+STAFF_COMMANDS = [
+    "panel", "merge", "embed", "autorole", "starboard", "serverstats",
+    "mod", "warn", "warnings", "unwarn", "nick", "note", "modlog", "userinfo", "tempban", "unban", "purge", "slowmode", "lock",
+]
+
+
+def role_commands() -> dict[str, list[str]]:
+    roles = role_commands_store.load().get("roles", {})
+    return {str(r): [c for c in STAFF_COMMANDS if c in cmds] for r, cmds in roles.items() if cmds}
+
+
+def set_role_commands(role_id: str, commands: list[str]) -> list[str]:
+    commands = [c for c in STAFF_COMMANDS if c in set(commands)]
+    with role_commands_store.edit() as data:
+        roles = data.setdefault("roles", {})
+        if commands:
+            roles[str(role_id)] = commands
+        else:
+            roles.pop(str(role_id), None)
+    return commands
+
+
+def role_allows(user: disnake.User | disnake.Member, command: str | None) -> bool:
+    if not command:
+        return False
+    granted = role_commands()
+    return any(command in granted.get(str(r.id), ()) for r in getattr(user, "roles", []) or [])
+
+
+def staff_allowed(user: disnake.User | disnake.Member, section: str, discord_perm: str | None = None,
+                  command: str | None = None) -> bool:
+    if _is_owner_id(user.id) or role_allows(user, command):
+        return True
+    if _is_admin_id(user.id):
+        try:
+            return bool(hooks.has_section(str(user.id), section))
+        except Exception:
+            return False
+    perms = getattr(user, "guild_permissions", None)
+    if not perms:
+        return False
+    return bool(perms.administrator or (discord_perm and getattr(perms, discord_perm, False)))
 
 
 def _mentions(allow: bool) -> disnake.AllowedMentions:
@@ -700,11 +749,8 @@ MAX_TIMEOUT = timedelta(days=28)  # Discord's limit
 _DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
 
 
-def _can_moderate(user: disnake.User | disnake.Member, action: str) -> bool:
-    if can_manage_server(user):
-        return True
-    perms = getattr(user, "guild_permissions", None)
-    return bool(perms and getattr(perms, MOD_ACTIONS[action][0]))
+def _can_moderate(user: disnake.User | disnake.Member, action: str, command: str = "mod") -> bool:
+    return staff_allowed(user, "moderation", MOD_ACTIONS[action][0], command)
 
 
 def parse_duration(text: str) -> timedelta | None:
@@ -840,6 +886,7 @@ async def _dm_mod_notice(member: disnake.Member, what: str, reason: str | None) 
 async def _log_mod_action(actor: str, target: disnake.abc.Snowflake, text: str, reason: str | None) -> None:
     """`actor` is a mention or a name like "Alex (via website)"."""
     log.info("Moderation: %s -> %s: %s (%s)", actor, target.id, text, reason)
+    record_mod_history(target.id, actor, text, reason)
     channel = await _get_channel(hooks.mod_log_channel_id)
     if not isinstance(channel, disnake.TextChannel):
         return
@@ -852,6 +899,17 @@ async def _log_mod_action(actor: str, target: disnake.abc.Snowflake, text: str, 
         await channel.send(embed=embed, allowed_mentions=disnake.AllowedMentions.none())
     except Exception as exc:
         log.warning("Could not post to the moderation log channel: %s", exc)
+
+
+MOD_HISTORY_LIMIT = 3000
+
+
+def record_mod_history(user_id, actor: str, text: str, reason: str | None) -> None:
+    with modstate_store.edit() as data:
+        history = data.setdefault("history", [])
+        history.append({"user_id": str(user_id), "actor": str(actor)[:120], "text": text[:300],
+                        "reason": (reason or "")[:400], "at": utc_now()})
+        del history[:-MOD_HISTORY_LIMIT]
 
 
 async def _run_mod_action(actor: str, actor_mention: str, member: disnake.Member, action: str,
@@ -2228,7 +2286,7 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
         user_id: str = commands.Param(description="Discord user ID of the banned user"),
         reason: str = commands.Param(default=None, description="Reason (shown in the audit log)"),
     ):
-        if not _can_moderate(inter.author, "ban"):
+        if not _can_moderate(inter.author, "ban", "unban"):
             await inter.response.send_message("You need the Ban Members permission to use this.", ephemeral=True)
             return
         if not user_id.strip().isdigit() or not inter.guild:
@@ -2249,7 +2307,7 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
 
     async def _warn_target(inter: disnake.ApplicationCommandInteraction, member: disnake.Member) -> bool:
         """Checks that the author may warn `member` (replies and returns False if not)."""
-        if not _can_moderate(inter.author, "warn"):
+        if not _can_moderate(inter.author, "warn", "warn"):
             await inter.response.send_message("You need the Timeout Members permission to use this.", ephemeral=True)
             return False
         if not isinstance(member, disnake.Member):
@@ -2296,7 +2354,7 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
         inter: disnake.ApplicationCommandInteraction,
         member: disnake.User = commands.Param(description="Member whose warnings to show"),
     ):
-        if not _can_moderate(inter.author, "warn"):
+        if not _can_moderate(inter.author, "warn", "warnings"):
             await inter.response.send_message("You need the Timeout Members permission to use this.", ephemeral=True)
             return
         await inter.response.send_message(embed=warnings_embed(member, active_warnings(member.id)), ephemeral=True)
@@ -2313,7 +2371,7 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
         inter: disnake.ApplicationCommandInteraction,
         warning: int = commands.Param(description="Warning number, e.g. 12 for #12", ge=1),
     ):
-        if not _can_moderate(inter.author, "warn"):
+        if not _can_moderate(inter.author, "warn", "unwarn"):
             await inter.response.send_message("You need the Timeout Members permission to use this.", ephemeral=True)
             return
         removed = remove_warning(warning)
@@ -2357,6 +2415,11 @@ def register(bot: commands.InteractionBot, *, guild_id: str | int | None = None,
         with faq_store.edit() as data:
             if key in data.get("entries", {}):
                 data["entries"][key]["uses"] = data["entries"][key].get("uses", 0) + 1
+
+    import bot_moderation
+    import bot_community
+    bot_moderation.register(bot, guild_ids=guild_ids, install=guild_install, contexts=guild_contexts)
+    bot_community.register(bot, guild_ids=guild_ids, install=guild_install, contexts=guild_contexts)
 
     @faq_command.autocomplete("name")
     async def faq_autocomplete(inter: disnake.ApplicationCommandInteraction, string: str):

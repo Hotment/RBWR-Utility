@@ -19,6 +19,7 @@ from typing import Any, Callable, Literal
 from flask import Flask, jsonify, request, send_from_directory
 from pydantic import BaseModel, Field, ValidationError
 
+import bot_community as bc
 import bot_features as bf
 
 # ---------------------------------------------------------------- wiring with app.py
@@ -380,7 +381,7 @@ class ErrorStatusIn(BaseModel):
 # ---------------------------------------------------------------- routes
 
 # the channel and role pickers are used by every bot section
-BOT_SECTIONS = ("embeds", "autorole", "welcome", "faq", "commands", "moderation", "automod", "dms", "errors")
+BOT_SECTIONS = ("embeds", "autorole", "welcome", "faq", "commands", "moderation", "automod", "dms", "community", "errors")
 
 
 def init_app(app: Flask, **hooks) -> None:
@@ -866,6 +867,122 @@ def init_app(app: Flask, **hooks) -> None:
             data["errors"] = [e for e in data.get("errors", []) if not e.get("resolved")]
         ctx.log_audit(user, "bot.error_clear_resolved", "bot", "Cleared resolved bot error records", target="Bot Errors")
         return {"ok": True}
+
+    # ------------------------------------------------ community: starboard, server stats (bot_community.py)
+
+    class StarboardIn(BaseModel):
+        enabled: bool = False
+        channel_id: str = Field("", max_length=22)
+        emoji: str = Field("⭐", min_length=1, max_length=64)
+        threshold: int = Field(3, ge=1, le=100)
+        self_star: bool = False
+        bots: bool = False
+        ignored_channels: list[str] = Field(default_factory=list, max_length=100)
+
+    class StarboardSetupIn(BaseModel):
+        emoji: str = Field("⭐", min_length=1, max_length=64)
+        threshold: int = Field(3, ge=1, le=100)
+
+    class ServerStatsIn(BaseModel):
+        enabled: bool = False
+        templates: dict[str, str] = Field(default_factory=dict)
+
+    class CounterIn(BaseModel):
+        type: str = Field(..., min_length=1, max_length=32)
+        template: str = Field("", max_length=90)
+
+    @route("/api/admin/community", ["GET"], "community")
+    def get_community(user):
+        return bc.panel_state()
+
+    @route("/api/admin/community/starboard", ["PUT"], "community")
+    def set_starboard(user):
+        payload = body(StarboardIn)
+        channel_id = _check_post_channel(payload.channel_id, required=payload.enabled)
+        bc.save_starboard(dict(
+            enabled=payload.enabled, channel_id=channel_id, emoji=payload.emoji.strip(), threshold=payload.threshold,
+            self_star=payload.self_star, bots=payload.bots,
+            ignored_channels=[c for c in payload.ignored_channels if c.isdigit()]))
+        ctx.log_audit(user, "community.starboard", "bot",
+                      f"{'Enabled' if payload.enabled else 'Disabled'} the starboard ({payload.threshold} x {payload.emoji.strip()})",
+                      target="Starboard")
+        return bc.panel_state()
+
+    @route("/api/admin/community/starboard/setup", ["POST"], "community")
+    def setup_starboard(user):
+        payload = body(StarboardSetupIn)
+        name = bc.panel_setup_starboard(display_name(user), payload.emoji.strip(), payload.threshold)
+        ctx.log_audit(user, "community.starboard_setup", "bot", f"Set up the starboard in #{name}", target="Starboard")
+        return bc.panel_state()
+
+    @route("/api/admin/community/serverstats", ["PUT"], "community")
+    def set_serverstats(user):
+        payload = body(ServerStatsIn)
+        bc.save_serverstats(payload.enabled, {k: v for k, v in payload.templates.items() if k in bc.COUNTERS})
+        ctx.log_audit(user, "community.serverstats", "bot",
+                      f"{'Enabled' if payload.enabled else 'Paused'} server stats and saved the counter names", target="Server stats")
+        return bc.panel_state()
+
+    @route("/api/admin/community/serverstats/setup", ["POST"], "community")
+    def setup_serverstats(user):
+        count = bc.panel_setup_serverstats(display_name(user))
+        ctx.log_audit(user, "community.serverstats_setup", "bot", f"Set up server stats with {count} counters", target="Server stats")
+        return bc.panel_state()
+
+    @route("/api/admin/community/serverstats/counters", ["POST"], "community")
+    def add_stats_counter(user):
+        payload = body(CounterIn)
+        if payload.type not in bc.COUNTERS:
+            raise ApiError(400, "Unknown counter.")
+        bc.panel_add_counter(payload.type, payload.template.strip() or None)
+        ctx.log_audit(user, "community.counter_add", "bot", f"Added the {payload.type} counter", target="Server stats")
+        return bc.panel_state()
+
+    @route("/api/admin/community/serverstats/counters/<kind>", ["DELETE"], "community")
+    def remove_stats_counter(user, kind):
+        if not bc.panel_remove_counter(kind, display_name(user)):
+            raise ApiError(404, f"There's no {kind} counter.")
+        ctx.log_audit(user, "community.counter_remove", "bot", f"Removed the {kind} counter", target="Server stats")
+        return bc.panel_state()
+
+    @route("/api/admin/community/serverstats/refresh", ["POST"], "community")
+    def refresh_serverstats(user):
+        renamed = bc.panel_refresh_serverstats()
+        return {**bc.panel_state(), "renamed": renamed}
+
+    @route("/api/admin/community/serverstats", ["DELETE"], "community")
+    def delete_serverstats(user):
+        bc.panel_delete_serverstats(display_name(user))
+        ctx.log_audit(user, "community.serverstats_delete", "bot", "Removed the server stats channels", target="Server stats")
+        return bc.panel_state()
+
+    class RoleCommandsIn(BaseModel):
+        commands: list[str] = Field(default_factory=list, max_length=50)
+
+    @route("/api/admin/role-commands", ["GET"])
+    def get_role_commands(user):
+        if not ctx.is_root(user):
+            raise ApiError(403, "Only root admins can manage role commands.")
+        try:
+            roles, online = bf.list_roles()["roles"], True
+        except bf.BotActionError:
+            roles, online = [], False
+        return {"bot_online": online, "roles": roles, "assigned": bf.role_commands(), "commands": bf.STAFF_COMMANDS}
+
+    @route("/api/admin/role-commands/<role_id>", ["PUT"])
+    def set_role_commands(user, role_id):
+        if not ctx.is_root(user):
+            raise ApiError(403, "Only root admins can manage role commands.")
+        if not role_id.isdigit():
+            raise ApiError(400, "Invalid role.")
+        payload = body(RoleCommandsIn)
+        unknown = set(payload.commands) - set(bf.STAFF_COMMANDS)
+        if unknown:
+            raise ApiError(400, f"Unknown command: {', '.join(sorted(unknown))}")
+        commands = bf.set_role_commands(role_id, payload.commands)
+        ctx.log_audit(user, "accounts.role_commands", "accounts", f"Changed the Discord commands of role {role_id}",
+                      target=f"Role {role_id}", details={"role_id": role_id, "commands": commands})
+        return {"role_id": role_id, "commands": commands, "assigned": bf.role_commands()}
 
     @route("/api/admin/errors/test", ["POST"], "errors")
     def test_error_alert(user):

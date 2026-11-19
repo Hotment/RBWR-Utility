@@ -32,6 +32,7 @@ _server_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__fil
 load_dotenv(os.path.join(_server_dir, ".env"))
 if os.path.isdir(_server_dir) and _server_dir not in sys.path:
     sys.path.append(_server_dir)
+import ticket_merge  # noqa: E402  (manual ticket merging, shared with the web server)  # pyright: ignore[reportMissingImports]
 import bot_features  # noqa: E402  (admin panel features: moderation, automod, welcome, FAQ, custom commands...)  # pyright: ignore[reportMissingImports]
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
@@ -898,6 +899,7 @@ class TicketBridge:
         self.save_suggestions: Callable[[dict[str, Any]], None] | None = None
         self.load_admins: Callable[[], dict[str, Any]] | None = None
         self.is_website_admin: Callable[[str], bool] | None = None
+        self.is_any_website_admin: Callable[[str], bool] | None = None
         self.broadcast_dashboard: Callable[[], None] | None = None
         self.broadcast_ticket_update: Callable[..., None] | None = None
 
@@ -913,11 +915,13 @@ def configure_ticket_bridge(
     is_website_admin: Callable[[str], bool] | None = None,
     broadcast_dashboard: Callable[[], None] | None = None,
     broadcast_ticket_update: Callable[..., None] | None = None,
+    is_any_website_admin: Callable[[str], bool] | None = None,
 ):
     ticket_bridge.load_suggestions = load_suggestions
     ticket_bridge.save_suggestions = save_suggestions
     ticket_bridge.load_admins = load_admins
     ticket_bridge.is_website_admin = is_website_admin
+    ticket_bridge.is_any_website_admin = is_any_website_admin or is_website_admin
     ticket_bridge.broadcast_dashboard = broadcast_dashboard
     ticket_bridge.broadcast_ticket_update = broadcast_ticket_update
 
@@ -1309,19 +1313,20 @@ def _check_and_mark_interaction(inter_id: int) -> bool:
             _handled_interaction_ids.pop()
     return False
 
-def is_inter_admin(inter: disnake.Interaction) -> bool:
-    """
-    Checks if an interaction author is an authorized administrator,
-    either via Discord guild administrator permissions or through website admin config.
-    """
+def has_ticket_access(inter: disnake.Interaction, command: str = "panel") -> bool:
     sender_discord_id = str(inter.author.id)
-    is_guild_admin = (
-        inter.author.guild_permissions.administrator
-        if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member))
-        else False
-    )
-    is_web_admin = bool(ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id))
-    return bool(is_guild_admin or is_web_admin)
+    if bot_features.role_allows(inter.author, command):
+        return True
+    if ticket_bridge.is_any_website_admin and ticket_bridge.is_any_website_admin(sender_discord_id):
+        return bool(ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id))
+    return bool(isinstance(inter.author, disnake.Member) and inter.author.guild_permissions.administrator)
+
+def is_inter_admin(inter: disnake.Interaction, section: str, command: str) -> bool:
+    """
+    Checks if an interaction author may use a staff command: website admins with the panel section,
+    Discord administrators, or members with a role that has the command assigned.
+    """
+    return bot_features.staff_allowed(inter.author, section, "administrator", command)
 
 def parse_embed_color(val: str | None) -> disnake.Color | None:
     if not val:
@@ -1526,7 +1531,7 @@ async def handle_embed_modal_submission(inter: disnake.ModalInteraction, target_
     if _check_and_mark_interaction(inter.id) or inter.response.is_done():
         return
 
-    if not is_inter_admin(inter):
+    if not is_inter_admin(inter, "embeds", "embed"):
         await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
         return
 
@@ -2191,8 +2196,7 @@ def notify_ticket_deleted(ticket: dict[str, Any], deleted_by: str = "Administrat
 
 async def handle_ticket_edit_note_button(inter: disnake.MessageInteraction, ticket_id: int):
     sender_discord_id = str(inter.author.id)
-    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
-    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+    is_admin = has_ticket_access(inter)
 
     if not is_admin:
         await inter.response.send_message("Only website administrators can edit ticket notes.", ephemeral=True)
@@ -2217,8 +2221,7 @@ async def handle_ticket_note_submission(inter: disnake.ModalInteraction, ticket_
         return
 
     sender_discord_id = str(inter.author.id)
-    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
-    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+    is_admin = has_ticket_access(inter)
 
     if not is_admin:
         await inter.response.send_message("Only website administrators can edit ticket notes.", ephemeral=True)
@@ -2284,8 +2287,7 @@ async def handle_ticket_status_select(inter: disnake.MessageInteraction, ticket_
         return
 
     sender_discord_id = str(inter.author.id)
-    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
-    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+    is_admin = has_ticket_access(inter)
 
     if not is_admin:
         await inter.response.send_message("Only website administrators can change ticket status.", ephemeral=True)
@@ -2355,8 +2357,7 @@ async def handle_ticket_open_discussions(inter: disnake.MessageInteraction, tick
         return
 
     sender_discord_id = str(inter.author.id)
-    is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
-    is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+    is_admin = has_ticket_access(inter)
 
     if not is_admin:
         await inter.response.send_message("Only administrators can open discussion threads.", ephemeral=True)
@@ -3211,6 +3212,8 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         autorole_save=save_autorole_config,
         autorole_resolve=resolve_autorole_for_guild,
     )
+    import bot_community  # pyright: ignore[reportMissingImports]
+    bot_community.configure(load_tickets=lambda: ticket_bridge.load_suggestions() if ticket_bridge.load_suggestions else {})
 
     @b.event
     async def on_ready():
@@ -4344,8 +4347,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     ):
         await inter.response.defer(ephemeral=True)
         sender_discord_id = str(inter.author.id)
-        is_guild_admin = inter.author.guild_permissions.administrator if (hasattr(inter.author, "guild_permissions") and isinstance(inter.author, disnake.Member)) else None
-        is_admin = (ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id)) or is_guild_admin
+        is_admin = has_ticket_access(inter)
         if not is_admin:
             await inter.followup.send("Only administrators can spawn ticket panels.", ephemeral=True)
             return
@@ -4420,6 +4422,41 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
     ):
         await _show_panel_interactive(inter, id)
 
+    @b.slash_command(
+        name="merge",
+        description="Merge a ticket into another one about the same thing (you decide, nothing is detected)",
+        guild_ids=admin_guild_ids,
+        install_types=guild_only_install,
+        contexts=guild_only_contexts,
+    )
+    async def merge_command(
+        inter: disnake.ApplicationCommandInteraction,
+        into: int = commands.Param(ge=1, description="Ticket number to merge into (the one that stays open)"),
+        ticket: int | None = commands.Param(default=None, ge=1, description="Ticket to merge (defaults to this channel's ticket)"),
+    ):
+        if not has_ticket_access(inter, "merge"):
+            await inter.response.send_message("You need the Tickets permission to merge tickets.", ephemeral=True)
+            return
+        if not ticket_bridge.is_configured():
+            await inter.response.send_message("Ticket bridge is not configured.", ephemeral=True)
+            return
+        if ticket is None:
+            assert ticket_bridge.load_suggestions is not None
+            ch_id = str(inter.channel.id)
+            here = next((s for s in ticket_bridge.load_suggestions().get("suggestions", [])
+                         if str(s.get("discord_channel_id", "")) == ch_id), None)
+            if not here:
+                await inter.response.send_message("This isn't a ticket channel. Pass the `ticket` number to merge.", ephemeral=True)
+                return
+            ticket = int(here["id"])
+        await inter.response.defer(ephemeral=True)
+        try:
+            _source, target = await asyncio.to_thread(apply_ticket_merge, ticket, into, f"{inter.author.display_name} (via Discord)")
+        except ticket_merge.MergeError as exc:
+            await inter.followup.send(str(exc), ephemeral=True)
+            return
+        await inter.followup.send(f"Ticket #{ticket} was merged into #{target['id']}.", ephemeral=True)
+
     @b.event
     async def on_member_join(member: disnake.Member):
         # automod join checks (raid / new accounts), then the autorole, then the welcome message
@@ -4454,7 +4491,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         timestamp: bool = commands.Param(default=True, description="Whether to include current timestamp on embed"),
         template: str | None = commands.Param(default=None, description="Post a template saved in the admin panel's Embed Builder"),
     ):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "embeds", "embed"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4573,7 +4610,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         enabled: bool = commands.Param(default=True, description="Enable autorole assignment immediately"),
         include_bots: bool = commands.Param(default=False, description="Whether to also assign role to newly added bots"),
     ):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "autorole", "autorole"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4633,7 +4670,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         description="View current autorole configuration and permissions for this server",
     )
     async def autorole_view(inter: disnake.ApplicationCommandInteraction):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "autorole", "autorole"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4688,7 +4725,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         description="Disable automatic role assignment for this server",
     )
     async def autorole_disable(inter: disnake.ApplicationCommandInteraction):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "autorole", "autorole"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4716,7 +4753,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         description="Enable automatic role assignment for this server",
     )
     async def autorole_enable(inter: disnake.ApplicationCommandInteraction):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "autorole", "autorole"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4747,7 +4784,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         inter: disnake.ApplicationCommandInteraction,
         include_bots: bool = commands.Param(default=False, description="Whether to also assign role to bots"),
     ):
-        if not is_inter_admin(inter):
+        if not is_inter_admin(inter, "autorole", "autorole"):
             await inter.response.send_message("Only administrators can execute this command.", ephemeral=True)
             return
 
@@ -4839,6 +4876,19 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         sender_discord_id = str(message.author.id)
 
         assert ticket_bridge.is_website_admin is not None
+        in_ticket_channel = str(target_ticket.get("discord_channel_id", "")) == ch_id
+        if (in_ticket_channel and ticket_bridge.is_any_website_admin
+                and ticket_bridge.is_any_website_admin(sender_discord_id)
+                and not ticket_bridge.is_website_admin(sender_discord_id)):
+            try:
+                await message.delete()
+                await message.channel.send(
+                    f"{message.author.mention} you don't have the Tickets permission, so you can't write in ticket channels. "
+                    "Ask a root admin to enable it in Accounts.",
+                    delete_after=10, allowed_mentions=disnake.AllowedMentions(users=[message.author]))
+            except disnake.HTTPException as ex:
+                log.warning(f"[Disnake Bot] Could not remove a message from an admin without the Tickets permission: {ex}")
+            return
         if not ticket_bridge.is_website_admin(sender_discord_id):
             log.info(
                 f"[Disnake Bot] Ignored message from non-website-admin {message.author} "
@@ -5028,6 +5078,84 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 target_ticket.get("anonymous")
             )
         log.info(f"[Disnake Bot] Synchronized deleted message {d_msg_id} for ticket #{target_ticket.get('id')}")
+
+def apply_ticket_merge(source_id: int, target_id: int, by: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not ticket_bridge.load_suggestions or not ticket_bridge.save_suggestions:
+        raise ticket_merge.MergeError("Ticket bridge is not configured.")
+    data = ticket_bridge.load_suggestions()
+    source, target, previous = ticket_merge.merge(data, source_id, target_id, by)
+    messages = source.setdefault("messages", [])
+    notice = {
+        "id": (max([m.get("id", 0) for m in messages]) if messages else 0) + 1,
+        "sender_type": "admin",
+        "sender_name": by,
+        "message": ticket_merge.merge_notice(source, target),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    messages.append(notice)
+    ticket_bridge.save_suggestions(data)
+
+    if ticket_bridge.broadcast_dashboard:
+        ticket_bridge.broadcast_dashboard()
+    if ticket_bridge.broadcast_ticket_update:
+        try:
+            ticket_bridge.broadcast_ticket_update(source.get("id"), notice, messages, source.get("discord_id"), source.get("anonymous"))
+        except Exception as ex:
+            log.warning(f"[Ticket Merge] Live update failed: {ex}")
+    try:
+        notify_ticket_author_dm(ticket=source, event_type="message", details={"sender_name": by, "message": notice["message"]})
+    except Exception as ex:
+        log.warning(f"[Ticket Merge] Author DM failed: {ex}")
+    _announce_ticket_merge(source, target, by)
+    for t, prev in ((source, previous), (target, None)):
+        try:
+            update_ticket_channel_message(t, changed_by=by, prev_status=prev)
+        except Exception as ex:
+            log.warning(f"[Ticket Merge] Could not refresh the channel of ticket #{t.get('id')}: {ex}")
+    return source, target
+
+
+def _announce_ticket_merge(source: dict[str, Any], target: dict[str, Any], by: str) -> None:
+    if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
+        return
+    bot_ref = disnake_bot
+    sid, tid = source.get("id"), target.get("id")
+    t_title = (target.get("title") or target.get("suggestion") or target.get("description") or "")[:80]
+    s_title = (source.get("title") or source.get("suggestion") or source.get("description") or "")[:80]
+
+    async def _post(channel_id, embed: disnake.Embed) -> None:
+        if not channel_id:
+            return
+        try:
+            ch = bot_ref.get_channel(int(channel_id)) or await bot_ref.fetch_channel(int(channel_id))
+            if hasattr(ch, "send"):
+                await ch.send(embed=embed)  # pyright: ignore[reportAttributeAccessIssue]
+        except Exception as ex:
+            log.warning(f"[Ticket Merge] Could not post in channel {channel_id}: {ex}")
+
+    async def _go() -> None:
+        here = disnake.Embed(
+            title=f"Ticket #{sid} merged into #{tid}",
+            description=(f"{by} merged this ticket into **#{tid}**" + (f" ({t_title})" if t_title else "") + ". "
+                         "Its author follows that ticket now."
+                         + (f"\nContinue in <#{target['discord_channel_id']}>." if target.get("discord_channel_id") else "")),
+            color=disnake.Color.dark_grey(), timestamp=datetime.now(timezone.utc))
+        await _post(source.get("discord_channel_id"), here)
+        there = disnake.Embed(
+            title=f"Ticket #{sid} merged into this one",
+            description=(f"{by} merged **#{sid}**" + (f" ({s_title})" if s_title else "") + " into this ticket. "
+                         f"{len(target.get('followers', []))} member(s) follow this ticket now."),
+            color=disnake.Color(0x00D1FF), timestamp=datetime.now(timezone.utc))
+        desc = source.get("suggestion") or source.get("description")
+        if desc:
+            there.add_field(name=f"#{sid} said", value=str(desc)[:1000], inline=False)
+        await _post(target.get("discord_channel_id"), there)
+
+    try:
+        asyncio.run_coroutine_threadsafe(_go(), disnake_bot_loop)
+    except Exception as ex:
+        log.warning(f"[Ticket Merge] Could not dispatch the Discord notices: {ex}")
+
 
 def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
     global disnake_bot, disnake_bot_loop
@@ -5291,6 +5419,7 @@ def start_bot_thread(
     broadcast_ticket_update: Callable[..., None] | None = None,
     get_servers_data: Callable[[bool], dict[str, Any]] | None = None,
     token: str | None = None,
+    is_any_website_admin: Callable[[str], bool] | None = None,
 ) -> threading.Thread | None:
     """
     Spawns the Disnake Discord bot in a background daemon thread, wiring the ticket bridge callbacks.
@@ -5302,6 +5431,7 @@ def start_bot_thread(
         is_website_admin=is_website_admin,
         broadcast_dashboard=broadcast_dashboard,
         broadcast_ticket_update=broadcast_ticket_update,
+        is_any_website_admin=is_any_website_admin,
     )
 
     bot_token = token or TOKEN or os.getenv("DISCORD_BOT_TOKEN", "").strip()

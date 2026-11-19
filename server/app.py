@@ -96,6 +96,7 @@ try:
         notify_ticket_deleted,
         report_error_to_discord,
         report_crash_to_discord,
+        apply_ticket_merge,
     )
 except Exception:
     from bot import (
@@ -112,7 +113,9 @@ except Exception:
         notify_ticket_deleted,  # pyright: ignore[reportAttributeAccessIssue]
         report_error_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
         report_crash_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        apply_ticket_merge,  # pyright: ignore[reportAttributeAccessIssue]
     )
+import ticket_merge  # noqa: E402
 
 try:
     send_test_notification_dm  # pyright: ignore[reportUnusedExpression]
@@ -467,7 +470,10 @@ def get_dashboard_payload_data(username=None):
                 "discord_username": s.get("discord_username") or "",
                 "discord_avatar": s.get("discord_avatar") or "",
                 "messages": s.get("messages", []),
-                "messages_count": len(s.get("messages", []))
+                "messages_count": len(s.get("messages", [])),
+                "merged_into": s.get("merged_into"),
+                "merged_by": s.get("merged_by") or "",
+                "merged_from": s.get("merged_from", []),
             })
 
     banned_ips = {}
@@ -891,7 +897,7 @@ def is_website_admin_discord_id(discord_id: str | int) -> bool:
 # they don't want that admin to have. Clearing audit logs is a separate, hardcoded
 # root-only action and is never gated by the "audit_logs" permission (see api_clear_audit_logs).
 LEGACY_PERMISSION_SECTIONS = ["suggestions", "crashes", "contact", "bans", "servers"]
-BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "errors", "debug", "audit_logs"]
+BOT_PERMISSION_SECTIONS = ["dms", "moderation", "automod", "embeds", "autorole", "welcome", "faq", "commands", "community", "errors", "debug", "audit_logs"]
 ALL_PERMISSION_SECTIONS = LEGACY_PERMISSION_SECTIONS + BOT_PERMISSION_SECTIONS
 
 
@@ -928,6 +934,14 @@ def has_permission(user_identifier: str, section: str) -> bool:
     if is_root_user(user_identifier):
         return True
     return bool(get_user_permissions(user_identifier).get(section, False))
+
+def discord_admin_has_permission(discord_id: str | int, section: str) -> bool:
+    d_id = str(discord_id or "").strip()
+    if not d_id or not is_website_admin_discord_id(d_id):
+        return False
+    if d_id in get_root_discord_ids() or is_root_user(d_id):
+        return True
+    return has_permission(d_id, section)
 
 def get_admin_notifier_config(user_identifier: str) -> dict:
     admins_data = load_admins()
@@ -1131,7 +1145,8 @@ try:
         load_suggestions=load_suggestions,
         save_suggestions=save_suggestions,
         load_admins=load_admins,
-        is_website_admin=is_website_admin_discord_id,
+        is_website_admin=lambda d_id: discord_admin_has_permission(d_id, "suggestions"),
+        is_any_website_admin=is_website_admin_discord_id,
         broadcast_dashboard=lambda: broadcast_update("dashboard"),
         broadcast_ticket_update=broadcast_ticket_update,
         get_servers_data=lambda public_only=True: get_public_servers_payload(public_only=public_only),
@@ -1145,6 +1160,7 @@ try:
 
     bot_features.configure(
         is_admin=is_website_admin_discord_id,
+        has_section=discord_admin_has_permission,
         is_owner=lambda d_id: bool(d_id) and str(d_id) in get_root_discord_ids(),
         site_url=os.environ.get("SERVER_BASE_URL", "").strip() or None,
     )
@@ -2790,6 +2806,32 @@ def update_suggestion_status(username):
             return jsonify({"message": "Status updated successfully.", "id": payload.id, "status": norm_status})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
 
+class MergeTicketPayload(BaseModel):
+    id: int
+    into: int
+
+@app.route("/admin/tickets/merge", methods=["POST"])
+@admin_required
+def merge_suggestion(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
+        payload = MergeTicketPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+    try:
+        source, target = apply_ticket_merge(payload.id, payload.into, f"{username} (via Website)")
+    except ticket_merge.MergeError as exc:
+        return jsonify({"detail": str(exc)}), 400
+    broadcast_update("dashboard")
+    log_audit_event("tickets.merge", "tickets", f"Merged ticket #{payload.id} into #{target['id']}",
+                    target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "into": target["id"]}, username=username)
+    return jsonify({"message": f"Ticket #{payload.id} was merged into #{target['id']}.", "id": payload.id,
+                    "merged_into": target["id"], "status": source.get("status")})
+
 @app.route("/admin/tickets/comment", methods=["POST"])
 @admin_required
 def update_suggestion_comment(username):
@@ -3059,7 +3101,7 @@ def admin_root(username):
         notifier=notifier_cfg
     )
 
-@app.route("/admin/<any(dms, moderation, automod, embeds, autorole, welcome, faq, commands, errors):section>", methods=["GET"])
+@app.route("/admin/<any(dms, moderation, automod, embeds, autorole, welcome, faq, commands, community, errors):section>", methods=["GET"])
 @admin_required
 def view_bot_section_dashboard(username, section):
     if not has_permission(username, section):

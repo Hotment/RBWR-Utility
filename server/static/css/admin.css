@@ -1511,3 +1511,18 @@ button.eb-item.active {
         grid-template-columns: 1fr;
     }
 }
+
+.cm-checklist {
+    max-height: 220px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.cm-checklist [hidden] {
+    display: none;
+}
