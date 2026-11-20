@@ -5178,6 +5178,7 @@ def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
 
     target_labels = {
         "overlay": "APRM Overlay",
+        "theme_creator": "Theme Creator",
         "point_graph": "Point History Graph",
         "server_checker": "Server Browser",
         "general": "General"

@@ -721,6 +721,9 @@
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">General</button>
                         <button onclick="filterTarget('overlay')" id="target-tab-overlay"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Overlay</button>
+                        <button onclick="filterTarget('theme_creator')" id="target-tab-theme_creator"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Theme
+                            Creator</button>
                         <button onclick="filterTarget('point_graph')" id="target-tab-point_graph"
                             class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Point
                             Graph</button>
@@ -2414,7 +2417,7 @@
 
         function filterTarget(target) {
             currentTargetFilter = target;
-            ['all', 'general', 'overlay', 'point_graph', 'server_checker'].forEach(t => {
+            ['all', 'general', 'overlay', 'theme_creator', 'point_graph', 'server_checker'].forEach(t => {
                 const btn = document.getElementById('target-tab-' + t);
                 if (btn) {
                     btn.className = (t === target)
@@ -3161,6 +3164,9 @@
                 if (s.target === 'general') {
                     targetTag = '<span class="px-2 py-0.5 bg-purple-500/10 text-purple-300 text-[10px] rounded font-bold uppercase border border-purple-500/20">General</span>';
                     targetAttr = 'general';
+                } else if (s.target === 'theme_creator') {
+                    targetTag = '<span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-300 text-[10px] rounded font-bold uppercase border border-cyan-500/20">Theme Creator</span>';
+                    targetAttr = 'theme_creator';
                 } else if (s.target === 'point_graph' || s.target === 'points_graph') {
                     targetTag = '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 text-[10px] rounded font-bold uppercase border border-emerald-500/20">Point Graph</span>';
                     targetAttr = 'point_graph';

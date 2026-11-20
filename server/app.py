@@ -637,7 +637,7 @@ def get_accounts_payload_data():
             "permissions": normalize_permissions(info.get("permissions")),
             "notifier": info.get("notifier") or {
                 "enabled": False,
-                "categories": ["overlay", "point_graph", "server_checker", "general"]
+                "categories": ["overlay", "theme_creator", "point_graph", "server_checker", "general"]
             }
         })
     return {"admins": admins_list}
@@ -1067,7 +1067,7 @@ def get_admin_notifier_config(user_identifier: str) -> dict:
     
     return {
         "enabled": False,
-        "categories": ["overlay", "point_graph", "server_checker", "general"]
+        "categories": ["overlay", "theme_creator", "point_graph", "server_checker", "general"]
     }
 
 def save_admin_notifier_config(user_identifier: str, notifier_config: dict):
@@ -2633,6 +2633,8 @@ def submit_ticket():
         target_val = "point_graph"
     elif payload.target == "server_checker" or payload.is_server_checker:
         target_val = "server_checker"
+    elif payload.target in ["theme_creator", "theme-creator", "themecreator", "themes"]:
+        target_val = "theme_creator"
     elif payload.target == "general":
         target_val = "general"
     else:
@@ -3458,7 +3460,7 @@ def create_admin_account(username):
         "permissions": normalize_permissions(None),
         "notifier": {
             "enabled": False,
-            "categories": ["overlay", "point_graph", "server_checker", "general"]
+            "categories": ["overlay", "theme_creator", "point_graph", "server_checker", "general"]
         }
     }
     save_admins(admins_data)

@@ -207,6 +207,7 @@
                     class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="all">All Categories</option>
                     <option value="overlay">APRM Overlay</option>
+                    <option value="theme_creator">Theme Creator</option>
                     <option value="point_graph">Point History Graph</option>
                     <option value="server_checker">Server Browser</option>
                     <option value="general">General</option>
@@ -378,13 +379,21 @@
 
                 <div class="flex flex-col gap-1.5">
                     <label class="text-xs font-medium text-gray-400">Target Project / Category</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs font-mono">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs font-mono">
                         <label
                             class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-blue-500/40 cursor-pointer transition">
                             <input type="radio" name="submit-target" value="overlay" checked
                                 class="premium-checkbox accent-blue-500">
                             <span class="inline-flex items-center text-blue-300 font-medium whitespace-nowrap">
                                 APRM Overlay
+                            </span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/10 hover:border-cyan-500/40 cursor-pointer transition">
+                            <input type="radio" name="submit-target" value="theme_creator"
+                                class="premium-checkbox accent-cyan-500">
+                            <span class="inline-flex items-center text-cyan-300 font-medium whitespace-nowrap">
+                                Theme Creator
                             </span>
                         </label>
                         <label
@@ -547,6 +556,8 @@
             let matchedTarget = null;
             if (['overlay', 'aprm', 'aprm_overlay'].includes(normTarget)) {
                 matchedTarget = 'overlay';
+            } else if (['theme_creator', 'theme-creator', 'themecreator', 'theme', 'themes', 'creator'].includes(normTarget)) {
+                matchedTarget = 'theme_creator';
             } else if (['point_graph', 'point', 'points', 'graph', 'history'].includes(normTarget)) {
                 matchedTarget = 'point_graph';
             } else if (['server_checker', 'server', 'servers', 'checker', 'browser'].includes(normTarget)) {
@@ -885,6 +896,8 @@
     function getCategoryBadge(target, isServerChecker) {
         if (target === 'general') {
             return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">General</span>`;
+        } else if (target === 'theme_creator') {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Theme Creator</span>`;
         } else if (target === 'point_graph' || target === 'points_graph') {
             return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Point History</span>`;
         } else if (target === 'server_checker' || isServerChecker) {
@@ -901,7 +914,10 @@
         let filtered = allTickets.filter(item => {
             const itemType = item.type || 'suggestion';
             const itemStatus = (item.status || 'pending').toLowerCase();
-            const itemTarget = (item.target === 'point_graph' || item.target === 'points_graph') ? 'point_graph' : (item.target === 'server_checker' || item.is_server_checker ? 'server_checker' : (item.target === 'general' ? 'general' : 'overlay'));
+            const itemTarget = (item.target === 'point_graph' || item.target === 'points_graph') ? 'point_graph'
+                : (item.target === 'server_checker' || item.is_server_checker ? 'server_checker'
+                : (item.target === 'theme_creator' ? 'theme_creator'
+                : (item.target === 'general' ? 'general' : 'overlay')));
 
             if (currentTypeFilter === 'suggestion' && itemType !== 'suggestion') return false;
             if (currentTypeFilter === 'bug_report' && itemType !== 'bug_report') return false;
