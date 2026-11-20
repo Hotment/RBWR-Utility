@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:RbwrThemeCreator.Views"
              x:Class="RbwrThemeCreator.Views.OverlayPreview">
 
     <!--
@@ -29,7 +30,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <Border x:Name="NavBar" Classes="hud-card nav-bar" Grid.Row="1" Margin="0,0,0,10">
+                    <Border x:Name="NavBar" Classes="hud-card nav-bar" Grid.Row="1" Margin="0,0,0,10" ClipToBounds="True">
                         <Grid ColumnDefinitions="*,*,*,*">
                             <Button x:Name="NavMonitorTab" Grid.Column="0" Classes="cyber-nav active" Content="MONITOR" HorizontalAlignment="Stretch" />
                             <Button Grid.Column="1" Classes="cyber-nav" Content="SERVER SYNC" HorizontalAlignment="Stretch" />
@@ -128,7 +129,7 @@
             <!-- ================= Detailed overlay: CONFIG / SYNC controls ================= -->
             <Border x:Name="ConfigShell" Classes="overlay-shell" Width="470" VerticalAlignment="Top">
                 <StackPanel Spacing="8">
-                    <Border Classes="hud-card nav-bar">
+                    <Border Classes="hud-card nav-bar" ClipToBounds="True">
                         <Grid ColumnDefinitions="*,*,*,*">
                             <Button Grid.Column="0" Classes="cyber-nav" Content="MONITOR" HorizontalAlignment="Stretch" />
                             <Button Grid.Column="1" Classes="cyber-nav" Content="SERVER SYNC" HorizontalAlignment="Stretch" />
@@ -256,6 +257,80 @@
                 </StackPanel>
             </Border>
         </StackPanel>
+
+        <!-- ================= Operator Tablet HUD preview ================= -->
+        <Border x:Name="TabletShell" Classes="overlay-shell popup-shell" Width="470" VerticalAlignment="Top" Padding="0">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto">
+                <Border Grid.Row="0" Classes="hud-header"
+                        CornerRadius="{Binding #TabletShell.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.TopOnly}}"
+                        Padding="12,8" BorderBrush="{DynamicResource CyberBorder}" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="OPERATOR TABLET" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" LetterSpacing="1" />
+                            <Border Classes="status-pill" Padding="6,1">
+                                <TextBlock Text="SYNCED · d638-4385" Foreground="{DynamicResource NeonGreen}" FontSize="9" FontWeight="Bold" />
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <Button Classes="cyber-header-btn" Content="HUD" Padding="6,2" FontSize="9" />
+                            <Button Classes="cyber-close-btn" Content="X" Padding="6,2" FontSize="9" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1" Classes="hud-card nav-bar" Margin="10,8,10,0" ClipToBounds="True">
+                    <Grid ColumnDefinitions="*,*,*,*">
+                        <Button Grid.Column="0" Classes="cyber-nav active" Content="UNIT 01" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="1" Classes="cyber-nav" Content="UNIT 02" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="2" Classes="cyber-nav" Content="MISC" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG" HorizontalAlignment="Stretch" />
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="10,8,10,0">
+                    <TextBox Grid.Column="0" Classes="cyber-search" Text="" PlaceholderText="Filter parameters..." />
+                    <Border Grid.Column="1" Classes="status-pill" Padding="8,4" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="DTL: 02:41" Foreground="{DynamicResource NeonGold}" FontSize="9.5" FontWeight="Bold" />
+                    </Border>
+                </Grid>
+
+                <StackPanel Grid.Row="3" Spacing="5" Margin="10,8,10,10">
+                    <TextBlock Classes="cyber-head" Text="UNIT 01 REACTOR PARAMETERS" />
+                    <Border Classes="hud-card cyber-data-row" Padding="10,5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="APRM Power" Foreground="{DynamicResource TextLight}" FontSize="11" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Classes="hud-card sub-panel" Width="140" Padding="8,3">
+                                <TextBlock Text="98.40%" Foreground="{DynamicResource NeonGreen}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border Classes="hud-card cyber-data-row" Padding="10,5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Generator Output" Foreground="{DynamicResource TextLight}" FontSize="11" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Classes="hud-card sub-panel" Width="140" Padding="8,3">
+                                <TextBlock Text="948.37 MW" Foreground="{DynamicResource NeonCyan}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border Classes="hud-card cyber-data-row" Padding="10,5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Target Demand" Foreground="{DynamicResource TextLight}" FontSize="11" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Classes="hud-card sub-panel" Width="140" Padding="8,3">
+                                <TextBlock Text="950 MW" Foreground="{DynamicResource NeonGold}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border Classes="hud-card cyber-data-row" Padding="10,5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Reactor Temp / Fuel" Foreground="{DynamicResource TextLight}" FontSize="11" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Classes="hud-card sub-panel" Width="140" Padding="8,3">
+                                <TextBlock Text="284 C · 72%" Foreground="{DynamicResource NeonPurple}" FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 
     <!-- Temporary "this is where the colour is used" highlights (not part of the overlay). -->

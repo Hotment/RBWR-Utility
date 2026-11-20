@@ -12,7 +12,8 @@ public partial class OverlayPreview : UserControl
     public const int ModeMonitor = 0;
     public const int ModeConfig = 1;
     public const int ModeCompact = 2;
-    public const int ModeAll = 3;
+    public const int ModeTablet = 3;
+    public const int ModeAll = 4;
 
     private const double Gap = 28;
 
@@ -28,21 +29,25 @@ public partial class OverlayPreview : UserControl
         DetailedShell.IsVisible = mode is ModeMonitor or ModeAll;
         ConfigShell.IsVisible = mode is ModeConfig or ModeAll;
         CompactGroup.IsVisible = mode is ModeCompact or ModeAll;
+        TabletShell.IsVisible = mode is ModeTablet or ModeAll;
 
         Place(DetailedShell, 0, 0, new Thickness(0));
         if (mode == ModeAll)
         {
             Place(ConfigShell, 0, 1, new Thickness(Gap, 0, 0, 0));
-            Place(CompactGroup, 1, 0, new Thickness(0, Gap, 0, 0));
-            Grid.SetColumnSpan(CompactGroup, 2);
+            Place(TabletShell, 1, 0, new Thickness(0, Gap, 0, 0));
+            Place(CompactGroup, 1, 1, new Thickness(Gap, Gap, 0, 0));
+            Grid.SetColumnSpan(CompactGroup, 1);
+            CompactGroup.Orientation = Avalonia.Layout.Orientation.Vertical;
         }
         else
         {
             Place(ConfigShell, 0, 0, new Thickness(0));
+            Place(TabletShell, 0, 0, new Thickness(0));
             Place(CompactGroup, 0, 0, new Thickness(0));
             Grid.SetColumnSpan(CompactGroup, 1);
+            CompactGroup.Orientation = mode == ModeCompact ? Avalonia.Layout.Orientation.Vertical : Avalonia.Layout.Orientation.Horizontal;
         }
-        CompactGroup.Orientation = mode == ModeCompact ? Avalonia.Layout.Orientation.Vertical : Avalonia.Layout.Orientation.Horizontal;
     }
 
     /// <summary>
@@ -61,11 +66,18 @@ public partial class OverlayPreview : UserControl
                 continue;
 
             const double pad = 4;
+            var radius = target is Border tb
+                ? new CornerRadius(
+                    tb.CornerRadius.TopLeft + 2,
+                    tb.CornerRadius.TopRight + 2,
+                    tb.CornerRadius.BottomRight + 2,
+                    tb.CornerRadius.BottomLeft + 2)
+                : new CornerRadius(8);
             var marker = new Border
             {
                 Width = target.Bounds.Width + pad * 2,
                 Height = target.Bounds.Height + pad * 2,
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = radius,
                 BorderThickness = new Thickness(2),
                 BorderBrush = new SolidColorBrush(Color.Parse("#ffffff")),
                 Background = new SolidColorBrush(Color.Parse("#22ffffff")),

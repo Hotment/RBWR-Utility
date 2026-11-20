@@ -34,6 +34,153 @@ public static class BuiltInThemes
         includeStyles: false);
 
     /// <summary>
+    /// Template-level hover/pressed/focus styles for the preview host so Avalonia's FluentTheme
+    /// (and EditorStyles.axaml's ButtonBackgroundPointerOver resources) do not override the previewed
+    /// theme's ControlHoverBg / ControlActiveBg / ControlPressedBg / TextBoxFocusBg / accent tokens.
+    /// </summary>
+    private const string PreviewHoverBridgeXaml = """
+<Styles xmlns="https://github.com/avaloniaui">
+    <Style Selector="Button.cyber:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlPressedBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber.error:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonRed}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonRed}" />
+    </Style>
+    <Style Selector="Button.cyber-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-nav.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-nav:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlPressedBg}" />
+    </Style>
+    <Style Selector="Button.cyber-blue:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-green:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonGreen}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-gold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonGold}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-red:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonRed}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-header-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-close:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.cyber-close-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NeonRed}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="Button.cyber-preset:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-preset.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-tick:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-tick.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBox.cyber:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource CyberCardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBox.cyber:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource TextBoxFocusBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="ComboBox.cyber:pointerover /template/ Border#Background">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="ComboBox.cyber:pressed /template/ Border#Background">
+        <Setter Property="Background" Value="{DynamicResource ControlPressedBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="ComboBox.cyber /template/ Border#PopupBorder">
+        <Setter Property="Background" Value="{DynamicResource CyberCardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="ComboBox.cyber ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+    </Style>
+    <Style Selector="ComboBox.cyber ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBlock.cyber-head">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="LetterSpacing" Value="0.8" />
+    </Style>
+    <Style Selector="TextBox.cyber-search">
+        <Setter Property="Background" Value="{DynamicResource DarkPanelBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CyberBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="8,4" />
+    </Style>
+    <Style Selector="TextBox.cyber-search:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource DarkPanelBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBox.cyber-search:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource TextBoxFocusBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Border.cyber-data-row:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+    </Style>
+</Styles>
+""";
+
+    public static Styles LoadPreviewHoverBridgeStyles() =>
+        AvaloniaRuntimeXamlLoader.Parse<Styles>(PreviewHoverBridgeXaml);
+
+    /// <summary>
     /// Loads the overlay's base Cyberpunk stylesheet for the preview. Overlay-only behavior setters are stripped,
     /// they do not affect visuals.
     /// </summary>
@@ -41,7 +188,9 @@ public static class BuiltInThemes
     {
         string xaml = BehaviorsXmlnsRegex.Replace(CyberpunkXaml, string.Empty);
         xaml = BehaviorsSetterRegex.Replace(xaml, string.Empty);
-        return AvaloniaRuntimeXamlLoader.Parse<Styles>(xaml);
+        var styles = AvaloniaRuntimeXamlLoader.Parse<Styles>(xaml);
+        styles.Add(LoadPreviewHoverBridgeStyles());
+        return styles;
     }
 
     public static IReadOnlyList<ThemePreset> Presets { get; } =

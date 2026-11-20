@@ -22,15 +22,23 @@ public sealed class PreviewReadyEventArgs(Styles? styles, List<Bitmap> bitmaps) 
 public partial class MainViewModel : ObservableObject
 {
     public const string AppVersion = "1.0.0";
+    public string GlobalAppVersion => AppVersion;
+    public string AppVersionBadge => $"v{AppVersion}";
+    public string AppVersionText => $"RBWR Theme Creator v{AppVersion}";
 
     private static readonly string[] FontPatterns = ["*.ttf", "*.otf", "*.ttc"];
     private static readonly string[] ImagePatterns = ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif"];
 
     private readonly DispatcherTimer _refreshTimer;
     private readonly Dictionary<string, TokenViewModel> _tokens = new(StringComparer.Ordinal);
+    private readonly List<ThemeState> _undoStack = new();
+    private readonly List<ThemeState> _redoStack = new();
+    private const int MaxUndoSteps = 50;
+    private ThemeState? _lastRecordedState;
+    private string _lastRecordedFingerprint = string.Empty;
+    private bool _isRestoringHistory;
     private bool _suppressChanges;
-    private string _lastSavedXaml = string.Empty;
-    private ThemeManifest _savedManifestSnapshot = new();
+    private string _lastSavedFingerprint = string.Empty;
 
     public IDialogHost? Dialogs { get; set; }
 
@@ -108,6 +116,8 @@ public partial class MainViewModel : ObservableObject
     public bool HasPreviewError => !string.IsNullOrEmpty(PreviewError);
     public bool HasManifestProblems => !string.IsNullOrEmpty(ManifestProblems);
     public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageFile);
+    public bool CanUndo => _undoStack.Count > 0;
+    public bool CanRedo => _redoStack.Count > 0;
     public string WindowTitle => $"RBWR Theme Creator — {(string.IsNullOrWhiteSpace(ThemeName) ? "Untitled" : ThemeName)}{(IsDirty ? " •" : string.Empty)}";
     public string CurrentFolderDisplay => CurrentFolder ?? "Not saved yet";
     public string PreviewZoomText => $"{Math.Round(PreviewZoom * 100)}%";
@@ -138,7 +148,7 @@ public partial class MainViewModel : ObservableObject
         _previewBackdrop = Math.Clamp(settings.PreviewBackdrop, 0, BackdropNames.Count - 1);
         _previewZoom = settings.PreviewZoom is >= 0.25 and <= 4 ? settings.PreviewZoom : 1.0;
         _previewFit = settings.PreviewFit;
-        _previewMode = Math.Clamp(settings.PreviewMode, 0, 3);
+        _previewMode = Math.Clamp(settings.PreviewMode, 0, 4);
 
         OverlayThemesDirectory = OverlayLocator.Detect() ?? string.Empty;
         LoadState(BuiltInThemes.Presets[0].Create(), folder: null);
@@ -248,11 +258,150 @@ public partial class MainViewModel : ObservableObject
             _suppressChanges = false;
         }
 
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _lastRecordedState = null;
+        _lastRecordedFingerprint = string.Empty;
+        NotifyHistoryChanged();
+
         Refresh();
-        _lastSavedXaml = folder != null ? GeneratedXaml : string.Empty;
+        _lastSavedFingerprint = folder != null ? ComputeSaveFingerprint(BuildState(), GeneratedXaml) : string.Empty;
         IsDirty = folder == null;
         if (state.ImportWarnings.Count > 0)
             SetStatus(string.Join(" ", state.ImportWarnings), isError: true);
+    }
+
+    private void NotifyHistoryChanged()
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RecordHistorySnapshot(ThemeState currentState, string currentFingerprint)
+    {
+        if (_isRestoringHistory) return;
+        if (_lastRecordedState == null)
+        {
+            _lastRecordedState = currentState.Clone();
+            _lastRecordedFingerprint = currentFingerprint;
+            return;
+        }
+        if (string.Equals(currentFingerprint, _lastRecordedFingerprint, StringComparison.Ordinal))
+            return;
+
+        _undoStack.Add(_lastRecordedState);
+        if (_undoStack.Count > MaxUndoSteps)
+            _undoStack.RemoveAt(0);
+        _redoStack.Clear();
+        _lastRecordedState = currentState.Clone();
+        _lastRecordedFingerprint = currentFingerprint;
+        NotifyHistoryChanged();
+    }
+
+    private void ApplyHistorySnapshot(ThemeState snapshot)
+    {
+        _isRestoringHistory = true;
+        _suppressChanges = true;
+        try
+        {
+            var m = snapshot.Manifest;
+            ThemeName = m.Name;
+            ThemeId = m.Id;
+            Author = m.Author;
+            Version = string.IsNullOrWhiteSpace(m.Version) ? "1.0.0" : m.Version;
+            Description = m.Description;
+            MinAppVersion = m.MinAppVersion;
+
+            FontFamily = snapshot.FontFamily;
+            MonoFontFamily = snapshot.MonoFontFamily;
+
+            foreach (var (key, vm) in _tokens)
+            {
+                if (snapshot.Tokens.TryGetValue(key, out var v))
+                    vm.SetValue(v);
+            }
+
+            var s = snapshot.Shape;
+            ShapeEnabled = s.Enabled;
+            ShellCornerRadius = s.ShellCornerRadius;
+            ShellBorderThickness = s.ShellBorderThickness;
+            CardCornerRadius = s.CardCornerRadius;
+            ButtonCornerRadius = s.ButtonCornerRadius;
+            CompactCornerRadius = s.CompactCornerRadius;
+            ShellGlow = s.ShellGlow;
+            ShellGlowBlur = s.ShellGlowBlur;
+
+            Fonts.Clear();
+            foreach (var f in snapshot.Fonts)
+                Fonts.Add(new FontEntry(f.FileName, f.SourcePath, FontTools.ReadFamilyName(f.SourcePath)));
+
+            Assets.Clear();
+            AssetNames.Clear();
+            foreach (var a in snapshot.Assets)
+            {
+                Assets.Add(a);
+                AssetNames.Add(a.FileName);
+            }
+
+            BackgroundImageFile = snapshot.BackgroundImage?.FileName;
+            BackgroundImageOpacity = snapshot.BackgroundImage?.Opacity ?? 0.35;
+            BackgroundStretch = snapshot.BackgroundImage?.Stretch ?? "UniformToFill";
+
+            CustomResources = snapshot.CustomResources;
+            CustomStyles = snapshot.CustomStyles;
+            GeneratorAccent = _tokens["NeonCyan"].Color;
+        }
+        finally
+        {
+            _suppressChanges = false;
+        }
+
+        try
+        {
+            Refresh();
+            var current = BuildState();
+            _lastRecordedState = current.Clone();
+            _lastRecordedFingerprint = ComputeSaveFingerprint(current, GeneratedXaml);
+        }
+        finally
+        {
+            _isRestoringHistory = false;
+            NotifyHistoryChanged();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    public void Undo()
+    {
+        if (_undoStack.Count == 0) return;
+        var current = BuildState();
+        _redoStack.Add(current.Clone());
+        var previous = _undoStack[^1];
+        _undoStack.RemoveAt(_undoStack.Count - 1);
+        ApplyHistorySnapshot(previous);
+        SetStatus("Undid last change.");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    public void Redo()
+    {
+        if (_redoStack.Count == 0) return;
+        var current = BuildState();
+        _undoStack.Add(current.Clone());
+        var next = _redoStack[^1];
+        _redoStack.RemoveAt(_redoStack.Count - 1);
+        ApplyHistorySnapshot(next);
+        SetStatus("Redid change.");
+    }
+
+    private static string ComputeSaveFingerprint(ThemeState state, string xaml)
+    {
+        var m = state.Manifest;
+        string fonts = string.Join("|", state.Fonts.Select(f => $"{f.FileName}:{f.SourcePath}"));
+        string assets = string.Join("|", state.Assets.Select(a => $"{a.FileName}:{a.SourcePath}"));
+        return $"{m.Id}\n{m.Name}\n{m.Author}\n{m.Version}\n{m.Description}\n{m.MinAppVersion}\n{fonts}\n{assets}\n---\n{xaml}";
     }
 
     // =====================================================================
@@ -338,7 +487,9 @@ public partial class MainViewModel : ObservableObject
         var state = BuildState();
         string xaml = ThemeXamlGenerator.Generate(state);
         GeneratedXaml = xaml;
-        IsDirty = !string.Equals(xaml, _lastSavedXaml, StringComparison.Ordinal);
+        string fp = ComputeSaveFingerprint(state, xaml);
+        IsDirty = !string.Equals(fp, _lastSavedFingerprint, StringComparison.Ordinal);
+        RecordHistorySnapshot(state, fp);
 
         ManifestProblems = string.Join(Environment.NewLine, ThemeValidator.ValidateManifest(state));
         UpdateContrast();
@@ -347,7 +498,14 @@ public partial class MainViewModel : ObservableObject
         {
             var (styles, bitmaps) = ThemeValidator.Load(xaml, rel => ResolvePreviewFile(rel));
             PreviewError = null;
-            PreviewReady?.Invoke(this, new PreviewReadyEventArgs(styles, bitmaps));
+            if (PreviewReady != null)
+            {
+                PreviewReady.Invoke(this, new PreviewReadyEventArgs(styles, bitmaps));
+            }
+            else
+            {
+                foreach (var b in bitmaps) b.Dispose();
+            }
         }
         catch (Exception ex)
         {
@@ -392,14 +550,14 @@ public partial class MainViewModel : ObservableObject
         double accent = ColorUtil.Contrast(C("NeonCyan"), C("CyberCardBg"));
         ContrastWarning = Math.Min(main, card) < 4.5 || muted < 3 || accent < 3;
         ContrastSummary = $"Contrast — text/background {main:0.0}:1, text/card {card:0.0}:1, muted/card {muted:0.0}:1, accent/card {accent:0.0}:1"
-                          + (ContrastWarning ? "   ⚠ some text may be hard to read (aim for ≥4.5 text, ≥3 muted/accent)" : "   ✓ readable");
+                          + (ContrastWarning ? "   [LOW CONTRAST: aim for >=4.5 text, >=3 muted/accent]" : "   [PASS]");
     }
 
     /// <summary>Shows an unexpected error in the status bar instead of crashing the app.</summary>
     public void ReportUnexpectedError(Exception ex) =>
         SetStatus($"Something went wrong (the app kept running): {ex.GetBaseException().Message}", isError: true);
 
-    private void SetStatus(string message, bool isError = false)
+    public void SetStatus(string message, bool isError = false)
     {
         StatusMessage = message;
         StatusIsError = isError;
@@ -484,11 +642,11 @@ public partial class MainViewModel : ObservableObject
             {
                 // The open theme was the deleted one: keep it in the editor as unsaved.
                 CurrentFolder = null;
-                _lastSavedXaml = string.Empty;
+                _lastSavedFingerprint = string.Empty;
                 IsDirty = true;
             }
             RefreshInstalledThemes();
-            SetStatus($"Deleted '{theme.Name}'. In the overlay click CONFIG → Reload.");
+            SetStatus($"Deleted '{theme.Name}'. In the overlay click CONFIG -> Reload.");
         }
         catch (Exception ex)
         {
@@ -501,8 +659,22 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var state = ThemeImporter.Load(path, BuiltInThemes.Cyberpunk);
-            bool isFolder = Directory.Exists(path) || Path.GetFileName(path).Equals("theme.json", StringComparison.OrdinalIgnoreCase);
-            string? folder = isFolder ? (Directory.Exists(path) ? path : Path.GetDirectoryName(path)) : null;
+            string? folder = null;
+            if (Directory.Exists(path))
+            {
+                folder = path;
+            }
+            else if (Path.GetFileName(path).Equals("theme.json", StringComparison.OrdinalIgnoreCase))
+            {
+                folder = Path.GetDirectoryName(path);
+            }
+            else if (Path.GetExtension(path) is var ext
+                     && (ext.Equals(".axaml", StringComparison.OrdinalIgnoreCase) || ext.Equals(".xaml", StringComparison.OrdinalIgnoreCase)))
+            {
+                string? dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && File.Exists(Path.Combine(dir, "theme.json")))
+                    folder = dir;
+            }
             LoadState(state, folder);
             if (state.ImportWarnings.Count == 0)
                 SetStatus($"Opened '{state.Manifest.Name}'{(folder != null ? " from " + folder : " (save it to a folder to keep changes)")}.");
@@ -575,7 +747,7 @@ public partial class MainViewModel : ObservableObject
             _suppressChanges = false;
         }
         CurrentFolder = folder;
-        _lastSavedXaml = GeneratedXaml;
+        _lastSavedFingerprint = ComputeSaveFingerprint(BuildState(), GeneratedXaml);
         IsDirty = false;
         RememberAuthor();
     }
@@ -783,22 +955,31 @@ public partial class MainViewModel : ObservableObject
     {
         if (Dialogs == null) return;
         var files = await Dialogs.PickFilesAsync("Add font files", "Fonts (*.ttf, *.otf, *.ttc)", FontPatterns, allowMultiple: true);
+        AddFontFiles(files);
+    }
+
+    public int AddFontFiles(IEnumerable<string> files)
+    {
         FontEntry? last = null;
+        int count = 0;
         foreach (var file in files)
         {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) continue;
             string name = SafeFileName(file);
             var existing = Fonts.FirstOrDefault(f => f.FileName.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (existing != null) Fonts.Remove(existing);
             last = new FontEntry(name, file, FontTools.ReadFamilyName(file));
             Fonts.Add(last);
+            count++;
         }
         if (last != null)
         {
-            SetStatus(files.Count == 1
+            SetStatus(count == 1
                 ? $"Added font {last.FileName}. Click 'Use as main' to apply it."
-                : $"Added {files.Count} fonts.");
+                : $"Added {count} fonts.");
             OnEdited();
         }
+        return count;
     }
 
     [RelayCommand]
@@ -850,9 +1031,16 @@ public partial class MainViewModel : ObservableObject
         if (Dialogs == null) return;
         var files = await Dialogs.PickFilesAsync(setAsBackground ? "Choose background image" : "Add images",
             "Images (*.png, *.jpg, *.webp, *.bmp, *.gif)", ImagePatterns, allowMultiple: !setAsBackground);
+        AddImageFiles(files, setAsBackground);
+    }
+
+    public int AddImageFiles(IEnumerable<string> files, bool setAsBackground = false)
+    {
         string? lastName = null;
+        int count = 0;
         foreach (var file in files)
         {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) continue;
             string name = SafeFileName(file);
             var existing = Assets.FirstOrDefault(a => a.FileName.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
@@ -863,8 +1051,9 @@ public partial class MainViewModel : ObservableObject
             Assets.Add(new ThemeFile(name, file));
             AssetNames.Add(name);
             lastName = name;
+            count++;
         }
-        if (lastName == null) return;
+        if (lastName == null) return 0;
 
         if (setAsBackground)
         {
@@ -875,9 +1064,45 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
-            SetStatus($"Added {files.Count} image(s). Reference them in custom styles as Source=\"assets/{lastName}\".");
+            SetStatus($"Added {count} image(s). Reference them in custom styles as Source=\"assets/{lastName}\".");
         }
         OnEdited();
+        return count;
+    }
+
+    /// <summary>Handles files or folders dropped onto the window.</summary>
+    public async Task HandleDroppedPathsAsync(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0) return;
+
+        var fontExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".ttf", ".otf", ".ttc" };
+        var imgExts = new HashSet<string>(ThemeImporter.ImageExtensions, StringComparer.OrdinalIgnoreCase);
+
+        // 1. Theme pack / folder / theme.json / .axaml -> open theme
+        string? themePath = paths.FirstOrDefault(p =>
+            Directory.Exists(p)
+            || Path.GetFileName(p).Equals("theme.json", StringComparison.OrdinalIgnoreCase)
+            || Path.GetExtension(p).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+            || Path.GetExtension(p).Equals(".axaml", StringComparison.OrdinalIgnoreCase)
+            || Path.GetExtension(p).Equals(".xaml", StringComparison.OrdinalIgnoreCase));
+        if (themePath != null)
+        {
+            if (!await ConfirmDiscardAsync()) return;
+            OpenPath(themePath);
+            return;
+        }
+
+        // 2. Fonts & images -> attach to current theme
+        var fonts = paths.Where(p => File.Exists(p) && fontExts.Contains(Path.GetExtension(p))).ToList();
+        var images = paths.Where(p => File.Exists(p) && imgExts.Contains(Path.GetExtension(p))).ToList();
+
+        int addedFonts = fonts.Count > 0 ? AddFontFiles(fonts) : 0;
+        int addedImages = images.Count > 0 ? AddImageFiles(images, setAsBackground: false) : 0;
+
+        if (addedFonts == 0 && addedImages == 0)
+        {
+            SetStatus("Dropped file type is not supported. Drop a theme (.zip, .axaml, folder), font (.ttf/.otf/.ttc), or image.", isError: true);
+        }
     }
 
     [RelayCommand]

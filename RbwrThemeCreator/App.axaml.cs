@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using RbwrThemeCreator.Services;
 using RbwrThemeCreator.ViewModels;
 using RbwrThemeCreator.Views;
 
@@ -36,6 +37,7 @@ public partial class App : Application
             if (e.ExceptionObject is Exception ex)
                 LogError("Fatal", ex);
         };
+        _ = Task.Run(() => FontTools.CleanupStaleTempFiles());
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

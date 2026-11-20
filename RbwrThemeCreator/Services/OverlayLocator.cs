@@ -56,7 +56,8 @@ public static class OverlayLocator
         {
             string uiBin = Path.Combine(probe.FullName, "RbwrOverlay", "RbwrOverlay.UI", "bin");
             if (!Directory.Exists(uiBin)) continue;
-            var exe = Directory.EnumerateFiles(uiBin, "RbwrOverlay.exe", SearchOption.AllDirectories)
+            var exe = OverlayExeNames
+                .SelectMany(name => Directory.EnumerateFiles(uiBin, name, SearchOption.AllDirectories))
                 .Select(f => new FileInfo(f))
                 .OrderByDescending(f => f.LastWriteTimeUtc)
                 .FirstOrDefault();

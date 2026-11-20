@@ -23,6 +23,7 @@ public partial class MainWindow : Window, IDialogHost
     private List<Bitmap> _activeBitmaps = new();
     private MainViewModel? _vm;
     private bool _closeConfirmed;
+    private bool _closingPromptOpen;
 
     public MainWindow()
     {
@@ -41,12 +42,22 @@ public partial class MainWindow : Window, IDialogHost
 
         DataContextChanged += (_, _) => AttachViewModel(DataContext as MainViewModel);
         Closing += OnClosing;
+        Closed += (_, _) =>
+        {
+            foreach (var b in _activeBitmaps)
+            {
+                try { b.Dispose(); } catch { }
+            }
+            _activeBitmaps.Clear();
+        };
         Viewport.SizeChanged += (_, _) => UpdateZoom();
         PreviewHost.SizeChanged += (_, _) => UpdateZoom();
         Viewport.PointerWheelChanged += OnViewportWheel;
         Viewport.AddHandler(PointerPressedEvent, OnViewportPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         Viewport.PointerMoved += OnViewportPointerMoved;
         Viewport.PointerReleased += OnViewportPointerReleased;
+        AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
+        AddHandler(DragDrop.DropEvent, OnWindowDrop);
         Opened += (_, _) => ApplyCornerPreference();
         // Enter in a number box commits the value (the bindings update on focus loss).
         AddHandler(KeyDownEvent, (_, e) =>
@@ -376,8 +387,8 @@ public partial class MainWindow : Window, IDialogHost
         }
 
         ResizeGrips.IsVisible = !_maximized;
-        ApplyCornerPreference();
         WindowFrame.BorderThickness = new Thickness(_maximized ? 0 : 1);
+        ApplyCornerPreference();
         MaximizeButton.Content = _maximized ? "❐" : "□";
         ToolTip.SetTip(MaximizeButton, _maximized ? "Restore" : "Maximize");
     }
@@ -391,16 +402,80 @@ public partial class MainWindow : Window, IDialogHost
         }
     }
 
+    private void OnWindowDragOver(object? sender, DragEventArgs e)
+    {
+        var files = e.DataTransfer.TryGetFiles();
+        e.DragEffects = files != null && files.Any() ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnWindowDrop(object? sender, DragEventArgs e)
+    {
+        if (_vm == null) return;
+        var files = e.DataTransfer.TryGetFiles();
+        if (files == null) return;
+        var paths = files
+            .Select(f => f.TryGetLocalPath())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!)
+            .ToList();
+        if (paths.Count > 0)
+        {
+            await _vm.HandleDroppedPathsAsync(paths);
+            e.Handled = true;
+        }
+    }
+
+    private async void OnExportPreviewPngClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm == null) return;
+        string suggested = string.IsNullOrWhiteSpace(_vm.ThemeId) ? "theme-preview.png" : $"{_vm.ThemeId}-preview.png";
+        string? outPath = await PickSaveFileAsync("Export preview screenshot", suggested, "PNG image (*.png)", "*.png");
+        if (string.IsNullOrWhiteSpace(outPath)) return;
+
+        try
+        {
+            const double scale = 2.0;
+            var size = PreviewHost.Bounds.Size;
+            if (size.Width < 1 || size.Height < 1)
+                size = PreviewHost.DesiredSize;
+            int pxW = Math.Max(1, (int)Math.Ceiling(size.Width * scale));
+            int pxH = Math.Max(1, (int)Math.Ceiling(size.Height * scale));
+
+            using var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96 * scale, 96 * scale));
+            rtb.Render(PreviewHost);
+            using (var fs = File.Create(outPath))
+            {
+                rtb.Save(fs, new PngBitmapEncoderOptions());
+            }
+            _vm.SetStatus($"Saved preview screenshot to {Path.GetFileName(outPath)} ({pxW}x{pxH}).");
+        }
+        catch (Exception ex)
+        {
+            _vm.SetStatus($"Could not export preview PNG: {ex.Message}", isError: true);
+        }
+    }
+
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_closeConfirmed || _vm == null || !_vm.IsDirty)
             return;
 
         e.Cancel = true;
-        if (await ConfirmAsync("Unsaved changes", "The theme has unsaved changes. Close anyway?", "Close without saving"))
+        if (_closingPromptOpen)
+            return;
+        _closingPromptOpen = true;
+        try
         {
-            _closeConfirmed = true;
-            Close();
+            if (await ConfirmAsync("Unsaved changes", "The theme has unsaved changes. Close anyway?", "Close without saving"))
+            {
+                _closeConfirmed = true;
+                Close();
+            }
+        }
+        finally
+        {
+            _closingPromptOpen = false;
         }
     }
 
@@ -443,6 +518,8 @@ public partial class MainWindow : Window, IDialogHost
         DwmSetWindowAttribute(handle, DwmWindowCornerPreference, ref preference, sizeof(int));
         int border = 0x003b251b; // COLORREF (BGR) of #1b253b, matches the HUD border
         DwmSetWindowAttribute(handle, DwmBorderColor, ref border, sizeof(int));
+        // Let DWM draw the rounded outer border on Windows 11 so WindowFrame's square border does not clip at the corners.
+        WindowFrame.BorderThickness = new Thickness(0);
     }
 
     // ===================== IDialogHost =====================

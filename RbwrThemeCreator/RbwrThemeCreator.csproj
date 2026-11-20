@@ -15,8 +15,23 @@
     <Company>Hotment</Company>
     <Authors>Hotment</Authors>
     <Copyright>Copyright © 2026 Hotment</Copyright>
-    <Version>1.0.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- Single source of truth: extracted from MainViewModel.AppVersion (mirrors RbwrOverlay.UI.csproj) -->
+    <_VmFileContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\ViewModels\MainViewModel.cs'))</_VmFileContent>
+    <_ExtractedVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_VmFileContent)', 'public const string AppVersion = "([^"]+)"').Groups[1].Value)</_ExtractedVersion>
+    <AppVersion Condition="'$(_ExtractedVersion)' != ''">$(_ExtractedVersion)</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
+
+    <_NumMatch>$([System.Text.RegularExpressions.Regex]::Match('$(AppVersion)', '^\d+(\.\d+)*').Value)</_NumMatch>
+    <CleanNumericVersion Condition="'$(_NumMatch)' != ''">$(_NumMatch).0</CleanNumericVersion>
+    <CleanNumericVersion Condition="'$(CleanNumericVersion)' == ''">1.0.0.0</CleanNumericVersion>
+
+    <Version>$(AppVersion)</Version>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+    <AssemblyVersion>$(CleanNumericVersion)</AssemblyVersion>
+    <FileVersion>$(CleanNumericVersion)</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

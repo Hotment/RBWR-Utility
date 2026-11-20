@@ -141,4 +141,32 @@ public sealed class ThemeState
 
     /// <summary>Non-fatal notes produced while importing.</summary>
     public List<string> ImportWarnings { get; } = new();
+
+    public ThemeState Clone()
+    {
+        var copy = new ThemeState
+        {
+            Manifest = new ThemeManifest
+            {
+                Id = Manifest.Id,
+                Name = Manifest.Name,
+                Author = Manifest.Author,
+                Version = Manifest.Version,
+                Description = Manifest.Description,
+                Entry = Manifest.Entry,
+                MinAppVersion = Manifest.MinAppVersion,
+            },
+            FontFamily = FontFamily,
+            MonoFontFamily = MonoFontFamily,
+            Tokens = new Dictionary<string, TokenValue>(Tokens, StringComparer.Ordinal),
+            Shape = Shape.Clone(),
+            BackgroundImage = BackgroundImage?.Clone(),
+            Fonts = new List<ThemeFile>(Fonts),
+            Assets = new List<ThemeFile>(Assets),
+            CustomResources = CustomResources,
+            CustomStyles = CustomStyles,
+        };
+        copy.ImportWarnings.AddRange(ImportWarnings);
+        return copy;
+    }
 }

@@ -11,6 +11,7 @@
         Width="1500" Height="940"
         MinWidth="1100" MinHeight="680"
         WindowDecorations="None"
+        DragDrop.AllowDrop="True"
         WindowStartupLocation="CenterScreen">
 
     <Panel>
@@ -25,8 +26,8 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Image Source="/Assets/icon.png" Width="26" Height="26" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     <TextBlock Text="RBWR THEME CREATOR" Classes="brand" />
-                    <Border Classes="pill" BorderBrush="{DynamicResource EdGreen}">
-                        <TextBlock Text="v1.0" Foreground="{DynamicResource EdGreen}" FontSize="9" FontWeight="Bold" />
+                    <Border Classes="pill" BorderBrush="{DynamicResource EdGreen}" ToolTip.Tip="{Binding AppVersionText}">
+                        <TextBlock Text="{Binding AppVersionBadge}" Foreground="{DynamicResource EdGreen}" FontSize="9" FontWeight="Bold" />
                     </Border>
                 </StackPanel>
 
@@ -39,10 +40,13 @@
                             <TextBlock Text="UNSAVED" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource EdGold}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" />
+                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" TextTrimming="CharacterEllipsis" MaxWidth="420" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" HotKey="Ctrl+Z" Padding="8,5" ToolTip.Tip="Undo last change (Ctrl+Z)" />
+                    <Button Classes="hud" Content="REDO" Command="{Binding RedoCommand}" HotKey="Ctrl+Y" Padding="8,5" Margin="0,0,4,0" ToolTip.Tip="Redo change (Ctrl+Y)" />
+
                     <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW" ToolTip.Tip="Start a new theme from a preset">
                         <DropDownButton.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
@@ -204,7 +208,7 @@
 
                             <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8">
                                 <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
-                                           Text="TIP: click ◢ GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                                           Text="TIP: click GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
                             </Border>
                             <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding !ContrastWarning}">
                                 <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
@@ -226,14 +230,14 @@
                                                             <Border Classes="token-row" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
                                                                     ToolTip.Tip="Double-click to show where this colour is used" ToolTip.ShowDelay="900">
                                                                 <StackPanel>
-                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,128">
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,148">
                                                                         <views:HudColorPicker Grid.Column="0" Color="{Binding Color}" VerticalAlignment="Center" />
                                                                         <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Hint}">
                                                                             <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                                             <TextBlock Classes="faint" Text="{Binding Key}" />
                                                                         </StackPanel>
                                                                         <ToggleButton Grid.Column="2" Classes="grad-toggle" IsChecked="{Binding IsGradient}" IsVisible="{Binding SupportsGradient}"
-                                                                                      Content="◢ GRADIENT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Use a gradient instead of a solid colour" />
+                                                                                      Content="GRADIENT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Use a gradient instead of a solid colour" />
                                                                         <TextBox Grid.Column="3" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
                                                                                  Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
                                                                                  ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
@@ -253,44 +257,46 @@
                                                                             <Border Classes="grad-strip" Background="{Binding PreviewBrush}" />
 
                                                                             <Grid ColumnDefinitions="*,Auto">
-                                                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                                                    <ItemsControl ItemsSource="{Binding Stops}">
-                                                                                        <ItemsControl.ItemsPanel>
-                                                                                            <ItemsPanelTemplate>
-                                                                                                <StackPanel Orientation="Horizontal" Spacing="6" />
-                                                                                            </ItemsPanelTemplate>
-                                                                                        </ItemsControl.ItemsPanel>
-                                                                                        <ItemsControl.ItemTemplate>
-                                                                                            <DataTemplate x:DataType="vm:GradientStopViewModel">
-                                                                                                <Border Classes="stop-chip">
-                                                                                                    <StackPanel Spacing="4">
-                                                                                                        <Grid ColumnDefinitions="*,Auto" Height="16">
-                                                                                                            <TextBlock Classes="label" Text="{Binding Number}" Margin="2,0,0,0" VerticalAlignment="Center" />
-                                                                                                            <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
-                                                                                                                    IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
-                                                                                                        </Grid>
-                                                                                                        <views:HudColorPicker Color="{Binding Color}" HorizontalAlignment="Center" />
-                                                                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" ToolTip.Tip="Where this colour sits along the gradient: 0% = start, 100% = end. Type a number and press Enter.">
-                                                                                                            <TextBox Classes="num-input" Text="{Binding PositionInput, UpdateSourceTrigger=LostFocus}" />
-                                                                                                            <TextBlock Classes="num-suffix" Text="%" />
+                                                                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,10,0">
+                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,2">
+                                                                                        <ItemsControl ItemsSource="{Binding Stops}">
+                                                                                            <ItemsControl.ItemsPanel>
+                                                                                                <ItemsPanelTemplate>
+                                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                                                                </ItemsPanelTemplate>
+                                                                                            </ItemsControl.ItemsPanel>
+                                                                                            <ItemsControl.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:GradientStopViewModel">
+                                                                                                    <Border Classes="stop-chip">
+                                                                                                        <StackPanel Spacing="4">
+                                                                                                            <Grid ColumnDefinitions="*,Auto" Height="16">
+                                                                                                                <TextBlock Classes="label" Text="{Binding Number}" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                                                                                                <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
+                                                                                                                        IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
+                                                                                                            </Grid>
+                                                                                                            <views:HudColorPicker Color="{Binding Color}" HorizontalAlignment="Center" />
+                                                                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" ToolTip.Tip="Where this colour sits along the gradient: 0% = start, 100% = end. Type a number and press Enter.">
+                                                                                                                <TextBox Classes="num-input" Text="{Binding PositionInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                                                <TextBlock Classes="num-suffix" Text="%" />
+                                                                                                            </StackPanel>
                                                                                                         </StackPanel>
-                                                                                                    </StackPanel>
-                                                                                                </Border>
-                                                                                            </DataTemplate>
-                                                                                        </ItemsControl.ItemTemplate>
-                                                                                    </ItemsControl>
-                                                                                    <Button Classes="stop-add" Command="{Binding AddStopCommand}" IsEnabled="{Binding CanAddStop}"
-                                                                                            ToolTip.Tip="Add another colour to the gradient (up to 6)" VerticalAlignment="Stretch">
-                                                                                        <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                                                            <TextBlock Text="+" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
-                                                                                            <TextBlock Text="{Binding StopCountText}" FontSize="8.5" FontWeight="Bold" HorizontalAlignment="Center" Opacity="0.75" />
-                                                                                        </StackPanel>
-                                                                                    </Button>
-                                                                                </StackPanel>
+                                                                                                    </Border>
+                                                                                                </DataTemplate>
+                                                                                            </ItemsControl.ItemTemplate>
+                                                                                        </ItemsControl>
+                                                                                        <Button Classes="stop-add" Command="{Binding AddStopCommand}" IsEnabled="{Binding CanAddStop}"
+                                                                                                ToolTip.Tip="Add another colour to the gradient (up to 6)" VerticalAlignment="Stretch">
+                                                                                            <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                                                <TextBlock Text="+" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                                                                                                <TextBlock Text="{Binding StopCountText}" FontSize="8.5" FontWeight="Bold" HorizontalAlignment="Center" Opacity="0.75" />
+                                                                                            </StackPanel>
+                                                                                        </Button>
+                                                                                    </StackPanel>
+                                                                                </ScrollViewer>
                                                                                 <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                                                                    <Button Classes="hud" Content="⇄ REVERSE" Command="{Binding SwapCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of all colours (flips the gradient)" />
-                                                                                    <Button Classes="hud" Content="✦ SOFT" Command="{Binding SoftFadeCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reset to a gentle two-colour fade from the first colour" />
-                                                                                    <Button Classes="hud" Content="⇹ EVEN" Command="{Binding SpreadEvenlyCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Spread all colours evenly again (0% … 100%)" />
+                                                                                    <Button Classes="hud" Content="REVERSE" Command="{Binding SwapCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of all colours (flips the gradient)" />
+                                                                                    <Button Classes="hud" Content="SOFT" Command="{Binding SoftFadeCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reset to a gentle two-colour fade from the first colour" />
+                                                                                    <Button Classes="hud" Content="EVEN" Command="{Binding SpreadEvenlyCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Spread all colours evenly again (0% … 100%)" />
                                                                                 </StackPanel>
                                                                             </Grid>
 
@@ -369,7 +375,7 @@
                                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
                                                             <Button Classes="hud" Content="Main" Command="{ReflectionBinding $parent[Window].DataContext.UseFontAsMainCommand}" CommandParameter="{Binding}" />
                                                             <Button Classes="hud" Content="Mono" Command="{ReflectionBinding $parent[Window].DataContext.UseFontAsMonoCommand}" CommandParameter="{Binding}" />
-                                                            <Button Classes="hud-red" Content="X" ToolTip.Tip="Remove" Command="{ReflectionBinding $parent[Window].DataContext.RemoveFontCommand}" CommandParameter="{Binding}" />
+                                                            <Button Classes="hud-red" Content="X" Padding="8,4" ToolTip.Tip="Remove" Command="{ReflectionBinding $parent[Window].DataContext.RemoveFontCommand}" CommandParameter="{Binding}" />
                                                         </StackPanel>
                                                     </Grid>
                                                 </Border>
@@ -488,7 +494,7 @@
                                                 <Border Classes="token-row">
                                                     <Grid ColumnDefinitions="*,Auto">
                                                         <TextBlock Text="{Binding FileName, StringFormat=assets/{0}}" VerticalAlignment="Center" />
-                                                        <Button Grid.Column="1" Classes="hud-red" Content="X" ToolTip.Tip="Remove" Command="{ReflectionBinding $parent[Window].DataContext.RemoveAssetCommand}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="1" Classes="hud-red" Content="X" Padding="8,4" ToolTip.Tip="Remove" Command="{ReflectionBinding $parent[Window].DataContext.RemoveAssetCommand}" CommandParameter="{Binding}" />
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
@@ -604,7 +610,7 @@
                                     <ListBox Classes="hud" ItemsSource="{Binding InstalledThemes}" SelectedItem="{Binding SelectedInstalledTheme}" MinHeight="120" MaxHeight="300" />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Button Classes="hud-blue" Content="OPEN SELECTED" Command="{Binding OpenInstalledCommand}" />
-                                        <Button Classes="hud-red" Content="DELETE SELECTED" Command="{Binding DeleteInstalledCommand}" Padding="12,5"
+                                        <Button Classes="hud-red" Content="DELETE SELECTED" Command="{Binding DeleteInstalledCommand}"
                                                 ToolTip.Tip="Permanently delete the selected theme folder from the overlay" />
                                     </StackPanel>
                                 </StackPanel>
@@ -619,23 +625,26 @@
             <!-- =============== Live preview =============== -->
             <DockPanel Grid.Column="2">
                 <Border DockPanel.Dock="Top" Classes="hud-header" Padding="14,8">
-                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
-                        <TextBlock Text="LIVE PREVIEW" Classes="section-title" VerticalAlignment="Center" Margin="0,0,14,0" />
-                        <Border Grid.Column="1" Classes="seg-host">
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="LIVE PREVIEW" Classes="section-title" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <Border Classes="seg-host">
                             <TabStrip Classes="seg" SelectedIndex="{Binding PreviewMode}">
                                 <TabStripItem Content="MONITOR" />
                                 <TabStripItem Content="CONFIG" />
                                 <TabStripItem Content="COMPACT" />
+                                <TabStripItem Content="TABLET" />
                                 <TabStripItem Content="ALL" />
                             </TabStrip>
                         </Border>
-                        <ComboBox Grid.Column="3" Classes="hud" ItemsSource="{Binding BackdropNames}" SelectedIndex="{Binding PreviewBackdrop}" Width="150" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="What is behind the overlay" />
-                        <ToggleButton Grid.Column="4" Classes="hud" IsChecked="{Binding PreviewFit}" Content="FIT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Scale the preview to fit the panel" />
-                        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding !PreviewFit}">
-                            <Slider Minimum="0.25" Maximum="4" Value="{Binding PreviewZoom}" TickFrequency="0.05" IsSnapToTickEnabled="True" Width="110" VerticalAlignment="Center" />
-                            <TextBlock x:Name="ZoomText" Width="38" VerticalAlignment="Center" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
+                        <ComboBox Classes="hud" ItemsSource="{Binding BackdropNames}" SelectedIndex="{Binding PreviewBackdrop}" Width="136" VerticalAlignment="Center" ToolTip.Tip="What is behind the overlay" />
+                        <ToggleButton Classes="hud" IsChecked="{Binding PreviewFit}" Content="FIT" VerticalAlignment="Center" ToolTip.Tip="Scale the preview to fit the panel" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsEnabled="{Binding !PreviewFit}">
+                            <Slider Minimum="0.25" Maximum="4" Value="{Binding PreviewZoom}" TickFrequency="0.05" IsSnapToTickEnabled="True" Width="90" VerticalAlignment="Center" />
+                            <TextBlock x:Name="ZoomText" Width="36" VerticalAlignment="Center" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
                         </StackPanel>
-                    </Grid>
+                        <Button Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center"
+                                ToolTip.Tip="Save a high-DPI PNG screenshot of the current preview" />
+                    </WrapPanel>
                 </Border>
 
                 <Border DockPanel.Dock="Top" Background="#2a0a12" BorderBrush="{DynamicResource EdRed}" BorderThickness="0,0,0,1" Padding="14,8" IsVisible="{Binding HasPreviewError}">

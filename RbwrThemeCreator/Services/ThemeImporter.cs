@@ -75,7 +75,10 @@ public static class ThemeImporter
             manifest.Name = Path.GetFileName(dir);
 
         string entry = string.IsNullOrWhiteSpace(manifest.Entry) ? "theme.axaml" : manifest.Entry.Trim();
-        string entryPath = Path.GetFullPath(Path.Combine(dir, entry));
+        string fullDir = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string entryPath = Path.GetFullPath(Path.Combine(fullDir, entry));
+        if (!entryPath.StartsWith(fullDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Theme entry path escapes theme directory: {entry}");
         if (!File.Exists(entryPath))
             throw new FileNotFoundException($"Theme entry file not found: {entry}", entryPath);
 
@@ -91,33 +94,51 @@ public static class ThemeImporter
         string workDir = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator", "imports", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workDir);
         string fullWork = Path.GetFullPath(workDir) + Path.DirectorySeparatorChar;
+        const long maxUncompressedBytes = 50L * 1024 * 1024;
 
-        using (var archive = ZipFile.OpenRead(zipPath))
+        try
         {
-            if (archive.Entries.Count > 200)
-                throw new InvalidOperationException("Archive has too many entries (max 200).");
-            long total = 0;
-            foreach (var entry in archive.Entries)
+            using (var archive = ZipFile.OpenRead(zipPath))
             {
-                if (string.IsNullOrEmpty(entry.Name)) continue;
-                total += entry.Length;
-                if (total > 50L * 1024 * 1024)
-                    throw new InvalidOperationException("Archive is larger than 50 MB uncompressed.");
-                string dest = Path.GetFullPath(Path.Combine(workDir, entry.FullName));
-                if (!dest.StartsWith(fullWork, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("Archive contains unsafe paths.");
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                entry.ExtractToFile(dest, overwrite: true);
+                if (archive.Entries.Count > 200)
+                    throw new InvalidOperationException("Archive has too many entries (max 200).");
+                long total = 0;
+                byte[] buffer = new byte[81920];
+                foreach (var entry in archive.Entries)
+                {
+                    if (string.IsNullOrEmpty(entry.Name)) continue;
+                    if (entry.Length > maxUncompressedBytes || total + entry.Length > maxUncompressedBytes)
+                        throw new InvalidOperationException("Archive is larger than 50 MB uncompressed.");
+                    string dest = Path.GetFullPath(Path.Combine(workDir, entry.FullName));
+                    if (!dest.StartsWith(fullWork, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Archive contains unsafe paths.");
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    using var srcStream = entry.Open();
+                    using var dstStream = File.Create(dest);
+                    int read;
+                    while ((read = srcStream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        total += read;
+                        if (total > maxUncompressedBytes)
+                            throw new InvalidOperationException("Archive is larger than 50 MB uncompressed.");
+                        dstStream.Write(buffer, 0, read);
+                    }
+                }
             }
-        }
 
-        string root = workDir;
-        if (!File.Exists(Path.Combine(root, "theme.json")) && !File.Exists(Path.Combine(root, "theme.axaml")))
-        {
-            var subDirs = Directory.GetDirectories(workDir);
-            if (subDirs.Length == 1) root = subDirs[0];
+            string root = workDir;
+            if (!File.Exists(Path.Combine(root, "theme.json")) && !File.Exists(Path.Combine(root, "theme.axaml")))
+            {
+                var subDirs = Directory.GetDirectories(workDir);
+                if (subDirs.Length == 1) root = subDirs[0];
+            }
+            return LoadFolder(root, fallback);
         }
-        return LoadFolder(root, fallback);
+        catch
+        {
+            try { if (Directory.Exists(workDir)) Directory.Delete(workDir, recursive: true); } catch { /* cleanup */ }
+            throw;
+        }
     }
 
     private static void CollectFiles(ThemeState state, string dir)
@@ -340,9 +361,13 @@ public static class ThemeImporter
         foreach (var style in root.Elements(Ns + "Style"))
         {
             string selector = ((string?)style.Attribute("Selector") ?? string.Empty).Trim();
-            var setters = style.Elements(Ns + "Setter")
-                .Where(s => s.Attribute("Property") != null)
-                .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? string.Empty);
+            var setters = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var s in style.Elements(Ns + "Setter"))
+            {
+                string? prop = (string?)s.Attribute("Property");
+                if (!string.IsNullOrEmpty(prop))
+                    setters[prop] = (string?)s.Attribute("Value") ?? string.Empty;
+            }
 
             double Get(string prop, double fallback) =>
                 setters.TryGetValue(prop, out var v) ? ColorUtil.ParseDouble(v.Split(',')[0], fallback) : fallback;

@@ -6,7 +6,40 @@ namespace RbwrThemeCreator.Services;
 
 public static class FontTools
 {
-    private static readonly string PreviewCacheDir = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator", "preview-files");
+    public static readonly string TempRootDir = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator");
+    private static readonly string PreviewCacheDir = Path.Combine(TempRootDir, "preview-files");
+
+    /// <summary>Removes temporary import/export/preview folders older than <paramref name="maxAge"/>.</summary>
+    public static int CleanupStaleTempFiles(TimeSpan? maxAge = null, string? rootOverride = null)
+    {
+        string root = rootOverride ?? TempRootDir;
+        if (!Directory.Exists(root)) return 0;
+
+        DateTime cutoff = DateTime.UtcNow - (maxAge ?? TimeSpan.FromHours(24));
+        int removed = 0;
+
+        foreach (string bucket in new[] { "imports", "preview-files", "export" })
+        {
+            string bucketPath = Path.Combine(root, bucket);
+            if (!Directory.Exists(bucketPath)) continue;
+            foreach (string sub in Directory.EnumerateDirectories(bucketPath))
+            {
+                try
+                {
+                    if (Directory.GetLastWriteTimeUtc(sub) < cutoff)
+                    {
+                        Directory.Delete(sub, recursive: true);
+                        removed++;
+                    }
+                }
+                catch
+                {
+                    // Ignore locked or in-use temp directories
+                }
+            }
+        }
+        return removed;
+    }
 
     /// <summary>Reads the font family name stored inside a .ttf/.otf/.ttc file.</summary>
     public static string ReadFamilyName(string path)
