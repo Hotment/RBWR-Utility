@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrThemeCreator.ViewModels"
+        xmlns:views="using:RbwrThemeCreator.Views"
+        x:Class="RbwrThemeCreator.Views.CreatorUpdateWindow"
+        x:DataType="vm:CreatorUpdateViewModel"
+        Title="Software Update Available"
+        Icon="/Assets/icon.ico"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        CanResize="False"
+        Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner">
+
+    <Border x:Name="RootBorder" Classes="dialog-frame">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+            <Border Grid.Row="0"
+                    x:Name="HeaderBorder"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.TopOnly}}"
+                    Padding="16,10"
+                    PointerPressed="OnHeaderPointerPressed">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Border Width="3" Height="13" CornerRadius="1.5" Background="{DynamicResource EdCyan}" VerticalAlignment="Center" />
+                        <TextBlock Text="SOFTWARE UPDATE" Classes="section-title" VerticalAlignment="Center" />
+                        <TextBlock Text="· RBWR THEME CREATOR" Classes="faint" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Classes="win-btn win-close"
+                            Content="X"
+                            Command="{Binding RemindLaterCommand}"
+                            IsEnabled="{Binding !IsDownloading}"
+                            ToolTip.Tip="Remind me later" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource EdBorder}" />
+
+            <StackPanel Grid.Row="2" Margin="16,14" Spacing="12">
+                <Border Classes="card" Margin="0" Padding="14,11">
+                    <Grid ColumnDefinitions="*,Auto,*" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="INSTALLED BUILD" Classes="label" Margin="0" />
+                            <TextBlock Text="{Binding CurrentVersion, StringFormat='v{0}'}" Foreground="{DynamicResource EdMuted}" FontWeight="Bold" FontSize="16" />
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Background="{DynamicResource EdPanel}" BorderBrush="{DynamicResource EdBorder}" BorderThickness="1"
+                                CornerRadius="6" Padding="8,3" Margin="12,0" VerticalAlignment="Center">
+                            <TextBlock Text="-&gt;" Foreground="{DynamicResource EdCyan}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+                        </Border>
+
+                        <Border Grid.Column="2" Background="{DynamicResource EdPanel}" BorderBrush="{DynamicResource EdCyan}" BorderThickness="1"
+                                CornerRadius="8" Padding="12,6" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="1" HorizontalAlignment="Right">
+                                <TextBlock Text="NEW RELEASE" Foreground="{DynamicResource EdCyan}" FontSize="9" FontWeight="Bold" LetterSpacing="0.7" HorizontalAlignment="Right" />
+                                <TextBlock Text="{Binding LatestVersion, StringFormat='v{0}'}" Foreground="{DynamicResource EdText}" FontWeight="Bold" FontSize="18" HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <StackPanel Spacing="5">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="RELEASE NOTES" Classes="label" Margin="0" />
+                        <TextBlock Grid.Column="1" Text="{Binding LatestVersion, StringFormat='CHANGELOG · v{0}'}" Classes="faint" VerticalAlignment="Center" />
+                    </Grid>
+                    <Border Background="{DynamicResource EdMain}" BorderBrush="{DynamicResource EdBorder}" BorderThickness="1"
+                            CornerRadius="8" Padding="12,10" MinHeight="78" MaxHeight="190">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding EffectiveReleaseNotes}" Foreground="{DynamicResource EdText}" FontSize="11.5" LineHeight="17" TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+
+                <Border Background="{DynamicResource EdMain}" BorderBrush="{DynamicResource EdCyan}" BorderThickness="1"
+                        CornerRadius="8" Padding="12,8" IsVisible="{Binding HasDownloadStatus}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding DownloadStatus}" Classes.error="{Binding IsDownloadError}"
+                                   Foreground="{DynamicResource EdCyan}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding DownloadProgress}" Height="6"
+                                     Foreground="{DynamicResource EdCyan}" Background="{DynamicResource EdBorder}"
+                                     IsVisible="{Binding IsDownloading}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Border Grid.Row="3" Background="{DynamicResource EdPanel}" BorderBrush="{DynamicResource EdBorder}" BorderThickness="0,1,0,0"
+                    CornerRadius="0,0,12,12" Padding="16,10">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <Button Grid.Column="0" Classes="hud" Content="SKIP VERSION" Command="{Binding SkipVersionCommand}" IsEnabled="{Binding !IsDownloading}" />
+                    <Button Grid.Column="2" Classes="hud" Content="LATER" Command="{Binding RemindLaterCommand}" IsEnabled="{Binding !IsDownloading}" Margin="0,0,8,0" />
+                    <Button Grid.Column="3" Classes="hud-green" Content="UPDATE NOW" Command="{Binding UpdateNowCommand}" IsEnabled="{Binding !IsDownloading}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

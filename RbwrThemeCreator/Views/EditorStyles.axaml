@@ -236,6 +236,24 @@
         <Setter Property="Padding" Value="7,1" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <Style Selector="Button.pill-btn">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="7,1" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.pill-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#10291d" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Button.pill-btn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#0b1f15" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
     <Style Selector="Border.warn-box">
         <Setter Property="Background" Value="#1f170a" />
         <Setter Property="BorderBrush" Value="#66ffaa00" />

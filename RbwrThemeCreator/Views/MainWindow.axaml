@@ -26,9 +26,10 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Image Source="/Assets/icon.png" Width="26" Height="26" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     <TextBlock Text="RBWR THEME CREATOR" Classes="brand" />
-                    <Border Classes="pill" BorderBrush="{DynamicResource EdGreen}" ToolTip.Tip="{Binding AppVersionText}">
+                    <Button Classes="pill-btn" Command="{Binding CheckUpdatesCommand}"
+                            ToolTip.Tip="Click to check for RBWR Theme Creator updates">
                         <TextBlock Text="{Binding AppVersionBadge}" Foreground="{DynamicResource EdGreen}" FontSize="9" FontWeight="Bold" />
-                    </Border>
+                    </Button>
                 </StackPanel>
 
                 <Border Grid.Column="1" Width="1" Background="{DynamicResource EdBorder}" Margin="18,0" />
@@ -159,6 +160,17 @@
                                         <TextBlock Classes="muted" Text="{Binding CurrentFolderDisplay}" Margin="0,4,0,0" />
                                     </StackPanel>
                                     <Button Grid.Column="1" Classes="hud" Content="Folder" Command="{Binding OpenCurrentFolderCommand}" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <Border Classes="card">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Classes="section-title" Text="APP UPDATES" />
+                                        <TextBlock Classes="muted" Text="{Binding UpdateStatusText}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="hud-blue" Content="CHECK UPDATES" Command="{Binding CheckUpdatesCommand}"
+                                            IsEnabled="{Binding !IsCheckingUpdates}" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
 

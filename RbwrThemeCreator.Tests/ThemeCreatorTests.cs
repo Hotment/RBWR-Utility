@@ -455,4 +455,117 @@ public class ThemeCreatorTests : IDisposable
         Assert.NotNull(infoAttr);
         Assert.Equal(MainViewModel.AppVersion, infoAttr.InformationalVersion);
     }
+
+    [Fact]
+    public void CreatorUpdateService_ParseLatestCreatorRelease_FiltersTagDraftPrereleaseAndSkipped()
+    {
+        const string sampleReleasesJson = """
+        [
+          {
+            "tag_name": "v2.4.0",
+            "draft": false,
+            "prerelease": false,
+            "body": "Overlay release",
+            "assets": [
+              { "name": "RBWR_APRM_Calculator_win-x64.exe", "browser_download_url": "https://example.com/overlay.exe" }
+            ]
+          },
+          {
+            "tag_name": "theme-creator-v1.3.0-beta.1",
+            "draft": false,
+            "prerelease": true,
+            "body": "Prerelease",
+            "assets": []
+          },
+          {
+            "tag_name": "theme-creator-v1.2.5",
+            "draft": true,
+            "prerelease": false,
+            "body": "Draft",
+            "assets": []
+          },
+          {
+            "tag_name": "theme-creator-v1.2.0",
+            "draft": false,
+            "prerelease": false,
+            "body": "New gradient tools",
+            "assets": [
+              { "name": "RBWR_Theme_Creator_win-x64.exe", "browser_download_url": "https://example.com/creator-x64.exe" },
+              { "name": "RBWR_Theme_Creator_win-arm64.exe", "browser_download_url": "https://example.com/creator-arm64.exe" },
+              { "name": "RBWR_Theme_Creator_linux-x64.AppImage", "browser_download_url": "https://example.com/creator.AppImage" },
+              { "name": "RBWR_Theme_Creator_macOS_osx-arm64.zip", "browser_download_url": "https://example.com/creator-mac.zip" }
+            ]
+          },
+          {
+            "tag_name": "theme-creator-v1.1.0",
+            "draft": false,
+            "prerelease": false,
+            "body": "Older release",
+            "assets": []
+          }
+        ]
+        """;
+
+        // Newer release found, ignoring v2.4.0 overlay release, prerelease, and draft
+        var update = CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.0.0", string.Empty);
+        Assert.True(update.IsAvailable);
+        Assert.Equal("1.2.0", update.Version);
+        Assert.Equal("New gradient tools", update.ReleaseNotes);
+        Assert.StartsWith("RBWR_Theme_Creator_", update.FileName);
+        Assert.NotEmpty(update.DownloadUrl);
+
+        // Already up to date (1.2.0 == 1.2.0) or newer dev build (1.3.0 > 1.2.0)
+        Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.2.0", string.Empty).IsAvailable);
+        Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.3.0", string.Empty).IsAvailable);
+
+        // Respects skippedVersion
+        Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.0.0", "1.2.0").IsAvailable);
+    }
+
+    [Fact]
+    public void CreatorUpdateService_IsNewerVersion_ComparesSemver()
+    {
+        Assert.True(CreatorUpdateService.IsNewerVersion("1.0.1", "1.0.0"));
+        Assert.True(CreatorUpdateService.IsNewerVersion("1.2.0", "1.1.9"));
+        Assert.True(CreatorUpdateService.IsNewerVersion("2.0.0", "1.9.9"));
+        Assert.False(CreatorUpdateService.IsNewerVersion("1.0.0", "1.0.0"));
+        Assert.False(CreatorUpdateService.IsNewerVersion("0.9.9", "1.0.0"));
+        Assert.False(CreatorUpdateService.IsNewerVersion("1.0.0", "1.1.0"));
+    }
+
+    private sealed class FakeUpdateService(RbwrOverlay.Core.Models.UpdateInfo result) : ICreatorUpdateService
+    {
+        public string? LastSkippedVersion { get; private set; }
+        public Task<RbwrOverlay.Core.Models.UpdateInfo> CheckForUpdatesAsync(string currentVersion, string skippedVersion, CancellationToken ct = default)
+        {
+            LastSkippedVersion = skippedVersion;
+            return Task.FromResult(result);
+        }
+        public Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task MainViewModel_ManualUpdateCheck_FiresRequestShowUpdate_AndIgnoresSkipped()
+    {
+        var fake = new FakeUpdateService(new RbwrOverlay.Core.Models.UpdateInfo
+        {
+            IsAvailable = true,
+            Version = "1.5.0",
+            ReleaseNotes = "Test update",
+            FileName = "RBWR_Theme_Creator_win-x64.exe",
+            DownloadUrl = "https://example.com/creator.exe",
+        });
+
+        var vm = new MainViewModel(fake);
+        RbwrOverlay.Core.Models.UpdateInfo? shown = null;
+        vm.RequestShowUpdate += info => shown = info;
+
+        await vm.RunUpdateCheckAsync(isManual: true);
+
+        Assert.NotNull(shown);
+        Assert.Equal("1.5.0", shown.Version);
+        Assert.Equal(string.Empty, fake.LastSkippedVersion);
+        Assert.Contains("1.5.0", vm.UpdateStatusText);
+    }
 }

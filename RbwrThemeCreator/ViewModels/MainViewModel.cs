@@ -40,10 +40,14 @@ public partial class MainViewModel : ObservableObject
     private bool _suppressChanges;
     private string _lastSavedFingerprint = string.Empty;
 
+    public ICreatorUpdateService UpdateService { get; }
     public IDialogHost? Dialogs { get; set; }
 
     /// <summary>Raised on the UI thread with freshly parsed preview styles (or null on error).</summary>
     public event EventHandler<PreviewReadyEventArgs>? PreviewReady;
+
+    /// <summary>Raised when a newer <c>theme-creator-v*</c> release is available on GitHub.</summary>
+    public event Action<UpdateInfo>? RequestShowUpdate;
 
     public IReadOnlyList<TokenGroupViewModel> Groups { get; }
     public IReadOnlyList<ThemePreset> Presets => BuiltInThemes.Presets;
@@ -113,6 +117,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _previewFit = true;
     [ObservableProperty] private int _previewMode;
 
+    // ---------- Updates ----------
+    [ObservableProperty] private bool _isCheckingUpdates;
+    [ObservableProperty] private string _updateStatusText = $"Installed version: v{AppVersion}";
+
     public bool HasPreviewError => !string.IsNullOrEmpty(PreviewError);
     public bool HasManifestProblems => !string.IsNullOrEmpty(ManifestProblems);
     public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageFile);
@@ -123,8 +131,10 @@ public partial class MainViewModel : ObservableObject
     public string PreviewZoomText => $"{Math.Round(PreviewZoom * 100)}%";
     public string ThemeSubtitle => $"{(string.IsNullOrWhiteSpace(ThemeId) ? "no-id" : ThemeId)}  ·  v{Version}{(string.IsNullOrWhiteSpace(Author) ? "" : "  ·  " + Author)}";
 
-    public MainViewModel()
+    public MainViewModel(ICreatorUpdateService? updateService = null)
     {
+        UpdateService = updateService ?? new CreatorUpdateService();
+
         foreach (var def in TokenCatalog.Tokens)
         {
             var vm = new TokenViewModel(def, BuiltInThemes.Cyberpunk.Tokens.GetValueOrDefault(def.Key) ?? new TokenValue(Colors.Gray));
@@ -1224,5 +1234,54 @@ public partial class MainViewModel : ObservableObject
         };
         if (snippet.Length == 0) return;
         CustomStyles = string.IsNullOrWhiteSpace(CustomStyles) ? snippet : CustomStyles.TrimEnd() + Environment.NewLine + Environment.NewLine + snippet;
+    }
+
+    [RelayCommand]
+    public async Task CheckUpdatesAsync() => await RunUpdateCheckAsync(isManual: true);
+
+    public async Task RunUpdateCheckAsync(bool isManual = false, CancellationToken ct = default)
+    {
+        if (IsCheckingUpdates)
+            return;
+
+        IsCheckingUpdates = true;
+        try
+        {
+            if (!isManual)
+                await Task.Delay(1500, ct);
+
+            UpdateStatusText = "Checking for latest release...";
+            string skipped = isManual ? string.Empty : CreatorSettings.Current.SkippedVersion;
+            var info = await UpdateService.CheckForUpdatesAsync(AppVersion, skipped, ct);
+
+            if (info.IsAvailable)
+            {
+                UpdateStatusText = $"Update available: v{info.Version}";
+                SetStatus($"Update v{info.Version} is available.");
+                RequestShowUpdate?.Invoke(info);
+            }
+            else
+            {
+                UpdateStatusText = $"Up to date (v{AppVersion})";
+                if (isManual)
+                    SetStatus($"RBWR Theme Creator is up to date (v{AppVersion}).");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            IsCheckingUpdates = false;
+        }
+    }
+
+    public void SkipVersion(string version)
+    {
+        CreatorSettings.Current.SkippedVersion = version;
+        CreatorSettings.Current.Save();
+        UpdateStatusText = $"Version v{version} skipped.";
+        SetStatus($"Skipped update v{version}.");
     }
 }

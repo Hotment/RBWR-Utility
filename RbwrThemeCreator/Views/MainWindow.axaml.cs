@@ -22,6 +22,7 @@ public partial class MainWindow : Window, IDialogHost
     private Styles? _baseStyles;
     private List<Bitmap> _activeBitmaps = new();
     private MainViewModel? _vm;
+    private CreatorUpdateWindow? _updateWindow;
     private bool _closeConfirmed;
     private bool _closingPromptOpen;
 
@@ -58,7 +59,11 @@ public partial class MainWindow : Window, IDialogHost
         Viewport.PointerReleased += OnViewportPointerReleased;
         AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
         AddHandler(DragDrop.DropEvent, OnWindowDrop);
-        Opened += (_, _) => ApplyCornerPreference();
+        Opened += (_, _) =>
+        {
+            ApplyCornerPreference();
+            _ = _vm?.RunUpdateCheckAsync(isManual: false);
+        };
         // Enter in a number box commits the value (the bindings update on focus loss).
         AddHandler(KeyDownEvent, (_, e) =>
         {
@@ -88,6 +93,7 @@ public partial class MainWindow : Window, IDialogHost
         {
             _vm.PreviewReady -= OnPreviewReady;
             _vm.PropertyChanged -= OnViewModelPropertyChanged;
+            _vm.RequestShowUpdate -= OnShowUpdate;
             _vm.Dialogs = null;
         }
         _vm = vm;
@@ -96,10 +102,37 @@ public partial class MainWindow : Window, IDialogHost
         vm.Dialogs = this;
         vm.PreviewReady += OnPreviewReady;
         vm.PropertyChanged += OnViewModelPropertyChanged;
+        vm.RequestShowUpdate += OnShowUpdate;
         ApplyBackdrop(vm.PreviewBackdrop);
         Preview.SetMode(vm.PreviewMode);
         vm.Refresh();
         UpdateZoom();
+    }
+
+    private void OnShowUpdate(RbwrOverlay.Core.Models.UpdateInfo info)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_updateWindow != null)
+            {
+                _updateWindow.Activate();
+                return;
+            }
+            if (_vm == null) return;
+
+            var updateVm = new CreatorUpdateViewModel(
+                _vm.UpdateService,
+                info,
+                MainViewModel.AppVersion,
+                _vm.SkipVersion);
+
+            _updateWindow = new CreatorUpdateWindow { DataContext = updateVm };
+            _updateWindow.Closed += (_, _) => _updateWindow = null;
+            if (IsVisible)
+                _updateWindow.Show(this);
+            else
+                _updateWindow.Show();
+        });
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
