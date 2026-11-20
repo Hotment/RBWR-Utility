@@ -81,7 +81,6 @@
 
         <div class="lg:col-span-5 flex justify-center items-center">
             <div class="relative group max-w-full">
-                <div class="absolute -inset-1 bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-cyan-500/15 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition duration-500 pointer-events-none"></div>
                 <img src="/static/rbwrapp.png"
                     srcset="/static/rbwrapp-preview.png 1x, /static/rbwrapp.png 2x"
                     alt="RBWR Overlay HUD Preview"
@@ -165,7 +164,7 @@
                     class="text-sm text-gray-400 bg-black/20 p-4 rounded-xl border border-white/5 leading-relaxed font-mono flex flex-col min-w-0">
                     <strong class="text-gray-200 block mb-2 shrink-0">Release Changelog:</strong>
                     <div class="max-h-64 sm:max-h-80 overflow-y-auto pr-2 break-words">
-                        <span class="block whitespace-pre-wrap text-xs sm:text-sm leading-relaxed">{{- release_notes -}}</span>
+                        <div class="text-xs sm:text-sm leading-relaxed">{{ release_notes | release_md }}</div>
                     </div>
                 </div>
             </div>

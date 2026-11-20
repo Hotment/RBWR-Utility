@@ -727,14 +727,20 @@ window.AdminBot = (() => {
         });
     }
 
+    // every view header has its own "Discord bot" pill; keep all of them in step
     async function loadBotStatus() {
-        const el = $("bot-status");
-        if (!el) return;
+        const pills = document.querySelectorAll(".bot-status");
+        if (!pills.length) return;
         try {
             const { online } = await api("/api/admin/bot-status");
-            el.classList.toggle("online", online);
-            el.classList.toggle("offline", !online);
-            el.title = online ? "The Discord bot is connected." : "The Discord bot is offline.";
+            pills.forEach((el) => {
+                el.hidden = false;
+                el.classList.toggle("online", online);
+                el.classList.toggle("offline", !online);
+                el.title = online ? "The Discord bot is connected." : "The Discord bot is offline.";
+                const label = el.querySelector("span:last-child");
+                if (label) label.textContent = online ? "Discord bot online" : "Discord bot offline";
+            });
         } catch (_) { /* keep the last state */ }
     }
 

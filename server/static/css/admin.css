@@ -1512,19 +1512,103 @@ button.eb-item.active {
     }
 }
 
+#cm-body .card {
+    min-width: 0;
+}
+
+/* ignored channels: grouped by category, each group a grid of one-line checkboxes */
 .cm-checklist {
-    max-height: 220px;
+    max-height: 300px;
     overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 2px 12px;
-    padding: 8px 10px;
+    padding: 0 10px 10px;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 8px;
 }
 
 .cm-checklist [hidden] {
     display: none;
+}
+
+.cm-group-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 10px 2px 6px;
+    background: var(--card-bg);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+
+.cm-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+    gap: 2px 8px;
+}
+
+.cm-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cm-check:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.cm-check:has(input:checked) {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.cm-check input {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent-gold);
+}
+
+.cm-check-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* server stats counters: the 4-column table becomes stacked rows on a phone */
+@media (max-width: 640px) {
+    #cm-body .card {
+        padding: 18px 16px;
+    }
+    .cm-counters thead {
+        display: none;
+    }
+    .cm-counters tr {
+        display: block;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .cm-counters tr:last-child {
+        border-bottom: 0;
+    }
+    .cm-counters td {
+        display: block;
+        padding: 4px 0;
+        border: 0;
+    }
+    .cm-counters tr:hover td {
+        background: none;
+    }
 }
 
 /* ---------- overview tiles ---------- */
@@ -1542,15 +1626,6 @@ button.eb-item.active {
 .cyber-panel.hover-glow:has(> div.text-purple-400) { --tone: #c084fc; }
 .cyber-panel.hover-glow:has(> div.text-pink-400) { --tone: #f472b6; }
 .cyber-panel.hover-glow:has(> div.text-cyan-400) { --tone: #22d3ee; }
-.cyber-panel.hover-glow::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(320px 180px at 0% 0%, color-mix(in srgb, var(--tone) 16%, transparent), transparent 70%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
 .cyber-panel.hover-glow::after {
     content: "\2192";
     position: absolute;
@@ -1571,7 +1646,6 @@ button.eb-item.active {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 44px -20px rgba(0, 0, 0, 0.9),
         0 18px 50px -30px color-mix(in srgb, var(--tone) 70%, transparent);
 }
-.cyber-panel.hover-glow:hover::before { opacity: 1; }
 .cyber-panel.hover-glow:hover::after { opacity: 1; transform: none; }
 .cyber-panel.hover-glow:hover > div:first-child { transform: scale(1.06) rotate(-3deg); }
 .cyber-panel.hover-glow:active { transform: translateY(-1px) scale(0.99); }
@@ -1590,4 +1664,81 @@ button.eb-item.active {
     .cyber-panel.hover-glow:hover,
     .cyber-panel.hover-glow:active,
     .cyber-panel.hover-glow:hover > div:first-child { transform: none; }
+}
+
+/* ---------- overview: one row of indicators (js/admin/overview.js) ----------
+   Twice the columns of the big tiles below with the same gap, so two indicators line up with one tile. */
+.ov-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+@media (min-width: 640px) { .ov-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 768px) { .ov-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2rem; } }
+.ov-stats[hidden] { display: none; }
+.ov-stat {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 16px 18px 16px 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease;
+}
+.ov-stat::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--tone);
+}
+.ov-stat:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tone) 40%, transparent); }
+.ov-value {
+    font-family: var(--mono);
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+.ov-stat.has .ov-value { color: var(--tone); }
+.ov-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#ov-bot[hidden] { display: none; }
+header .bot-status {
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    white-space: nowrap;
+}
+header .bot-status.online { color: #4ade80; border-color: rgba(74, 222, 128, 0.35); background: rgba(74, 222, 128, 0.06); }
+header .bot-status.offline { color: #f87171; border-color: rgba(248, 113, 113, 0.35); }
+header .bot-status.offline .dot { background: #f87171; }
+
+/* sidebar counters (admin-bot.js setCount): coloured when something is waiting, like the Overview indicators */
+#nav-count-errors.alert-count {
+    background: rgba(251, 146, 60, 0.18) !important;
+    color: #fb923c !important;
+    box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.35);
+}
+#nav-count-dms.alert-count {
+    background: rgba(167, 139, 250, 0.18) !important;
+    color: #a78bfa !important;
+    box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.35);
 }

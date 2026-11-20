@@ -8,6 +8,7 @@ import gzip
 import traceback
 import re
 from werkzeug.exceptions import HTTPException
+from markupsafe import Markup, escape
 orjson = None
 try:
     import orjson
@@ -295,6 +296,110 @@ def hex_to_int_filter(val, default=3900150):
         return int(s, 16)
     except Exception:
         return default
+
+_RN_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+_RN_LIST = re.compile(r"^(\s*)[-*+]\s+(.*)$")
+_RN_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$")
+_RN_HEADING_CLASSES = {
+    1: "text-base sm:text-lg font-semibold text-gray-100 mt-1 mb-2",
+    2: "text-sm sm:text-base font-semibold text-blue-300 mt-4 mb-1",
+    3: "text-xs sm:text-sm font-semibold text-gray-200 mt-3 mb-1",
+}
+_RN_LINK_CLASS = "text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 underline-offset-2 transition"
+
+def _rn_link(href: str, label: str) -> str:
+    return f'<a href="{href}" target="_blank" rel="noopener noreferrer" class="{_RN_LINK_CLASS}">{label}</a>'
+
+def _rn_url_label(url: str) -> str:
+    """Short text for a bare URL: GitHub PRs/issues become #7, compares v2.2.1...v2.3.0."""
+    if m := re.match(r"https?://github\.com/[^/\s]+/[^/\s]+/(?:pull|issues)/(\d+)/?$", url):
+        return f"#{m.group(1)}"
+    if m := re.match(r"https?://github\.com/[^/\s]+/[^/\s]+/(?:compare|releases/tag)/(\S+?)/?$", url):
+        return m.group(1)
+    short = re.sub(r"^https?://(www\.)?", "", url).rstrip("/")
+    return short if len(short) <= 48 else short[:45] + "…"
+
+def _rn_emphasis(s: str) -> str:
+    s = re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", r'<strong class="text-gray-200">\1</strong>', s)
+    s = re.sub(r"(?<![\w*])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![\w*])", r"<em>\1</em>", s)
+    return re.sub(r"(?<![\w_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![\w_])", r"<em>\1</em>", s)
+
+def _rn_inline(escaped: str) -> str:
+    # code and links are swapped for placeholders so bold/italic never reach into them
+    slots = []
+    def keep(html):
+        slots.append(html)
+        return f"\x00{len(slots) - 1}\x00"
+    s = re.sub(r"`([^`]+)`", lambda m: keep(f'<code class="text-blue-300">{m.group(1)}</code>'), escaped)
+    s = re.sub(r"\[([^\]]+)\]\((https?://(?:[^\s)<&]|&amp;)+)\)", lambda m: keep(_rn_link(m.group(2), _rn_emphasis(m.group(1)))), s)
+    s = re.sub(r"(?<![\w/\"])(https?://(?:[^\s<&]|&amp;)+?)([.,;:!?)]*)(?=\s|$|&(?:quot|lt|gt|#34|#39);)",
+               lambda m: keep(_rn_link(m.group(1), _rn_url_label(m.group(1)))) + m.group(2), s)
+    s = re.sub(r"(?<![\w/@.])@([A-Za-z0-9][A-Za-z0-9-]{0,38})\b",
+               lambda m: keep(_rn_link(f"https://github.com/{m.group(1)}", f"@{m.group(1)}")), s)
+    s = _rn_emphasis(s)
+    return re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], s)
+
+def _rn_cells(raw: str) -> list:
+    raw = raw.strip()
+    if raw.startswith("|"):
+        raw = raw[1:]
+    if raw.endswith("|"):
+        raw = raw[:-1]
+    return [_rn_inline(str(escape(c.strip()))) for c in raw.split("|")]
+
+def _rn_table(rows: list) -> str:
+    head = "".join(f'<th class="py-1.5 pr-4 font-semibold text-gray-300 border-b border-white/10 whitespace-nowrap">{c}</th>' for c in _rn_cells(rows[0]))
+    body = "".join(
+        "<tr>" + "".join(f'<td class="py-1.5 pr-4 border-b border-white/5 align-top">{c}</td>' for c in _rn_cells(r)) + "</tr>"
+        for r in rows[2:])
+    return (f'<div class="overflow-x-auto my-3"><table class="w-full text-left border-collapse">'
+            f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>")
+
+@app.template_filter("release_md")
+def release_md_filter(text):
+    """A small, safe subset of Markdown for the GitHub release notes: # headings, **bold**,
+    *italic*, `code`, [links](url), bare URLs, @mentions, tables, --- rules and - lists.
+    Everything is HTML-escaped first; only http(s) links are made clickable."""
+    out = []
+    blank = False
+    lines = str(text or "").replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        i += 1
+        line = str(escape(raw.rstrip()))
+        if not line.strip():
+            blank = bool(out)
+            continue
+        gap = " mt-2" if blank else ""
+        blank = False
+        if raw.lstrip().startswith("```"):
+            code_lines = []
+            while i < len(lines) and not lines[i].lstrip().startswith("```"):
+                code_lines.append(str(escape(lines[i])))
+                i += 1
+            if i < len(lines) and lines[i].lstrip().startswith("```"):
+                i += 1
+            out.append('<pre class="bg-black/40 border border-white/10 rounded-lg p-3 my-2 overflow-x-auto text-xs text-blue-300"><code>'
+                       + "\n".join(code_lines) + "</code></pre>")
+        elif raw.lstrip().startswith("|") and i < len(lines) and _RN_TABLE_SEP.match(lines[i]):
+            rows = [raw, lines[i]]
+            i += 1
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                rows.append(lines[i])
+                i += 1
+            out.append(_rn_table(rows))
+        elif re.fullmatch(r"\s*([-*_])(\s*\1){2,}\s*", raw):
+            out.append('<hr class="border-white/10 my-3">')
+        elif m := _RN_HEADING.match(line):
+            level = min(len(m.group(1)), 3)
+            out.append(f'<div class="{_RN_HEADING_CLASSES[level]}">{_rn_inline(m.group(2))}</div>')
+        elif m := _RN_LIST.match(line):
+            indent = "pl-4" if m.group(1) else ""
+            out.append(f'<div class="flex gap-2 {indent}{gap}"><span class="text-gray-600">•</span><span>{_rn_inline(m.group(2))}</span></div>')
+        else:
+            out.append(f'<p class="mt-2">{_rn_inline(line)}</p>' if gap else f'<p>{_rn_inline(line)}</p>')
+    return Markup("\n".join(out))
 
 @app.template_filter("fmt_score")
 def fmt_score_filter(val):
@@ -3011,6 +3116,37 @@ def unban_ip(username):
         log_audit_event("bans.unban_ip", "bans", f"Unbanned IP {payload.ip}", target=f"IP {payload.ip}", details={"ip": payload.ip}, username=username)
         return jsonify({"message": f"IP {payload.ip} unbanned successfully.", "ip": payload.ip})
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
+
+@app.route("/admin/overview-stats", methods=["GET"])
+@admin_required
+def admin_overview_stats(username):
+    """Counters for the Overview indicators, only for the sections this admin can open."""
+    perms = get_user_permissions(username)
+    out = {}
+    if perms.get("suggestions"):
+        tickets = load_suggestions().get("suggestions", [])
+        out["bugs"] = sum(1 for t in tickets if t.get("type") == "bug_report"
+                          and str(t.get("status") or "open") in ("open", "investigating", "confirmed"))
+        out["suggestions"] = sum(1 for t in tickets if t.get("type") != "bug_report"
+                                 and str(t.get("status") or "pending") == "pending")
+    if perms.get("crashes"):
+        out["crashes"] = sum(1 for c in load_crashes().get("crashes", []) if str(c.get("status", "OPEN")).upper() == "OPEN")
+    if perms.get("contact"):
+        out["messages"] = sum(1 for m in load_contact_messages().get("messages", []) if not m.get("read"))
+    if perms.get("servers"):
+        try:
+            out["servers"] = len(build_server_cards(get_sc_data("servers.json") or {}))
+        except Exception as e:
+            logger.warning(f"[overview] server count failed: {e}")
+    try:
+        import bot_features as _bf
+        out["bot_online"] = bool(_bf.is_ready())
+        if perms.get("errors"):
+            out["errors"] = sum(1 for e in _bf.errors_store.load().get("errors", []) if not e.get("resolved"))
+    except Exception as e:
+        logger.warning(f"[overview] bot stats failed: {e}")
+    return jsonify(out)
+
 
 @app.route("/admin/tickets", methods=["GET"])
 @admin_required
