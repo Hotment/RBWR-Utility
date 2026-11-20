@@ -13,13 +13,22 @@ public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec?
 }
 
 /// <summary>
-/// Linear gradient from the token's colour to <see cref="End"/>, optionally through <see cref="Mid"/>.
+/// Linear gradient. The token's own colour is the first stop; <see cref="Colors"/> are the following
+/// stops (1..<see cref="MaxExtraStops"/>), spread evenly along the gradient.
 /// <see cref="Angle"/> is in degrees: 0 = left to right, 90 = top to bottom.
 /// </summary>
-public sealed record GradientSpec(Color End, Color? Mid, double Angle)
+public sealed record GradientSpec(IReadOnlyList<Color> Colors, double Angle)
 {
+    /// <summary>Total stops allowed (start + extras). More than this rarely looks good and bloats the theme.</summary>
+    public const int MaxStops = 6;
+    public const int MaxExtraStops = MaxStops - 1;
+
     /// <summary>Angle normalised to [0, 360); NaN/infinity become 90 (top to bottom).</summary>
     public double SafeAngle => double.IsFinite(Angle) ? ((Angle % 360) + 360) % 360 : 90;
+
+    /// <summary>The extra stops clamped to a valid count (at least one, at most <see cref="MaxExtraStops"/>).</summary>
+    public IReadOnlyList<Color> SafeColors(Color start) =>
+        Colors is { Count: > 0 } ? Colors.Take(MaxExtraStops).ToList() : [start];
 
     /// <summary>Start/end points in percent (0..100) of the element box for the angle.</summary>
     public (double Sx, double Sy, double Ex, double Ey) Points()
@@ -30,9 +39,18 @@ public sealed record GradientSpec(Color End, Color? Mid, double Angle)
         return (R(50 - 50 * dx), R(50 - 50 * dy), R(50 + 50 * dx), R(50 + 50 * dy));
     }
 
+    /// <summary>All stops including the start colour, each with its evenly spaced offset.</summary>
+    public IReadOnlyList<(double Offset, Color Color)> Stops(Color start)
+    {
+        var all = new List<Color> { start };
+        all.AddRange(SafeColors(start));
+        int last = all.Count - 1;
+        return all.Select((c, i) => ((double)i / last, c)).ToList();
+    }
+
     public static Color Average(Color start, GradientSpec g)
     {
-        var cs = g.Mid is { } m ? new[] { start, m, g.End } : new[] { start, g.End };
+        var cs = g.Stops(start).Select(s => s.Color).ToList();
         return Color.FromArgb(
             (byte)cs.Average(c => c.A), (byte)cs.Average(c => c.R),
             (byte)cs.Average(c => c.G), (byte)cs.Average(c => c.B));

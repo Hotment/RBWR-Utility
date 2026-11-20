@@ -88,7 +88,7 @@ public static class BuiltInThemes
         var s = Fresh(Cyberpunk, "my-synthwave", "My Synthwave Theme", includeCustom: false);
         Color C(string hex) => Color.Parse(hex);
         void Set(string key, string start, string end, double angle, double opacity = 1, string? mid = null) =>
-            s.Tokens[key] = new TokenValue(C(start), opacity, new GradientSpec(C(end), mid == null ? null : C(mid), angle));
+            s.Tokens[key] = new TokenValue(C(start), opacity, new GradientSpec(mid == null ? [C(end)] : [C(mid), C(end)], angle));
         void Solid(string key, string hex, double opacity = 1) => s.Tokens[key] = new TokenValue(C(hex), opacity);
 
         Set("CyberMainBg", "#1a0b2e", "#08122b", 120, 0.95);

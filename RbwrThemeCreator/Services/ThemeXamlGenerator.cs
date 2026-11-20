@@ -70,10 +70,8 @@ public static class ThemeXamlGenerator
             {
                 var (sx, sy, ex, ey) = g.Points();
                 sb.AppendLine($"        <LinearGradientBrush x:Key=\"{def.Key}\" StartPoint=\"{Num(sx)}%,{Num(sy)}%\" EndPoint=\"{Num(ex)}%,{Num(ey)}%\"{opacity}>");
-                sb.AppendLine($"            <GradientStop Offset=\"0\" Color=\"{ColorUtil.ToHex(value.Color)}\" />");
-                if (g.Mid is { } mid)
-                    sb.AppendLine($"            <GradientStop Offset=\"0.5\" Color=\"{ColorUtil.ToHex(mid)}\" />");
-                sb.AppendLine($"            <GradientStop Offset=\"1\" Color=\"{ColorUtil.ToHex(g.End)}\" />");
+                foreach (var (offset, color) in g.Stops(value.Color))
+                    sb.AppendLine($"            <GradientStop Offset=\"{Num(offset)}\" Color=\"{ColorUtil.ToHex(color)}\" />");
                 sb.AppendLine("        </LinearGradientBrush>");
                 continue;
             }

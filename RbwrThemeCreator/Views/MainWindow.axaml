@@ -249,19 +249,40 @@
                                                                         <StackPanel Spacing="10">
                                                                             <Border Classes="grad-strip" Background="{Binding PreviewBrush}" />
 
-                                                                            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" RowDefinitions="22,Auto">
-                                                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="START" Margin="0" VerticalAlignment="Center" />
-                                                                                <ToggleButton Grid.Row="0" Grid.Column="1" Classes="mid-toggle" Content="+ MIDDLE" IsChecked="{Binding HasMid}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                                                          ToolTip.Tip="Add a third colour in the middle of the gradient" />
-                                                                                <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="END" Margin="12,0,0,0" VerticalAlignment="Center" />
-
-                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="0" Color="{Binding Color}" Margin="0,4,0,0" />
-                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="1" Color="{Binding MidColor}" IsEnabled="{Binding HasMid}" Margin="12,4,0,0" />
-                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="2" Color="{Binding EndColor}" Margin="12,4,0,0" />
-
-                                                                                <StackPanel Grid.Row="1" Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="0,4,0,0" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                                                                    <Button Classes="hud" Content="⇄ SWAP" Command="{Binding SwapCommand}" ToolTip.Tip="Swap the START and END colours (flips the gradient)" />
-                                                                                    <Button Classes="hud" Content="✦ SOFT" Command="{Binding SoftFadeCommand}" ToolTip.Tip="Auto-pick a matching END colour: a gentle fade from the START colour" />
+                                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                                    <ItemsControl ItemsSource="{Binding Stops}">
+                                                                                        <ItemsControl.ItemsPanel>
+                                                                                            <ItemsPanelTemplate>
+                                                                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                                                            </ItemsPanelTemplate>
+                                                                                        </ItemsControl.ItemsPanel>
+                                                                                        <ItemsControl.ItemTemplate>
+                                                                                            <DataTemplate x:DataType="vm:GradientStopViewModel">
+                                                                                                <Border Classes="stop-chip">
+                                                                                                    <StackPanel Spacing="4">
+                                                                                                        <Grid ColumnDefinitions="*,Auto" Height="16">
+                                                                                                            <TextBlock Classes="label" Text="{Binding Number}" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                                                                                            <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
+                                                                                                                    IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
+                                                                                                        </Grid>
+                                                                                                        <views:HudColorPicker Color="{Binding Color}" />
+                                                                                                    </StackPanel>
+                                                                                                </Border>
+                                                                                            </DataTemplate>
+                                                                                        </ItemsControl.ItemTemplate>
+                                                                                    </ItemsControl>
+                                                                                    <Button Classes="stop-add" Command="{Binding AddStopCommand}" IsEnabled="{Binding CanAddStop}"
+                                                                                            ToolTip.Tip="Add another colour to the gradient (up to 6)" VerticalAlignment="Stretch">
+                                                                                        <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="+" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                                                                                            <TextBlock Text="{Binding StopCountText}" FontSize="8.5" FontWeight="Bold" HorizontalAlignment="Center" Opacity="0.75" />
+                                                                                        </StackPanel>
+                                                                                    </Button>
+                                                                                </StackPanel>
+                                                                                <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                                                    <Button Classes="hud" Content="⇄ REVERSE" Command="{Binding SwapCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of all colours (flips the gradient)" />
+                                                                                    <Button Classes="hud" Content="✦ SOFT" Command="{Binding SoftFadeCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reset to a gentle two-colour fade from the first colour" />
                                                                                 </StackPanel>
                                                                             </Grid>
 
