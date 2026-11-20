@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RbwrThemeCreator</AssemblyName>
+    <RootNamespace>RbwrThemeCreator</RootNamespace>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <Title>RBWR Theme Creator</Title>
+    <Product>RBWR Theme Creator</Product>
+    <Description>Visual theme editor for the RBWR APRM Calculator overlay</Description>
+    <Company>Hotment</Company>
+    <Authors>Hotment</Authors>
+    <Copyright>Copyright © 2026 Hotment</Copyright>
+    <Version>1.0.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\Source\**" />
+  </ItemGroup>
+
+  <!-- The overlay's real built-in themes are embedded so the live preview and presets
+       always match the shipped overlay (no copy that can drift out of sync). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\RbwrOverlay\RbwrOverlay.UI\Styles\CyberpunkTheme.axaml" LogicalName="Base.CyberpunkTheme.axaml" Link="Embedded\CyberpunkTheme.axaml" />
+    <EmbeddedResource Include="..\RbwrOverlay\RbwrOverlay.UI\Styles\ReactorAmberTheme.axaml" LogicalName="Base.ReactorAmberTheme.axaml" Link="Embedded\ReactorAmberTheme.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.3" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RbwrOverlay\RbwrOverlay.Core\RbwrOverlay.Core.csproj" />
+  </ItemGroup>
+</Project>
