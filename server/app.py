@@ -331,8 +331,8 @@ def _rn_inline(escaped: str) -> str:
         slots.append(html)
         return f"\x00{len(slots) - 1}\x00"
     s = re.sub(r"`([^`]+)`", lambda m: keep(f'<code class="text-blue-300">{m.group(1)}</code>'), escaped)
-    s = re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", lambda m: keep(_rn_link(m.group(2), _rn_emphasis(m.group(1)))), s)
-    s = re.sub(r"(?<![\w/\"])(https?://[^\s<]+?)([.,;:!?)]*)(?=\s|$)",
+    s = re.sub(r"\[([^\]]+)\]\((https?://(?:[^\s)<&]|&amp;)+)\)", lambda m: keep(_rn_link(m.group(2), _rn_emphasis(m.group(1)))), s)
+    s = re.sub(r"(?<![\w/\"])(https?://(?:[^\s<&]|&amp;)+?)([.,;:!?)]*)(?=\s|$|&(?:quot|lt|gt|#34|#39);)",
                lambda m: keep(_rn_link(m.group(1), _rn_url_label(m.group(1)))) + m.group(2), s)
     s = re.sub(r"(?<![\w/@.])@([A-Za-z0-9][A-Za-z0-9-]{0,38})\b",
                lambda m: keep(_rn_link(f"https://github.com/{m.group(1)}", f"@{m.group(1)}")), s)
@@ -373,7 +373,16 @@ def release_md_filter(text):
             continue
         gap = " mt-2" if blank else ""
         blank = False
-        if raw.lstrip().startswith("|") and i < len(lines) and _RN_TABLE_SEP.match(lines[i]):
+        if raw.lstrip().startswith("```"):
+            code_lines = []
+            while i < len(lines) and not lines[i].lstrip().startswith("```"):
+                code_lines.append(str(escape(lines[i])))
+                i += 1
+            if i < len(lines) and lines[i].lstrip().startswith("```"):
+                i += 1
+            out.append('<pre class="bg-black/40 border border-white/10 rounded-lg p-3 my-2 overflow-x-auto text-xs text-blue-300"><code>'
+                       + "\n".join(code_lines) + "</code></pre>")
+        elif raw.lstrip().startswith("|") and i < len(lines) and _RN_TABLE_SEP.match(lines[i]):
             rows = [raw, lines[i]]
             i += 1
             while i < len(lines) and lines[i].lstrip().startswith("|"):

@@ -6,19 +6,19 @@ window.Overview = (() => {
     let timer = null;
 
     const TILES = [
-        { key: "bugs", label: "Open bugs", href: "/admin/tickets", tone: "#f87171" },
-        { key: "suggestions", label: "Pending suggestions", href: "/admin/tickets", tone: "#fbbf24" },
-        { key: "errors", label: "Unresolved errors", href: "/admin/errors", tone: "#fb923c" },
-        { key: "crashes", label: "Unresolved crashes", href: "/admin/crashes", tone: "#f472b6" },
-        { key: "messages", label: "Unread messages", href: "/admin/contact", tone: "#a78bfa" },
-        { key: "servers", label: "Active servers", href: "/admin/servers", tone: "#34d399" },
+        { key: "bugs", label: "Open bugs", view: "suggestions", href: "/admin/tickets", tone: "#f87171" },
+        { key: "suggestions", label: "Pending suggestions", view: "suggestions", href: "/admin/tickets", tone: "#fbbf24" },
+        { key: "errors", label: "Unresolved errors", view: "errors", href: "/admin/errors", tone: "#fb923c" },
+        { key: "crashes", label: "Unresolved crashes", view: "crashes", href: "/admin/crashes", tone: "#f472b6" },
+        { key: "messages", label: "Unread messages", view: "contact", href: "/admin/contact", tone: "#a78bfa" },
+        { key: "servers", label: "Active servers", view: "servers", href: "/admin/servers", tone: "#34d399" },
     ];
 
     function render(d) {
         const tiles = TILES.filter((t) => typeof d[t.key] === "number");
         const box = $("ov-stats");
         box.innerHTML = tiles.map((t) => `
-            <a href="${t.href}" class="cyber-panel ov-stat ${d[t.key] > 0 && t.key !== "servers" ? "has" : ""}" style="--tone:${t.tone}">
+            <a href="${t.href}" data-ov-view="${t.view}" class="cyber-panel ov-stat ${d[t.key] > 0 && t.key !== "servers" ? "has" : ""}" style="--tone:${t.tone}">
                 <span class="ov-value">${d[t.key]}</span>
                 <span class="ov-label">${t.label}</span>
             </a>`).join("");
@@ -50,7 +50,16 @@ window.Overview = (() => {
     }
 
     function start() {
-        if (!$("ov-stats")) return;
+        const box = $("ov-stats");
+        if (!box) return;
+        box.addEventListener("click", (e) => {
+            const link = e.target.closest("a[data-ov-view]");
+            if (!link || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            if (typeof window.navigateToView === "function") {
+                e.preventDefault();
+                window.navigateToView(link.dataset.ovView, link.getAttribute("href"));
+            }
+        });
         load();
         // the panel switches views without reloading: refresh as soon as Overview is shown again
         new MutationObserver(load).observe($("view-overview"), { attributes: true, attributeFilter: ["class"] });
