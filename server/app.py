@@ -1612,6 +1612,20 @@ def contact_page():
 def credits_page():
     return render_template("credits.html")
 
+def get_discord_invite_url() -> str:
+    raw = (os.environ.get("DISCORD_INVITE_CODE") or "4eUQQcuv87").strip()
+    code = re.sub(r"^(?:https?://)?(?:www\.)?(?:discord\.gg|discord\.com/invite)/", "", raw, flags=re.IGNORECASE).strip("/")
+    code = code or "4eUQQcuv87"
+    return f"https://discord.gg/{code}"
+
+@app.route("/discord", methods=["GET"])
+@app.route("/discord/", methods=["GET"])
+def discord_invite_redirect():
+    resp = redirect(get_discord_invite_url(), code=302)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
 @app.errorhandler(404)
 def page_not_found(e):
     if request.path.startswith("/api/") or request.headers.get("Accept") == "application/json":

@@ -666,7 +666,7 @@
                                                    Foreground="{DynamicResource TextMuted}"
                                                    FontSize="8"
                                                    FontFamily="{DynamicResource AppMonoFontFamily}" />
-                                        <TextBlock Text="Discord Community: discord.gg/4eUQQcuv87"
+                                        <TextBlock Text="Discord Community: rbwr.hotment.dev/discord"
                                                    Foreground="{DynamicResource TextMuted}"
                                                    FontSize="8"
                                                    FontFamily="{DynamicResource AppMonoFontFamily}" />

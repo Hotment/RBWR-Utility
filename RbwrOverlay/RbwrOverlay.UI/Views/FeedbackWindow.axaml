@@ -81,7 +81,7 @@
                                    Foreground="{DynamicResource TextMuted}"
                                    FontSize="8"
                                    FontFamily="{DynamicResource AppMonoFontFamily}" />
-                        <TextBlock Text="Discord: discord.gg/4eUQQcuv87"
+                        <TextBlock Text="Discord: rbwr.hotment.dev/discord"
                                    Foreground="{DynamicResource TextMuted}"
                                    FontSize="8"
                                    FontFamily="{DynamicResource AppMonoFontFamily}" />

@@ -1659,7 +1659,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     public void OpenDiscordServer()
     {
-        OpenBrowser("https://discord.gg/4eUQQcuv87");
+        OpenBrowser("https://rbwr.hotment.dev/discord");
     }
 
     private static void OpenBrowser(string url)
