@@ -1697,7 +1697,6 @@ button.eb-item.active {
     overflow: hidden;
     color: inherit;
     text-decoration: none;
-    background: linear-gradient(110deg, #121217 45%, color-mix(in srgb, var(--tone) 9%, #121217)) !important;
     transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease;
 }
 .ov-stat::before {
