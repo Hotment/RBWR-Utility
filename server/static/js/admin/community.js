@@ -55,8 +55,9 @@ window.Community = (() => {
                     <input class="adm-input" id="cm-sb-ignored-search" type="search" placeholder="Find a channel" aria-label="Find a channel" style="margin:6px 0">
                     <div id="cm-sb-ignored" class="cm-checklist">
                         ${st.text_channels.map((ch) => `
-                        <label class="adm-check" data-name="${esc(ch.name.toLowerCase())}">
-                            <input type="checkbox" value="${esc(ch.id)}" ${ignored.has(ch.id) ? "checked" : ""}> #${esc(ch.name)}${ch.category ? ` <span class="adm-hint">${esc(ch.category)}</span>` : ""}
+                        <label class="adm-check cm-check" data-name="${esc(ch.name.toLowerCase())}" title="#${esc(ch.name)}${ch.category ? ` · ${esc(ch.category)}` : ""}">
+                            <input type="checkbox" value="${esc(ch.id)}" ${ignored.has(ch.id) ? "checked" : ""}>
+                            <span class="cm-check-name">#${esc(ch.name)}</span>${ch.category ? `<small>${esc(ch.category)}</small>` : ""}
                         </label>`).join("")}
                     </div>` : `<p class="adm-hint">${ignored.size ? `${ignored.size} channel(s) ignored. ` : ""}The channel list needs the bot to be online.</p>`}
                 </div>
@@ -87,7 +88,7 @@ window.Community = (() => {
             ${setUp ? `
             <form id="cm-ss-form">
                 <label class="adm-check"><input type="checkbox" id="cm-ss-enabled" ${c.enabled ? "checked" : ""}> Keep the numbers updated</label>
-                <div class="table-wrap" style="margin-top:10px"><table class="admin-table">
+                <div class="table-wrap" style="margin-top:10px"><table class="admin-table cm-counters">
                     <thead><tr><th>Counter</th><th>Channel name <span class="adm-optional">({value} = the number)</span></th><th>Now</th><th></th></tr></thead>
                     <tbody>${rows || '<tr><td colspan="4" class="adm-hint">No counters. Add one below.</td></tr>'}</tbody>
                 </table></div>

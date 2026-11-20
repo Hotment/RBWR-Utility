@@ -1512,11 +1512,15 @@ button.eb-item.active {
     }
 }
 
+#cm-body .card {
+    min-width: 0;
+}
+
 .cm-checklist {
     max-height: 220px;
     overflow-y: auto;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
     gap: 2px 12px;
     padding: 8px 10px;
     border: 1px solid var(--border-color);
@@ -1525,6 +1529,58 @@ button.eb-item.active {
 
 .cm-checklist [hidden] {
     display: none;
+}
+
+/* one line per channel: long names and categories get an ellipsis instead of wrapping */
+.cm-check {
+    min-width: 0;
+    padding: 3px 0;
+}
+
+.cm-check input {
+    flex: none;
+}
+
+.cm-check-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cm-check small {
+    margin-left: auto;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    color: var(--muted);
+}
+
+/* server stats counters: the 4-column table becomes stacked rows on a phone */
+@media (max-width: 640px) {
+    #cm-body .card {
+        padding: 18px 16px;
+    }
+    .cm-counters thead {
+        display: none;
+    }
+    .cm-counters tr {
+        display: block;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .cm-counters tr:last-child {
+        border-bottom: 0;
+    }
+    .cm-counters td {
+        display: block;
+        padding: 4px 0;
+        border: 0;
+    }
+    .cm-counters tr:hover td {
+        background: none;
+    }
 }
 
 /* ---------- overview tiles ---------- */
