@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:primitives="using:Avalonia.Controls.Primitives"
+             x:Class="RbwrThemeCreator.Views.HudColorPicker">
+
+    <!-- Swatch button + HUD styled flyout (spectrum, hue, alpha, hex, overlay palette). -->
+    <Button x:Name="SwatchButton" Classes="swatch" ToolTip.Tip="Pick a colour">
+        <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="hud-color">
+                <StackPanel Width="226" Spacing="10">
+                    <Border CornerRadius="8" ClipToBounds="True" BorderBrush="{DynamicResource EdBorder}" BorderThickness="1">
+                        <primitives:ColorSpectrum x:Name="Spectrum" Components="SaturationValue" Shape="Box" Width="224" Height="224" />
+                    </Border>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="label" Text="HUE" Margin="0" />
+                        <primitives:ColorSlider x:Name="HueSlider" ColorComponent="Component1" ColorModel="Hsva"
+                                                IsAlphaVisible="False" IsPerceptive="False" Orientation="Horizontal" Height="18" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="AlphaPanel" Spacing="4">
+                        <TextBlock Classes="label" Text="OPACITY (ALPHA)" Margin="0" />
+                        <primitives:ColorSlider x:Name="AlphaSlider" ColorComponent="Alpha" ColorModel="Hsva"
+                                                IsAlphaVisible="True" Orientation="Horizontal" Height="18" />
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Border x:Name="PreviewChecker" Width="44" Height="30" CornerRadius="7" ClipToBounds="True"
+                                BorderBrush="{DynamicResource EdBorder}" BorderThickness="1">
+                            <Border x:Name="PreviewFill" />
+                        </Border>
+                        <TextBox x:Name="HexBox" Grid.Column="1" Classes="hud hex" Margin="8,0,0,0" ToolTip.Tip="#rrggbb or #aarrggbb, press Enter" />
+                    </Grid>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="label" Text="OVERLAY PALETTE" Margin="0" />
+                        <WrapPanel x:Name="Swatches" />
+                    </StackPanel>
+                </StackPanel>
+            </Flyout>
+        </Button.Flyout>
+
+        <Border x:Name="SwatchChecker" CornerRadius="5" ClipToBounds="True">
+            <Border x:Name="SwatchFill" />
+        </Border>
+    </Button>
+</UserControl>

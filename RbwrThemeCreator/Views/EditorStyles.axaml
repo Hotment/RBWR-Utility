@@ -1,0 +1,795 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+      The creator's own UI, styled after the overlay's built-in Cyberpunk HUD theme
+      (RbwrOverlay.UI/Styles/CyberpunkTheme.axaml). Keys are prefixed "Ed" so they never
+      collide with the theme being edited in the live preview.
+    -->
+    <Styles.Resources>
+        <SolidColorBrush x:Key="EdBg" Color="#05070d" />
+        <SolidColorBrush x:Key="EdMain" Color="#070a12" />
+        <SolidColorBrush x:Key="EdCard" Color="#0f1422" />
+        <SolidColorBrush x:Key="EdPanel" Color="#111726" />
+        <SolidColorBrush x:Key="EdHover" Color="#192338" />
+        <SolidColorBrush x:Key="EdActive" Color="#141f33" />
+        <SolidColorBrush x:Key="EdBorder" Color="#1b253b" />
+        <SolidColorBrush x:Key="EdText" Color="#ffffff" />
+        <SolidColorBrush x:Key="EdMuted" Color="#73839c" />
+        <SolidColorBrush x:Key="EdFaint" Color="#4a5670" />
+        <SolidColorBrush x:Key="EdCyan" Color="#00f0ff" />
+        <SolidColorBrush x:Key="EdGreen" Color="#39ff14" />
+        <SolidColorBrush x:Key="EdRed" Color="#ff003c" />
+        <SolidColorBrush x:Key="EdGold" Color="#ffaa00" />
+        <FontFamily x:Key="EdFont">Consolas, Segoe UI, monospace</FontFamily>
+        <FontFamily x:Key="EdIcons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- Fluent control resources re-coloured to the HUD palette -->
+        <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
+        <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
+        <SolidColorBrush x:Key="ButtonBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#0b0f19" />
+        <SolidColorBrush x:Key="ButtonForeground" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#ffffff" />
+        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#3a465c" />
+        <SolidColorBrush x:Key="ButtonBorderBrush" Color="#1b253b" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#141b2b" />
+        <Thickness x:Key="ButtonBorderThemeThickness">1</Thickness>
+
+        <SolidColorBrush x:Key="ToggleButtonBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#141f33" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="ToggleButtonForeground" Color="#73839c" />
+        <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#ffffff" />
+        <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#1b253b" />
+        <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="#00f0ff" />
+
+        <SolidColorBrush x:Key="TextControlBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#131b2e" />
+        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#131b2e" />
+        <SolidColorBrush x:Key="TextControlForeground" Color="#ffffff" />
+        <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#ffffff" />
+        <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#ffffff" />
+        <SolidColorBrush x:Key="TextControlBorderBrush" Color="#1b253b" />
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#2a3a5a" />
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#00f0ff" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#4a5670" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#4a5670" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#4a5670" />
+        <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#0090a0" />
+        <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
+
+        <SolidColorBrush x:Key="ComboBoxBackground" Color="#111726" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#1b253b" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ComboBoxForeground" Color="#ffffff" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#141f33" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ComboBoxItemPillFillSelected" Color="#00f0ff" />
+
+        <SolidColorBrush x:Key="SliderTrackFill" Color="#1b253b" />
+        <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#243352" />
+        <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#243352" />
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="#00f0ff" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#33f3ff" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="SliderThumbBackground" Color="#00f0ff" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#5ff5ff" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#a0faff" />
+
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#5ff5ff" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#070a12" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#070a12" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="#0f1422" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#2a3a5a" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#73839c" />
+
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#00f0ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#5ff5ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#00f0ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#070a12" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#070a12" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#2a3a5a" />
+
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#00f0ff" />
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#0f1422" />
+        <SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#00f0ff" />
+
+        <SolidColorBrush x:Key="ToolTipBackground" Color="#f5080d18" />
+        <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#8800f0ff" />
+        <SolidColorBrush x:Key="ToolTipForeground" Color="#dce6f5" />
+    </Styles.Resources>
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource EdBg}" />
+        <Setter Property="FontFamily" Value="{DynamicResource EdFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+    </Style>
+    <Style Selector="ToolTip">
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <!-- ===== Typography ===== -->
+    <Style Selector="TextBlock.brand">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LetterSpacing" Value="1.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LetterSpacing" Value="1.5" />
+    </Style>
+    <Style Selector="TextBlock.page-sub">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,4,0,14" />
+    </Style>
+    <Style Selector="TextBlock.section-title">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LetterSpacing" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.faint">
+        <Setter Property="Foreground" Value="{DynamicResource EdFaint}" />
+        <Setter Property="FontSize" Value="10" />
+    </Style>
+    <Style Selector="TextBlock.label">
+        <Setter Property="FontSize" Value="9.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LetterSpacing" Value="0.5" />
+        <Setter Property="Margin" Value="0,10,0,4" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+    </Style>
+    <Style Selector="TextBlock.row-label">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.value">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.icon">
+        <Setter Property="FontFamily" Value="{DynamicResource EdIcons}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.error">
+        <Setter Property="Foreground" Value="{DynamicResource EdRed}" />
+    </Style>
+    <Style Selector="TextBlock.warn">
+        <Setter Property="Foreground" Value="{DynamicResource EdGold}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- ===== Containers (overlay-shell / hud-card look) ===== -->
+    <Style Selector="Border.hud-header">
+        <Setter Property="Background" Value="{DynamicResource EdMain}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="16,10" />
+    </Style>
+    <Style Selector="Border.hud-footer-bar">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="14,6" />
+    </Style>
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="Border.card.accent-card">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Background" Value="#0b1b26" />
+    </Style>
+    <Style Selector="Border.pill">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="7,1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.pill-btn">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="7,1" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.pill-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#10291d" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Button.pill-btn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#0b1f15" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Border.warn-box">
+        <Setter Property="Background" Value="#1f170a" />
+        <Setter Property="BorderBrush" Value="#66ffaa00" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,7" />
+    </Style>
+    <Style Selector="Border.ok-box">
+        <Setter Property="Background" Value="#0b1f12" />
+        <Setter Property="BorderBrush" Value="#5539ff14" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,7" />
+    </Style>
+    <Style Selector="Border.divider">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource EdBorder}" />
+        <Setter Property="Margin" Value="0,6" />
+    </Style>
+    <Style Selector="Border.token-row">
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderBrush" Value="#0dffffff" />
+    </Style>
+    <Style Selector="Border.token-row:pointerover">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+
+    <!-- ===== Buttons (cyber, cyber-blue, cyber-green, cyber-red) ===== -->
+    <Style Selector="Button, DropDownButton, ToggleButton, TextBox, ComboBox">
+        <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="Button.hud, DropDownButton.hud, ToggleButton.hud">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Button.hud-blue, Button.hud-green, Button.hud-red">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.hud-blue">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.hud-blue:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.hud-blue:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#0e1726" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.hud-green">
+        <Setter Property="Foreground" Value="{DynamicResource EdGreen}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Button.hud-green:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#10291d" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Button.hud-green:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#0b1f15" />
+        <Setter Property="Foreground" Value="{DynamicResource EdGreen}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Button.hud-red">
+        <Setter Property="Foreground" Value="{DynamicResource EdRed}" />
+        <Setter Property="BorderBrush" Value="#66ff003c" />
+    </Style>
+    <Style Selector="Button.hud-red:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#290e14" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
+    </Style>
+    <Style Selector="Button.hud-red:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#1f0a0f" />
+        <Setter Property="Foreground" Value="{DynamicResource EdRed}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
+    </Style>
+    <Style Selector="Button.hud-blue:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.hud-green:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.hud-red:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <Style Selector="Button.hud-list">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.hud-list:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.hud-list:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+
+    <!-- ===== Inputs ===== -->
+    <Style Selector="TextBox.hud">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="CaretBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="8,5" />
+    </Style>
+    <Style Selector="TextBox.hex">
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.hex.invalid">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
+    </Style>
+    <Style Selector="TextBox.code">
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="AcceptsReturn" Value="True" />
+        <Setter Property="AcceptsTab" Value="True" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="Background" Value="#070a12" />
+    </Style>
+    <Style Selector="ComboBox.hud">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ListBox.hud">
+        <Setter Property="Background" Value="{DynamicResource EdMain}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="FontSize" Value="11.5" />
+    </Style>
+    <Style Selector="ListBox.hud ListBoxItem">
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ListBox.hud ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="ListBox.hud ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+    <Style Selector="CheckBox, ToggleSwitch">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- ===== Left navigation (styled like the overlay's nav-bar tabs, vertically) ===== -->
+    <Style Selector="TabControl.nav">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{DynamicResource EdMain}" />
+    </Style>
+    <Style Selector="TabControl.nav /template/ ItemsPresenter#PART_ItemsPresenter">
+        <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="MinWidth" Value="148" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Margin" Value="10,2" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:selected">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="#8800f0ff" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem:selected:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="TabControl.nav > TabItem /template/ Border#PART_SelectedPipe">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- ===== Preview mode switch (nav-bar card with cyber-nav tabs) ===== -->
+    <Style Selector="Border.seg-host">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TabStrip.seg">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="11,0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:selected">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="#8800f0ff" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem:selected:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="TabStrip.seg > TabStripItem /template/ Border#PART_SelectedPipe">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- ===== HUD colour picker ===== -->
+    <Style Selector="Button.swatch">
+        <Setter Property="Width" Value="48" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.swatch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+    <Style Selector="Button.palette">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Margin" Value="0,0,5,5" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderBrush" Value="#33ffffff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.palette:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.palette:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+    </Style>
+    <Style Selector="FlyoutPresenter.hud-color">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="#8800f0ff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14" />
+        <Setter Property="MaxWidth" Value="400" />
+    </Style>
+    <!-- ===== Custom title bar buttons (cyber-header-btn / cyber-close-btn look) ===== -->
+    <Style Selector="Button.win-btn">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.win-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.win-btn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.win-btn.win-close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdRed}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+    <Style Selector="Button.win-btn.win-close:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#b3002a" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+    <Style Selector="Border.grip">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- ===== HUD dialog window ===== -->
+    <Style Selector="Border.dialog-frame">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="#8800f0ff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+    </Style>
+    <Style Selector="Border.canvas-hint">
+        <Setter Property="Background" Value="#cc070a12" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,5" />
+    </Style>
+    <Style Selector="Border.canvas-hint TextBlock">
+        <Setter Property="FontSize" Value="9.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+    </Style>
+    <!-- ===== Gradient editor ===== -->
+    <Style Selector="ToggleButton.grad-toggle">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="9,5" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="#5500f0ff" />
+    </Style>
+    <Style Selector="ToggleButton.grad-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="ToggleButton.grad-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#ff4fd8" />
+                <GradientStop Offset="1" Color="#00e5ff" />
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="Foreground" Value="#070a12" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.grad-toggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#ff6ee0" />
+                <GradientStop Offset="1" Color="#33ecff" />
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="Foreground" Value="#070a12" />
+        <Setter Property="BorderBrush" Value="#ffffff" />
+    </Style>
+    <Style Selector="ToggleButton.grad-toggle:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#d93cb8" />
+                <GradientStop Offset="1" Color="#00c4d4" />
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="Foreground" Value="#070a12" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.grad-panel">
+        <Setter Property="Background" Value="#0a0e18" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Margin" Value="0,8,0,2" />
+    </Style>
+    <Style Selector="Border.grad-strip">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="BorderBrush" Value="#33ffffff" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.dir">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontFamily" Value="Segoe UI Symbol, Segoe UI, sans-serif" />
+    </Style>
+    <Style Selector="Button.dir:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.dir:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="ToggleButton.mid-toggle">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="6,1" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stop-chip">
+        <Setter Property="Background" Value="#101626" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="5,4,5,5" />
+    </Style>
+    <Style Selector="Button.stop-remove">
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.stop-remove:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdRed}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+    <Style Selector="Button.stop-remove:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#b3002a" />
+        <Setter Property="Foreground" Value="#ffffff" />
+    </Style>
+    <Style Selector="Button.stop-add">
+        <Setter Property="Width" Value="52" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="#5500f0ff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.stop-add:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+    </Style>
+    <Style Selector="Button.stop-add:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.stop-add:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Opacity" Value="0.35" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+    </Style>
+    <Style Selector="Slider.stop-pos">
+        <Setter Property="Width" Value="62" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Margin" Value="0,-6,0,-8" />
+    </Style>
+    <Style Selector="TextBox.num-input">
+        <Setter Property="Width" Value="42" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="CornerRadius" Value="5" />
+    </Style>
+    <Style Selector="TextBlock.num-suffix">
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="3,0,0,0" />
+    </Style>
+</Styles>

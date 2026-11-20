@@ -1,0 +1,419 @@
+name: Build & Release RBWR Theme Creator (.NET Multi-Platform)
+
+on:
+  push:
+    tags:
+      - 'theme-creator-v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to upload assets to (e.g. theme-creator-v1.0.0; leave empty for CI artifacts only)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-15]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj
+
+      - name: Build Theme Creator & Tests
+        run: dotnet build RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj -c Release --no-build --verbosity normal
+
+  publish-windows:
+    name: Publish Windows (${{ matrix.rid }})
+    needs: test
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Standalone Single-File Executable
+        run: |
+          dotnet publish RbwrThemeCreator/RbwrThemeCreator.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o publish-standalone/${{ matrix.rid }}
+
+          Copy-Item "publish-standalone/${{ matrix.rid }}/RbwrThemeCreator.exe" "RBWR_Theme_Creator_${{ matrix.rid }}.exe"
+
+      - name: Publish & Package Windows Archive Bundle
+        run: |
+          dotnet publish RbwrThemeCreator/RbwrThemeCreator.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o publish-bundle/${{ matrix.rid }}
+
+          $bundleDir = "RBWR_Theme_Creator_Windows_${{ matrix.rid }}"
+          New-Item -ItemType Directory -Path $bundleDir -Force
+
+          Copy-Item -Path "publish-bundle/${{ matrix.rid }}/*" -Destination $bundleDir -Recurse
+          Get-ChildItem -Path $bundleDir -Filter "*.pdb" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          if (Test-Path "RbwrThemeCreator/Assets/icon.ico") { Copy-Item "RbwrThemeCreator/Assets/icon.ico" "$bundleDir/" }
+          if (Test-Path "RbwrThemeCreator/Assets/icon.png") { Copy-Item "RbwrThemeCreator/Assets/icon.png" "$bundleDir/" }
+
+          Compress-Archive -Path "$bundleDir" -DestinationPath "${bundleDir}.zip" -CompressionLevel Optimal
+
+      - name: Upload Windows Standalone Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_${{ matrix.rid }}_exe
+          path: RBWR_Theme_Creator_${{ matrix.rid }}.exe
+
+      - name: Upload Windows Zip Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_Windows_${{ matrix.rid }}
+          path: RBWR_Theme_Creator_Windows_${{ matrix.rid }}.zip
+
+  publish-linux:
+    name: Publish Linux (${{ matrix.rid }})
+    needs: test
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        rid: [linux-x64, linux-arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Linux Standalone Single-File Binary
+        run: |
+          dotnet publish RbwrThemeCreator/RbwrThemeCreator.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
+            -o publish-standalone/${{ matrix.rid }}
+
+          cp "publish-standalone/${{ matrix.rid }}/RbwrThemeCreator" "RbwrThemeCreator_${{ matrix.rid }}"
+          chmod +x "RbwrThemeCreator_${{ matrix.rid }}"
+
+      - name: Publish & Package Linux Archive Bundle
+        run: |
+          dotnet publish RbwrThemeCreator/RbwrThemeCreator.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
+            -o publish-bundle/${{ matrix.rid }}
+
+          BUNDLE_NAME="RBWR_Theme_Creator_Linux_${{ matrix.rid }}"
+          mkdir -p "${BUNDLE_NAME}"
+          cp -r publish-bundle/${{ matrix.rid }}/* "${BUNDLE_NAME}/"
+          chmod +x "${BUNDLE_NAME}/RbwrThemeCreator"
+          rm -f "${BUNDLE_NAME}"/*.pdb "${BUNDLE_NAME}"/*.dbg
+
+          if [ -f "RbwrThemeCreator/Assets/icon.png" ]; then cp "RbwrThemeCreator/Assets/icon.png" "${BUNDLE_NAME}/"; fi
+          if [ -f "RbwrThemeCreator/Assets/icon.ico" ]; then cp "RbwrThemeCreator/Assets/icon.ico" "${BUNDLE_NAME}/"; fi
+
+          cat << 'EOF' > "${BUNDLE_NAME}/run.sh"
+          #!/usr/bin/env bash
+          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="${SCRIPT_DIR}:${LD_LIBRARY_PATH}"
+          exec "${SCRIPT_DIR}/RbwrThemeCreator" "$@"
+          EOF
+          chmod +x "${BUNDLE_NAME}/run.sh"
+
+          cat << 'EOF' > "${BUNDLE_NAME}/rbwr-theme-creator.desktop"
+          [Desktop Entry]
+          Version=1.0
+          Name=RBWR Theme Creator
+          Comment=Visual theme editor for the RBWR APRM Calculator overlay
+          Exec=sh -c '"$(dirname "%k")/run.sh"'
+          Icon=icon.png
+          Terminal=false
+          Type=Application
+          Categories=Utility;Graphics;
+          EOF
+          chmod +x "${BUNDLE_NAME}/rbwr-theme-creator.desktop"
+
+          GZIP=-9 tar -czf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
+          zip -9 -r "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
+
+      - name: Upload Linux Package (tar.gz)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_Linux_${{ matrix.rid }}_targz
+          path: RBWR_Theme_Creator_Linux_${{ matrix.rid }}.tar.gz
+
+      - name: Upload Linux Package (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_Linux_${{ matrix.rid }}_zip
+          path: RBWR_Theme_Creator_Linux_${{ matrix.rid }}.zip
+
+      - name: Upload Linux Standalone Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: RbwrThemeCreator_${{ matrix.rid }}_binary
+          path: RbwrThemeCreator_${{ matrix.rid }}
+
+      - name: Build Linux AppImage (x86_64)
+        if: matrix.rid == 'linux-x64'
+        run: |
+          APPDIR="RBWR_Theme_Creator.AppDir"
+          rm -rf "${APPDIR}"
+          mkdir -p "${APPDIR}/usr/bin"
+          mkdir -p "${APPDIR}/usr/lib"
+
+          cp -r publish-bundle/linux-x64/* "${APPDIR}/usr/bin/"
+          chmod +x "${APPDIR}/usr/bin/RbwrThemeCreator"
+          rm -f "${APPDIR}/usr/bin"/*.pdb "${APPDIR}/usr/bin"/*.dbg
+
+          APP_VER="1.0.0"
+          if [ -f "RbwrThemeCreator/ViewModels/MainViewModel.cs" ]; then
+            DETECTED=$(sed -nE 's/.*public const string AppVersion = "([^"]+)".*/\1/p' "RbwrThemeCreator/ViewModels/MainViewModel.cs" | head -n 1)
+            if [ -n "${DETECTED}" ]; then
+              APP_VER="${DETECTED}"
+            fi
+          fi
+
+          cat << EOF > "${APPDIR}/rbwr-theme-creator.desktop"
+          [Desktop Entry]
+          Version=1.0
+          Name=RBWR Theme Creator
+          GenericName=Theme Editor
+          Comment=Visual theme editor for the RBWR APRM Calculator overlay
+          Exec=RbwrThemeCreator
+          Icon=icon
+          Terminal=false
+          Type=Application
+          Categories=Utility;Graphics;
+          X-AppImage-Version=${APP_VER}
+          EOF
+
+          if [ -f "RbwrThemeCreator/Assets/icon.png" ]; then
+            cp RbwrThemeCreator/Assets/icon.png "${APPDIR}/icon.png"
+            cp RbwrThemeCreator/Assets/icon.png "${APPDIR}/rbwr-theme-creator.png"
+            mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
+            cp RbwrThemeCreator/Assets/icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/rbwr-theme-creator.png"
+          fi
+
+          cat << 'EOF' > "${APPDIR}/AppRun"
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/RbwrThemeCreator" "$@"
+          EOF
+          chmod +x "${APPDIR}/AppRun"
+
+          wget -q -O appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract >/dev/null 2>&1
+
+          ARCH=x86_64 ./squashfs-root/AppRun "${APPDIR}" "RBWR_Theme_Creator_linux-x64.AppImage"
+          chmod +x "RBWR_Theme_Creator_linux-x64.AppImage"
+
+      - name: Upload Linux AppImage
+        if: matrix.rid == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_linux-x64_AppImage
+          path: RBWR_Theme_Creator_linux-x64.AppImage
+
+  publish-macos:
+    name: Publish macOS (${{ matrix.rid }})
+    needs: test
+    runs-on: macos-15
+    strategy:
+      matrix:
+        rid: [osx-arm64, osx-x64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Generate macOS Application Icon (.icns)
+        run: |
+          if [ -f "RbwrThemeCreator/Assets/icon.png" ]; then
+            mkdir -p icon.iconset
+            sips -z 16 16     RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_16x16.png
+            sips -z 32 32     RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_16x16@2x.png
+            sips -z 32 32     RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_32x32.png
+            sips -z 64 64     RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_32x32@2x.png
+            sips -z 128 128   RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_128x128.png
+            sips -z 256 256   RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_128x128@2x.png
+            sips -z 512 512   RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_512x512.png
+            sips -z 1024 1024 RbwrThemeCreator/Assets/icon.png --out icon.iconset/icon_512x512@2x.png
+            iconutil -c icns icon.iconset -o icon.icns
+            rm -rf icon.iconset
+          fi
+
+      - name: Publish macOS Bundle Files
+        run: |
+          dotnet publish RbwrThemeCreator/RbwrThemeCreator.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
+            -o publish/${{ matrix.rid }}
+
+      - name: Build macOS Application Bundle (.app)
+        run: |
+          BUNDLE_NAME="RBWR_Theme_Creator_macOS_${{ matrix.rid }}"
+          APP_NAME="RBWR Theme Creator.app"
+          mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS"
+          mkdir -p "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources"
+
+          cp -r publish/${{ matrix.rid }}/* "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/"
+          chmod +x "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS/RbwrThemeCreator"
+          rm -f "${BUNDLE_NAME}/${APP_NAME}/Contents/MacOS"/*.pdb
+
+          if [ -f "icon.icns" ]; then
+            cp icon.icns "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.icns"
+          fi
+          if [ -f "RbwrThemeCreator/Assets/icon.png" ]; then
+            cp RbwrThemeCreator/Assets/icon.png "${BUNDLE_NAME}/${APP_NAME}/Contents/Resources/icon.png"
+          fi
+
+          APP_VER="1.0.0"
+          if [ -f "RbwrThemeCreator/ViewModels/MainViewModel.cs" ]; then
+            DETECTED=$(sed -nE 's/.*public const string AppVersion = "([^"]+)".*/\1/p' "RbwrThemeCreator/ViewModels/MainViewModel.cs" | head -n 1)
+            if [ -n "${DETECTED}" ]; then
+              APP_VER="${DETECTED}"
+            fi
+          fi
+          NUM_VER=$(echo "${APP_VER}" | cut -d'-' -f1)
+
+          cat << EOF > "${BUNDLE_NAME}/${APP_NAME}/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>RBWR Theme Creator</string>
+              <key>CFBundleDisplayName</key>
+              <string>RBWR Theme Creator</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.hotment.rbwrthemecreator</string>
+              <key>CFBundleVersion</key>
+              <string>${NUM_VER}.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${APP_VER}</string>
+              <key>NSHumanReadableCopyright</key>
+              <string>Copyright © 2026 Hotment</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleExecutable</key>
+              <string>RbwrThemeCreator</string>
+              <key>CFBundleIconFile</key>
+              <string>icon.icns</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          cat << 'EOF' > "${BUNDLE_NAME}/run.command"
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          open "${DIR}/RBWR Theme Creator.app" --args "$@"
+          EOF
+          chmod +x "${BUNDLE_NAME}/run.command"
+
+          codesign --force --deep -s - "${BUNDLE_NAME}/${APP_NAME}" || true
+          ditto -c -k --sequesterRsrc --keepParent "${BUNDLE_NAME}" "${BUNDLE_NAME}.zip"
+
+      - name: Upload macOS Package (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RBWR_Theme_Creator_macOS_${{ matrix.rid }}
+          path: RBWR_Theme_Creator_macOS_${{ matrix.rid }}.zip
+
+  release:
+    name: Publish GitHub Release (Non-Latest)
+    if: startsWith(github.ref, 'refs/tags/theme-creator-v') || (github.event_name == 'workflow_dispatch' && inputs.tag_name != '')
+    needs: [publish-windows, publish-linux, publish-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-downloads
+
+      - name: Consolidate Release Assets
+        run: |
+          mkdir -p release-assets
+          find release-downloads -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz" -o -name "*.AppImage" -o -name "RbwrThemeCreator_*" \) -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name || github.ref_name }}
+          name: RBWR Theme Creator ${{ inputs.tag_name || github.ref_name }}
+          files: release-assets/*
+          generate_release_notes: true
+          make_latest: false

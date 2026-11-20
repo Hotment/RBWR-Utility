@@ -1,0 +1,41 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="RbwrThemeCreator.App"
+             RequestedThemeVariant="Dark">
+    <Application.Styles>
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Dark"
+                                       Accent="#00f0ff"
+                                       AltHigh="#0e1014"
+                                       AltLow="#0e1014"
+                                       AltMedium="#0e1014"
+                                       AltMediumHigh="#0e1014"
+                                       AltMediumLow="#0e1014"
+                                       BaseHigh="#e9edf3"
+                                       BaseLow="#1b253b"
+                                       BaseMedium="#73839c"
+                                       BaseMediumHigh="#c3cad6"
+                                       BaseMediumLow="#5f6878"
+                                       ChromeAltLow="#c3cad6"
+                                       ChromeBlackHigh="#000000"
+                                       ChromeBlackLow="#c3cad6"
+                                       ChromeBlackMedium="#0e1014"
+                                       ChromeBlackMediumLow="#0e1014"
+                                       ChromeDisabledHigh="#2c3240"
+                                       ChromeDisabledLow="#5f6878"
+                                       ChromeGray="#808a9b"
+                                       ChromeHigh="#3a4252"
+                                       ChromeLow="#0b0f19"
+                                       ChromeMedium="#0f1422"
+                                       ChromeMediumLow="#111726"
+                                       ChromeWhite="#ffffff"
+                                       ListLow="#192338"
+                                       ListMedium="#141f33"
+                                       RegionColor="#070a12" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+        <StyleInclude Source="avares://RbwrThemeCreator/Views/EditorStyles.axaml" />
+    </Application.Styles>
+</Application>
