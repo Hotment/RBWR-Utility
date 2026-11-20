@@ -35,7 +35,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**" Exclude="Assets\Source\**" />
+    <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
   <!-- The overlay's real built-in themes are embedded so the live preview and presets
