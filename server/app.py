@@ -3012,6 +3012,37 @@ def unban_ip(username):
         return jsonify({"message": f"IP {payload.ip} unbanned successfully.", "ip": payload.ip})
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
 
+@app.route("/admin/overview-stats", methods=["GET"])
+@admin_required
+def admin_overview_stats(username):
+    """Counters for the Overview indicators, only for the sections this admin can open."""
+    perms = get_user_permissions(username)
+    out = {}
+    if perms.get("suggestions"):
+        tickets = load_suggestions().get("suggestions", [])
+        out["bugs"] = sum(1 for t in tickets if t.get("type") == "bug_report"
+                          and str(t.get("status") or "open") in ("open", "investigating", "confirmed"))
+        out["suggestions"] = sum(1 for t in tickets if t.get("type") != "bug_report"
+                                 and str(t.get("status") or "pending") == "pending")
+    if perms.get("crashes"):
+        out["crashes"] = sum(1 for c in load_crashes().get("crashes", []) if str(c.get("status", "OPEN")).upper() == "OPEN")
+    if perms.get("contact"):
+        out["messages"] = sum(1 for m in load_contact_messages().get("messages", []) if not m.get("read"))
+    if perms.get("servers"):
+        try:
+            out["servers"] = len(build_server_cards(get_sc_data("servers.json") or {}))
+        except Exception as e:
+            logger.warning(f"[overview] server count failed: {e}")
+    try:
+        import bot_features as _bf
+        out["bot_online"] = bool(_bf.is_ready())
+        if perms.get("errors"):
+            out["errors"] = sum(1 for e in _bf.errors_store.load().get("errors", []) if not e.get("resolved"))
+    except Exception as e:
+        logger.warning(f"[overview] bot stats failed: {e}")
+    return jsonify(out)
+
+
 @app.route("/admin/tickets", methods=["GET"])
 @admin_required
 def view_suggestions_dashboard(username):

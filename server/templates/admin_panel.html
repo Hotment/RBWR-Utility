@@ -428,12 +428,16 @@
                     <h1 class="text-2xl font-bold tracking-wide text-white font-display whitespace-nowrap">Overview</h1>
                     <p class="text-xs text-slate-500 font-mono mt-1 whitespace-nowrap">Logged in as {{ username }}</p>
                 </div>
-                <div class="flex gap-4 font-mono text-xs">
+                <div class="flex items-center gap-4 font-mono text-xs">
+                    <span id="ov-bot" class="bot-status font-mono text-xs" hidden><span class="dot"></span><span id="ov-bot-text">Discord bot</span></span>
                     <a href="/"
                         class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-medium text-xs transition whitespace-nowrap">Home
                         Site</a>
                 </div>
             </header>
+
+            <!-- one row of indicators, two per big tile (static/js/admin/overview.js) -->
+            <div id="ov-stats" class="ov-stats" hidden></div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 grow-0">
                 {% if permissions.suggestions %}
@@ -2062,6 +2066,7 @@
     <script src="/static/js/admin/botconfig.js"></script>
     <script src="/static/js/admin/automod.js"></script>
     <script src="/static/js/admin/community.js"></script>
+    <script src="/static/js/admin/overview.js"></script>
     <script src="/static/js/admin/role-commands.js"></script>
     <script>window.ADMIN_PERMISSIONS = {{ permissions | tojson | safe }};</script>
     <script src="/static/js/admin/admin-bot.js"></script>
