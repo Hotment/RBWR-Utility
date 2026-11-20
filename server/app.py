@@ -299,30 +299,88 @@ def hex_to_int_filter(val, default=3900150):
 
 _RN_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 _RN_LIST = re.compile(r"^(\s*)[-*+]\s+(.*)$")
+_RN_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$")
 _RN_HEADING_CLASSES = {
     1: "text-base sm:text-lg font-semibold text-gray-100 mt-1 mb-2",
     2: "text-sm sm:text-base font-semibold text-blue-300 mt-4 mb-1",
     3: "text-xs sm:text-sm font-semibold text-gray-200 mt-3 mb-1",
 }
+_RN_LINK_CLASS = "text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 underline-offset-2 transition"
+
+def _rn_link(href: str, label: str) -> str:
+    return f'<a href="{href}" target="_blank" rel="noopener noreferrer" class="{_RN_LINK_CLASS}">{label}</a>'
+
+def _rn_url_label(url: str) -> str:
+    """Short text for a bare URL: GitHub PRs/issues become #7, compares v2.2.1...v2.3.0."""
+    if m := re.match(r"https?://github\.com/[^/\s]+/[^/\s]+/(?:pull|issues)/(\d+)/?$", url):
+        return f"#{m.group(1)}"
+    if m := re.match(r"https?://github\.com/[^/\s]+/[^/\s]+/(?:compare|releases/tag)/(\S+?)/?$", url):
+        return m.group(1)
+    short = re.sub(r"^https?://(www\.)?", "", url).rstrip("/")
+    return short if len(short) <= 48 else short[:45] + "…"
+
+def _rn_emphasis(s: str) -> str:
+    s = re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", r'<strong class="text-gray-200">\1</strong>', s)
+    s = re.sub(r"(?<![\w*])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![\w*])", r"<em>\1</em>", s)
+    return re.sub(r"(?<![\w_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![\w_])", r"<em>\1</em>", s)
 
 def _rn_inline(escaped: str) -> str:
-    escaped = re.sub(r"`([^`]+)`", r'<code class="text-blue-300">\1</code>', escaped)
-    return re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", r'<strong class="text-gray-200">\1</strong>', escaped)
+    # code and links are swapped for placeholders so bold/italic never reach into them
+    slots = []
+    def keep(html):
+        slots.append(html)
+        return f"\x00{len(slots) - 1}\x00"
+    s = re.sub(r"`([^`]+)`", lambda m: keep(f'<code class="text-blue-300">{m.group(1)}</code>'), escaped)
+    s = re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", lambda m: keep(_rn_link(m.group(2), _rn_emphasis(m.group(1)))), s)
+    s = re.sub(r"(?<![\w/\"])(https?://[^\s<]+?)([.,;:!?)]*)(?=\s|$)",
+               lambda m: keep(_rn_link(m.group(1), _rn_url_label(m.group(1)))) + m.group(2), s)
+    s = re.sub(r"(?<![\w/@.])@([A-Za-z0-9][A-Za-z0-9-]{0,38})\b",
+               lambda m: keep(_rn_link(f"https://github.com/{m.group(1)}", f"@{m.group(1)}")), s)
+    s = _rn_emphasis(s)
+    return re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], s)
+
+def _rn_cells(raw: str) -> list:
+    raw = raw.strip()
+    if raw.startswith("|"):
+        raw = raw[1:]
+    if raw.endswith("|"):
+        raw = raw[:-1]
+    return [_rn_inline(str(escape(c.strip()))) for c in raw.split("|")]
+
+def _rn_table(rows: list) -> str:
+    head = "".join(f'<th class="py-1.5 pr-4 font-semibold text-gray-300 border-b border-white/10 whitespace-nowrap">{c}</th>' for c in _rn_cells(rows[0]))
+    body = "".join(
+        "<tr>" + "".join(f'<td class="py-1.5 pr-4 border-b border-white/5 align-top">{c}</td>' for c in _rn_cells(r)) + "</tr>"
+        for r in rows[2:])
+    return (f'<div class="overflow-x-auto my-3"><table class="w-full text-left border-collapse">'
+            f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>")
 
 @app.template_filter("release_md")
 def release_md_filter(text):
-    """A small, safe subset of Markdown for the GitHub release notes: # headings,
-    **bold**, `code`, --- rules and - lists. Everything is HTML-escaped first."""
+    """A small, safe subset of Markdown for the GitHub release notes: # headings, **bold**,
+    *italic*, `code`, [links](url), bare URLs, @mentions, tables, --- rules and - lists.
+    Everything is HTML-escaped first; only http(s) links are made clickable."""
     out = []
     blank = False
-    for raw in str(text or "").replace("\r\n", "\n").split("\n"):
+    lines = str(text or "").replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        i += 1
         line = str(escape(raw.rstrip()))
         if not line.strip():
             blank = bool(out)
             continue
         gap = " mt-2" if blank else ""
         blank = False
-        if re.fullmatch(r"\s*([-*_])(\s*\1){2,}\s*", raw):
+        if raw.lstrip().startswith("|") and i < len(lines) and _RN_TABLE_SEP.match(lines[i]):
+            rows = [raw, lines[i]]
+            i += 1
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                rows.append(lines[i])
+                i += 1
+            out.append(_rn_table(rows))
+        elif re.fullmatch(r"\s*([-*_])(\s*\1){2,}\s*", raw):
             out.append('<hr class="border-white/10 my-3">')
         elif m := _RN_HEADING.match(line):
             level = min(len(m.group(1)), 3)
