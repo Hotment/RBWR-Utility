@@ -4617,8 +4617,12 @@ _api_supervisor_thread = None
 _api_supervisor_started = False
 _api_external_detected = False
 _api_shutting_down = False
+_api_manual_stopped = False
 _api_immediate_restart = False
 _api_supervisor_lock = threading.Lock()
+_api_recovery_lock = threading.Lock()
+_api_last_recovery_ts = 0.0
+_API_AUTO_RECOVERY_COOLDOWN_S = 10.0
 _HOP_BY_HOP_HEADERS = frozenset({
     "connection",
     "keep-alive",
@@ -4755,7 +4759,7 @@ def get_api_subservice_status(probe_http: bool = True) -> dict:
 
 
 def start_api_subservice() -> tuple[bool, str]:
-    global _api_shutting_down, _api_supervisor_started, _api_external_detected
+    global _api_shutting_down, _api_manual_stopped, _api_supervisor_started, _api_external_detected
     if os.environ.get("DISABLE_API_PROCESS") == "1":
         return False, "API subprocess is disabled via DISABLE_API_PROCESS=1."
     if not os.path.exists(API_SCRIPT_PATH):
@@ -4763,6 +4767,7 @@ def start_api_subservice() -> tuple[bool, str]:
     port = _get_api_port()
     with _api_supervisor_lock:
         _api_shutting_down = False
+        _api_manual_stopped = False
         _api_external_detected = False
         if _api_process is not None and _api_process.poll() is None:
             return True, f"API subservice is already running (PID {_api_process.pid}, port {port})."
@@ -4783,6 +4788,8 @@ def start_api_subservice() -> tuple[bool, str]:
 
 
 def stop_api_subservice() -> tuple[bool, str]:
+    global _api_manual_stopped
+    _api_manual_stopped = True
     proc = _api_process
     pid = proc.pid if proc is not None else None
     was_running = proc is not None and proc.poll() is None
@@ -4796,9 +4803,10 @@ def stop_api_subservice() -> tuple[bool, str]:
 
 
 def restart_api_subservice() -> tuple[bool, str]:
-    global _api_immediate_restart, _api_shutting_down
+    global _api_immediate_restart, _api_shutting_down, _api_manual_stopped
     if os.environ.get("DISABLE_API_PROCESS") == "1":
         return False, "API subprocess is disabled via DISABLE_API_PROCESS=1."
+    _api_manual_stopped = False
     port = _get_api_port()
     proc = _api_process
     if proc is not None and proc.poll() is None and _api_supervisor_thread is not None and _api_supervisor_thread.is_alive():
@@ -4846,19 +4854,51 @@ def start_api_subprocess():
         )
         _api_supervisor_thread.start()
 
+def _attempt_api_auto_recovery(reason: str) -> bool:
+    global _api_last_recovery_ts
+    if os.environ.get("DISABLE_API_PROCESS") == "1" or "unittest" in sys.modules:
+        return False
+    if _api_manual_stopped or not os.path.exists(API_SCRIPT_PATH):
+        return False
+
+    api_port = _get_api_port()
+    with _api_recovery_lock:
+        if _is_local_port_open(api_port, timeout=0.2):
+            return True
+        now = time.monotonic()
+        if (now - _api_last_recovery_ts) < _API_AUTO_RECOVERY_COOLDOWN_S:
+            return False
+        _api_last_recovery_ts = now
+
+        logger.warning(f"[REST API Proxy] Triggering automatic recovery ({reason})...")
+        proc = _api_process
+        if proc is not None and proc.poll() is None:
+            ok, msg = restart_api_subservice()
+        else:
+            ok, msg = start_api_subservice()
+
+        if ok:
+            logger.info(f"[REST API Proxy] Auto-recovery succeeded: {msg}")
+        else:
+            logger.warning(f"[REST API Proxy] Auto-recovery did not complete: {msg}")
+        return ok
+
+
 @app.before_request
 def ensure_api_subprocess():
-    if not _api_supervisor_started and not _api_external_detected:
+    if not _api_manual_stopped and not _api_supervisor_started and not _api_external_detected:
         start_api_subprocess()
 
 @app.route("/api", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 @app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 def proxy_api_request(subpath: str = ""):
-    if not _api_supervisor_started and not _api_external_detected:
+    if not _api_manual_stopped and not _api_supervisor_started and not _api_external_detected:
         start_api_subprocess()
 
     api_port = _get_api_port()
-    if _api_supervisor_started and not _is_local_port_open(api_port, timeout=0.15):
+    if _api_external_detected and not _is_local_port_open(api_port, timeout=0.15):
+        _attempt_api_auto_recovery(f"external listener on 127.0.0.1:{api_port} is no longer reachable")
+    elif _api_supervisor_started and not _is_local_port_open(api_port, timeout=0.15):
         deadline = time.time() + 4.0
         while time.time() < deadline:
             if _is_local_port_open(api_port, timeout=0.2):
@@ -4888,22 +4928,37 @@ def proxy_api_request(subpath: str = ""):
     fwd_headers["X-Forwarded-Proto"] = request.scheme
     fwd_headers["Accept-Encoding"] = "identity"
 
-    try:
-        upstream_resp = requests.request(
+    req_body = request.get_data()
+
+    def _send_upstream():
+        return requests.request(
             method=request.method,
             url=upstream_url,
             headers=fwd_headers,
-            data=request.get_data(),
+            data=req_body,
             stream=True,
             allow_redirects=False,
             timeout=(5, 60),
         )
+
+    try:
+        upstream_resp = _send_upstream()
     except requests.RequestException as e:
         logger.warning(f"[REST API Proxy] Failed reaching 127.0.0.1:{api_port}{target_path}: {e}")
-        return jsonify({
-            "success": False,
-            "detail": "REST API service is currently unavailable.",
-        }), 503
+        if _attempt_api_auto_recovery(f"proxy request failed for {target_path}: {e}"):
+            try:
+                upstream_resp = _send_upstream()
+            except requests.RequestException as retry_err:
+                logger.warning(f"[REST API Proxy] Retry after auto-recovery failed for 127.0.0.1:{api_port}{target_path}: {retry_err}")
+                return jsonify({
+                    "success": False,
+                    "detail": "REST API service is currently unavailable.",
+                }), 503
+        else:
+            return jsonify({
+                "success": False,
+                "detail": "REST API service is currently unavailable.",
+            }), 503
 
     resp_headers = [
         (k, v)
