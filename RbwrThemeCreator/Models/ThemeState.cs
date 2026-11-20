@@ -3,7 +3,41 @@ using RbwrOverlay.Core.Models;
 
 namespace RbwrThemeCreator.Models;
 
-public sealed record TokenValue(Color Color, double Opacity = 1.0);
+/// <summary>
+/// Value of a brush token. <see cref="Color"/> is the solid colour, or the first stop of the gradient.
+/// </summary>
+public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec? Gradient = null)
+{
+    /// <summary>Single representative colour (used for &lt;Color&gt; mirrors, glow and contrast).</summary>
+    public Color Representative => Gradient == null ? Color : GradientSpec.Average(Color, Gradient);
+}
+
+/// <summary>
+/// Linear gradient from the token's colour to <see cref="End"/>, optionally through <see cref="Mid"/>.
+/// <see cref="Angle"/> is in degrees: 0 = left to right, 90 = top to bottom.
+/// </summary>
+public sealed record GradientSpec(Color End, Color? Mid, double Angle)
+{
+    /// <summary>Angle normalised to [0, 360); NaN/infinity become 90 (top to bottom).</summary>
+    public double SafeAngle => double.IsFinite(Angle) ? ((Angle % 360) + 360) % 360 : 90;
+
+    /// <summary>Start/end points in percent (0..100) of the element box for the angle.</summary>
+    public (double Sx, double Sy, double Ex, double Ey) Points()
+    {
+        double rad = SafeAngle * Math.PI / 180;
+        double dx = Math.Cos(rad), dy = Math.Sin(rad);
+        static double R(double v) => Math.Round(Math.Clamp(v, 0, 100), 1);
+        return (R(50 - 50 * dx), R(50 - 50 * dy), R(50 + 50 * dx), R(50 + 50 * dy));
+    }
+
+    public static Color Average(Color start, GradientSpec g)
+    {
+        var cs = g.Mid is { } m ? new[] { start, m, g.End } : new[] { start, g.End };
+        return Color.FromArgb(
+            (byte)cs.Average(c => c.A), (byte)cs.Average(c => c.R),
+            (byte)cs.Average(c => c.G), (byte)cs.Average(c => c.B));
+    }
+}
 
 public sealed record ThemeFile(string FileName, string SourcePath);
 

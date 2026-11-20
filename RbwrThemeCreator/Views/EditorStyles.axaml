@@ -544,4 +544,59 @@
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
     </Style>
+    <!-- ===== Gradient editor ===== -->
+    <Style Selector="ToggleButton.grad-toggle">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="9,5" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderBrush" Value="#5500f0ff" />
+    </Style>
+    <Style Selector="ToggleButton.grad-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#ff4fd8" />
+                <GradientStop Offset="1" Color="#00e5ff" />
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="Foreground" Value="#070a12" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.grad-panel">
+        <Setter Property="Background" Value="#0a0e18" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Margin" Value="0,8,0,2" />
+    </Style>
+    <Style Selector="Border.grad-strip">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="BorderBrush" Value="#33ffffff" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.dir">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontFamily" Value="Segoe UI Symbol, Segoe UI, sans-serif" />
+    </Style>
+    <Style Selector="ToggleButton.mid-toggle">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="6,1" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
 </Styles>

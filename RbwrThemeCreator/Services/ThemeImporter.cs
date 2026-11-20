@@ -220,6 +220,20 @@ public static class ThemeImporter
                         Stretch = (string?)el.Attribute("Stretch") ?? "UniformToFill",
                     };
                 }
+                else if (el.Name.Namespace == Ns && local == "LinearGradientBrush" && key != null
+                         && TokenCatalog.ByKey.TryGetValue(key, out var gdef) && gdef.SupportsGradient
+                         && TryParseGradient(el, out var gradientValue))
+                {
+                    state.Tokens[key] = gradientValue;
+                }
+                else if (key != null && (TokenCatalog.ByKey.ContainsKey(key) || TokenCatalog.ByMirrorColorKey.ContainsKey(key)
+                                         || key == TokenCatalog.FontKey || key == TokenCatalog.MonoFontKey))
+                {
+                    // A token the creator generates itself but cannot read in this form. Keeping it as an extra
+                    // resource would duplicate the key and break the theme, so fall back to a safe value instead.
+                    if (!TokenCatalog.ByMirrorColorKey.ContainsKey(key))
+                        state.ImportWarnings.Add($"Could not read '{key}' ({local}); it was replaced with a default value.");
+                }
                 else
                 {
                     extraResources.Add(Serialize(el));
@@ -258,6 +272,54 @@ public static class ThemeImporter
             state.Shape = ParseShape(shapeXml);
 
         return state;
+    }
+
+    /// <summary>
+    /// Reads a 2 or 3 stop &lt;LinearGradientBrush&gt;. Anything more exotic is rejected (the caller falls back to a solid colour).
+    /// </summary>
+    private static bool TryParseGradient(XElement el, out TokenValue value)
+    {
+        value = null!;
+        var stops = new List<(double Offset, Color Color)>();
+        foreach (var stop in el.Descendants(Ns + "GradientStop"))
+        {
+            if (!ColorUtil.TryParse((string?)stop.Attribute("Color"), out var c))
+                return false;
+            double off = ColorUtil.ParseDouble((string?)stop.Attribute("Offset"), 0);
+            stops.Add((double.IsFinite(off) ? Math.Clamp(off, 0, 1) : 0, c));
+        }
+        if (stops.Count is < 2 or > 3)
+            return false;
+        stops.Sort((a, b) => a.Offset.CompareTo(b.Offset));
+
+        if (!TryParseRelativePoint((string?)el.Attribute("StartPoint") ?? "0%,0%", out var sx, out var sy)
+            || !TryParseRelativePoint((string?)el.Attribute("EndPoint") ?? "100%,100%", out var ex, out var ey))
+            return false;
+        double angle = Math.Abs(ex - sx) < 1e-9 && Math.Abs(ey - sy) < 1e-9 ? 90 : Math.Atan2(ey - sy, ex - sx) * 180 / Math.PI;
+        angle = Math.Round(((angle % 360) + 360) % 360);
+
+        double opacity = Math.Clamp(ColorUtil.ParseDouble((string?)el.Attribute("Opacity"), 1.0), 0, 1);
+        Color? mid = stops.Count == 3 ? stops[1].Color : null;
+        value = new TokenValue(stops[0].Color, opacity, new GradientSpec(stops[^1].Color, mid, angle));
+        return true;
+    }
+
+    /// <summary>Parses "50%,0%" (relative) or "0.5,0" (treated as fractions) into percentages.</summary>
+    private static bool TryParseRelativePoint(string text, out double x, out double y)
+    {
+        x = y = 0;
+        var parts = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2) return false;
+        static bool Part(string p, out double v)
+        {
+            bool percent = p.EndsWith('%');
+            v = ColorUtil.ParseDouble(percent ? p[..^1] : p, double.NaN);
+            if (!double.IsFinite(v)) return false;
+            if (!percent) v *= 100;
+            v = Math.Clamp(v, -1000, 1000);
+            return true;
+        }
+        return Part(parts[0], out x) && Part(parts[1], out y);
     }
 
     private static ShapeSettings ParseShape(string regionXml)

@@ -384,14 +384,20 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateContrast()
     {
-        double main = ColorUtil.Contrast(_tokens["TextLight"].Color, _tokens["CyberMainBg"].Color);
-        double card = ColorUtil.Contrast(_tokens["TextLight"].Color, _tokens["CyberCardBg"].Color);
-        double muted = ColorUtil.Contrast(_tokens["TextMuted"].Color, _tokens["CyberCardBg"].Color);
-        double accent = ColorUtil.Contrast(_tokens["NeonCyan"].Color, _tokens["CyberCardBg"].Color);
+        // Gradients are judged by their average colour.
+        Color C(string key) => _tokens[key].ToValue().Representative;
+        double main = ColorUtil.Contrast(C("TextLight"), C("CyberMainBg"));
+        double card = ColorUtil.Contrast(C("TextLight"), C("CyberCardBg"));
+        double muted = ColorUtil.Contrast(C("TextMuted"), C("CyberCardBg"));
+        double accent = ColorUtil.Contrast(C("NeonCyan"), C("CyberCardBg"));
         ContrastWarning = Math.Min(main, card) < 4.5 || muted < 3 || accent < 3;
         ContrastSummary = $"Contrast — text/background {main:0.0}:1, text/card {card:0.0}:1, muted/card {muted:0.0}:1, accent/card {accent:0.0}:1"
                           + (ContrastWarning ? "   ⚠ some text may be hard to read (aim for ≥4.5 text, ≥3 muted/accent)" : "   ✓ readable");
     }
+
+    /// <summary>Shows an unexpected error in the status bar instead of crashing the app.</summary>
+    public void ReportUnexpectedError(Exception ex) =>
+        SetStatus($"Something went wrong (the app kept running): {ex.GetBaseException().Message}", isError: true);
 
     private void SetStatus(string message, bool isError = false)
     {

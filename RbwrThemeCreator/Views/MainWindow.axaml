@@ -102,7 +102,7 @@
         </Border>
 
         <!-- =============== Body =============== -->
-        <Grid Grid.Row="1" ColumnDefinitions="700,1,*">
+        <Grid Grid.Row="1" ColumnDefinitions="740,1,*">
 
             <TabControl Grid.Column="0" Classes="nav" TabStripPlacement="Left">
 
@@ -202,6 +202,10 @@
                                 </StackPanel>
                             </Border>
 
+                            <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8">
+                                <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
+                                           Text="TIP: click ◢ GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                            </Border>
                             <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding !ContrastWarning}">
                                 <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
                             </Border>
@@ -221,21 +225,64 @@
                                                         <DataTemplate x:DataType="vm:TokenViewModel">
                                                             <Border Classes="token-row" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
                                                                     ToolTip.Tip="Double-click to show where this colour is used" ToolTip.ShowDelay="900">
-                                                                <Grid ColumnDefinitions="Auto,*,90,128">
-                                                                    <views:HudColorPicker Grid.Column="0" Color="{Binding Color}" VerticalAlignment="Center" />
-                                                                    <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Hint}">
-                                                                        <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                                        <TextBlock Classes="faint" Text="{Binding Key}" />
-                                                                    </StackPanel>
-                                                                    <TextBox Grid.Column="2" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
-                                                                             Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
-                                                                             ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
-                                                                    <Grid Grid.Column="3" ColumnDefinitions="*,38" IsVisible="{Binding SupportsOpacity}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                                          ToolTip.Tip="Opacity — lower values let the game show through">
-                                                                        <Slider Minimum="0" Maximum="1" Value="{Binding Opacity}" />
-                                                                        <TextBlock Grid.Column="1" Text="{Binding OpacityText}" VerticalAlignment="Center" TextAlignment="Right" FontSize="10.5" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" />
+                                                                <StackPanel>
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,128">
+                                                                        <views:HudColorPicker Grid.Column="0" Color="{Binding Color}" VerticalAlignment="Center" />
+                                                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Hint}">
+                                                                            <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                            <TextBlock Classes="faint" Text="{Binding Key}" />
+                                                                        </StackPanel>
+                                                                        <ToggleButton Grid.Column="2" Classes="grad-toggle" IsChecked="{Binding IsGradient}" IsVisible="{Binding SupportsGradient}"
+                                                                                      Content="◢ GRADIENT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Use a gradient instead of a solid colour" />
+                                                                        <TextBox Grid.Column="3" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
+                                                                                 Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
+                                                                                 ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
+                                                                        <Grid Grid.Column="4" ColumnDefinitions="*,38" IsVisible="{Binding SupportsOpacity}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                                              ToolTip.Tip="Opacity — lower values let the game show through">
+                                                                            <Slider Minimum="0" Maximum="1" Value="{Binding Opacity}" />
+                                                                            <TextBlock Grid.Column="1" Text="{Binding OpacityText}" VerticalAlignment="Center" TextAlignment="Right" FontSize="10.5" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" />
+                                                                        </Grid>
                                                                     </Grid>
-                                                                </Grid>
+
+                                                                    <!-- Gradient editor (only when GRAD is on) -->
+                                                                    <Border Classes="grad-panel" IsVisible="{Binding IsGradient}">
+                                                                        <StackPanel Spacing="10">
+                                                                            <Border Classes="grad-strip" Background="{Binding PreviewBrush}" />
+
+                                                                            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" RowDefinitions="22,Auto">
+                                                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="START" Margin="0" VerticalAlignment="Center" />
+                                                                                <ToggleButton Grid.Row="0" Grid.Column="1" Classes="mid-toggle" Content="+ MIDDLE" IsChecked="{Binding HasMid}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                                                          ToolTip.Tip="Add a third colour in the middle of the gradient" />
+                                                                                <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="END" Margin="12,0,0,0" VerticalAlignment="Center" />
+
+                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="0" Color="{Binding Color}" Margin="0,4,0,0" />
+                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="1" Color="{Binding MidColor}" IsEnabled="{Binding HasMid}" Margin="12,4,0,0" />
+                                                                                <views:HudColorPicker Grid.Row="1" Grid.Column="2" Color="{Binding EndColor}" Margin="12,4,0,0" />
+
+                                                                                <StackPanel Grid.Row="1" Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="0,4,0,0" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                                                    <Button Classes="hud" Content="⇄ SWAP" Command="{Binding SwapCommand}" ToolTip.Tip="Swap the START and END colours (flips the gradient)" />
+                                                                                    <Button Classes="hud" Content="✦ SOFT" Command="{Binding SoftFadeCommand}" ToolTip.Tip="Auto-pick a matching END colour: a gentle fade from the START colour" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                            <Grid ColumnDefinitions="Auto,*,44">
+                                                                                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                                                <Button Classes="dir" Content="→" Command="{Binding SetDirectionCommand}" CommandParameter="0" ToolTip.Tip="Left to right" />
+                                                                                <Button Classes="dir" Content="↘" Command="{Binding SetDirectionCommand}" CommandParameter="45" ToolTip.Tip="Top-left to bottom-right" />
+                                                                                <Button Classes="dir" Content="↓" Command="{Binding SetDirectionCommand}" CommandParameter="90" ToolTip.Tip="Top to bottom" />
+                                                                                <Button Classes="dir" Content="↙" Command="{Binding SetDirectionCommand}" CommandParameter="135" ToolTip.Tip="Top-right to bottom-left" />
+                                                                                <Button Classes="dir" Content="←" Command="{Binding SetDirectionCommand}" CommandParameter="180" ToolTip.Tip="Right to left" />
+                                                                                <Button Classes="dir" Content="↖" Command="{Binding SetDirectionCommand}" CommandParameter="225" ToolTip.Tip="Bottom-right to top-left" />
+                                                                                <Button Classes="dir" Content="↑" Command="{Binding SetDirectionCommand}" CommandParameter="270" ToolTip.Tip="Bottom to top" />
+                                                                                <Button Classes="dir" Content="↗" Command="{Binding SetDirectionCommand}" CommandParameter="315" ToolTip.Tip="Bottom-left to top-right" />
+                                                                                </StackPanel>
+                                                                                <Slider Grid.Column="1" Minimum="0" Maximum="359" Value="{Binding Angle}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
+                                                                                        ToolTip.Tip="Gradient direction" />
+                                                                                <TextBlock Grid.Column="2" Classes="value" Text="{Binding AngleText}" />
+                                                                            </Grid>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </StackPanel>
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>

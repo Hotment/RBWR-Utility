@@ -44,7 +44,7 @@ public static class ThemeXamlGenerator
         foreach (var def in TokenCatalog.Tokens.Where(t => t.MirrorColorKey != null))
         {
             var value = GetToken(state, def.Key);
-            sb.AppendLine($"        <Color x:Key=\"{def.MirrorColorKey}\">{ColorUtil.ToHex(value.Color)}</Color>");
+            sb.AppendLine($"        <Color x:Key=\"{def.MirrorColorKey}\">{ColorUtil.ToHex(value.Representative)}</Color>");
         }
         sb.AppendLine();
 
@@ -63,7 +63,21 @@ public static class ThemeXamlGenerator
                 continue;
             }
 
-            string opacity = value.Opacity < 0.999 ? $" Opacity=\"{Num(value.Opacity)}\"" : string.Empty;
+            double op = double.IsFinite(value.Opacity) ? Math.Clamp(value.Opacity, 0, 1) : 1;
+            string opacity = op < 0.999 ? $" Opacity=\"{Num(op)}\"" : string.Empty;
+
+            if (value.Gradient is { } g && def.SupportsGradient)
+            {
+                var (sx, sy, ex, ey) = g.Points();
+                sb.AppendLine($"        <LinearGradientBrush x:Key=\"{def.Key}\" StartPoint=\"{Num(sx)}%,{Num(sy)}%\" EndPoint=\"{Num(ex)}%,{Num(ey)}%\"{opacity}>");
+                sb.AppendLine($"            <GradientStop Offset=\"0\" Color=\"{ColorUtil.ToHex(value.Color)}\" />");
+                if (g.Mid is { } mid)
+                    sb.AppendLine($"            <GradientStop Offset=\"0.5\" Color=\"{ColorUtil.ToHex(mid)}\" />");
+                sb.AppendLine($"            <GradientStop Offset=\"1\" Color=\"{ColorUtil.ToHex(g.End)}\" />");
+                sb.AppendLine("        </LinearGradientBrush>");
+                continue;
+            }
+
             sb.AppendLine($"        <SolidColorBrush x:Key=\"{def.Key}\" Color=\"{ColorUtil.ToHex(value.Color)}\"{opacity} />");
         }
 
@@ -91,7 +105,7 @@ public static class ThemeXamlGenerator
             sb.AppendLine($"        <Setter Property=\"BorderThickness\" Value=\"{Num(s.ShellBorderThickness)}\" />");
             if (s.ShellGlow)
             {
-                var glow = GetToken(state, "CyberBorderGlow").Color;
+                var glow = GetToken(state, "CyberBorderGlow").Representative;
                 var glowColor = Avalonia.Media.Color.FromArgb(0x88, glow.R, glow.G, glow.B);
                 sb.AppendLine($"        <Setter Property=\"BoxShadow\" Value=\"0 0 {Num(s.ShellGlowBlur)} 0 {ColorUtil.ToHex(glowColor)}\" />");
             }

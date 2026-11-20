@@ -15,7 +15,11 @@ public sealed record TokenDefinition(
     string Label,
     string Hint,
     string? MirrorColorKey = null,
-    bool SupportsOpacity = false);
+    bool SupportsOpacity = false)
+{
+    /// <summary>Whether a gradient makes sense for this token (backgrounds, borders, accents; not body text).</summary>
+    public bool SupportsGradient => TokenCatalog.GradientKeys.Contains(Key);
+}
 
 public static class TokenCatalog
 {
@@ -84,6 +88,17 @@ public static class TokenCatalog
 
     public static readonly IReadOnlyDictionary<string, TokenDefinition> ByMirrorColorKey =
         Tokens.Where(t => t.MirrorColorKey != null).ToDictionary(t => t.MirrorColorKey!, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Tokens that may be gradients. Text colours stay solid so labels remain readable,
+    /// and slider states other than the filled value stay solid to keep the control crisp.
+    /// </summary>
+    public static readonly HashSet<string> GradientKeys = new(StringComparer.Ordinal)
+    {
+        "CyberMainBg", "CyberCardBg", "CyberHeaderBg", "DarkPanelBg", "CyberBorder", "CyberBorderGlow",
+        "NeonCyan", "NeonGreen", "NeonRed", "NeonGold", "NeonPurple",
+        "ControlHoverBg", "ControlActiveBg", "TooltipBg", "TooltipBorder", "SliderTrackValueFill",
+    };
 
     public const string FontKey = "AppFontFamily";
     public const string MonoFontKey = "AppMonoFontFamily";
