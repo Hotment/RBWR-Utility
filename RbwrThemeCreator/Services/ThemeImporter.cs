@@ -275,7 +275,7 @@ public static class ThemeImporter
     }
 
     /// <summary>
-    /// Reads a &lt;LinearGradientBrush&gt; with 2..6 stops (offsets are re-spread evenly). Anything more exotic is
+    /// Reads a &lt;LinearGradientBrush&gt; with 2..6 stops (custom offsets are kept). Anything more exotic is
     /// rejected and the caller falls back to a solid colour.
     /// </summary>
     private static bool TryParseGradient(XElement el, out TokenValue value)
@@ -300,7 +300,9 @@ public static class ThemeImporter
         angle = Math.Round(((angle % 360) + 360) % 360);
 
         double opacity = Math.Clamp(ColorUtil.ParseDouble((string?)el.Attribute("Opacity"), 1.0), 0, 1);
-        value = new TokenValue(stops[0].Color, opacity, new GradientSpec(stops.Skip(1).Select(st => st.Color).ToList(), angle));
+        var offsets = stops.Select(st => st.Offset).ToList();
+        value = new TokenValue(stops[0].Color, opacity, new GradientSpec(
+            stops.Skip(1).Select(st => st.Color).ToList(), angle, GradientSpec.IsEven(offsets) ? null : offsets));
         return true;
     }
 

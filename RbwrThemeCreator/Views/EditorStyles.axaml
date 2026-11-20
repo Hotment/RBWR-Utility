@@ -634,4 +634,9 @@
         <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
         <Setter Property="Cursor" Value="Hand" />
     </Style>
+    <Style Selector="Slider.stop-pos">
+        <Setter Property="Width" Value="62" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Margin" Value="0,-6,0,-8" />
+    </Style>
 </Styles>

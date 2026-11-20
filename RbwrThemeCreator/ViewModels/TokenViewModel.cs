@@ -22,13 +22,37 @@ public partial class GradientStopViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRemove;
 
-    public GradientStopViewModel(TokenViewModel owner, Color color)
+    /// <summary>Where this colour sits along the gradient, 0..100 %.</summary>
+    [ObservableProperty]
+    private double _position;
+
+    public string PositionText => $"{Math.Round(Position)}%";
+
+    internal bool Silent;
+
+    public GradientStopViewModel(TokenViewModel owner, Color color, double position)
     {
         _owner = owner;
         _color = color;
+        _position = position;
     }
 
     partial void OnColorChanged(Color value) => _owner.OnStopColorChanged(this);
+
+    partial void OnPositionChanged(double value)
+    {
+        OnPropertyChanged(nameof(PositionText));
+        if (!Silent)
+            _owner.OnStopPositionChanged(this);
+    }
+
+    /// <summary>Sets the position without notifying the owner (used while the owner rearranges stops).</summary>
+    internal void SetPositionSilently(double value)
+    {
+        Silent = true;
+        try { Position = value; }
+        finally { Silent = false; }
+    }
 
     [RelayCommand]
     private void Remove() => _owner.RemoveStop(this);
@@ -103,7 +127,11 @@ public partial class TokenViewModel : ObservableObject
         }
     }
 
-    private GradientSpec CurrentGradient() => new(Stops.Skip(1).Select(st => st.Color).ToList(), Angle);
+    private GradientSpec CurrentGradient()
+    {
+        var offsets = Stops.Select(st => st.Position / 100).ToList();
+        return new(Stops.Skip(1).Select(st => st.Color).ToList(), Angle, GradientSpec.IsEven(offsets) ? null : offsets);
+    }
 
     public TokenValue ToValue() => new(
         Color,
@@ -119,7 +147,8 @@ public partial class TokenViewModel : ObservableObject
             Opacity = double.IsFinite(value.Opacity) ? Math.Clamp(value.Opacity, 0, 1) : 1;
             if (value.Gradient is { } g && SupportsGradient)
             {
-                ReplaceStops([value.Color, .. g.SafeColors(value.Color)]);
+                var stops = g.Stops(value.Color);
+                ReplaceStops(stops.Select(st => st.Color), stops.Select(st => st.Offset * 100).ToList());
                 Angle = Math.Round(g.SafeAngle);
                 IsGradient = true;
             }
@@ -139,22 +168,58 @@ public partial class TokenViewModel : ObservableObject
 
     // ---------- Stop management ----------
 
-    private void ReplaceStops(IEnumerable<Color> colors)
+    private void ReplaceStops(IEnumerable<Color> colors, IReadOnlyList<double>? positions = null)
     {
         _syncingStops = true;
         try
         {
             Stops.Clear();
             foreach (var c in colors.Take(GradientSpec.MaxStops))
-                Stops.Add(new GradientStopViewModel(this, c));
+                Stops.Add(new GradientStopViewModel(this, c, 0));
             while (Stops.Count < 2)
-                Stops.Add(new GradientStopViewModel(this, DefaultEnd(Stops.Count > 0 ? Stops[^1].Color : Color)));
+                Stops.Add(new GradientStopViewModel(this, DefaultEnd(Stops.Count > 0 ? Stops[^1].Color : Color), 0));
+
+            if (positions != null && positions.Count == Stops.Count)
+                for (int i = 0; i < Stops.Count; i++)
+                    Stops[i].SetPositionSilently(Math.Clamp(double.IsFinite(positions[i]) ? positions[i] : 0, 0, 100));
+            else
+                SpreadEvenlySilently();
         }
         finally
         {
             _syncingStops = false;
         }
         RefreshStopInfo();
+    }
+
+    private void SpreadEvenlySilently()
+    {
+        var even = GradientSpec.EvenOffsets(Stops.Count);
+        for (int i = 0; i < Stops.Count; i++)
+            Stops[i].SetPositionSilently(Math.Round(even[i] * 100, 1));
+    }
+
+    private bool PositionsAreEven() => GradientSpec.IsEven(Stops.Select(st => st.Position / 100).ToList());
+
+    /// <summary>Keeps a moved stop between its neighbours so the colours can never cross over.</summary>
+    internal void OnStopPositionChanged(GradientStopViewModel stop)
+    {
+        int i = Stops.IndexOf(stop);
+        if (i < 0) return;
+        double min = i > 0 ? Stops[i - 1].Position : 0;
+        double max = i < Stops.Count - 1 ? Stops[i + 1].Position : 100;
+        double v = double.IsFinite(stop.Position) ? Math.Clamp(stop.Position, min, max) : min;
+        if (Math.Abs(v - stop.Position) > 1e-9)
+            stop.SetPositionSilently(v);
+        Changed();
+    }
+
+    /// <summary>Spreads all colours evenly again (0%, ..., 100%).</summary>
+    [RelayCommand]
+    private void SpreadEvenly()
+    {
+        SpreadEvenlySilently();
+        Changed();
     }
 
     private void RefreshStopInfo()
@@ -181,7 +246,9 @@ public partial class TokenViewModel : ObservableObject
     {
         if (Stops.Count <= 2 || !Stops.Contains(stop)) return;
         bool wasFirst = ReferenceEquals(Stops[0], stop);
+        bool wasEven = PositionsAreEven();
         Stops.Remove(stop);
+        if (wasEven) SpreadEvenlySilently();
         RefreshStopInfo();
         if (wasFirst)
             Color = Stops[0].Color;
@@ -196,10 +263,18 @@ public partial class TokenViewModel : ObservableObject
         if (!CanAddStop) return;
         var last = Stops.Count > 0 ? Stops[^1].Color : Color;
         var (h, s, l) = ColorUtil.ToHsl(last);
+        bool wasEven = PositionsAreEven();
         _syncingStops = true;
         try
         {
-            Stops.Add(new GradientStopViewModel(this, ColorUtil.FromHsl(h + 40, Math.Max(s, 0.35), Math.Clamp(l, 0.2, 0.7), last.A)));
+            var stop = new GradientStopViewModel(this, ColorUtil.FromHsl(h + 40, Math.Max(s, 0.35), Math.Clamp(l, 0.2, 0.7), last.A), 100);
+            if (!wasEven && Stops.Count >= 2 && Stops[^1].Position >= 100)
+            {
+                // Custom positions: make room at the end instead of resetting the user's layout.
+                Stops[^1].SetPositionSilently(Math.Round((Stops[^2].Position + 100) / 2, 1));
+            }
+            Stops.Add(stop);
+            if (wasEven) SpreadEvenlySilently();
         }
         finally
         {
@@ -221,10 +296,11 @@ public partial class TokenViewModel : ObservableObject
     private void Swap()
     {
         var reversed = Stops.Select(st => st.Color).Reverse().ToList();
+        var mirrored = Stops.Select(st => 100 - st.Position).Reverse().ToList();
         _loading = true;
         try
         {
-            ReplaceStops(reversed);
+            ReplaceStops(reversed, mirrored);
             Color = reversed[0];
         }
         finally

@@ -266,7 +266,10 @@
                                                                                                             <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
                                                                                                                     IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
                                                                                                         </Grid>
-                                                                                                        <views:HudColorPicker Color="{Binding Color}" />
+                                                                                                        <views:HudColorPicker Color="{Binding Color}" HorizontalAlignment="Center" />
+                                                                                                        <Slider Classes="stop-pos" Minimum="0" Maximum="100" Value="{Binding Position}" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                                                                                ToolTip.Tip="Where this colour sits along the gradient (0% = start, 100% = end)" />
+                                                                                                        <TextBlock Text="{Binding PositionText}" Classes="value" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" />
                                                                                                     </StackPanel>
                                                                                                 </Border>
                                                                                             </DataTemplate>
@@ -283,6 +286,7 @@
                                                                                 <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
                                                                                     <Button Classes="hud" Content="⇄ REVERSE" Command="{Binding SwapCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of all colours (flips the gradient)" />
                                                                                     <Button Classes="hud" Content="✦ SOFT" Command="{Binding SoftFadeCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reset to a gentle two-colour fade from the first colour" />
+                                                                                    <Button Classes="hud" Content="⇹ EVEN" Command="{Binding SpreadEvenlyCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Spread all colours evenly again (0% … 100%)" />
                                                                                 </StackPanel>
                                                                             </Grid>
 

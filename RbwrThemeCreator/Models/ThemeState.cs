@@ -17,7 +17,7 @@ public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec?
 /// stops (1..<see cref="MaxExtraStops"/>), spread evenly along the gradient.
 /// <see cref="Angle"/> is in degrees: 0 = left to right, 90 = top to bottom.
 /// </summary>
-public sealed record GradientSpec(IReadOnlyList<Color> Colors, double Angle)
+public sealed record GradientSpec(IReadOnlyList<Color> Colors, double Angle, IReadOnlyList<double>? Offsets = null)
 {
     /// <summary>Total stops allowed (start + extras). More than this rarely looks good and bloats the theme.</summary>
     public const int MaxStops = 6;
@@ -39,13 +39,44 @@ public sealed record GradientSpec(IReadOnlyList<Color> Colors, double Angle)
         return (R(50 - 50 * dx), R(50 - 50 * dy), R(50 + 50 * dx), R(50 + 50 * dy));
     }
 
-    /// <summary>All stops including the start colour, each with its evenly spaced offset.</summary>
+    /// <summary>
+    /// All stops including the start colour. Uses <see cref="Offsets"/> (0..1, one per stop including the start)
+    /// when present and valid, otherwise spreads the colours evenly. Offsets are always clamped to 0..1 and
+    /// forced into ascending order, so a bad value can never produce an invalid brush.
+    /// </summary>
     public IReadOnlyList<(double Offset, Color Color)> Stops(Color start)
     {
         var all = new List<Color> { start };
         all.AddRange(SafeColors(start));
-        int last = all.Count - 1;
-        return all.Select((c, i) => ((double)i / last, c)).ToList();
+        var offsets = SafeOffsets(all.Count) ?? EvenOffsets(all.Count);
+        return all.Select((c, i) => (offsets[i], c)).ToList();
+    }
+
+    public static double[] EvenOffsets(int count) =>
+        Enumerable.Range(0, count).Select(i => count <= 1 ? 0 : (double)i / (count - 1)).ToArray();
+
+    /// <summary>Sanitised custom offsets, or null when there are none / they do not match the stop count.</summary>
+    private double[]? SafeOffsets(int count)
+    {
+        if (Offsets == null || Offsets.Count != count)
+            return null;
+        var result = new double[count];
+        double floor = 0;
+        for (int i = 0; i < count; i++)
+        {
+            double v = double.IsFinite(Offsets[i]) ? Math.Clamp(Offsets[i], 0, 1) : (count <= 1 ? 0 : (double)i / (count - 1));
+            v = Math.Max(v, floor); // keep ascending
+            result[i] = Math.Round(v, 3);
+            floor = result[i];
+        }
+        return result;
+    }
+
+    /// <summary>True when the offsets are just the default even spread (so nothing custom needs saving).</summary>
+    public static bool IsEven(IReadOnlyList<double> offsets)
+    {
+        var even = EvenOffsets(offsets.Count);
+        return offsets.Select((o, i) => Math.Abs(o - even[i]) < 0.0015).All(x => x);
     }
 
     public static Color Average(Color start, GradientSpec g)
