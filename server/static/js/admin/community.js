@@ -14,6 +14,16 @@ window.Community = (() => {
     };
     const state = (on, text) => `<span class="badge ${on ? "s-fixed" : "neutral"}">${esc(text || (on ? "On" : "Off"))}</span>`;
     const offline = () => (st.bot_online ? "" : "disabled");
+    // [[category, channels], …] in the order Discord lists them
+    const groupByCategory = (channels) => {
+        const groups = new Map();
+        channels.forEach((ch) => {
+            const key = ch.category || "No category";
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(ch);
+        });
+        return [...groups];
+    };
 
     async function call(path, options, done) {
         try {
@@ -54,11 +64,16 @@ window.Community = (() => {
                     ${st.text_channels.length ? `
                     <input class="adm-input" id="cm-sb-ignored-search" type="search" placeholder="Find a channel" aria-label="Find a channel" style="margin:6px 0">
                     <div id="cm-sb-ignored" class="cm-checklist">
-                        ${st.text_channels.map((ch) => `
-                        <label class="adm-check cm-check" data-name="${esc(ch.name.toLowerCase())}" title="#${esc(ch.name)}${ch.category ? ` · ${esc(ch.category)}` : ""}">
-                            <input type="checkbox" value="${esc(ch.id)}" ${ignored.has(ch.id) ? "checked" : ""}>
-                            <span class="cm-check-name">#${esc(ch.name)}</span>${ch.category ? `<small>${esc(ch.category)}</small>` : ""}
-                        </label>`).join("")}
+                        ${groupByCategory(st.text_channels).map(([cat, chs]) => `
+                        <div class="cm-group" data-group>
+                            <div class="cm-group-head">${esc(cat)}</div>
+                            <div class="cm-group-items">${chs.map((ch) => `
+                                <label class="cm-check" data-name="${esc(ch.name.toLowerCase())}" title="#${esc(ch.name)}">
+                                    <input type="checkbox" value="${esc(ch.id)}" ${ignored.has(ch.id) ? "checked" : ""}>
+                                    <span class="cm-check-name">#${esc(ch.name)}</span>
+                                </label>`).join("")}
+                            </div>
+                        </div>`).join("")}
                     </div>` : `<p class="adm-hint">${ignored.size ? `${ignored.size} channel(s) ignored. ` : ""}The channel list needs the bot to be online.</p>`}
                 </div>
                 <p class="adm-hint">Custom server emoji work too: type it as <code>&lt;:name:id&gt;</code>.</p>
@@ -129,6 +144,7 @@ window.Community = (() => {
             if (e.target.id !== "cm-sb-ignored-search") return;
             const q = e.target.value.trim().toLowerCase();
             body.querySelectorAll("#cm-sb-ignored [data-name]").forEach((row) => { row.hidden = Boolean(q) && !row.dataset.name.includes(q); });
+            body.querySelectorAll("#cm-sb-ignored [data-group]").forEach((g) => { g.hidden = !g.querySelector("[data-name]:not([hidden])"); });
         });
         body.addEventListener("change", (e) => {
             if (e.target.closest("#cm-sb-ignored")) {
