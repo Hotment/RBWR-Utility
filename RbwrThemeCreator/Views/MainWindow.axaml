@@ -237,10 +237,13 @@
                                                                         <TextBox Grid.Column="3" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
                                                                                  Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
                                                                                  ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
-                                                                        <Grid Grid.Column="4" ColumnDefinitions="*,38" IsVisible="{Binding SupportsOpacity}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                                        <Grid Grid.Column="4" ColumnDefinitions="*,Auto" IsVisible="{Binding SupportsOpacity}" Margin="12,0,0,0" VerticalAlignment="Center"
                                                                               ToolTip.Tip="Opacity — lower values let the game show through">
                                                                             <Slider Minimum="0" Maximum="1" Value="{Binding Opacity}" />
-                                                                            <TextBlock Grid.Column="1" Text="{Binding OpacityText}" VerticalAlignment="Center" TextAlignment="Right" FontSize="10.5" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" />
+                                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                                                <TextBox Classes="num-input" Text="{Binding OpacityInput, UpdateSourceTrigger=LostFocus}" ToolTip.Tip="Type the opacity in % and press Enter" />
+                                                                                <TextBlock Classes="num-suffix" Text="%" />
+                                                                            </StackPanel>
                                                                         </Grid>
                                                                     </Grid>
 
@@ -267,9 +270,10 @@
                                                                                                                     IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
                                                                                                         </Grid>
                                                                                                         <views:HudColorPicker Color="{Binding Color}" HorizontalAlignment="Center" />
-                                                                                                        <Slider Classes="stop-pos" Minimum="0" Maximum="100" Value="{Binding Position}" TickFrequency="1" IsSnapToTickEnabled="True"
-                                                                                                                ToolTip.Tip="Where this colour sits along the gradient (0% = start, 100% = end)" />
-                                                                                                        <TextBlock Text="{Binding PositionText}" Classes="value" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" />
+                                                                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" ToolTip.Tip="Where this colour sits along the gradient: 0% = start, 100% = end. Type a number and press Enter.">
+                                                                                                            <TextBox Classes="num-input" Text="{Binding PositionInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                                            <TextBlock Classes="num-suffix" Text="%" />
+                                                                                                        </StackPanel>
                                                                                                     </StackPanel>
                                                                                                 </Border>
                                                                                             </DataTemplate>
@@ -290,7 +294,7 @@
                                                                                 </StackPanel>
                                                                             </Grid>
 
-                                                                            <Grid ColumnDefinitions="Auto,*,44">
+                                                                            <Grid ColumnDefinitions="Auto,*,Auto">
                                                                                 <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                                                                 <Button Classes="dir" Content="→" Command="{Binding SetDirectionCommand}" CommandParameter="0" ToolTip.Tip="Left to right" />
                                                                                 <Button Classes="dir" Content="↘" Command="{Binding SetDirectionCommand}" CommandParameter="45" ToolTip.Tip="Top-left to bottom-right" />
@@ -303,7 +307,10 @@
                                                                                 </StackPanel>
                                                                                 <Slider Grid.Column="1" Minimum="0" Maximum="359" Value="{Binding Angle}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
                                                                                         ToolTip.Tip="Gradient direction" />
-                                                                                <TextBlock Grid.Column="2" Classes="value" Text="{Binding AngleText}" />
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" ToolTip.Tip="Type the angle in degrees and press Enter">
+                                                                                    <TextBox Classes="num-input" Text="{Binding AngleInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                    <TextBlock Classes="num-suffix" Text="°" />
+                                                                                </StackPanel>
                                                                             </Grid>
                                                                         </StackPanel>
                                                                     </Border>

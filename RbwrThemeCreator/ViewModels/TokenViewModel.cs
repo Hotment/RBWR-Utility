@@ -28,6 +28,19 @@ public partial class GradientStopViewModel : ObservableObject
 
     public string PositionText => $"{Math.Round(Position)}%";
 
+    /// <summary>Typed position in %, e.g. "30" or "30%". Bad input is ignored and the box shows the real value again.</summary>
+    public string PositionInput
+    {
+        get => ColorUtil.FormatNumber(Position);
+        set
+        {
+            if (ColorUtil.TryParseUserNumber(value, out var v))
+                Position = Math.Clamp(v, 0, 100);
+            // Re-notify after the binding finished writing, so rejected text is replaced by the real value.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(PositionInput)));
+        }
+    }
+
     internal bool Silent;
 
     public GradientStopViewModel(TokenViewModel owner, Color color, double position)
@@ -42,6 +55,7 @@ public partial class GradientStopViewModel : ObservableObject
     partial void OnPositionChanged(double value)
     {
         OnPropertyChanged(nameof(PositionText));
+        OnPropertyChanged(nameof(PositionInput));
         if (!Silent)
             _owner.OnStopPositionChanged(this);
     }
@@ -106,6 +120,32 @@ public partial class TokenViewModel : ObservableObject
 
     public string OpacityText => $"{Math.Round(Opacity * 100)}%";
     public string AngleText => $"{Math.Round(Angle)}°";
+
+    /// <summary>Typed opacity in % (0..100).</summary>
+    public string OpacityInput
+    {
+        get => ColorUtil.FormatNumber(Opacity * 100);
+        set
+        {
+            if (ColorUtil.TryParseUserNumber(value, out var v))
+                Opacity = Math.Clamp(v, 0, 100) / 100;
+            // Re-notify after the binding finished writing, so rejected text is replaced by the real value.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(OpacityInput)));
+        }
+    }
+
+    /// <summary>Typed gradient angle in degrees; any number is wrapped into 0..359.</summary>
+    public string AngleInput
+    {
+        get => ColorUtil.FormatNumber(Angle);
+        set
+        {
+            if (ColorUtil.TryParseUserNumber(value, out var v))
+                Angle = v;
+            // Re-notify after the binding finished writing, so rejected text is replaced by the real value.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(AngleInput)));
+        }
+    }
 
     /// <summary>The brush exactly as the theme will draw it (solid or gradient), for the editor preview strip.</summary>
     public IBrush PreviewBrush
@@ -357,6 +397,7 @@ public partial class TokenViewModel : ObservableObject
             return;
         }
         OnPropertyChanged(nameof(OpacityText));
+        OnPropertyChanged(nameof(OpacityInput));
         Changed();
     }
 
@@ -379,6 +420,7 @@ public partial class TokenViewModel : ObservableObject
             return;
         }
         OnPropertyChanged(nameof(AngleText));
+        OnPropertyChanged(nameof(AngleInput));
         Changed();
     }
 

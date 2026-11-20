@@ -48,6 +48,27 @@ public partial class MainWindow : Window, IDialogHost
         Viewport.PointerMoved += OnViewportPointerMoved;
         Viewport.PointerReleased += OnViewportPointerReleased;
         Opened += (_, _) => ApplyCornerPreference();
+        // Enter in a number box commits the value (the bindings update on focus loss).
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key is Key.Enter && (e.Source as Visual)?.FindAncestorOfType<TextBox>(includeSelf: true) is { } tb
+                && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+            {
+                var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
+                expr?.UpdateSource();
+                // Show the value that was actually applied (rejected or clamped input snaps back).
+                Dispatcher.UIThread.Post(() => { expr?.UpdateTarget(); tb.SelectAll(); }, DispatcherPriority.Background);
+                e.Handled = true;
+            }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        AddHandler(LostFocusEvent, (_, e) =>
+        {
+            if (e.Source is TextBox tb && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+            {
+                var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
+                Dispatcher.UIThread.Post(() => expr?.UpdateTarget(), DispatcherPriority.Background);
+            }
+        }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     private void AttachViewModel(MainViewModel? vm)

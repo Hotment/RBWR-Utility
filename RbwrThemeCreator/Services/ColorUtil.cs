@@ -25,6 +25,21 @@ public static class ColorUtil
         return Color.TryParse(t, out color);
     }
 
+    /// <summary>
+    /// Parses a number the user typed: accepts "30", "30%", "30,5", " 120° ". Returns false for anything else
+    /// (and for NaN/infinity), so callers can simply ignore bad input.
+    /// </summary>
+    public static bool TryParseUserNumber(string? text, out double value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        string t = text.Trim().TrimEnd('%', '°').Trim().Replace(',', '.');
+        return double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
+    }
+
+    public static string FormatNumber(double value) =>
+        Math.Round(value, 1).ToString("0.#", CultureInfo.InvariantCulture);
+
     public static double ParseDouble(string? text, double fallback) =>
         double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : fallback;
 

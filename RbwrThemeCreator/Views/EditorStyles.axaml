@@ -639,4 +639,26 @@
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="Margin" Value="0,-6,0,-8" />
     </Style>
+    <Style Selector="TextBox.num-input">
+        <Setter Property="Width" Value="42" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="CornerRadius" Value="5" />
+    </Style>
+    <Style Selector="TextBlock.num-suffix">
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="3,0,0,0" />
+    </Style>
 </Styles>
