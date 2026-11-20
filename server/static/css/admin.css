@@ -1512,19 +1512,103 @@ button.eb-item.active {
     }
 }
 
+#cm-body .card {
+    min-width: 0;
+}
+
+/* ignored channels: grouped by category, each group a grid of one-line checkboxes */
 .cm-checklist {
-    max-height: 220px;
+    max-height: 300px;
     overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 2px 12px;
-    padding: 8px 10px;
+    padding: 0 10px 10px;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 8px;
 }
 
 .cm-checklist [hidden] {
     display: none;
+}
+
+.cm-group-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 10px 2px 6px;
+    background: var(--card-bg);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+
+.cm-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+    gap: 2px 8px;
+}
+
+.cm-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cm-check:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.cm-check:has(input:checked) {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.cm-check input {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent-gold);
+}
+
+.cm-check-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* server stats counters: the 4-column table becomes stacked rows on a phone */
+@media (max-width: 640px) {
+    #cm-body .card {
+        padding: 18px 16px;
+    }
+    .cm-counters thead {
+        display: none;
+    }
+    .cm-counters tr {
+        display: block;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .cm-counters tr:last-child {
+        border-bottom: 0;
+    }
+    .cm-counters td {
+        display: block;
+        padding: 4px 0;
+        border: 0;
+    }
+    .cm-counters tr:hover td {
+        background: none;
+    }
 }
 
 /* ---------- overview tiles ---------- */
