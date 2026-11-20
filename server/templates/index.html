@@ -165,7 +165,7 @@
                     class="text-sm text-gray-400 bg-black/20 p-4 rounded-xl border border-white/5 leading-relaxed font-mono flex flex-col min-w-0">
                     <strong class="text-gray-200 block mb-2 shrink-0">Release Changelog:</strong>
                     <div class="max-h-64 sm:max-h-80 overflow-y-auto pr-2 break-words">
-                        <span class="block whitespace-pre-wrap text-xs sm:text-sm leading-relaxed">{{- release_notes -}}</span>
+                        <div class="text-xs sm:text-sm leading-relaxed">{{ release_notes | release_md }}</div>
                     </div>
                 </div>
             </div>

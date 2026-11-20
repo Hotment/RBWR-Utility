@@ -8,6 +8,7 @@ import gzip
 import traceback
 import re
 from werkzeug.exceptions import HTTPException
+from markupsafe import Markup, escape
 orjson = None
 try:
     import orjson
@@ -295,6 +296,43 @@ def hex_to_int_filter(val, default=3900150):
         return int(s, 16)
     except Exception:
         return default
+
+_RN_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+_RN_LIST = re.compile(r"^(\s*)[-*+]\s+(.*)$")
+_RN_HEADING_CLASSES = {
+    1: "text-base sm:text-lg font-semibold text-gray-100 mt-1 mb-2",
+    2: "text-sm sm:text-base font-semibold text-blue-300 mt-4 mb-1",
+    3: "text-xs sm:text-sm font-semibold text-gray-200 mt-3 mb-1",
+}
+
+def _rn_inline(escaped: str) -> str:
+    escaped = re.sub(r"`([^`]+)`", r'<code class="text-blue-300">\1</code>', escaped)
+    return re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", r'<strong class="text-gray-200">\1</strong>', escaped)
+
+@app.template_filter("release_md")
+def release_md_filter(text):
+    """A small, safe subset of Markdown for the GitHub release notes: # headings,
+    **bold**, `code`, --- rules and - lists. Everything is HTML-escaped first."""
+    out = []
+    blank = False
+    for raw in str(text or "").replace("\r\n", "\n").split("\n"):
+        line = str(escape(raw.rstrip()))
+        if not line.strip():
+            blank = bool(out)
+            continue
+        gap = " mt-2" if blank else ""
+        blank = False
+        if re.fullmatch(r"\s*([-*_])(\s*\1){2,}\s*", raw):
+            out.append('<hr class="border-white/10 my-3">')
+        elif m := _RN_HEADING.match(line):
+            level = min(len(m.group(1)), 3)
+            out.append(f'<div class="{_RN_HEADING_CLASSES[level]}">{_rn_inline(m.group(2))}</div>')
+        elif m := _RN_LIST.match(line):
+            indent = "pl-4" if m.group(1) else ""
+            out.append(f'<div class="flex gap-2 {indent}{gap}"><span class="text-gray-600">•</span><span>{_rn_inline(m.group(2))}</span></div>')
+        else:
+            out.append(f'<p class="mt-2">{_rn_inline(line)}</p>' if gap else f'<p>{_rn_inline(line)}</p>')
+    return Markup("\n".join(out))
 
 @app.template_filter("fmt_score")
 def fmt_score_filter(val):
