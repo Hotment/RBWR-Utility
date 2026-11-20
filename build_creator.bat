@@ -37,9 +37,15 @@ set "ICON_ICO=RbwrThemeCreator\Assets\icon.ico"
 set "ICON_PNG=RbwrThemeCreator\Assets\icon.png"
 set "OUT_ROOT=publish\creator"
 
-REM Version comes from <Version> in RbwrThemeCreator.csproj
+REM Version comes from MainViewModel.AppVersion (single source of truth)
 set "APP_VER=1.0.0"
-for /f "tokens=3 delims=<>" %%A in ('findstr /i /c:"<Version>" "%PROJECT_PATH%"') do set "APP_VER=%%A"
+for /f "tokens=2 delims==" %%A in ('findstr /c:"public const string AppVersion" "RbwrThemeCreator\ViewModels\MainViewModel.cs"') do (
+    set "RAW_VER=%%A"
+    set "RAW_VER=!RAW_VER:"=!"
+    set "RAW_VER=!RAW_VER:;=!"
+    set "RAW_VER=!RAW_VER: =!"
+    if not "!RAW_VER!"=="" set "APP_VER=!RAW_VER!"
+)
 
 for /f "tokens=1 delims=-" %%A in ("!APP_VER!") do set "SEM_BASE=%%A"
 for /f "tokens=1,2,3,4 delims=." %%A in ("!SEM_BASE!") do (

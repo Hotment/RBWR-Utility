@@ -1,0 +1,47 @@
+name: Test RBWR Theme Creator (.NET Multi-Platform)
+
+on:
+  push:
+    paths:
+      - 'RbwrThemeCreator/**'
+      - 'RbwrThemeCreator.Tests/**'
+      - 'RbwrOverlay/RbwrOverlay.Core/**'
+      - 'RbwrOverlay/RbwrOverlay.UI/Styles/**'
+      - '.github/workflows/theme-creator-test.yml'
+  pull_request:
+    paths:
+      - 'RbwrThemeCreator/**'
+      - 'RbwrThemeCreator.Tests/**'
+      - 'RbwrOverlay/RbwrOverlay.Core/**'
+      - 'RbwrOverlay/RbwrOverlay.UI/Styles/**'
+      - '.github/workflows/theme-creator-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-15]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj
+
+      - name: Build Theme Creator & Tests
+        run: dotnet build RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test RbwrThemeCreator.Tests/RbwrThemeCreator.Tests.csproj -c Release --no-build --verbosity normal
