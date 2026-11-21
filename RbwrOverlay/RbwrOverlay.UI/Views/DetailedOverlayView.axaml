@@ -624,10 +624,33 @@
                                     <TextBlock Grid.Column="0" Text="Demand Change Notification:" VerticalAlignment="Center" FontSize="11" />
                                     <Button Grid.Column="1" Classes="cyber" Content="{Binding DemandNotifyStatusText}" Foreground="{Binding DemandNotifyStatusBrush}" Command="{Binding ToggleDemandNotifySettingCommand}" Padding="10,3" />
                                 </Grid>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="Notify Before Change (s):" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextMuted}" />
-                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandNotifySecondsInput}" Width="45" Padding="2,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBlock Grid.Column="0" Text="Add Trigger Time (s):" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextMuted}" />
+                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandNotifyNewTimeInput}" PlaceholderText="300" Width="52" Padding="2,0" Margin="0,0,4,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="2" Classes="cyber" Content="Add" Command="{Binding AddDemandNotifyTimeCommand}" Padding="8,2" FontSize="10" />
                                 </Grid>
+                                <ItemsControl ItemsSource="{Binding DemandNotifyTriggerTimes}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:Int32">
+                                            <Button Classes="cyber"
+                                                    Content="{Binding StringFormat='{}{0}s  X'}"
+                                                    Command="{Binding $parent[UserControl].((vm:MainOverlayViewModel)DataContext).RemoveDemandNotifyTimeCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="7,2"
+                                                    Margin="0,0,4,4"
+                                                    FontSize="9.5" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="No trigger times configured."
+                                           IsVisible="{Binding !HasDemandNotifyTriggerTimes}"
+                                           FontSize="9.5"
+                                           Foreground="{DynamicResource TextMuted}" />
                             </StackPanel>
                         </Border>
 

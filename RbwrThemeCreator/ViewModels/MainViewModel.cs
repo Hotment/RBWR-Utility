@@ -307,14 +307,10 @@ public partial class MainViewModel : ObservableObject
         foreach (var def in TokenCatalog.Tokens)
         {
             var vm = new TokenViewModel(def, BuiltInThemes.Cyberpunk.Tokens.GetValueOrDefault(def.Key) ?? new TokenValue(Colors.Gray));
-            vm.ValueChanged += (_, _) => OnEdited();
-            vm.CanAnimate = () => IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay);
-            vm.AnimationRefused = () =>
+            vm.ValueChanged += (_, _) =>
             {
-                SetStatus($"ANIMATED needs Min. overlay {AnimatedColoursMinOverlay} or newer (THEME tab).", isError: true);
-                RequestWarningToast?.Invoke("ANIMATED IS LOCKED",
-                    $"Animated colours only work on overlay {AnimatedColoursMinOverlay} or newer (older overlays can crash). "
-                    + $"Set Min. overlay to {AnimatedColoursMinOverlay} or higher in the THEME tab first.");
+                EnsureMinOverlayForAnimations();
+                OnEdited();
             };
             _tokens[def.Key] = vm;
         }

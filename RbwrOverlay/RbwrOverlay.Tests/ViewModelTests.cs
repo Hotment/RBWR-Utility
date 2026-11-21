@@ -863,15 +863,21 @@ public class ViewModelTests
     }
 
     [Fact]
-    public void TestDemandChangeNotification_Default300sAndTriggerLogic()
+    public void TestDemandChangeNotification_Default300sAndMultipleTriggerTimes()
     {
         var settings = new AppSettings();
         Assert.True(settings.EnableDemandChangeNotification);
-        Assert.Equal(300, settings.DemandChangeNotificationSeconds);
+        Assert.Equal([300], settings.DemandChangeNotificationTimes);
 
         var vm = CreateTestVm(new DummySettingsService(settings));
-        Assert.Equal("300", vm.DemandNotifySecondsInput);
+        Assert.Equal([300], vm.DemandNotifyTriggerTimes.ToArray());
         Assert.Equal("ENABLED", vm.DemandNotifyStatusText);
+
+        // Add a second trigger time (120s) -> sorted descending [300, 120]
+        vm.DemandNotifyNewTimeInput = "120";
+        vm.AddDemandNotifyTime();
+        Assert.Equal([300, 120], vm.DemandNotifyTriggerTimes.ToArray());
+        Assert.Equal([300, 120], settings.DemandChangeNotificationTimes);
 
         var notifications = new List<(string Title, string Message)>();
         vm.RequestShowMessage += (title, msg, _) => notifications.Add((title, msg));
@@ -885,7 +891,7 @@ public class ViewModelTests
         });
         Assert.Empty(notifications);
 
-        // 2. DTL drops to <= 300s -> fires exactly once
+        // 2. DTL drops to <= 300s -> fires once for 300s trigger
         vm.OnServerConnected(new ServerInfo
         {
             JobId = "job-notify-1",
@@ -896,21 +902,47 @@ public class ViewModelTests
         Assert.Equal("UPCOMING DEMAND CHANGE", notifications[0].Title);
         Assert.Contains("1100 MWe", notifications[0].Message);
 
-        // 3. Subsequent poll in same window -> does NOT double-fire
+        // 3. Subsequent poll at 200s -> does NOT double-fire
         vm.OnServerConnected(new ServerInfo
         {
             JobId = "job-notify-1",
             HeartbeatTimestamp = DateTimeOffset.UtcNow,
-            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 280 }
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 200 }
         });
         Assert.Single(notifications);
 
-        // 4. Disable notification + change threshold -> persists and suppresses future alerts
+        // 4. DTL drops to <= 120s -> fires a second time for the 120s trigger
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-1",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 118 }
+        });
+        Assert.Equal(2, notifications.Count);
+
+        // 5. DTL drops to <= 60s (unconfigured!) -> does NOT fire a third notification
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-1",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 55 }
+        });
+        Assert.Equal(2, notifications.Count);
+
+        // 5b. Joining/syncing a new server already at 60s with only 300s configured -> must NOT fire 300s notification
+        vm.RemoveDemandNotifyTime(120);
+        Assert.Equal([300], vm.DemandNotifyTriggerTimes.ToArray());
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-2",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 800, NextDemand = 1000, DemandTimeLeft = 60 }
+        });
+        Assert.Equal(2, notifications.Count);
+
+        // 6. Disable notification -> persists cleanly
         vm.ToggleDemandNotifySetting();
         Assert.False(settings.EnableDemandChangeNotification);
         Assert.Equal("DISABLED", vm.DemandNotifyStatusText);
-
-        vm.DemandNotifySecondsInput = "120";
-        Assert.Equal(120, settings.DemandChangeNotificationSeconds);
     }
 }

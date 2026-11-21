@@ -261,7 +261,7 @@ public static class TooltipCatalog
         ),
         ["DemandNotifyConfig"] = new(
             Title: "DEMAND CHANGE NOTIFICATION",
-            Description: "Alerts you with a popup and chime when Demand Time Left (DTL) reaches the configured number of seconds before the next demand change (default 300s)."
+            Description: "Alerts you with a popup and chime at each configured trigger time (in seconds before the next demand change, default 300s). Add multiple times or click a chip to remove it."
         ),
         ["TurbineAlarmConfig"] = new(
             Title: "TURBINE HEALTH ALARM",

@@ -361,8 +361,8 @@
                                                                                 <TabStrip Classes="seg mini" SelectedIndex="{Binding FillMode}">
                                                                                     <TabStripItem Content="SOLID" ToolTip.Tip="One plain colour" />
                                                                                     <TabStripItem Content="GRADIENT" ToolTip.Tip="Two to six colours blending into each other" />
-                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}" Classes.locked="{Binding !AnimationAllowed}"
-                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay. Needs Min. overlay 2.3.1 or newer (THEME tab)." />
+                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}"
+                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay. Automatically raises Min. overlay to 2.3.1 if needed." />
                                                                                 </TabStrip>
                                                                             </Border>
                                                                             <!-- Folded: the gradient / animation stays visible as a thin strip -->

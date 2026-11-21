@@ -183,6 +183,12 @@ public partial class TokenViewModel : ObservableObject
         set
         {
             if (value == FillMode) return;
+            if (value == 2 && !_loading && (!SupportsAnimation || !AnimationAllowed))
+            {
+                if (!AnimationAllowed) AnimationRefused?.Invoke();
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(FillMode)));
+                return;
+            }
             IsGradient = value == 1;
             IsAnimated = value == 2;
             OnPropertyChanged();

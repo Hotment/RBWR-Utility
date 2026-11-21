@@ -622,7 +622,7 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
-    public void Animated_IsLockedBelowMinOverlay231_AndMinOverlayCantGoLowerWhileAnimated()
+    public void Animated_AutoRaisesMinOverlayTo231_AndMinOverlayCantGoLowerWhileAnimated()
     {
         Assert.True(MainViewModel.IsVersionAtLeast("2.3.1", "2.3.1"));
         Assert.True(MainViewModel.IsVersionAtLeast("v2.4.0-dev", "2.3.1"));
@@ -634,19 +634,13 @@ public class ThemeCreatorTests : IDisposable
         vm.RequestWarningToast += (title, _) => toasts.Add(title);
         var card = vm.Groups.SelectMany(g => g.Tokens).First(t => t.Key == "CyberCardBg");
 
-        // Min. overlay 2.3.0: ANIMATED is locked and refused with a warning.
+        // Min. overlay 2.3.0: choosing ANIMATED succeeds and auto-raises Min. overlay to 2.3.1 with a notice.
         vm.MinAppVersion = "2.3.0";
-        Assert.False(card.AnimationAllowed);
-        card.FillMode = 2;
-        Assert.False(card.IsAnimated);
-        Assert.Contains("ANIMATED IS LOCKED", toasts);
-        Assert.Equal("2.3.0", vm.MinAppVersion); // nothing is changed behind the user's back
-
-        // Raised to 2.3.1: ANIMATED can be chosen.
-        vm.MinAppVersion = "2.3.1";
         Assert.True(card.AnimationAllowed);
         card.FillMode = 2;
         Assert.True(card.IsAnimated);
+        Assert.Equal("2.3.1", vm.MinAppVersion);
+        Assert.Contains("MIN. OVERLAY RAISED", toasts);
         vm.Refresh();
         Assert.True(vm.HasAnimatedColours);
 
