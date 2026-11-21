@@ -63,14 +63,17 @@ public static class BuiltInThemes
     </Style>
     <Style Selector="Button.cyber-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
     </Style>
     <Style Selector="Button.cyber-nav.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
     </Style>
     <Style Selector="Button.cyber-nav:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlPressedBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
     </Style>
     <Style Selector="Button.cyber-blue:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
