@@ -107,6 +107,49 @@ public static class ThemeCardResources
         }
     }
 
+    /// <summary>
+    /// The animation styles of a theme (the Theme Creator's "token animations" section of theme.axaml),
+    /// as a &lt;Styles&gt; document, or null. Attached to the inside of the theme's card so its buttons,
+    /// badges and frames animate exactly like the overlay does with that theme.
+    /// </summary>
+    public static string? GetAnimationStylesXaml(InstalledThemeInfo info)
+    {
+        if (info.IsBuiltIn || string.IsNullOrWhiteSpace(info.EntryFilePath))
+            return null;
+        try
+        {
+            var file = new FileInfo(info.EntryFilePath);
+            if (!file.Exists || file.Length > MaxXamlBytes)
+                return null;
+            string text = File.ReadAllText(file.FullName);
+            const string begin = "<!-- @creator:token-animations-begin -->";
+            const string end = "<!-- @creator:token-animations-end -->";
+            int b = text.IndexOf(begin, StringComparison.Ordinal);
+            int e = b < 0 ? -1 : text.IndexOf(end, b, StringComparison.Ordinal);
+            if (b < 0 || e < 0) return null;
+            string inner = text.Substring(b + begin.Length, e - b - begin.Length);
+            if (!inner.Contains("<Style", StringComparison.Ordinal)) return null;
+            // Inside its own card the theme's animations must apply, so the ":not(.theme-card)" the
+            // Theme Creator adds (to keep the active theme off other cards) is removed here.
+            inner = inner.Replace(":not(.theme-card)", string.Empty, StringComparison.Ordinal);
+            string xaml = "<Styles xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">"
+                          + inner + "</Styles>";
+            // Same safety rules as a full theme (no clr-namespace, x:Class, includes).
+            return ThemeService.PrepareThemeXaml(xaml, info.DirectoryPath);
+        }
+        catch
+        {
+            return null; // the card simply does not animate inside
+        }
+    }
+
+    /// <summary>The animation for a thumbnail's frame: the window outline, else the main background, else any.</summary>
+    public static CardAnimation? GetThumbnailAnimation(InstalledThemeInfo info)
+    {
+        var map = GetAnimations(info);
+        return map.GetValueOrDefault("CyberBorderGlow") ?? map.GetValueOrDefault("CyberMainBg") ?? map.Values.FirstOrDefault();
+    }
+
     private static IReadOnlyDictionary<object, object?>? Build(InstalledThemeInfo info)
     {
         _base ??= Collect(Load(CyberpunkUri), null);

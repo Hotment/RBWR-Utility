@@ -57,6 +57,12 @@ public partial class ThemeEntryViewModel : ObservableObject
     public CardAnimation? CardBackgroundAnimation { get; }
     public CardAnimation? CardBorderAnimation { get; }
 
+    /// <summary>The theme's animation styles, applied to the inside of the card (buttons, badges, frames).</summary>
+    public string? CardAnimationStyles { get; }
+
+    /// <summary>The animation the thumbnail's frame plays (null = still frame).</summary>
+    public CardAnimation? ThumbnailAnimation { get; }
+
     public ThemeEntryViewModel(InstalledThemeInfo info, bool isActive, bool isExpanded, ThemeSelectorViewModel owner)
     {
         Info = info;
@@ -69,6 +75,8 @@ public partial class ThemeEntryViewModel : ObservableObject
         var animations = ThemeCardResources.GetAnimations(info);
         CardBackgroundAnimation = animations.GetValueOrDefault("CyberMainBg");
         CardBorderAnimation = animations.GetValueOrDefault("CyberBorderGlow");
+        CardAnimationStyles = ThemeCardResources.GetAnimationStylesXaml(info);
+        ThumbnailAnimation = ThemeCardResources.GetThumbnailAnimation(info);
     }
 
     partial void OnIsExpandedChanged(bool value)

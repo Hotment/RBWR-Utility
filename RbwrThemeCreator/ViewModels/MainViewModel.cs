@@ -147,8 +147,16 @@ public partial class MainViewModel : ObservableObject
     public IBrush CardGoldBrush => TokenBrush("NeonGold");
     public IBrush CardAccentBrush => TokenBrush("NeonCyan");
 
+    /// <summary>Animations played on the THEME tab card and the thumbnails, like the overlay shows them.</summary>
+    public TokenAnimation? CardBackgroundAnimationPreview => _tokens["CyberMainBg"].AnimPreview;
+    public TokenAnimation? CardBorderAnimationPreview => _tokens["CyberBorderGlow"].AnimPreview;
+    public TokenAnimation? ThumbAnimationPreview =>
+        _tokens["CyberBorderGlow"].AnimPreview ?? _tokens["CyberMainBg"].AnimPreview
+        ?? _tokens.Values.Select(t => t.AnimPreview).FirstOrDefault(a => a != null);
+
     private static readonly string[] CardBrushProperties =
     [
+        nameof(CardBackgroundAnimationPreview), nameof(CardBorderAnimationPreview), nameof(ThumbAnimationPreview),
         nameof(CardWindowBrush), nameof(CardBackgroundBrush), nameof(CardBorderBrush), nameof(CardGlowBrush), nameof(CardPanelBrush),
         nameof(CardTextBrush), nameof(CardMutedBrush), nameof(CardGoldBrush), nameof(CardAccentBrush),
     ];

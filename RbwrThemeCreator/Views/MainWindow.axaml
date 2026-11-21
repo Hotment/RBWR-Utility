@@ -170,10 +170,14 @@
                                     <Border Background="#0b0e14" CornerRadius="10" Padding="12">
                                         <!-- Card fill = the theme's main background (gradients included), like the overlay. -->
                                         <Border Background="{Binding CardWindowBrush}" BorderBrush="{Binding CardGlowBrush}"
+                                                views:AnimationStrip.Animation="{Binding CardBackgroundAnimationPreview}"
+                                                views:AnimationStrip.BorderAnimation="{Binding CardBorderAnimationPreview}"
                                                 BorderThickness="1" CornerRadius="4" Padding="11,9">
                                             <StackPanel Spacing="8">
                                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                                     <Border Width="56" Height="54" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True" VerticalAlignment="Center"
+                                                            BorderThickness="1.5" BorderBrush="Transparent"
+                                                            views:AnimationStrip.BorderAnimation="{Binding ThumbAnimationPreview}"
                                                             ToolTip.Tip="The thumbnail (preview.png) is the MONITOR view of your theme">
                                                         <Image x:Name="ThemeCardThumb" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
                                                     </Border>

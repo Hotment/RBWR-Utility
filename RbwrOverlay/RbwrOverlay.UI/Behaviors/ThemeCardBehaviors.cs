@@ -34,10 +34,45 @@ public static class ThemeCardBehaviors
     private static readonly AttachedProperty<CancellationTokenSource?> RunningBorderProperty =
         AvaloniaProperty.RegisterAttached<Border, CancellationTokenSource?>("RunningBorder", typeof(ThemeCardBehaviors));
 
+    /// <summary>
+    /// A theme's animation styles (XAML &lt;Styles&gt;) applied to this element and everything inside it, so the
+    /// inside of a theme card animates like the overlay with that theme.
+    /// </summary>
+    public static readonly AttachedProperty<string?> AnimationStylesProperty =
+        AvaloniaProperty.RegisterAttached<StyledElement, string?>("AnimationStyles", typeof(ThemeCardBehaviors));
+
+    private static readonly AttachedProperty<IStyle?> AddedStylesProperty =
+        AvaloniaProperty.RegisterAttached<StyledElement, IStyle?>("AddedStyles", typeof(ThemeCardBehaviors));
+
+    public static string? GetAnimationStyles(StyledElement e) => e.GetValue(AnimationStylesProperty);
+    public static void SetAnimationStyles(StyledElement e, string? value) => e.SetValue(AnimationStylesProperty, value);
+
+    private static void ApplyAnimationStyles(StyledElement element, string? xaml)
+    {
+        if (element.GetValue(AddedStylesProperty) is { } old)
+        {
+            element.Styles.Remove(old);
+            element.SetValue(AddedStylesProperty, null);
+        }
+        if (string.IsNullOrWhiteSpace(xaml)) return;
+        try
+        {
+            // A fresh copy per card: a style collection can only belong to one element.
+            var styles = Avalonia.Markup.Xaml.AvaloniaRuntimeXamlLoader.Parse<Styles>(xaml);
+            element.Styles.Add(styles);
+            element.SetValue(AddedStylesProperty, styles);
+        }
+        catch
+        {
+            // the card just does not animate inside
+        }
+    }
+
     private static readonly ResourceDictionary MarkerKey = new();
 
     static ThemeCardBehaviors()
     {
+        AnimationStylesProperty.Changed.AddClassHandler<StyledElement>((e, args) => ApplyAnimationStyles(e, args.NewValue as string));
         ResourcesProperty.Changed.AddClassHandler<StyledElement>((element, e) => Apply(element, e.NewValue as IReadOnlyDictionary<object, object?>));
         BackgroundAnimationProperty.Changed.AddClassHandler<Border>((b, e) =>
             Run(b, Border.BackgroundProperty, e.NewValue as CardAnimation, RunningBackgroundProperty));

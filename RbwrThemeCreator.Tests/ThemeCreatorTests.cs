@@ -574,7 +574,7 @@ public class ThemeCreatorTests : IDisposable
 
         // Every style where the overlay uses the colour gets an animation.
         foreach (var usage in TokenUsages.For("CyberCardBg").Concat(TokenUsages.For("NeonCyan")))
-            Assert.Contains($"<Style Selector=\"{System.Security.SecurityElement.Escape(usage.Selector)}\">", xaml);
+            Assert.Contains($"<Style Selector=\"{System.Security.SecurityElement.Escape(ThemeXamlGenerator.SkipThemeCards(usage.Selector))}\">", xaml);
         Assert.True(TokenUsages.For("CyberCardBg").Count >= 5);
 
         // Flow: a gradient whose colours shift one place per frame (n + 1 frames, last = first).
@@ -936,5 +936,13 @@ public class ThemeCreatorTests : IDisposable
         Assert.Equal("1.5.0", shown.Version);
         Assert.Equal(string.Empty, fake.LastSkippedVersion);
         Assert.Contains("1.5.0", vm.UpdateStatusText);
+    }
+
+    [Fact]
+    public void SkipThemeCards_AddsExclusionToEveryPart()
+    {
+        Assert.Equal("Border.hud-card:not(.theme-card)", ThemeXamlGenerator.SkipThemeCards("Border.hud-card"));
+        Assert.Equal("Button.cyber:not(.theme-card) /template/ ContentPresenter, Button.cyber-red:not(.theme-card)",
+            ThemeXamlGenerator.SkipThemeCards("Button.cyber /template/ ContentPresenter,Button.cyber-red"));
     }
 }

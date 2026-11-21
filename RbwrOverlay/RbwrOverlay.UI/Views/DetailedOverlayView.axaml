@@ -496,6 +496,9 @@
                                                         Margin="0,0,9,0"
                                                         CornerRadius="3"
                                                         ClipToBounds="True"
+                                                        BorderThickness="1.5"
+                                                        BorderBrush="Transparent"
+                                                        behaviors:ThemeCardBehaviors.BorderAnimation="{Binding Converter={x:Static conv:ThemeInfoConverters.ThumbnailAnimation}}"
                                                         VerticalAlignment="Center"
                                                         IsVisible="{Binding Converter={x:Static conv:ThemeInfoConverters.HasThumbnail}}">
                                                     <Image Source="{Binding Converter={x:Static conv:ThemeInfoConverters.Thumbnail}}"

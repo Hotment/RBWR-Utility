@@ -166,7 +166,7 @@ public static class ThemeXamlGenerator
             sb.AppendLine($"    <!-- {CommentSafe(key)} -->");
             foreach (var group in usages.GroupBy(u => u.Selector))
             {
-                sb.AppendLine($"    <Style Selector=\"{Escape(group.Key)}\">");
+                sb.AppendLine($"    <Style Selector=\"{Escape(SkipThemeCards(group.Key))}\">");
                 // Base value of the same kind as the frames (solid or gradient): older overlays without
                 // the safe brush animator would otherwise crash when a solid colour animates into a gradient.
                 foreach (var usage in group)
@@ -186,6 +186,25 @@ public static class ThemeXamlGenerator
                 sb.AppendLine("    </Style>");
             }
         }
+    }
+
+    /// <summary>Class the overlay puts on the Theme Manager's theme cards (and the buttons on them).</summary>
+    public const string ThemeCardClass = "theme-card";
+
+    /// <summary>
+    /// Adds :not(.theme-card) to every part of a selector, so the active theme's animations leave the
+    /// Theme Manager's cards alone (each card shows its own theme). For "/template/" selectors the
+    /// check goes on the control before "/template/".
+    /// </summary>
+    public static string SkipThemeCards(string selector)
+    {
+        string not = $":not(.{ThemeCardClass})";
+        return string.Join(", ", selector.Split(',').Select(part =>
+        {
+            string p = part.Trim();
+            int t = p.IndexOf(" /template/", StringComparison.Ordinal);
+            return t >= 0 ? p[..t] + not + p[t..] : p + not;
+        }));
     }
 
     /// <summary>A setter whose value is a colour ("#rrggbb") or a brush element ("&lt;LinearGradientBrush …").</summary>

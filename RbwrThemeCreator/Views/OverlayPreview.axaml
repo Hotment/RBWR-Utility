@@ -157,7 +157,9 @@
                             <Border x:Name="ThemeCombo" Background="{DynamicResource DarkPanelBg}" BorderBrush="{DynamicResource CyberBorder}"
                                     BorderThickness="1" CornerRadius="4" Padding="10,5,12,5">
                                 <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Border Width="34" Height="33" Margin="0,0,9,0" CornerRadius="3" ClipToBounds="True" VerticalAlignment="Center">
+                                    <Border Width="34" Height="33" Margin="0,0,9,0" CornerRadius="3" ClipToBounds="True" VerticalAlignment="Center"
+                                            BorderThickness="1.5" BorderBrush="Transparent"
+                                            views:AnimationStrip.BorderAnimation="{ReflectionBinding ThumbAnimationPreview}">
                                         <Image x:Name="ThemeComboThumb" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">

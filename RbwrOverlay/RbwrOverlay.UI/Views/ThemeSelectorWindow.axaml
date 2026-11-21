@@ -97,7 +97,7 @@
                             <DataTemplate x:DataType="vm:ThemeEntryViewModel">
                                 <!-- Each card is drawn in its own theme's colours (its resources are attached to it),
                                      with the theme's window glow colour as the outline. -->
-                                <Border Classes="hud-card"
+                                <Border Classes="hud-card theme-card"
                                         behaviors:ThemeCardBehaviors.Resources="{Binding CardResources}"
                                         behaviors:ThemeCardBehaviors.BackgroundAnimation="{Binding CardBackgroundAnimation}"
                                         behaviors:ThemeCardBehaviors.BorderAnimation="{Binding CardBorderAnimation}"
@@ -106,7 +106,7 @@
                                         Cursor="Hand"
                                         PointerPressed="OnThemeCardPointerPressed"
                                         behaviors:TooltipBehaviors.Key="ThemeEntryDetails">
-                                    <StackPanel Spacing="8">
+                                    <StackPanel Spacing="8" behaviors:ThemeCardBehaviors.AnimationStyles="{Binding CardAnimationStyles}">
 
                                         <Grid ColumnDefinitions="Auto,*,Auto">
                                             <!-- Thumbnail: the theme's preview.png (made by the Theme Creator; built-in
@@ -118,6 +118,9 @@
                                                     Margin="0,0,10,0"
                                                     CornerRadius="4"
                                                     ClipToBounds="True"
+                                                    BorderThickness="1.5"
+                                                    BorderBrush="Transparent"
+                                                    behaviors:ThemeCardBehaviors.BorderAnimation="{Binding ThumbnailAnimation}"
                                                     VerticalAlignment="Center">
                                                 <Image Source="{Binding Thumbnail}"
                                                        Stretch="Uniform"
@@ -198,7 +201,7 @@
                                                         Spacing="6"
                                                         VerticalAlignment="Center"
                                                         Margin="8,0,0,0">
-                                                <Button Classes="cyber"
+                                                <Button Classes="cyber theme-card"
                                                         Classes.active="{Binding IsActive}"
                                                         Content="{Binding ApplyButtonText}"
                                                         Command="{Binding ApplyCommand}"
@@ -210,7 +213,7 @@
                                         </Grid>
 
                                         <Border IsVisible="{Binding IsExpanded}"
-                                                Classes="hud-card sub-panel"
+                                                Classes="hud-card sub-panel theme-card"
                                                 Padding="10,8">
                                             <StackPanel Spacing="8">
                                                 <TextBlock Text="{Binding DescriptionText}"
@@ -233,7 +236,7 @@
 
                                                 <StackPanel Orientation="Horizontal"
                                                             Spacing="6">
-                                                    <Button Classes="cyber-green"
+                                                    <Button Classes="cyber-green theme-card"
                                                             Content="Apply Theme"
                                                             Command="{Binding ApplyCommand}"
                                                             IsVisible="{Binding !IsActive}"
@@ -241,7 +244,7 @@
                                                             FontSize="9.5"
                                                             behaviors:TooltipBehaviors.Key="ThemeEntryApply" />
 
-                                                    <Button Classes="cyber"
+                                                    <Button Classes="cyber theme-card"
                                                             Content="Reload"
                                                             Command="{Binding ReloadEntryCommand}"
                                                             IsVisible="{Binding CanManageFiles}"
@@ -249,7 +252,7 @@
                                                             FontSize="9.5"
                                                             behaviors:TooltipBehaviors.Key="ThemeReloadButton" />
 
-                                                    <Button Classes="cyber"
+                                                    <Button Classes="cyber theme-card"
                                                             Content="Edit AXAML"
                                                             Command="{Binding EditAxamlCommand}"
                                                             IsVisible="{Binding CanManageFiles}"
@@ -257,7 +260,7 @@
                                                             FontSize="9.5"
                                                             behaviors:TooltipBehaviors.Key="ThemeEntryEdit" />
 
-                                                    <Button Classes="cyber"
+                                                    <Button Classes="cyber theme-card"
                                                             Content="Folder"
                                                             Command="{Binding OpenEntryFolderCommand}"
                                                             IsVisible="{Binding CanManageFiles}"
@@ -265,7 +268,7 @@
                                                             FontSize="9.5"
                                                             behaviors:TooltipBehaviors.Key="ThemeEntryFolder" />
 
-                                                    <Button Classes="cyber-red"
+                                                    <Button Classes="cyber-red theme-card"
                                                             Content="{Binding DeleteButtonText}"
                                                             Command="{Binding DeleteCommand}"
                                                             IsVisible="{Binding CanManageFiles}"
