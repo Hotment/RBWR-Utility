@@ -33,6 +33,12 @@ public sealed class CreatorSettings
     /// <summary>Look for a new creator version when it starts.</summary>
     public bool CheckUpdatesAtStart { get; set; } = true;
 
+    /// <summary>COLOURS tab: show the gradient tip box.</summary>
+    public bool ShowGradientTip { get; set; } = true;
+
+    /// <summary>COLOURS tab: show the contrast check box.</summary>
+    public bool ShowContrastCheck { get; set; } = true;
+
     /// <summary>Changed keyboard shortcuts: action id -> gesture ("" = none). Missing = default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = new();
 

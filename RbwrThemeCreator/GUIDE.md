@@ -124,7 +124,7 @@ Tick *Also change status colours* if you want green, red and gold to follow the 
 
 The green or gold box above the list tells you whether text is readable on your backgrounds. Aim for
 at least **4.5:1** for normal text and **3:1** for muted text and accents. A gold box means something
-may be hard to read.
+may be hard to read. The **×** hides it (and the gradient tip); turn them back on in **SETTINGS**.
 
 ---
 
@@ -360,6 +360,11 @@ The **SETTINGS** tab. Everything here is saved on your PC and never changes your
 Type your name and click **SET** (or press Enter): every new theme starts with it as the **Author**.
 Clear the box and click **SET** to use the last author you saved a theme with instead.
 
+### COLOURS tab
+
+The gradient tip and the contrast check at the top of the COLOURS tab can be hidden with their **×**.
+Turn them back on here with **Show the gradient tip** and **Show the contrast check**.
+
 ### Updates
 
 - **CHECK UPDATES** looks for a new version now; the line next to it shows your version and the result.
@@ -380,7 +385,7 @@ Some actions have no shortcut by default (for example *FIND COLOUR on / off*); g
 
 ### Reset
 
-- **RESET SETTINGS** resets the start-up and update options, the default author, the skipped update, the recent themes
+- **RESET SETTINGS** resets the start-up and update options, the default author, the COLOURS tab boxes, the skipped update, the recent themes
   list and the preview view. Your keyboard shortcuts (they have their own reset), the overlay folder and
   your themes are kept.
 - **OPEN SETTINGS FOLDER** opens the folder with `settings.json`.

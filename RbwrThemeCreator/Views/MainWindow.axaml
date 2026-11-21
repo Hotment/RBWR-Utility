@@ -274,15 +274,27 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8">
-                                <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
-                                           Text="TIP: click GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                            <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8" IsVisible="{Binding ShowGradientTip}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
+                                               Text="TIP: click GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideGradientTipCommand}" ToolTip.Tip="Hide this tip (show it again in SETTINGS)" />
+                                </Grid>
                             </Border>
-                            <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding !ContrastWarning}">
-                                <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
+                            <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding ShowContrastOk}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideContrastCheckCommand}" ToolTip.Tip="Hide the contrast check (show it again in SETTINGS)" />
+                                </Grid>
                             </Border>
-                            <Border Classes="warn-box" Margin="0,0,0,10" IsVisible="{Binding ContrastWarning}">
-                                <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGold}" TextWrapping="Wrap" />
+                            <Border Classes="warn-box" Margin="0,0,0,10" IsVisible="{Binding ShowContrastWarning}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGold}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideContrastCheckCommand}" ToolTip.Tip="Hide the contrast check (show it again in SETTINGS)" />
+                                </Grid>
                             </Border>
 
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
@@ -738,6 +750,20 @@
 
                             <Border Classes="card">
                                 <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="COLOURS TAB" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Show the gradient tip" IsChecked="{Binding ShowGradientTip}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="The pink box about GRADIENT at the top of the COLOURS tab." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Show the contrast check" IsChecked="{Binding ShowContrastCheck}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="The box that says whether text is readable on your backgrounds. When it is hidden you also miss its low-contrast warning." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="UPDATES" />
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Classes="muted" Text="{Binding UpdateStatusText}" VerticalAlignment="Center" TextWrapping="Wrap" />
@@ -794,7 +820,7 @@
                                 <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="RESET" />
                                     <TextBlock Classes="muted"
-                                               Text="Resets the start-up and update options, the default author, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
+                                               Text="Resets the start-up and update options, the default author, the COLOURS tab boxes, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Button Classes="hud-red" Content="RESET SETTINGS" Command="{Binding ResetSettingsCommand}" />
                                         <Button Classes="hud" Content="OPEN SETTINGS FOLDER" Command="{Binding OpenSettingsFolderCommand}"

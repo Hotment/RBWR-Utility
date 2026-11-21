@@ -207,6 +207,41 @@ public partial class MainViewModel : ObservableObject
             : $"Empty: new themes use the last author you saved with ({CreatorSettings.Current.LastAuthor}).")
         : "New themes start with this author.";
 
+    /// <summary>COLOURS tab boxes; hidden with their × button, shown again in SETTINGS.</summary>
+    public bool ShowGradientTip
+    {
+        get => CreatorSettings.Current.ShowGradientTip;
+        set => SetSetting(value, CreatorSettings.Current.ShowGradientTip, v => CreatorSettings.Current.ShowGradientTip = v);
+    }
+
+    public bool ShowContrastCheck
+    {
+        get => CreatorSettings.Current.ShowContrastCheck;
+        set
+        {
+            SetSetting(value, CreatorSettings.Current.ShowContrastCheck, v => CreatorSettings.Current.ShowContrastCheck = v);
+            OnPropertyChanged(nameof(ShowContrastOk));
+            OnPropertyChanged(nameof(ShowContrastWarning));
+        }
+    }
+
+    public bool ShowContrastOk => ShowContrastCheck && !ContrastWarning;
+    public bool ShowContrastWarning => ShowContrastCheck && ContrastWarning;
+
+    [RelayCommand]
+    private void HideGradientTip()
+    {
+        ShowGradientTip = false;
+        SetStatus("Gradient tip hidden. Show it again in SETTINGS.");
+    }
+
+    [RelayCommand]
+    private void HideContrastCheck()
+    {
+        ShowContrastCheck = false;
+        SetStatus("Contrast check hidden. Show it again in SETTINGS.");
+    }
+
     public bool HasSkippedVersion => !string.IsNullOrWhiteSpace(CreatorSettings.Current.SkippedVersion);
     public string SkippedVersionText => HasSkippedVersion ? $"Skipped update: v{CreatorSettings.Current.SkippedVersion}" : "No update is skipped.";
 
@@ -365,7 +400,7 @@ public partial class MainViewModel : ObservableObject
     private async Task ResetSettingsAsync()
     {
         if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset settings",
-                "Reset the start-up options, the default author, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
+                "Reset the start-up options, the default author, the COLOURS tab boxes, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
                 "Reset settings"))
             return;
 
@@ -376,6 +411,8 @@ public partial class MainViewModel : ObservableObject
         s.SkippedVersion = string.Empty;
         s.LastAuthor = string.Empty;
         s.DefaultAuthor = string.Empty;
+        s.ShowGradientTip = true;
+        s.ShowContrastCheck = true;
         s.RecentThemes.Clear();
         s.Save();
 
@@ -386,6 +423,7 @@ public partial class MainViewModel : ObservableObject
 
         foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart),
                      nameof(DefaultAuthor), nameof(DefaultAuthorHint),
+                     nameof(ShowGradientTip), nameof(ShowContrastCheck), nameof(ShowContrastOk), nameof(ShowContrastWarning),
                      nameof(HasSkippedVersion), nameof(SkippedVersionText) })
             OnPropertyChanged(name);
         DefaultAuthorInput = string.Empty;
@@ -822,6 +860,10 @@ public partial class MainViewModel : ObservableObject
                 break;
             case nameof(ManifestProblems):
                 OnPropertyChanged(nameof(HasManifestProblems));
+                break;
+            case nameof(ContrastWarning):
+                OnPropertyChanged(nameof(ShowContrastOk));
+                OnPropertyChanged(nameof(ShowContrastWarning));
                 break;
             case nameof(BackgroundImageFile):
                 OnPropertyChanged(nameof(HasBackgroundImage));
