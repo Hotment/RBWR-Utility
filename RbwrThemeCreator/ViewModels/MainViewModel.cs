@@ -1655,28 +1655,53 @@ public partial class MainViewModel : ObservableObject
         Fonts.Remove(font);
         string reference = $"fonts/{font.FileName}";
         if (FontFamily.Contains(reference, StringComparison.OrdinalIgnoreCase))
-            FontFamily = BuiltInThemes.Cyberpunk.FontFamily;
+            FontFamily = RemoveFontReference(FontFamily, reference, BuiltInThemes.Cyberpunk.FontFamily);
         if (MonoFontFamily.Contains(reference, StringComparison.OrdinalIgnoreCase))
-            MonoFontFamily = BuiltInThemes.Cyberpunk.MonoFontFamily;
+            MonoFontFamily = RemoveFontReference(MonoFontFamily, reference, BuiltInThemes.Cyberpunk.MonoFontFamily);
         OnEdited();
     }
 
     [RelayCommand]
     private void UseFontAsMain(FontEntry? font)
     {
-        if (font != null) FontFamily = FontReference(font, "Consolas, 'Segoe UI', Inter, monospace");
+        if (font != null)
+            FontFamily = PrependFontReference(font, FontFamily, BuiltInThemes.Cyberpunk.FontFamily);
     }
 
     [RelayCommand]
     private void UseFontAsMono(FontEntry? font)
     {
-        if (font != null) MonoFontFamily = FontReference(font, "Consolas, monospace");
+        if (font != null)
+            MonoFontFamily = PrependFontReference(font, MonoFontFamily, BuiltInThemes.Cyberpunk.MonoFontFamily);
     }
 
-    private static string FontReference(FontEntry font, string fallbacks)
+    private static string PrependFontReference(FontEntry font, string currentList, string defaultFallbacks)
     {
-        string family = string.IsNullOrWhiteSpace(font.FamilyName) ? Path.GetFileNameWithoutExtension(font.FileName) : font.FamilyName;
-        return $"fonts/{font.FileName}#{family}, {fallbacks}";
+        string family = string.IsNullOrWhiteSpace(font.FamilyName)
+            ? Path.GetFileNameWithoutExtension(font.FileName)
+            : font.FamilyName.Trim();
+        string filePrefix = $"fonts/{font.FileName}";
+        string entry = $"{filePrefix}#{family}";
+
+        string source = string.IsNullOrWhiteSpace(currentList) ? defaultFallbacks : currentList;
+        var existing = source
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0 && !p.Contains(filePrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        existing.Insert(0, entry);
+        return string.Join(", ", existing);
+    }
+
+    private static string RemoveFontReference(string currentList, string filePrefix, string defaultFallbacks)
+    {
+        var remaining = currentList
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0 && !p.Contains(filePrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return remaining.Count > 0 ? string.Join(", ", remaining) : defaultFallbacks;
     }
 
     [RelayCommand]
@@ -1941,5 +1966,22 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SkippedVersionText));
         UpdateStatusText = $"Version v{version} skipped.";
         SetStatus($"Skipped update v{version}.");
+    }
+
+    [RelayCommand]
+    private void OpenLog()
+    {
+        try
+        {
+            string path = CreatorLogging.Instance.GetLogFilePath();
+            if (!File.Exists(path))
+                CreatorLogging.Instance.Info("Log file opened by user.");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            CreatorLogging.Instance.Error("Could not open log file", ex);
+            SetStatus($"Could not open log file: {ex.Message}", isError: true);
+        }
     }
 }

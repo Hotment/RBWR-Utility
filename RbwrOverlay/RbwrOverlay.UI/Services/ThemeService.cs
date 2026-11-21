@@ -1,10 +1,14 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -12,6 +16,54 @@ using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
 
 namespace RbwrOverlay.UI.Services;
+
+internal sealed class ThemeFileFontCollection(Uri key) : FontCollectionBase
+{
+    private static readonly ConcurrentDictionary<string, (Uri Key, string? FamilyName)> Registered = new(StringComparer.OrdinalIgnoreCase);
+
+    public override Uri Key { get; } = key;
+
+    public bool LoadFile(string filePath, out string? familyName)
+    {
+        familyName = null;
+        if (!File.Exists(filePath)) return false;
+        using var fs = File.OpenRead(filePath);
+        if (!TryAddGlyphTypeface(fs, out var gt)) return false;
+        familyName = gt?.FamilyName;
+        return true;
+    }
+
+    public static (Uri Uri, string? FamilyName) EnsureRegistered(string fullPath)
+    {
+        string normalized = Path.GetFullPath(fullPath);
+        if (Registered.TryGetValue(normalized, out var existing))
+            return existing;
+
+        if (!File.Exists(normalized))
+            return (new Uri(normalized), null);
+
+        string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(normalized)))[..12].ToLowerInvariant();
+        var collectionUri = new Uri($"fonts:rbwr-font-{hash}");
+
+        try
+        {
+            var collection = new ThemeFileFontCollection(collectionUri);
+            if (collection.LoadFile(normalized, out var familyName))
+            {
+                FontManager.Current.AddFontCollection(collection);
+                var entry = (collectionUri, familyName);
+                Registered[normalized] = entry;
+                return entry;
+            }
+        }
+        catch
+        {
+            // Headless unit tests without an initialized FontManager: fall back to file:/// URI.
+        }
+
+        return (new Uri(normalized), null);
+    }
+}
 
 public interface IThemeService
 {
@@ -52,7 +104,7 @@ public class ThemeService : IThemeService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeFontPathRegex = new(
-        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""'\s;,)]*)?)",
+        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""';,)]*)?)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeAssetImageRegex = new(
@@ -421,16 +473,26 @@ public class ThemeService : IThemeService
         string normalizedDir = Path.GetFullPath(themeDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         string baseFileUri = new Uri(normalizedDir + Path.DirectorySeparatorChar).AbsoluteUri;
 
+        string fullThemeRoot = normalizedDir + Path.DirectorySeparatorChar;
         string withFonts = RelativeFontPathRegex.Replace(strippedXaml, m =>
         {
             string prefix = m.Groups["prefix"].Value;
             string rel = m.Groups["rel"].Value.TrimStart('.', '/').Replace('\\', '/');
-            return $"{prefix}{baseFileUri}{rel}";
+            string filePart = rel.Split('#')[0];
+            string fragment = rel.Length > filePart.Length ? rel[filePart.Length..].TrimEnd() : string.Empty;
+            string fullFontPath = Path.GetFullPath(Path.Combine(normalizedDir, filePart.Replace('/', Path.DirectorySeparatorChar)));
+            if (fullFontPath.StartsWith(fullThemeRoot, StringComparison.OrdinalIgnoreCase) && File.Exists(fullFontPath))
+            {
+                var (fontUri, detectedFamily) = ThemeFileFontCollection.EnsureRegistered(fullFontPath);
+                if (string.IsNullOrEmpty(fragment) && !string.IsNullOrWhiteSpace(detectedFamily))
+                    fragment = $"#{detectedFamily}";
+                return $"{prefix}{fontUri.AbsoluteUri}{fragment}";
+            }
+            return $"{prefix}{baseFileUri}{filePart}{fragment}";
         });
 
         var assets = new List<(string Key, string FullPath)>();
         var seenPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        string fullThemeRoot = normalizedDir + Path.DirectorySeparatorChar;
 
         string withAssets = RelativeAssetImageRegex.Replace(withFonts, m =>
         {

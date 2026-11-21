@@ -948,4 +948,83 @@ public class ThemeCreatorTests : IDisposable
         Assert.NotNull(s.Tokens["CyberBorderGlow"].Animation);
         Assert.True(s.Tokens.Values.Count(v => v.Animation != null) >= 3);
     }
+
+    [Fact]
+    public void Fonts_PrependPreservesExistingList_AndHandlesSpacesInFamilyName()
+    {
+        var vm = new MainViewModel();
+        vm.FontFamily = "JetBrains Mono, Inter";
+
+        string fontPath = Path.Combine(_tempDir, "ShareTechMono-Regular.ttf");
+        File.WriteAllBytes(fontPath, [0x00, 0x01, 0x00, 0x00]);
+        var entry = new FontEntry("ShareTechMono-Regular.ttf", fontPath, "Share Tech Mono");
+        vm.Fonts.Add(entry);
+
+        vm.UseFontAsMainCommand.Execute(entry);
+        Assert.Equal("fonts/ShareTechMono-Regular.ttf#Share Tech Mono, JetBrains Mono, Inter", vm.FontFamily);
+
+        // Clicking again does not duplicate
+        vm.UseFontAsMainCommand.Execute(entry);
+        Assert.Equal("fonts/ShareTechMono-Regular.ttf#Share Tech Mono, JetBrains Mono, Inter", vm.FontFamily);
+
+        // Removing the font preserves the user's custom fallbacks
+        vm.RemoveFontCommand.Execute(entry);
+        Assert.Equal("JetBrains Mono, Inter", vm.FontFamily);
+
+        // Validator preserves full family name with spaces when rewriting to file:/// URI
+        string xaml = """
+        <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Styles.Resources>
+                <FontFamily x:Key="AppFontFamily">fonts/ShareTechMono-Regular.ttf#Share Tech Mono, Inter</FontFamily>
+            </Styles.Resources>
+        </Styles>
+        """;
+        string prepared = ThemeValidator.Prepare(xaml, rel => rel == "fonts/ShareTechMono-Regular.ttf" ? fontPath : null, out _);
+        Assert.Contains($"{new Uri(fontPath).AbsoluteUri}#Share Tech Mono, Inter", prepared);
+    }
+
+    private sealed class FakeCrashApiClient : RbwrOverlay.Core.Services.IApiClient
+    {
+        public string? SubmittedVersion { get; private set; }
+        public string? SubmittedTraceback { get; private set; }
+        public Task<List<RbwrOverlay.Core.Models.ServerInfo>> GetLatestServersAsync(CancellationToken ct = default) => Task.FromResult(new List<RbwrOverlay.Core.Models.ServerInfo>());
+        public Task<RbwrOverlay.Core.Models.ServerFetchResult> GetLatestServersDetailedAsync(CancellationToken ct = default) => Task.FromResult(RbwrOverlay.Core.Models.ServerFetchResult.Success([]));
+        public RbwrOverlay.Core.Models.ServerInfo? FindServerByIdOrJobId(IEnumerable<RbwrOverlay.Core.Models.ServerInfo> servers, string query) => null;
+        public Task<bool> SubmitSuggestionAsync(string name, string suggestion, bool anonymous, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> SubmitCrashReportAsync(string version, string traceback, string logData, string osInfo, CancellationToken ct = default)
+        {
+            SubmittedVersion = version;
+            SubmittedTraceback = traceback;
+            return Task.FromResult(true);
+        }
+        public Task<RbwrOverlay.Core.Models.UpdateInfo> CheckForUpdatesAsync(string currentVersion, string skippedVersion, CancellationToken ct = default) => Task.FromResult(new RbwrOverlay.Core.Models.UpdateInfo());
+        public Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task CreatorCrashHandler_FormatsWritesAndSubmitsReport()
+    {
+        string logPath = Path.Combine(_tempDir, "creator_test.log");
+        var logger = new RbwrOverlay.Core.Services.LoggingService(logPath, "RBWR Theme Creator");
+        logger.LogSystemInfo(MainViewModel.AppVersion);
+        Assert.True(File.Exists(logPath));
+        Assert.Contains("RBWR Theme Creator", logger.GetLogContent());
+
+        var ex = new InvalidOperationException("Boom in theme creator");
+        string details = CreatorCrashHandler.FormatExceptionDetails(ex, "Unit Test Context", logger);
+        Assert.Contains("RBWR THEME CREATOR CRASH", details);
+        Assert.Contains(MainViewModel.AppVersion, details);
+        Assert.Contains("Boom in theme creator", details);
+
+        string writtenPath = CreatorCrashHandler.WriteCrashReportFile(details, _tempDir);
+        Assert.True(File.Exists(writtenPath));
+        Assert.Equal(details, File.ReadAllText(writtenPath));
+
+        var fakeApi = new FakeCrashApiClient();
+        var vm = new CreatorCrashReportViewModel(details, writtenPath, fakeApi, logger);
+        await vm.SendReportAsync();
+        Assert.Equal(CreatorCrashHandler.ReportVersionTag, fakeApi.SubmittedVersion);
+        Assert.Equal(details, fakeApi.SubmittedTraceback);
+        Assert.Equal("Report sent.", vm.StatusText);
+    }
 }

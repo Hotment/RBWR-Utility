@@ -1,10 +1,68 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using RbwrThemeCreator.Models;
 
 namespace RbwrThemeCreator.Services;
+
+/// <summary>
+/// Registers local .ttf/.otf/.ttc font files with Avalonia's FontManager under a <c>fonts:</c> URI
+/// (Avalonia's FontManager requires the <c>fonts:</c> scheme for custom collections and ignores raw
+/// <c>file:///</c> font URIs).
+/// </summary>
+internal sealed class FileFontCollection(Uri key) : FontCollectionBase
+{
+    private static readonly ConcurrentDictionary<string, (Uri Key, string? FamilyName)> Registered = new(StringComparer.OrdinalIgnoreCase);
+
+    public override Uri Key { get; } = key;
+
+    public bool LoadFile(string filePath, out string? familyName)
+    {
+        familyName = null;
+        if (!File.Exists(filePath)) return false;
+        using var fs = File.OpenRead(filePath);
+        if (!TryAddGlyphTypeface(fs, out var gt)) return false;
+        familyName = gt?.FamilyName;
+        return true;
+    }
+
+    public static (Uri Uri, string? FamilyName) EnsureRegistered(string fullPath)
+    {
+        string normalized = Path.GetFullPath(fullPath);
+        if (Registered.TryGetValue(normalized, out var existing))
+            return existing;
+
+        if (!File.Exists(normalized))
+            return (new Uri(normalized), null);
+
+        string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(normalized)))[..12].ToLowerInvariant();
+        var collectionUri = new Uri($"fonts:rbwr-font-{hash}");
+
+        try
+        {
+            var collection = new FileFontCollection(collectionUri);
+            if (collection.LoadFile(normalized, out var familyName))
+            {
+                FontManager.Current.AddFontCollection(collection);
+                var entry = (collectionUri, familyName);
+                Registered[normalized] = entry;
+                return entry;
+            }
+        }
+        catch
+        {
+            // Headless unit tests without an initialized FontManager: fall back to file:/// URI.
+        }
+
+        return (new Uri(normalized), null);
+    }
+}
 
 /// <summary>
 /// Mirrors the overlay's ThemeService loading rules (RbwrOverlay.UI/Services/ThemeService.cs) so a theme that
@@ -21,7 +79,7 @@ public static class ThemeValidator
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeFontPathRegex = new(
-        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""'\s;,)]*)?)",
+        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""';,)]*)?)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeAssetImageRegex = new(
@@ -82,9 +140,12 @@ public static class ThemeValidator
         {
             string rel = m.Groups["rel"].Value.TrimStart('.', '/').Replace('\\', '/');
             string filePart = rel.Split('#')[0];
-            string fragment = rel.Length > filePart.Length ? rel[filePart.Length..] : string.Empty;
+            string fragment = rel.Length > filePart.Length ? rel[filePart.Length..].TrimEnd() : string.Empty;
             string full = resolve(filePart) ?? throw new FileNotFoundException($"Font not found: {filePart}. Add it in the Fonts section.");
-            return $"{m.Groups["prefix"].Value}{new Uri(full).AbsoluteUri}{fragment}";
+            var (fontUri, detectedFamily) = FileFontCollection.EnsureRegistered(full);
+            if (string.IsNullOrEmpty(fragment) && !string.IsNullOrWhiteSpace(detectedFamily))
+                fragment = $"#{detectedFamily}";
+            return $"{m.Groups["prefix"].Value}{fontUri.AbsoluteUri}{fragment}";
         });
 
         var assets = new List<(string Key, string FullPath)>();

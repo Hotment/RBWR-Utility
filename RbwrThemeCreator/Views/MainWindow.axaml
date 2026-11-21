@@ -960,6 +960,8 @@
                                         <Button Classes="hud-red" Content="RESET SETTINGS" Command="{Binding ResetSettingsCommand}" />
                                         <Button Classes="hud" Content="OPEN SETTINGS FOLDER" Command="{Binding OpenSettingsFolderCommand}"
                                                 ToolTip.Tip="The folder with settings.json" />
+                                        <Button Classes="hud" Content="OPEN LOG FILE" Command="{Binding OpenLogCommand}"
+                                                ToolTip.Tip="Open the diagnostic log file (RBWR_Theme_Creator.log)" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
