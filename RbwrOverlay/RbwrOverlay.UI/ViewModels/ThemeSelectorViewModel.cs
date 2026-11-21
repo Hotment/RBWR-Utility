@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -45,12 +46,18 @@ public partial class ThemeEntryViewModel : ObservableObject
     public string ExpandButtonText => IsExpanded ? "Hide" : "Details";
     public string DeleteButtonText => IsConfirmingDelete ? "Confirm?" : "Delete";
 
+    // ---------- Thumbnail: preview.png of the theme (null = no thumbnail) ----------
+    public Bitmap? Thumbnail { get; }
+    public bool HasThumbnail => Thumbnail != null;
+
     public ThemeEntryViewModel(InstalledThemeInfo info, bool isActive, bool isExpanded, ThemeSelectorViewModel owner)
     {
         Info = info;
         _isActive = isActive;
         _isExpanded = isExpanded;
         _owner = owner;
+
+        Thumbnail = ThemeThumbnailService.Get(info);
     }
 
     partial void OnIsExpandedChanged(bool value)

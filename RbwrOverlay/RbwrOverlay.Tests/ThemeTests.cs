@@ -30,6 +30,53 @@ public class ThemeTests : IDisposable
         }
     }
 
+    private static byte[] PngHeader(uint width, uint height)
+    {
+        var bytes = new byte[33];
+        new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R' }.CopyTo(bytes, 0);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(16), width);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(20), height);
+        return bytes;
+    }
+
+    [Fact]
+    public void ThumbnailGuard_AcceptsNormalPng_RejectsHugeOrFakeImages()
+    {
+        Assert.True(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(705, 683))));
+        Assert.True(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(4000, 4000))));
+
+        // Small file declaring enormous dimensions: must not be decoded.
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(30000, 30000))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(8000, 8000))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(0, 100))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(uint.MaxValue, 1))));
+
+        // Not a PNG (e.g. a JPEG renamed to preview.png), or a truncated file.
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 0x4A, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0])));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream([0x89, 0x50, 0x4E])));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream()));
+    }
+
+    [Fact]
+    public void Thumbnail_HugeOrBrokenPreviewPng_GivesNoThumbnailInsteadOfCrashing()
+    {
+        string dir = Path.Combine(_tempDir, "huge-preview");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "theme.axaml"), "<Styles />");
+        var info = new InstalledThemeInfo { Id = "huge-preview", DirectoryPath = dir, EntryFilePath = Path.Combine(dir, "theme.axaml") };
+
+        File.WriteAllBytes(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), PngHeader(50000, 50000));
+        Assert.Null(ThemeThumbnailService.Get(info));
+
+        File.WriteAllText(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), "this is not an image");
+        File.SetLastWriteTimeUtc(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), DateTime.UtcNow.AddMinutes(1));
+        Assert.Null(ThemeThumbnailService.Get(info));
+
+        // No preview.png at all: still fine, just no thumbnail.
+        File.Delete(Path.Combine(dir, ThemeThumbnailService.PreviewFileName));
+        Assert.Null(ThemeThumbnailService.Get(info));
+    }
+
     [Fact]
     public void TestDiscoverThemesIncludesBothBuiltInThemesFirst()
     {

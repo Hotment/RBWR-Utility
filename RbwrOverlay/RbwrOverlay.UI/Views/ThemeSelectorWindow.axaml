@@ -103,8 +103,23 @@
                                         behaviors:TooltipBehaviors.Key="ThemeEntryDetails">
                                     <StackPanel Spacing="8">
 
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Grid.Column="0"
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <!-- Thumbnail: the theme's preview.png (made by the Theme Creator; built-in
+                                                 themes ship one). Hidden when the theme has no image. -->
+                                            <Border Grid.Column="0"
+                                                    IsVisible="{Binding HasThumbnail}"
+                                                    Width="56"
+                                                    Height="54"
+                                                    Margin="0,0,10,0"
+                                                    CornerRadius="4"
+                                                    ClipToBounds="True"
+                                                    VerticalAlignment="Center">
+                                                <Image Source="{Binding Thumbnail}"
+                                                       Stretch="Uniform"
+                                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1"
                                                         Spacing="3"
                                                         VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal"
@@ -173,7 +188,7 @@
                                                            FontSize="10" />
                                             </StackPanel>
 
-                                            <StackPanel Grid.Column="1"
+                                            <StackPanel Grid.Column="2"
                                                         Orientation="Horizontal"
                                                         Spacing="6"
                                                         VerticalAlignment="Center"
