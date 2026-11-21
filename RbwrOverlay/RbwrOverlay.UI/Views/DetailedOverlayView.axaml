@@ -3,6 +3,7 @@
              xmlns:vm="using:RbwrOverlay.UI.ViewModels"
              xmlns:models="using:RbwrOverlay.Core.Models"
              xmlns:behaviors="using:RbwrOverlay.UI.Behaviors"
+             xmlns:conv="using:RbwrOverlay.UI.Converters"
              x:Class="RbwrOverlay.UI.Views.DetailedOverlayView"
              x:DataType="vm:MainOverlayViewModel">
 
@@ -93,6 +94,7 @@
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Monitor"
                             behaviors:TooltipBehaviors.Key="TabMonitor"
+                            CornerRadius="{Binding #NavBar.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.LeftOnly}}"
                             HorizontalAlignment="Stretch" />
 
                     <Button Grid.Column="1"
@@ -120,6 +122,7 @@
                             Command="{Binding SwitchTabCommand}"
                             CommandParameter="Feedback"
                             behaviors:TooltipBehaviors.Key="TabFeedback"
+                            CornerRadius="{Binding #NavBar.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.RightOnly}}"
                             HorizontalAlignment="Stretch" />
                 </Grid>
             </Border>
@@ -590,6 +593,19 @@
                                 <TextBlock Grid.Column="0" Text="Next Demand Switch Timer (s):" VerticalAlignment="Center" FontSize="11" />
                                 <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandThresholdSecondsInput}" Width="45" Padding="2,0" FontSize="11" VerticalAlignment="Center" VerticalContentAlignment="Center" />
                             </Grid>
+                        </Border>
+
+                        <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="DemandNotifyConfig">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Demand Change Notification:" VerticalAlignment="Center" FontSize="11" />
+                                    <Button Grid.Column="1" Classes="cyber" Content="{Binding DemandNotifyStatusText}" Foreground="{Binding DemandNotifyStatusBrush}" Command="{Binding ToggleDemandNotifySettingCommand}" Padding="10,3" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Notify Before Change (s):" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextMuted}" />
+                                    <TextBox Grid.Column="1" Classes="cyber" Text="{Binding DemandNotifySecondsInput}" Width="45" Padding="2,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
                         </Border>
 
                         <Border Classes="hud-card config-card" Padding="10,6" behaviors:TooltipBehaviors.Key="TurbineAlarmConfig">

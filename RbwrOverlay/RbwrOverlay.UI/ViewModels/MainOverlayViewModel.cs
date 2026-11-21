@@ -25,7 +25,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.3.0";
+    public const string AppVersion = "2.3.1-dev";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -60,8 +60,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
+    private bool _demandChangeNotified;
+    private double? _lastNotifiedNextDemand;
     private const long RbwrPlaceId = RobloxLogReader.RbwrPlaceId;
 
+    [DllImport("user32.dll")]
+    private static extern bool MessageBeep(uint uType);
 
     [ObservableProperty]
     private HudTab _currentTab = HudTab.Monitor;
@@ -356,6 +360,18 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _turbineHealthThresholdInput = "65";
 
     [ObservableProperty]
+    private bool _enableDemandChangeNotification = true;
+
+    [ObservableProperty]
+    private string _demandNotifySecondsInput = "300";
+
+    [ObservableProperty]
+    private string _demandNotifyStatusText = "ENABLED";
+
+    [ObservableProperty]
+    private IBrush _demandNotifyStatusBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+
+    [ObservableProperty]
     private string _topmostStatusText = "ENABLED";
 
     [ObservableProperty]
@@ -494,6 +510,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _demandThresholdSecondsInput = _settings.NextDemandThresholdSeconds.ToString();
         _enableTurbineHealthAlert = _settings.EnableTurbineHealthAlert;
         _turbineHealthThresholdInput = ((int)_settings.TurbineHealthThreshold).ToString();
+        _enableDemandChangeNotification = _settings.EnableDemandChangeNotification;
+        _demandNotifySecondsInput = _settings.DemandChangeNotificationSeconds.ToString();
         _showTooltips = _settings.ShowTooltips;
         TooltipCatalog.SetEnabled(_showTooltips);
         _enableDiscordPresence = _settings.EnableDiscordPresence;
@@ -1491,6 +1509,37 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         CompactServerDtlText = formatDemand(nextDem, true);
         UpdateCompactCounterDisplay(liveDtl, nextDem);
 
+        int notifySec = _settings.DemandChangeNotificationSeconds;
+        if (_demandChangeNotified)
+        {
+            if (liveDtl > notifySec || (nextDem.HasValue && _lastNotifiedNextDemand.HasValue && nextDem.Value != _lastNotifiedNextDemand.Value))
+            {
+                _demandChangeNotified = false;
+            }
+        }
+
+        if (_settings.EnableDemandChangeNotification && notifySec > 0 && liveDtl > 0.0 && liveDtl <= notifySec && !_demandChangeNotified && nextDem.HasValue)
+        {
+            _demandChangeNotified = true;
+            _lastNotifiedNextDemand = nextDem.Value;
+
+            int secsLeft = Math.Max(1, (int)Math.Ceiling(liveDtl));
+            string timeFormatted = $"{secsLeft / 60:D2}:{secsLeft % 60:D2}";
+            string unitLabel = _calc.SelectedUnit == 1 ? "Unit 1" : "Unit 2";
+            string nextLabel = formatDemand(nextDem, false);
+            string curLabel = formatDemand(uState?.Demand, false);
+
+            if (OperatingSystem.IsWindows())
+            {
+                try { MessageBeep(0x00000040); } catch { }
+            }
+
+            RequestShowMessage?.Invoke(
+                "UPCOMING DEMAND CHANGE",
+                $"{unitLabel} demand changes to {nextLabel} in {timeFormatted} ({secsLeft}s).\nCurrent Demand: {curLabel}.",
+                false);
+        }
+
         int thresh = _settings.NextDemandThresholdSeconds;
 
         if (_nextDemandSwitched)
@@ -1595,6 +1644,27 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _settings.EnableTurbineHealthAlert = EnableTurbineHealthAlert;
         UpdateSettingsVisuals();
         _settingsService.SaveSettings(_settings);
+    }
+
+    [RelayCommand]
+    public void ToggleDemandNotifySetting()
+    {
+        EnableDemandChangeNotification = !EnableDemandChangeNotification;
+        _settings.EnableDemandChangeNotification = EnableDemandChangeNotification;
+        if (!EnableDemandChangeNotification)
+            _demandChangeNotified = false;
+        UpdateSettingsVisuals();
+        _settingsService.SaveSettings(_settings);
+    }
+
+    partial void OnDemandNotifySecondsInputChanged(string value)
+    {
+        if (int.TryParse(value, out int sec))
+        {
+            _settings.DemandChangeNotificationSeconds = Math.Clamp(sec, 1, 3600);
+            _demandChangeNotified = false;
+            _settingsService.SaveSettings(_settings);
+        }
     }
 
     partial void OnDemandThresholdSecondsInputChanged(string value)
@@ -1968,6 +2038,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         TurbineAlertStatusText = EnableTurbineHealthAlert ? "ENABLED" : "DISABLED";
         TurbineAlertStatusBrush = EnableTurbineHealthAlert ? green : red;
+
+        DemandNotifyStatusText = EnableDemandChangeNotification ? "ENABLED" : "DISABLED";
+        DemandNotifyStatusBrush = EnableDemandChangeNotification ? green : red;
 
         DiscordPresenceStatusText = EnableDiscordPresence ? "ENABLED" : "DISABLED";
         DiscordPresenceStatusBrush = EnableDiscordPresence ? green : red;

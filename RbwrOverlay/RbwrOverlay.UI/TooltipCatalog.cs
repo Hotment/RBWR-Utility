@@ -259,6 +259,10 @@ public static class TooltipCatalog
             Title: "NEXT DEMAND PRE-LOAD TIMER",
             Description: "Number of seconds left on DTL when the overlay automatically switches its calculator to the upcoming demand setpoint."
         ),
+        ["DemandNotifyConfig"] = new(
+            Title: "DEMAND CHANGE NOTIFICATION",
+            Description: "Alerts you with a popup and chime when Demand Time Left (DTL) reaches the configured number of seconds before the next demand change (default 300s)."
+        ),
         ["TurbineAlarmConfig"] = new(
             Title: "TURBINE HEALTH ALARM",
             Description: "Triggers a warning popup when synced turbine health drops at or below the specified threshold percentage."

@@ -861,4 +861,56 @@ public class ViewModelTests
         Assert.Equal(600.0, vm.DemandSliderValue);
         Assert.True(vm.IsPreset600Active);
     }
+
+    [Fact]
+    public void TestDemandChangeNotification_Default300sAndTriggerLogic()
+    {
+        var settings = new AppSettings();
+        Assert.True(settings.EnableDemandChangeNotification);
+        Assert.Equal(300, settings.DemandChangeNotificationSeconds);
+
+        var vm = CreateTestVm(new DummySettingsService(settings));
+        Assert.Equal("300", vm.DemandNotifySecondsInput);
+        Assert.Equal("ENABLED", vm.DemandNotifyStatusText);
+
+        var notifications = new List<(string Title, string Message)>();
+        vm.RequestShowMessage += (title, msg, _) => notifications.Add((title, msg));
+
+        // 1. DTL above 300s -> no notification
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-1",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 350 }
+        });
+        Assert.Empty(notifications);
+
+        // 2. DTL drops to <= 300s -> fires exactly once
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-1",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 295 }
+        });
+        Assert.Single(notifications);
+        Assert.Equal("UPCOMING DEMAND CHANGE", notifications[0].Title);
+        Assert.Contains("1100 MWe", notifications[0].Message);
+
+        // 3. Subsequent poll in same window -> does NOT double-fire
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "job-notify-1",
+            HeartbeatTimestamp = DateTimeOffset.UtcNow,
+            Unit1 = new UnitState { Demand = 900, NextDemand = 1100, DemandTimeLeft = 280 }
+        });
+        Assert.Single(notifications);
+
+        // 4. Disable notification + change threshold -> persists and suppresses future alerts
+        vm.ToggleDemandNotifySetting();
+        Assert.False(settings.EnableDemandChangeNotification);
+        Assert.Equal("DISABLED", vm.DemandNotifyStatusText);
+
+        vm.DemandNotifySecondsInput = "120";
+        Assert.Equal(120, settings.DemandChangeNotificationSeconds);
+    }
 }

@@ -32,10 +32,14 @@
 
                     <Border x:Name="NavBar" Classes="hud-card nav-bar" Grid.Row="1" Margin="0,0,0,10" ClipToBounds="True">
                         <Grid ColumnDefinitions="*,*,*,*">
-                            <Button x:Name="NavMonitorTab" Grid.Column="0" Classes="cyber-nav active" Content="MONITOR" HorizontalAlignment="Stretch" />
+                            <Button x:Name="NavMonitorTab" Grid.Column="0" Classes="cyber-nav active" Content="MONITOR"
+                                    CornerRadius="{Binding #NavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.LeftOnly}}"
+                                    HorizontalAlignment="Stretch" />
                             <Button Grid.Column="1" Classes="cyber-nav" Content="SERVER SYNC" HorizontalAlignment="Stretch" />
                             <Button Grid.Column="2" Classes="cyber-nav" Content="CONFIG" HorizontalAlignment="Stretch" />
-                            <Button Grid.Column="3" Classes="cyber-nav" Content="FEEDBACK" HorizontalAlignment="Stretch" />
+                            <Button Grid.Column="3" Classes="cyber-nav" Content="FEEDBACK"
+                                    CornerRadius="{Binding #NavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.RightOnly}}"
+                                    HorizontalAlignment="Stretch" />
                         </Grid>
                     </Border>
 
@@ -129,12 +133,16 @@
             <!-- ================= Detailed overlay: CONFIG / SYNC controls ================= -->
             <Border x:Name="ConfigShell" Classes="overlay-shell" Width="470" VerticalAlignment="Top">
                 <StackPanel Spacing="8">
-                    <Border Classes="hud-card nav-bar" ClipToBounds="True">
+                    <Border x:Name="ConfigNavBar" Classes="hud-card nav-bar" ClipToBounds="True">
                         <Grid ColumnDefinitions="*,*,*,*">
-                            <Button Grid.Column="0" Classes="cyber-nav" Content="MONITOR" HorizontalAlignment="Stretch" />
+                            <Button Grid.Column="0" Classes="cyber-nav" Content="MONITOR"
+                                    CornerRadius="{Binding #ConfigNavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.LeftOnly}}"
+                                    HorizontalAlignment="Stretch" />
                             <Button Grid.Column="1" Classes="cyber-nav" Content="SERVER SYNC" HorizontalAlignment="Stretch" />
                             <Button Grid.Column="2" Classes="cyber-nav active" Content="CONFIG" HorizontalAlignment="Stretch" />
-                            <Button Grid.Column="3" Classes="cyber-nav" Content="FEEDBACK" HorizontalAlignment="Stretch" />
+                            <Button Grid.Column="3" Classes="cyber-nav" Content="FEEDBACK"
+                                    CornerRadius="{Binding #ConfigNavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.RightOnly}}"
+                                    HorizontalAlignment="Stretch" />
                         </Grid>
                     </Border>
 
@@ -278,12 +286,16 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="1" Classes="hud-card nav-bar" Margin="10,8,10,0" ClipToBounds="True">
+                <Border x:Name="TabletNavBar" Grid.Row="1" Classes="hud-card nav-bar" Margin="10,8,10,0" ClipToBounds="True">
                     <Grid ColumnDefinitions="*,*,*,*">
-                        <Button Grid.Column="0" Classes="cyber-nav active" Content="UNIT 01" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="0" Classes="cyber-nav active" Content="UNIT 01"
+                                CornerRadius="{Binding #TabletNavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.LeftOnly}}"
+                                HorizontalAlignment="Stretch" />
                         <Button Grid.Column="1" Classes="cyber-nav" Content="UNIT 02" HorizontalAlignment="Stretch" />
                         <Button Grid.Column="2" Classes="cyber-nav" Content="MISC" HorizontalAlignment="Stretch" />
-                        <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG"
+                                CornerRadius="{Binding #TabletNavBar.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.RightOnly}}"
+                                HorizontalAlignment="Stretch" />
                     </Grid>
                 </Border>
 

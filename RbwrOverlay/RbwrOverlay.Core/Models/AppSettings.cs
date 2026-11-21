@@ -61,6 +61,12 @@ public class AppSettings
     [JsonPropertyName("turbine_health_threshold")]
     public double TurbineHealthThreshold { get; set; } = 65.0;
 
+    [JsonPropertyName("enable_demand_change_notification")]
+    public bool EnableDemandChangeNotification { get; set; } = true;
+
+    [JsonPropertyName("demand_change_notification_seconds")]
+    public int DemandChangeNotificationSeconds { get; set; } = 300;
+
     [JsonPropertyName("show_tooltips")]
     public bool ShowTooltips { get; set; } = true;
 

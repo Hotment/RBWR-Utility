@@ -104,12 +104,14 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="1"
+                <Border x:Name="TabletNavBar"
+                        Grid.Row="1"
                         Classes="hud-card nav-bar"
                         Margin="12,10,12,0">
                     <Grid ColumnDefinitions="*,*,*,*">
                         <Button Grid.Column="0" Classes="cyber-nav" Content="UNIT 01" Classes.active="{Binding IsU1}"
                                 Command="{Binding SwitchTabCommand}" CommandParameter="u1"
+                                CornerRadius="{Binding #TabletNavBar.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.LeftOnly}}"
                                 HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
                         <Button Grid.Column="1" Classes="cyber-nav" Content="UNIT 02" Classes.active="{Binding IsU2}"
                                 Command="{Binding SwitchTabCommand}" CommandParameter="u2"
@@ -119,6 +121,7 @@
                                 HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
                         <Button Grid.Column="3" Classes="cyber-nav" Content="CONFIG" Classes.active="{Binding IsConfig}"
                                 Command="{Binding SwitchTabCommand}" CommandParameter="config"
+                                CornerRadius="{Binding #TabletNavBar.CornerRadius, Converter={x:Static conv:CornerRadiusEdgeConverter.RightOnly}}"
                                 HorizontalAlignment="Stretch" Padding="0,7" FontSize="11" />
                     </Grid>
                 </Border>
