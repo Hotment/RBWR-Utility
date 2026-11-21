@@ -371,6 +371,46 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public void Guide_EmbeddedGuideParses_AndEveryContentsLinkHasASection()
+    {
+        var blocks = GuideParser.Parse(GuideParser.LoadEmbedded());
+
+        Assert.IsType<GuideTitle>(blocks[0]);
+        var anchors = blocks.OfType<GuideSection>().Select(s => s.Anchor).ToHashSet();
+        Assert.Contains("14-keyboard-shortcuts", anchors); // F1 jumps here
+
+        // Contents list: every link must point at a real section.
+        int contents = blocks.ToList().FindIndex(b => b is GuideSection { Title: "Contents" });
+        var toc = Assert.IsType<GuideList>(blocks[contents + 1]);
+        Assert.True(toc.Numbered);
+        foreach (string item in toc.Items)
+        {
+            var link = Assert.Single(GuideParser.ParseInlines(item), i => i.Kind == GuideInlineKind.Link);
+            Assert.Contains(link.Target!.TrimStart('#'), anchors);
+        }
+        Assert.Equal(toc.Items.Count, anchors.Count - 1); // every numbered section is listed (minus "Contents")
+
+        // Tables keep their rows and drop the |---| separator.
+        var shortcuts = blocks.OfType<GuideTable>().Single(t => t.Header[0] == "Shortcut");
+        Assert.Contains(shortcuts.Rows, r => r[0] == "**Ctrl+S**" && r[1] == "Save");
+        Assert.DoesNotContain(shortcuts.Rows, r => r[0].StartsWith("---", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Guide_InlinesAndSlugs()
+    {
+        var parts = GuideParser.ParseInlines("Press **Ctrl+S**, type `#00f0ff`, pick *Dark* or see [section 5](#5-x).");
+        Assert.Equal(
+            [GuideInlineKind.Text, GuideInlineKind.Bold, GuideInlineKind.Text, GuideInlineKind.Code, GuideInlineKind.Text,
+             GuideInlineKind.Italic, GuideInlineKind.Text, GuideInlineKind.Link, GuideInlineKind.Text],
+            parts.Select(p => p.Kind));
+        Assert.Equal("#5-x", parts[7].Target);
+
+        Assert.Equal("5-picking-colours-from-the-screen-eyedropper", GuideParser.Slug("5. Picking colours from the screen (eyedropper)"));
+        Assert.Equal("8-shape-corners-borders-glow", GuideParser.Slug("8. Shape: corners, borders, glow"));
+    }
+
+    [Fact]
     public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
     {
         var vm = new MainViewModel();

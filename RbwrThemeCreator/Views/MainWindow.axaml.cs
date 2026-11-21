@@ -588,8 +588,8 @@ public partial class MainWindow : Window, IDialogHost
                 _vm.PreviewMode = e.Key - Key.NumPad1;
                 break;
             case Key.F1:
-                NavTabs.SelectedItem = ThemeTab;
-                Dispatcher.UIThread.Post(() => ShortcutsCard.BringIntoView(), DispatcherPriority.Loaded);
+                NavTabs.SelectedItem = GuideTab;
+                Dispatcher.UIThread.Post(() => GuidePage.ShowSection("14-keyboard-shortcuts"), DispatcherPriority.Loaded);
                 break;
             case Key.Escape when InspectToggle.IsChecked == true:
                 InspectToggle.IsChecked = false;

@@ -230,6 +230,62 @@
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
         <Setter Property="Background" Value="#0b1b26" />
     </Style>
+    <!-- ===== GUIDE tab ===== -->
+    <Style Selector="SelectableTextBlock.guide-text">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="18" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="#c3cad6" />
+        <Setter Property="SelectionBrush" Value="#5500f0ff" />
+    </Style>
+    <Style Selector="SelectableTextBlock.guide-intro">
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="Margin" Value="0,6,0,8" />
+    </Style>
+    <Style Selector="TextBlock.guide-sub">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="TextBlock.guide-num">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.guide-link">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.guide-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Border.guide-table">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Margin" Value="0,2" />
+    </Style>
+    <Style Selector="Border.guide-th">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.guide-tr">
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="BorderBrush" Value="#0dffffff" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.guide-tr:pointerover">
+        <Setter Property="Background" Value="#0affffff" />
+    </Style>
     <Style Selector="Border.pill">
         <Setter Property="Background" Value="{DynamicResource EdPanel}" />
         <Setter Property="BorderThickness" Value="1" />

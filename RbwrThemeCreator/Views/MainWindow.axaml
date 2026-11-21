@@ -205,7 +205,7 @@
 
                             <Border x:Name="ShortcutsCard" Classes="card">
                                 <StackPanel Spacing="8">
-                                    <TextBlock Classes="section-title" Text="KEYBOARD SHORTCUTS  (F1)" />
+                                    <TextBlock Classes="section-title" Text="KEYBOARD SHORTCUTS  (F1 OPENS THE FULL GUIDE)" />
                                     <Grid ColumnDefinitions="150,*,150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                                         <Grid.Styles>
                                             <Style Selector="TextBlock.key">
@@ -705,6 +705,14 @@
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
+                </TabItem>
+
+                <!-- User guide (GUIDE.md rendered in the editor's style) -->
+                <TabItem x:Name="GuideTab">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE897;" /><TextBlock Text="GUIDE" VerticalAlignment="Center" /></StackPanel>
+                    </TabItem.Header>
+                    <views:GuideView x:Name="GuidePage" />
                 </TabItem>
             </TabControl>
 

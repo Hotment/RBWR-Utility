@@ -4,7 +4,7 @@ The RBWR Theme Creator lets you design themes for the RBWR APRM Calculator overl
 any XAML. You pick colours, fonts and shapes, see the result live, and install the theme into the
 overlay with one click.
 
-Press **F1** at any time to see the keyboard shortcuts.
+This guide is also built into the creator: open the **GUIDE** tab, or press **F1** at any time to jump to the keyboard shortcuts.
 
 ---
 
@@ -49,7 +49,7 @@ That's it. Everything below explains each feature in more detail.
 | Area | What it does |
 |---|---|
 | **Top bar** | Undo/redo, NEW, OPEN, SAVE, EXPORT, INSTALL TO OVERLAY. The green version badge checks for updates. |
-| **Left tabs** | THEME, COLOURS, FONTS, SHAPE, IMAGES, ADVANCED, CODE, OVERLAY. |
+| **Left tabs** | THEME, COLOURS, FONTS, SHAPE, IMAGES, ADVANCED, CODE, OVERLAY and GUIDE (this guide). |
 | **Right side** | The live preview of the overlay with your theme. |
 | **Status bar** (bottom) | What just happened, errors, and where the theme is saved. |
 
@@ -327,7 +327,7 @@ Both capture the view you have selected, so switch to ALL first to show every vi
 | **Ctrl+Shift+C** | Copy preview image |
 | **Ctrl+click** (preview) | Find the colours of an element |
 | **Esc** | Clear the search / stop FIND COLOUR |
-| **F1** | Show this list in the app |
+| **F1** | Open this guide at the shortcuts (GUIDE tab) |
 
 **Eyedropper:** left click or Enter picks, right click or Esc cancels, arrows move 1 px, Shift+arrows 10 px.
 
