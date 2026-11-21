@@ -621,6 +621,36 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public void AnimatedColours_RaiseMinOverlayTo231_ButNeverLowerIt()
+    {
+        Assert.True(MainViewModel.IsVersionAtLeast("2.3.1", "2.3.1"));
+        Assert.True(MainViewModel.IsVersionAtLeast("v2.4.0-dev", "2.3.1"));
+        Assert.False(MainViewModel.IsVersionAtLeast("2.3.0", "2.3.1"));
+        Assert.False(MainViewModel.IsVersionAtLeast("", "2.3.1"));
+
+        var vm = new MainViewModel();
+        vm.MinAppVersion = "2.3.0";
+        var card = vm.Groups.SelectMany(g => g.Tokens).First(t => t.Key == "CyberCardBg");
+        Assert.False(vm.HasAnimatedColours);
+
+        card.FillMode = 2; // ANIMATED
+        vm.Refresh();
+        Assert.True(vm.HasAnimatedColours);
+        Assert.Equal(MainViewModel.AnimatedColoursMinOverlay, vm.MinAppVersion);
+
+        // A higher version typed by hand is kept.
+        vm.MinAppVersion = "2.5.0";
+        vm.Refresh();
+        Assert.Equal("2.5.0", vm.MinAppVersion);
+
+        // Without animations nothing is forced.
+        card.FillMode = 0;
+        vm.MinAppVersion = "2.3.0";
+        vm.Refresh();
+        Assert.Equal("2.3.0", vm.MinAppVersion);
+    }
+
+    [Fact]
     public void OldAnimatedColoursSection_IsDroppedOnOpen_NotKeptAsCustomStyles()
     {
         var state = BuiltInThemes.Presets[0].Create();

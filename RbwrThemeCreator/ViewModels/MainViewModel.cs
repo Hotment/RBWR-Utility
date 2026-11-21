@@ -1056,8 +1056,40 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Regenerates XAML, validates it and rebuilds the preview.</summary>
+    /// <summary>
+    /// First overlay version with the safe brush animator. Older overlays can crash on some animated
+    /// colours, so a theme with ANIMATED colours needs at least this version.
+    /// </summary>
+    public const string AnimatedColoursMinOverlay = "2.3.1";
+
+    public bool HasAnimatedColours => _tokens.Values.Any(t => t.IsAnimated);
+
+    /// <summary>Raises Min. overlay to <see cref="AnimatedColoursMinOverlay"/> when the theme has animated colours.</summary>
+    private void EnsureMinOverlayForAnimations()
+    {
+        OnPropertyChanged(nameof(HasAnimatedColours));
+        if (!HasAnimatedColours || IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay))
+            return;
+        MinAppVersion = AnimatedColoursMinOverlay;
+        SetStatus($"Min. overlay set to {AnimatedColoursMinOverlay}: animated colours need overlay v{AnimatedColoursMinOverlay} or newer.");
+    }
+
+    /// <summary>"2.4" >= "2.3.1"; empty or unreadable counts as too old.</summary>
+    public static bool IsVersionAtLeast(string? version, string minimum)
+    {
+        static System.Version? Parse(string? v)
+        {
+            string clean = (v ?? string.Empty).Trim().TrimStart('v', 'V').Split('-', '+')[0];
+            return System.Version.TryParse(clean, out var parsed) ? parsed : null;
+        }
+        var a = Parse(version);
+        var b = Parse(minimum);
+        return a != null && b != null && a >= b;
+    }
+
     public void Refresh()
     {
+        EnsureMinOverlayForAnimations();
         var state = BuildState();
         string xaml = ThemeXamlGenerator.Generate(state);
         GeneratedXaml = xaml;

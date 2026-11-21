@@ -145,6 +145,10 @@
                                             <TextBox Classes="hud" Text="{Binding MinAppVersion}" PlaceholderText="2.3.0" />
                                         </StackPanel>
                                     </Grid>
+                                    <Border Classes="warn-box" Margin="0,8,0,0" IsVisible="{Binding HasAnimatedColours}">
+                                        <TextBlock Classes="warn" TextWrapping="Wrap"
+                                                   Text="This theme has animated colours, so Min. overlay is at least 2.3.1: older overlays can crash on some animations. Players on an older overlay see 'REQUIRES v2.3.1+' in the Theme Manager." />
+                                    </Border>
 
                                     <TextBlock Classes="label" Text="DESCRIPTION" />
                                     <TextBox Classes="hud" Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" PlaceholderText="Short description of the look" />
@@ -456,6 +460,11 @@
                                                                                     <TextBlock Classes="num-suffix" Text="°" />
                                                                                 </StackPanel>
                                                                             </Grid>
+
+                                                                            <Border Classes="warn-box" Margin="0">
+                                                                                <TextBlock Classes="warn" TextWrapping="Wrap" FontSize="10.5"
+                                                                                           Text="Needs overlay v2.3.1 or newer: on older overlays animated colours can crash the overlay. Min. overlay is raised to 2.3.1 for you." />
+                                                                            </Border>
                                                                         </StackPanel>
                                                                     </Border>
 
