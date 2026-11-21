@@ -192,16 +192,11 @@
                                                         <TextBlock Text="Apply" Foreground="{Binding CardAccentBrush}" FontSize="10" FontWeight="SemiBold" />
                                                     </Border>
                                                 </Grid>
-                                                <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
-                                                        CornerRadius="4" Padding="10,8">
-                                                    <TextBlock Text="{Binding CardDescriptionText}" Foreground="{Binding CardTextBrush}" Opacity="0.85"
-                                                               FontSize="10" LineHeight="14" TextWrapping="Wrap" />
-                                                </Border>
                                             </StackPanel>
                                         </Border>
                                     </Border>
                                     <TextBlock Classes="faint" TextWrapping="Wrap"
-                                               Text="Shown with your theme's colours. The description appears when players click Details." />
+                                               Text="Shown with your theme's colours." />
                                 </StackPanel>
                             </Border>
 

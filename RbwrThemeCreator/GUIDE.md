@@ -246,7 +246,7 @@ The **CODE** tab shows the exact `theme.axaml` that will be saved. **COPY** puts
   and **Description**.
 
 The card at the top of the THEME tab shows how your theme will look in the overlay's **Theme Manager**:
-thumbnail, name, version, author and description, drawn in your theme's own colours. It updates live
+thumbnail, name, version and author, drawn in your theme's own colours. It updates live
 while you edit.
 
 ### Where your theme goes

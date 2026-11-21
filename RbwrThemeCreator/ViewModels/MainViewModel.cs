@@ -122,7 +122,6 @@ public partial class MainViewModel : ObservableObject
     public string CardName => string.IsNullOrWhiteSpace(ThemeName) ? "Untitled" : ThemeName.Trim();
     public string CardVersionText => string.IsNullOrWhiteSpace(Version) ? "v1.0.0" : (Version.Trim().StartsWith('v') ? Version.Trim() : $"v{Version.Trim()}");
     public string CardAuthorText => string.IsNullOrWhiteSpace(Author) ? "Unknown Author" : $"by {Author.Trim()}";
-    public string CardDescriptionText => string.IsNullOrWhiteSpace(Description) ? "No description provided." : Description.Trim();
 
     // Brushes of the edited theme, so the card is drawn in the theme's own colours.
     public IBrush CardWindowBrush => TokenBrush("CyberMainBg");
@@ -752,9 +751,6 @@ public partial class MainViewModel : ObservableObject
             case nameof(IsDirty):
                 OnPropertyChanged(nameof(WindowTitle));
                 if (e.PropertyName == nameof(ThemeName)) OnPropertyChanged(nameof(CardName));
-                break;
-            case nameof(Description):
-                OnPropertyChanged(nameof(CardDescriptionText));
                 break;
             case nameof(ThemeId):
             case nameof(Version):
