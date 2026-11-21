@@ -22,11 +22,11 @@ public static class AnimationStrip
     public static readonly AttachedProperty<TokenAnimation?> BorderAnimationProperty =
         AvaloniaProperty.RegisterAttached<Border, TokenAnimation?>("BorderAnimation", typeof(AnimationStrip));
 
-    private static readonly AttachedProperty<CancellationTokenSource?> RunningProperty =
-        AvaloniaProperty.RegisterAttached<Border, CancellationTokenSource?>("Running", typeof(AnimationStrip));
+    private static readonly AttachedProperty<Style?> RunningProperty =
+        AvaloniaProperty.RegisterAttached<Border, Style?>("Running", typeof(AnimationStrip));
 
-    private static readonly AttachedProperty<CancellationTokenSource?> RunningBorderProperty =
-        AvaloniaProperty.RegisterAttached<Border, CancellationTokenSource?>("RunningBorder", typeof(AnimationStrip));
+    private static readonly AttachedProperty<Style?> RunningBorderProperty =
+        AvaloniaProperty.RegisterAttached<Border, Style?>("RunningBorder", typeof(AnimationStrip));
 
     static AnimationStrip()
     {
@@ -41,10 +41,18 @@ public static class AnimationStrip
     public static TokenAnimation? GetBorderAnimation(Border border) => border.GetValue(BorderAnimationProperty);
     public static void SetBorderAnimation(Border border, TokenAnimation? value) => border.SetValue(BorderAnimationProperty, value);
 
-    private static void Restart(Border border, AvaloniaProperty property, TokenAnimation? anim, AttachedProperty<CancellationTokenSource?> running)
+    /// <summary>
+    /// A looping animation must run from a style (Avalonia refuses RunAsync for it), so the border gets a
+    /// small style of its own, matched by a class only this border has. Avalonia stops it when the border
+    /// leaves the screen.
+    /// </summary>
+    private static void Restart(Border border, AvaloniaProperty property, TokenAnimation? anim, AttachedProperty<Style?> running)
     {
-        border.GetValue(running)?.Cancel();
+        string cls = property == Border.BackgroundProperty ? "strip-anim-fill" : "strip-anim-outline";
+        if (border.GetValue(running) is { } old)
+            border.Styles.Remove(old);
         border.SetValue(running, null);
+        border.Classes.Remove(cls);
         if (anim is not { Colors.Count: >= 2 })
             return;
 
@@ -63,10 +71,11 @@ public static class AnimationStrip
             });
         }
 
-        var cts = new CancellationTokenSource();
-        border.SetValue(running, cts);
-        border.DetachedFromVisualTree += (_, _) => cts.Cancel();
-        _ = animation.RunAsync(border, cts.Token);
+        var style = new Style(x => x.OfType<Border>().Class(cls));
+        style.Animations.Add(animation);
+        border.Styles.Add(style);
+        border.SetValue(running, style);
+        border.Classes.Add(cls);
     }
 
     /// <summary>Key frame brushes (same idea as ThemeXamlGenerator.TokenFrames, as brushes).</summary>

@@ -28,11 +28,11 @@ public static class ThemeCardBehaviors
     public static readonly AttachedProperty<CardAnimation?> BorderAnimationProperty =
         AvaloniaProperty.RegisterAttached<Border, CardAnimation?>("BorderAnimation", typeof(ThemeCardBehaviors));
 
-    private static readonly AttachedProperty<CancellationTokenSource?> RunningBackgroundProperty =
-        AvaloniaProperty.RegisterAttached<Border, CancellationTokenSource?>("RunningBackground", typeof(ThemeCardBehaviors));
+    private static readonly AttachedProperty<Style?> RunningBackgroundProperty =
+        AvaloniaProperty.RegisterAttached<Border, Style?>("RunningBackground", typeof(ThemeCardBehaviors));
 
-    private static readonly AttachedProperty<CancellationTokenSource?> RunningBorderProperty =
-        AvaloniaProperty.RegisterAttached<Border, CancellationTokenSource?>("RunningBorder", typeof(ThemeCardBehaviors));
+    private static readonly AttachedProperty<Style?> RunningBorderProperty =
+        AvaloniaProperty.RegisterAttached<Border, Style?>("RunningBorder", typeof(ThemeCardBehaviors));
 
     /// <summary>
     /// A theme's animation styles (XAML &lt;Styles&gt;) applied to this element and everything inside it, so the
@@ -86,13 +86,18 @@ public static class ThemeCardBehaviors
     public static void SetBorderAnimation(Border b, CardAnimation? value) => b.SetValue(BorderAnimationProperty, value);
 
     /// <summary>
-    /// Plays the animation on the card while it is on screen; stops it when the card is removed (the list
-    /// is rebuilt on every search keystroke) so nothing keeps running in the background.
+    /// Plays the animation on the card while it is on screen. A looping animation must run from a style
+    /// (Avalonia refuses RunAsync for it), so the border gets a small style of its own, matched by a class
+    /// only this border has. Avalonia stops it when the card is removed (the list is rebuilt on every
+    /// search keystroke), so nothing keeps running in the background.
     /// </summary>
-    private static void Run(Border border, AvaloniaProperty property, CardAnimation? anim, AttachedProperty<CancellationTokenSource?> running)
+    private static void Run(Border border, AvaloniaProperty property, CardAnimation? anim, AttachedProperty<Style?> running)
     {
-        border.GetValue(running)?.Cancel();
+        string cls = property == Border.BackgroundProperty ? "card-anim-fill" : "card-anim-outline";
+        if (border.GetValue(running) is { } old)
+            border.Styles.Remove(old);
         border.SetValue(running, null);
+        border.Classes.Remove(cls);
         if (anim is not { Colors.Count: >= 2 }) return;
 
         try
@@ -106,10 +111,11 @@ public static class ThemeCardBehaviors
             for (int i = 0; i < frames.Count; i++)
                 animation.Children.Add(new KeyFrame { Cue = new Cue((double)i / (frames.Count - 1)), Setters = { new Setter(property, frames[i]) } });
 
-            var cts = new CancellationTokenSource();
-            border.SetValue(running, cts);
-            border.DetachedFromVisualTree += (_, _) => cts.Cancel();
-            _ = animation.RunAsync(border, cts.Token);
+            var style = new Style(x => x.OfType<Border>().Class(cls));
+            style.Animations.Add(animation);
+            border.Styles.Add(style);
+            border.SetValue(running, style);
+            border.Classes.Add(cls);
         }
         catch
         {
