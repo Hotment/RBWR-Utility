@@ -356,6 +356,11 @@ The **SETTINGS** tab. Everything here is saved on your PC and never changes your
 
 - **Open the last theme at start**: the creator opens the newest theme from *Recent themes* instead of
   a new Cyberpunk theme.
+- **Autosave unsaved work**: every 30 seconds the creator keeps a copy of your unsaved changes. If it
+  crashes or is closed by force, the next start asks **Restore unsaved theme?**: *Restore* brings the
+  theme back with all changes (still unsaved, attached to its folder), *Discard* deletes the copy, and
+  closing the question keeps the copy for the next start. The copy is also removed when you save, or
+  when you close or discard the changes on purpose.
 - **Create missing thumbnails automatically**: adds a `preview.png` to themes you open and, at start-up,
   to installed overlay themes that have none. Turn it off if the creator should never add files to your
   theme folders on its own. Save, Export and Install always write a thumbnail.
@@ -390,7 +395,7 @@ Some actions have no shortcut by default (for example *FIND COLOUR on / off*); g
 
 ### Reset
 
-- **RESET SETTINGS** resets the start-up and update options, the default author, the COLOURS tab boxes, the skipped update, the recent themes
+- **RESET SETTINGS** resets the start-up, autosave and update options, the default author, the COLOURS tab boxes, the skipped update, the recent themes
   list and the preview view. Your keyboard shortcuts (they have their own reset), the overlay folder and
   your themes are kept.
 - **OPEN SETTINGS FOLDER** opens the folder with `settings.json`.

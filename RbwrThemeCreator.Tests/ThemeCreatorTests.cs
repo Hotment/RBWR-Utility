@@ -520,6 +520,45 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Autosave_SurvivesACrash_RestoresIntoTheOriginalFolder_AndSaveClearsIt()
+    {
+        if (!CreatorSettings.Current.AutosaveEnabled) return; // turned off by the user on this PC
+
+        var store = new RecoveryStore(Path.Combine(_tempDir, "recovery"));
+        var seed = BuiltInThemes.Presets[0].Create();
+        seed.Manifest.Id = "crash-theme";
+        seed.Manifest.Name = "Crash Theme";
+        string folder = Path.Combine(_tempDir, "crash-theme");
+        ThemeExporter.WriteFolder(seed, ThemeXamlGenerator.Generate(seed), folder);
+
+        var vm = new MainViewModel { Recovery = store };
+        vm.OpenPath(folder);
+        Assert.False(vm.AutosaveNow()); // just opened, nothing changed: no copy
+        Assert.False(store.Exists);
+
+        vm.Description = "Changed before the crash";
+        vm.Refresh();
+        Assert.True(vm.AutosaveNow());
+        Assert.True(store.Exists);
+        var info = store.Peek();
+        Assert.NotNull(info);
+        Assert.Equal("Crash Theme", info!.ThemeName);
+        Assert.Equal(folder, info.OriginalFolder);
+
+        // "Crash": a brand-new editor restores the copy.
+        var after = new MainViewModel { Recovery = store };
+        Assert.True(after.RestoreRecovery());
+        Assert.Equal("Changed before the crash", after.Description);
+        Assert.Equal(folder, after.CurrentFolder);
+        Assert.True(after.IsDirty);
+
+        // Saving writes the changes to the original folder and removes the copy.
+        await after.SaveCommand.ExecuteAsync(null);
+        Assert.False(store.Exists);
+        Assert.Contains("Changed before the crash", File.ReadAllText(Path.Combine(folder, "theme.json")));
+    }
+
+    [Fact]
     public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
     {
         var vm = new MainViewModel();

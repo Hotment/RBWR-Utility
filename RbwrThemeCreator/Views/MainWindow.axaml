@@ -737,6 +737,10 @@
                                         <TextBlock Classes="muted" Margin="28,0,0,0" Text="Opens the newest theme from Recent themes instead of a new Cyberpunk theme." />
                                     </StackPanel>
                                     <StackPanel Spacing="2">
+                                        <CheckBox Content="Autosave unsaved work (every 30 seconds)" IsChecked="{Binding AutosaveEnabled}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Keeps a copy of your unsaved changes. If the creator crashes or is closed by force, it offers to restore them at the next start." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
                                         <CheckBox Content="Create missing thumbnails automatically" IsChecked="{Binding AutoCreateThumbnails}" FontSize="12" />
                                         <TextBlock Classes="muted" Margin="28,0,0,0" Text="Adds a preview.png to opened themes, and at start-up to installed overlay themes that have none. Save, Export and Install always write one." />
                                     </StackPanel>

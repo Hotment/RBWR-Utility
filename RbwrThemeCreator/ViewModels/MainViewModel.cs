@@ -177,6 +177,22 @@ public partial class MainViewModel : ObservableObject
         set => SetSetting(value, CreatorSettings.Current.AutoCreateThumbnails, v => CreatorSettings.Current.AutoCreateThumbnails = v);
     }
 
+    public bool AutosaveEnabled
+    {
+        get => CreatorSettings.Current.AutosaveEnabled;
+        set
+        {
+            SetSetting(value, CreatorSettings.Current.AutosaveEnabled, v => CreatorSettings.Current.AutosaveEnabled = v);
+            if (!value) Recovery?.Clear();
+        }
+    }
+
+    // ---------- Autosave / crash recovery ----------
+    /// <summary>Where the recovery copy lives. Null (tests) = no autosave at all.</summary>
+    public RecoveryStore? Recovery { get; set; }
+    private DispatcherTimer? _autosaveTimer;
+    private string _loadedFingerprint = string.Empty;
+
     public bool CheckUpdatesAtStart
     {
         get => CreatorSettings.Current.CheckUpdatesAtStart;
@@ -317,6 +333,67 @@ public partial class MainViewModel : ObservableObject
     }
 
     // =====================================================================
+    // Autosave / crash recovery
+    // =====================================================================
+
+    /// <summary>Starts the 30-second autosave (MainWindow calls this once the window is open).</summary>
+    public void StartAutosave()
+    {
+        _autosaveTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => AutosaveNow());
+        _autosaveTimer.Start();
+    }
+
+    /// <summary>
+    /// Writes the recovery copy when there are unsaved changes (a theme that was just opened or
+    /// created and not touched is not copied). Returns true when a copy was written.
+    /// </summary>
+    public bool AutosaveNow()
+    {
+        if (Recovery == null || !AutosaveEnabled) return false;
+        var state = BuildState();
+        string fingerprint = ComputeSaveFingerprint(state, GeneratedXaml);
+        if (!IsDirty || fingerprint == _loadedFingerprint)
+            return false;
+        try
+        {
+            byte[]? custom = CustomThumbnailPath != null && File.Exists(CustomThumbnailPath) ? File.ReadAllBytes(CustomThumbnailPath) : null;
+            Recovery.Save(state, GeneratedXaml, CurrentFolder, custom);
+            return true;
+        }
+        catch
+        {
+            return false; // never interrupt the user over an autosave
+        }
+    }
+
+    /// <summary>
+    /// Loads the recovery copy: the theme comes back with all its changes, unsaved, and attached to
+    /// its original folder (when that still exists) so SAVE writes it there.
+    /// </summary>
+    public bool RestoreRecovery()
+    {
+        if (Recovery?.Peek() is not { } info) return false;
+        try
+        {
+            var state = Recovery.Load();
+            if (state == null) return false;
+            string? folder = info.OriginalFolder != null && Directory.Exists(info.OriginalFolder) ? info.OriginalFolder : null;
+            LoadState(state, folder);
+            _lastSavedFingerprint = string.Empty; // the restored changes are not saved yet
+            IsDirty = true;
+            SetStatus(folder != null
+                ? $"Restored unsaved changes to '{info.ThemeName}'. SAVE to keep them in {folder}."
+                : $"Restored unsaved theme '{info.ThemeName}'. Save it to a folder to keep it.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Could not restore the unsaved theme: {ex.Message}", isError: true);
+            return false;
+        }
+    }
+
+    // =====================================================================
     // SETTINGS tab
     // =====================================================================
 
@@ -421,6 +498,7 @@ public partial class MainViewModel : ObservableObject
         s.OpenLastThemeAtStart = false;
         s.AutoCreateThumbnails = true;
         s.CheckUpdatesAtStart = true;
+        s.AutosaveEnabled = true;
         s.SkippedVersion = string.Empty;
         s.LastAuthor = string.Empty;
         s.DefaultAuthor = string.Empty;
@@ -434,7 +512,7 @@ public partial class MainViewModel : ObservableObject
         PreviewFit = true;
         PreviewMode = 0;
 
-        foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart),
+        foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart), nameof(AutosaveEnabled),
                      nameof(DefaultAuthor), nameof(DefaultAuthorHint),
                      nameof(ShowGradientTip), nameof(ShowContrastCheck), nameof(ShowContrastOk), nameof(ShowContrastWarning),
                      nameof(HasSkippedVersion), nameof(SkippedVersionText) })
@@ -729,6 +807,7 @@ public partial class MainViewModel : ObservableObject
 
         Refresh();
         _lastSavedFingerprint = folder != null ? ComputeSaveFingerprint(BuildState(), GeneratedXaml) : string.Empty;
+        _loadedFingerprint = ComputeSaveFingerprint(BuildState(), GeneratedXaml);
         IsDirty = folder == null;
         if (state.ImportWarnings.Count > 0)
             SetStatus(string.Join(" ", state.ImportWarnings), isError: true);
@@ -1045,7 +1124,9 @@ public partial class MainViewModel : ObservableObject
     private async Task<bool> ConfirmDiscardAsync()
     {
         if (!IsDirty || Dialogs == null) return true;
-        return await Dialogs.ConfirmAsync("Unsaved changes", "The current theme has unsaved changes. Discard them?", "Discard");
+        bool discard = await Dialogs.ConfirmAsync("Unsaved changes", "The current theme has unsaved changes. Discard them?", "Discard");
+        if (discard) Recovery?.Clear(); // the changes are thrown away on purpose
+        return discard;
     }
 
     [RelayCommand]
@@ -1205,6 +1286,7 @@ public partial class MainViewModel : ObservableObject
 
     private void MarkSaved(string folder)
     {
+        Recovery?.Clear(); // saved: nothing left to recover
         // After writing, fonts and assets live in the saved folder; point the editor at those copies.
         _suppressChanges = true;
         try

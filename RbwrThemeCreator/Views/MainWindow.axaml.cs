@@ -68,8 +68,16 @@ public partial class MainWindow : Window, IDialogHost
             var settings = CreatorSettings.Current;
             if (settings.CheckUpdatesAtStart)
                 _ = _vm?.RunUpdateCheckAsync(isManual: false);
-            if (settings.OpenLastThemeAtStart)
-                _vm?.OpenLastTheme();
+            // Unsaved work from a crash comes first; otherwise the last theme if wanted.
+            Dispatcher.UIThread.Post(async () =>
+            {
+                if (_vm == null) return;
+                _vm.Recovery = RecoveryStore.Default;
+                bool restored = await OfferRecoveryAsync();
+                if (!restored && settings.OpenLastThemeAtStart)
+                    _vm.OpenLastTheme();
+                _vm.StartAutosave();
+            }, DispatcherPriority.Loaded);
             // Older installed themes without preview.png get one (shown by the overlay's Theme Manager).
             if (settings.AutoCreateThumbnails)
                 Dispatcher.UIThread.Post(() => _ = CreateMissingInstalledThumbnailsAsync(), DispatcherPriority.ApplicationIdle);
@@ -629,8 +637,36 @@ public partial class MainWindow : Window, IDialogHost
         await flash;
     }
 
+    /// <summary>Asks to restore the recovery copy left by a crash. Returns true when it was restored.</summary>
+    private async Task<bool> OfferRecoveryAsync()
+    {
+        if (_vm?.Recovery?.Peek() is not { } info) return false;
+        string when = info.SavedAtUtc.ToLocalTime().ToString("g");
+        string where = info.OriginalFolder != null
+            ? $" (folder '{Path.GetFileName(info.OriginalFolder.TrimEnd('/', Path.DirectorySeparatorChar))}')"
+            : string.Empty;
+        bool? answer = await AskAsync("Restore unsaved theme",
+            $"The creator closed without saving '{info.ThemeName}'{where}. The last autosave is from {when}." + Environment.NewLine + Environment.NewLine
+            + "Restore it? Discard deletes the autosaved copy.",
+            "Restore", "Discard", danger: false);
+        switch (answer)
+        {
+            case true:
+                return _vm.RestoreRecovery();
+            case false:
+                _vm.Recovery.Clear();
+                _vm.SetStatus("The autosaved theme was discarded.");
+                return false;
+            default:
+                _vm.SetStatus("The autosaved theme is kept; you will be asked again at the next start.");
+                return false;
+        }
+    }
+
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        if (_vm != null && !_vm.IsDirty)
+            _vm.Recovery?.Clear(); // closing with everything saved
         if (_closeConfirmed || _vm == null || !_vm.IsDirty)
             return;
 
@@ -642,6 +678,7 @@ public partial class MainWindow : Window, IDialogHost
         {
             if (await ConfirmAsync("Unsaved changes", "The theme has unsaved changes. Close anyway?", "Close without saving"))
             {
+                _vm.Recovery?.Clear(); // closed without saving on purpose
                 _closeConfirmed = true;
                 Close();
             }
@@ -732,9 +769,16 @@ public partial class MainWindow : Window, IDialogHost
             await Clipboard.SetTextAsync(text);
     }
 
-    public async Task<bool> ConfirmAsync(string title, string message, string okText = "OK")
+    public async Task<bool> ConfirmAsync(string title, string message, string okText = "OK") =>
+        await AskAsync(title, message, okText, "Cancel", danger: !string.Equals(okText, "OK", StringComparison.OrdinalIgnoreCase)) == true;
+
+    /// <summary>
+    /// Dialog with two buttons. Returns true for <paramref name="okText"/>, false for
+    /// <paramref name="cancelText"/>, null when closed with X or Esc.
+    /// </summary>
+    private async Task<bool?> AskAsync(string title, string message, string okText, string cancelText, bool danger)
     {
-        bool result = false;
+        bool? result = null;
         var dialog = new Window
         {
             Title = title,
@@ -749,12 +793,11 @@ public partial class MainWindow : Window, IDialogHost
             Icon = Icon,
         };
 
-        bool danger = !string.Equals(okText, "OK", StringComparison.OrdinalIgnoreCase);
         var ok = new Button { Content = okText.ToUpperInvariant(), Classes = { danger ? "hud-red" : "hud-blue" }, MinWidth = 100, Padding = new Thickness(14, 6) };
-        var cancel = new Button { Content = "CANCEL", Classes = { "hud" }, MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var cancel = new Button { Content = cancelText.ToUpperInvariant(), Classes = { "hud" }, MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
         var close = new Button { Content = "X", Classes = { "win-btn", "win-close" } };
         ok.Click += (_, _) => { result = true; dialog.Close(); };
-        cancel.Click += (_, _) => dialog.Close();
+        cancel.Click += (_, _) => { result = false; dialog.Close(); };
         close.Click += (_, _) => dialog.Close();
 
         var titleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Background = Brushes.Transparent };

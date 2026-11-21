@@ -30,6 +30,9 @@ public sealed class CreatorSettings
     /// <summary>Create missing preview.png thumbnails (installed themes at start-up, opened themes).</summary>
     public bool AutoCreateThumbnails { get; set; } = true;
 
+    /// <summary>Keep a recovery copy of unsaved work every 30 s (restored after a crash).</summary>
+    public bool AutosaveEnabled { get; set; } = true;
+
     /// <summary>Look for a new creator version when it starts.</summary>
     public bool CheckUpdatesAtStart { get; set; } = true;
 

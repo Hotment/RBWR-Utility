@@ -88,6 +88,21 @@ public static class ThemeExporter
         }
     }
 
+    /// <summary>Same size and the copy is not older than the source (File.Copy keeps the write time).</summary>
+    private static bool IsSameFile(string source, string dest)
+    {
+        try
+        {
+            var s = new FileInfo(source);
+            var d = new FileInfo(dest);
+            return s.Exists && d.Exists && s.Length == d.Length && d.LastWriteTimeUtc >= s.LastWriteTimeUtc;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static void SyncFiles(IEnumerable<ThemeFile> files, string targetDir, List<string> warnings)
     {
         var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -97,6 +112,8 @@ public static class ThemeExporter
             wanted.Add(file.FileName);
             if (string.Equals(Path.GetFullPath(file.SourcePath), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
                 continue;
+            if (IsSameFile(file.SourcePath, dest))
+                continue; // already there (e.g. autosave every 30 s): do not copy big images again
             try
             {
                 File.Copy(file.SourcePath, dest, overwrite: true);
