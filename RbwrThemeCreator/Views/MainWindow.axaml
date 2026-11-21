@@ -204,8 +204,8 @@
                                             <TextBlock Classes="muted" Text="{Binding ThumbnailModeText}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <Button Classes="hud" Content="USE AUTO" Command="{Binding UseAutoThumbnailCommand}" IsVisible="{Binding HasCustomThumbnail}"
-                                                    ToolTip.Tip="Go back to the automatic thumbnail (the MONITOR view of your theme)" />
+                                            <Button Classes="hud-red" Content="REMOVE" Command="{Binding UseAutoThumbnailCommand}" IsVisible="{Binding HasCustomThumbnail}"
+                                                    ToolTip.Tip="Remove the custom image: the thumbnail is generated automatically again (the MONITOR view of your theme)" />
                                             <Button Classes="hud-blue" Content="CUSTOM IMAGE…" Command="{Binding ChooseCustomThumbnailCommand}"
                                                     ToolTip.Tip="Use your own picture (.png, .jpg, .webp, .bmp) as the thumbnail in the overlay's Theme Manager" />
                                         </StackPanel>

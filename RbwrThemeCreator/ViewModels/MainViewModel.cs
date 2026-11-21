@@ -480,7 +480,7 @@ public partial class MainViewModel : ObservableObject
     private void UseAutoThumbnail()
     {
         CustomThumbnailPath = null;
-        SetStatus("Thumbnail is automatic again (the MONITOR view of your theme).");
+        SetStatus("Custom thumbnail removed. The thumbnail is generated automatically again; Save to update preview.png.");
     }
 
     /// <summary>The token's brush as the theme draws it (gradient and opacity included).</summary>
