@@ -50,6 +50,9 @@ public partial class ThemeEntryViewModel : ObservableObject
     public Bitmap? Thumbnail { get; }
     public bool HasThumbnail => Thumbnail != null;
 
+    /// <summary>This theme's colours and fonts: the card is drawn in the theme's own look.</summary>
+    public IReadOnlyDictionary<object, object?>? CardResources { get; }
+
     public ThemeEntryViewModel(InstalledThemeInfo info, bool isActive, bool isExpanded, ThemeSelectorViewModel owner)
     {
         Info = info;
@@ -58,6 +61,7 @@ public partial class ThemeEntryViewModel : ObservableObject
         _owner = owner;
 
         Thumbnail = ThemeThumbnailService.Get(info);
+        CardResources = ThemeCardResources.Get(info);
     }
 
     partial void OnIsExpandedChanged(bool value)

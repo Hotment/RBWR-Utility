@@ -95,7 +95,10 @@
                     <ItemsControl ItemsSource="{Binding FilteredThemes}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ThemeEntryViewModel">
+                                <!-- Each card is drawn in its own theme's colours (its resources are attached to it),
+                                     with the theme's window glow colour as the outline. -->
                                 <Border Classes="hud-card"
+                                        behaviors:ThemeCardBehaviors.Resources="{Binding CardResources}"
                                         Padding="11,9"
                                         Margin="0,0,0,8"
                                         Cursor="Hand"

@@ -128,6 +128,7 @@ public partial class MainViewModel : ObservableObject
     public IBrush CardWindowBrush => TokenBrush("CyberMainBg");
     public IBrush CardBackgroundBrush => TokenBrush("CyberCardBg");
     public IBrush CardBorderBrush => TokenBrush("CyberBorder");
+    public IBrush CardGlowBrush => TokenBrush("CyberBorderGlow"); // the card outline in the Theme Manager
     public IBrush CardPanelBrush => TokenBrush("DarkPanelBg");
     public IBrush CardTextBrush => TokenBrush("TextLight");
     public IBrush CardMutedBrush => TokenBrush("TextMuted");
@@ -136,7 +137,7 @@ public partial class MainViewModel : ObservableObject
 
     private static readonly string[] CardBrushProperties =
     [
-        nameof(CardWindowBrush), nameof(CardBackgroundBrush), nameof(CardBorderBrush), nameof(CardPanelBrush),
+        nameof(CardWindowBrush), nameof(CardBackgroundBrush), nameof(CardBorderBrush), nameof(CardGlowBrush), nameof(CardPanelBrush),
         nameof(CardTextBrush), nameof(CardMutedBrush), nameof(CardGoldBrush), nameof(CardAccentBrush),
     ];
 

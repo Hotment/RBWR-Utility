@@ -134,6 +134,38 @@
                             <TextBlock Classes="page-title" Text="THEME" />
                             <TextBlock Classes="page-sub" Text="Name and details shown in the overlay's theme list." />
 
+                            <Border Classes="card">
+                                <StackPanel>
+                                    <TextBlock Classes="label" Text="NAME" Margin="0,0,0,4" />
+                                    <TextBox Classes="hud" Text="{Binding ThemeName}" PlaceholderText="My Theme" />
+
+                                    <TextBlock Classes="label" Text="ID (FOLDER NAME — lowercase, no spaces)" />
+                                    <TextBox Classes="hud" Text="{Binding ThemeId}" PlaceholderText="my-theme" />
+
+                                    <Grid ColumnDefinitions="*,10,100,10,110">
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Classes="label" Text="AUTHOR" />
+                                            <TextBox Classes="hud" Text="{Binding Author}" PlaceholderText="Your name" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Classes="label" Text="VERSION" />
+                                            <TextBox Classes="hud" Text="{Binding Version}" PlaceholderText="1.0.0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Classes="label" Text="MIN. OVERLAY" />
+                                            <TextBox Classes="hud" Text="{Binding MinAppVersion}" PlaceholderText="2.3.0" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Classes="label" Text="DESCRIPTION" />
+                                    <TextBox Classes="hud" Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" PlaceholderText="Short description of the look" />
+
+                                    <Border Classes="warn-box" Margin="0,12,0,0" IsVisible="{Binding HasManifestProblems}">
+                                        <TextBlock Classes="warn" Text="{Binding ManifestProblems}" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
                             <!-- How the theme's card looks in the overlay's Theme Manager, in the theme's own colours. -->
                             <Border Classes="card accent-card">
                                 <StackPanel Spacing="10">
@@ -141,9 +173,10 @@
                                         <TextBlock Classes="section-title" Text="IN THE OVERLAY'S THEME MANAGER" VerticalAlignment="Center" />
                                         <TextBlock Grid.Column="1" Classes="faint" Text="live preview" VerticalAlignment="Center" />
                                     </Grid>
-                                    <Border Background="{Binding CardWindowBrush}" CornerRadius="10" Padding="12">
-                                        <Border Background="{Binding CardBackgroundBrush}" BorderBrush="{Binding CardBorderBrush}"
-                                                BorderThickness="1" CornerRadius="6" Padding="11,9">
+                                    <Border Background="#0b0e14" CornerRadius="10" Padding="12">
+                                        <!-- Card fill = the theme's main background (gradients included), like the overlay. -->
+                                        <Border Background="{Binding CardWindowBrush}" BorderBrush="{Binding CardGlowBrush}"
+                                                BorderThickness="1" CornerRadius="4" Padding="11,9">
                                             <StackPanel Spacing="8">
                                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                                     <Border Width="56" Height="54" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True" VerticalAlignment="Center"
@@ -180,38 +213,6 @@
                                     </Border>
                                     <TextBlock Classes="faint" TextWrapping="Wrap"
                                                Text="Shown with your theme's colours. The description appears when players click Details." />
-                                </StackPanel>
-                            </Border>
-
-                            <Border Classes="card">
-                                <StackPanel>
-                                    <TextBlock Classes="label" Text="NAME" Margin="0,0,0,4" />
-                                    <TextBox Classes="hud" Text="{Binding ThemeName}" PlaceholderText="My Theme" />
-
-                                    <TextBlock Classes="label" Text="ID (FOLDER NAME — lowercase, no spaces)" />
-                                    <TextBox Classes="hud" Text="{Binding ThemeId}" PlaceholderText="my-theme" />
-
-                                    <Grid ColumnDefinitions="*,10,100,10,110">
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Classes="label" Text="AUTHOR" />
-                                            <TextBox Classes="hud" Text="{Binding Author}" PlaceholderText="Your name" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Classes="label" Text="VERSION" />
-                                            <TextBox Classes="hud" Text="{Binding Version}" PlaceholderText="1.0.0" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="4">
-                                            <TextBlock Classes="label" Text="MIN. OVERLAY" />
-                                            <TextBox Classes="hud" Text="{Binding MinAppVersion}" PlaceholderText="2.3.0" />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <TextBlock Classes="label" Text="DESCRIPTION" />
-                                    <TextBox Classes="hud" Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" PlaceholderText="Short description of the look" />
-
-                                    <Border Classes="warn-box" Margin="0,12,0,0" IsVisible="{Binding HasManifestProblems}">
-                                        <TextBlock Classes="warn" Text="{Binding ManifestProblems}" />
-                                    </Border>
                                 </StackPanel>
                             </Border>
 
