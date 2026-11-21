@@ -12,6 +12,7 @@ public partial class App : Application
 
     public override void Initialize()
     {
+        Services.SafeBrushAnimator.Register();
         AvaloniaXamlLoader.Load(this);
     }
 

@@ -310,10 +310,14 @@
                                 </Grid>
                             </Border>
 
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,10">
                                 <TextBox x:Name="TokenSearchBox" Classes="hud" Text="{Binding TokenSearch}" />
                                 <Button Grid.Column="1" Classes="hud" Content="CLEAR" Margin="6,0,0,0" Command="{Binding ClearTokenSearchCommand}"
                                         IsVisible="{Binding TokenSearch, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <Button Grid.Column="2" Classes="hud" Content="COLLAPSE ALL" Margin="6,0,0,0" Command="{Binding CollapseAllColoursCommand}"
+                                        ToolTip.Tip="Fold every group and every gradient / animation editor" />
+                                <Button Grid.Column="3" Classes="hud" Content="EXPAND ALL" Margin="6,0,0,0" Command="{Binding ExpandAllColoursCommand}"
+                                        ToolTip.Tip="Unfold every group" />
                             </Grid>
                             <TextBlock Classes="muted" Text="No colours match the search." Margin="4,0,0,10" IsVisible="{Binding HasNoSearchResults}" />
 
@@ -322,22 +326,42 @@
                                     <DataTemplate x:DataType="vm:TokenGroupViewModel">
                                         <Border Classes="card" IsVisible="{Binding HasMatches}">
                                             <StackPanel>
-                                                <TextBlock Classes="section-title" Text="{Binding Name}" />
-                                                <TextBlock Classes="muted" Text="{Binding Description}" Margin="0,2,0,8" />
-                                                <ItemsControl ItemsSource="{Binding Tokens}">
+                                                <Button Classes="group-head" Command="{Binding ToggleCommand}" ToolTip.Tip="Fold / unfold this group">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel>
+                                                            <TextBlock Classes="section-title" Text="{Binding Name}" />
+                                                            <TextBlock Classes="muted" Text="{Binding Description}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Classes="fold-glyph" Text="{Binding Glyph}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+                                                <ItemsControl ItemsSource="{Binding Tokens}" IsVisible="{Binding IsExpanded}" Margin="0,8,0,0">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate x:DataType="vm:TokenViewModel">
                                                             <Border Classes="token-row" Classes.flash="{Binding IsFlashing}" IsVisible="{Binding IsMatch}" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
                                                                     ToolTip.Tip="Double-click to show where this colour is used" ToolTip.ShowDelay="900">
                                                                 <StackPanel>
-                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,148">
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,148" RowDefinitions="Auto,Auto">
                                                                         <views:HudColorPicker Grid.Column="0" Color="{Binding Color}" VerticalAlignment="Center" />
-                                                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Hint}">
-                                                                            <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                                            <TextBlock Classes="faint" Text="{Binding Key}" />
-                                                                        </StackPanel>
-                                                                        <ToggleButton Grid.Column="2" Classes="grad-toggle" IsChecked="{Binding IsGradient}" IsVisible="{Binding SupportsGradient}"
-                                                                                      Content="GRADIENT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Use a gradient instead of a solid colour" />
+                                                                        <TextBlock Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Text="{Binding Label}" FontSize="12.5" FontWeight="SemiBold"
+                                                                                   TextTrimming="CharacterEllipsis" Background="Transparent" ToolTip.Tip="{Binding Hint}" />
+                                                                        <!-- Line 2: resource key, how the colour is drawn (one of three), a small live preview, fold arrow -->
+                                                                        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" ColumnDefinitions="Auto,Auto,*,Auto" Margin="12,6,0,0">
+                                                                            <TextBlock Classes="faint" Text="{Binding Key}" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="96" />
+                                                                            <Border Grid.Column="1" Classes="seg-host" IsVisible="{Binding SupportsGradient}" VerticalAlignment="Center">
+                                                                                <TabStrip Classes="seg mini" SelectedIndex="{Binding FillMode}">
+                                                                                    <TabStripItem Content="SOLID" ToolTip.Tip="One plain colour" />
+                                                                                    <TabStripItem Content="GRADIENT" ToolTip.Tip="Two to six colours blending into each other" />
+                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}"
+                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay" />
+                                                                                </TabStrip>
+                                                                            </Border>
+                                                                            <!-- Folded: the gradient / animation stays visible as a thin strip -->
+                                                                            <Border Grid.Column="2" Classes="mini-strip" Background="{Binding PreviewBrush}" IsVisible="{Binding ShowGradientMini}" />
+                                                                            <Border Grid.Column="2" Classes="mini-strip" views:AnimationStrip.Animation="{Binding AnimPreview}" IsVisible="{Binding ShowAnimMini}" />
+                                                                            <Button Grid.Column="3" Classes="fold" Content="{Binding EditorGlyph}" Command="{Binding ToggleEditorCommand}"
+                                                                                    IsVisible="{Binding HasEditor}" ToolTip.Tip="{Binding EditorToggleTip}" />
+                                                                        </Grid>
                                                                         <TextBox Grid.Column="3" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
                                                                                  Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
                                                                                  ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
@@ -351,8 +375,92 @@
                                                                         </Grid>
                                                                     </Grid>
 
+                                                                    <!-- Animation editor (only when ANIMATED is on): built like the gradient editor below -->
+                                                                    <Border Classes="grad-panel" IsVisible="{Binding ShowAnimEditor}">
+                                                                        <StackPanel Spacing="10">
+                                                                            <Border Classes="grad-strip" views:AnimationStrip.Animation="{Binding AnimPreview}"
+                                                                                    ToolTip.Tip="Live preview of the animation" />
+
+                                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,10,0">
+                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,2">
+                                                                                        <ItemsControl ItemsSource="{Binding AnimColours}">
+                                                                                            <ItemsControl.ItemsPanel>
+                                                                                                <ItemsPanelTemplate>
+                                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                                                                </ItemsPanelTemplate>
+                                                                                            </ItemsControl.ItemsPanel>
+                                                                                            <ItemsControl.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:AnimationColourViewModel">
+                                                                                                    <Border Classes="stop-chip">
+                                                                                                        <StackPanel Spacing="4">
+                                                                                                            <Grid ColumnDefinitions="*,Auto" Height="16">
+                                                                                                                <TextBlock Classes="label" Text="{Binding Number}" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                                                                                                <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
+                                                                                                                        IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
+                                                                                                            </Grid>
+                                                                                                            <views:HudColorPicker Color="{Binding Color}" IsAlphaEnabled="False" HorizontalAlignment="Center" />
+                                                                                                        </StackPanel>
+                                                                                                    </Border>
+                                                                                                </DataTemplate>
+                                                                                            </ItemsControl.ItemTemplate>
+                                                                                        </ItemsControl>
+                                                                                        <Button Classes="stop-add" Command="{Binding AddAnimColourCommand}" IsEnabled="{Binding CanAddAnimColour}"
+                                                                                                ToolTip.Tip="Add another colour to the animation (up to 4)" VerticalAlignment="Stretch">
+                                                                                            <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                                                <TextBlock Text="+" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                                                                                                <TextBlock Text="{Binding AnimStopCountText}" FontSize="8.5" FontWeight="Bold" HorizontalAlignment="Center" Opacity="0.75" />
+                                                                                            </StackPanel>
+                                                                                        </Button>
+                                                                                    </StackPanel>
+                                                                                </ScrollViewer>
+                                                                                <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                                                    <Button Classes="hud" Content="REVERSE" Command="{Binding ReverseAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of the colours" />
+                                                                                    <Button Classes="hud" Content="SHIFT" Command="{Binding ShiftAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Move every colour one place (the last one becomes the first)" />
+                                                                                    <Button Classes="hud" Content="RANDOM" Command="{Binding RandomAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="New colours that go well together" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                            <!-- How it moves + how fast -->
+                                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                                <Border Classes="seg-host" VerticalAlignment="Center">
+                                                                                    <TabStrip Classes="seg mini" SelectedIndex="{Binding AnimMode}">
+                                                                                        <TabStripItem Content="ALL AT ONCE" ToolTip.Tip="Everything in this colour changes colour together" />
+                                                                                        <TabStripItem Content="FLOW" ToolTip.Tip="The colours move along one after another, like a running gradient" />
+                                                                                    </TabStrip>
+                                                                                </Border>
+                                                                                <Slider Grid.Column="1" Minimum="1" Maximum="20" Value="{Binding AnimSeconds}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
+                                                                                        ToolTip.Tip="Seconds for one full loop: higher is calmer" />
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" ToolTip.Tip="Seconds for one loop (1 to 20). Type a number and press Enter.">
+                                                                                    <TextBox Classes="num-input" Text="{Binding AnimSecondsInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                    <TextBlock Classes="num-suffix" Text="s" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                            <!-- Flow direction (same controls as the gradient direction) -->
+                                                                            <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsFlow}">
+                                                                                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                                                <Button Classes="dir" Content="→" Command="{Binding SetAnimDirectionCommand}" CommandParameter="0" ToolTip.Tip="Flow left to right" />
+                                                                                <Button Classes="dir" Content="↘" Command="{Binding SetAnimDirectionCommand}" CommandParameter="45" ToolTip.Tip="Flow top-left to bottom-right" />
+                                                                                <Button Classes="dir" Content="↓" Command="{Binding SetAnimDirectionCommand}" CommandParameter="90" ToolTip.Tip="Flow top to bottom" />
+                                                                                <Button Classes="dir" Content="↙" Command="{Binding SetAnimDirectionCommand}" CommandParameter="135" ToolTip.Tip="Flow top-right to bottom-left" />
+                                                                                <Button Classes="dir" Content="←" Command="{Binding SetAnimDirectionCommand}" CommandParameter="180" ToolTip.Tip="Flow right to left" />
+                                                                                <Button Classes="dir" Content="↖" Command="{Binding SetAnimDirectionCommand}" CommandParameter="225" ToolTip.Tip="Flow bottom-right to top-left" />
+                                                                                <Button Classes="dir" Content="↑" Command="{Binding SetAnimDirectionCommand}" CommandParameter="270" ToolTip.Tip="Flow bottom to top" />
+                                                                                <Button Classes="dir" Content="↗" Command="{Binding SetAnimDirectionCommand}" CommandParameter="315" ToolTip.Tip="Flow bottom-left to top-right" />
+                                                                                </StackPanel>
+                                                                                <Slider Grid.Column="1" Minimum="0" Maximum="359" Value="{Binding AnimAngle}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
+                                                                                        ToolTip.Tip="Flow direction" />
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" ToolTip.Tip="Type the angle in degrees and press Enter">
+                                                                                    <TextBox Classes="num-input" Text="{Binding AnimAngleInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                    <TextBlock Classes="num-suffix" Text="°" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+                                                                        </StackPanel>
+                                                                    </Border>
+
                                                                     <!-- Gradient editor (only when GRAD is on) -->
-                                                                    <Border Classes="grad-panel" IsVisible="{Binding IsGradient}">
+                                                                    <Border Classes="grad-panel" IsVisible="{Binding ShowGradientEditor}">
                                                                         <StackPanel Spacing="10">
                                                                             <Border Classes="grad-strip" Background="{Binding PreviewBrush}" />
 

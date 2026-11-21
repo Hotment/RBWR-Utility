@@ -668,12 +668,32 @@ public partial class MainViewModel : ObservableObject
                 if (match) visible++;
             }
             group.HasMatches = any;
+            if (words.Length > 0 && any)
+                group.IsExpanded = true; // a search never hides its results in a folded group
         }
         HasNoSearchResults = visible == 0;
     }
 
     [RelayCommand]
     private void ClearTokenSearch() => TokenSearch = string.Empty;
+
+    /// <summary>COLOURS → COLLAPSE ALL: fold every group and every gradient / animation editor.</summary>
+    [RelayCommand]
+    private void CollapseAllColours()
+    {
+        foreach (var group in Groups)
+        {
+            group.IsExpanded = false;
+            foreach (var token in group.Tokens) token.IsEditorOpen = false;
+        }
+    }
+
+    /// <summary>COLOURS → EXPAND ALL: unfold every group (editors stay as they are).</summary>
+    [RelayCommand]
+    private void ExpandAllColours()
+    {
+        foreach (var group in Groups) group.IsExpanded = true;
+    }
 
     /// <summary>Token view models for the given keys, in catalogue order.</summary>
     public IReadOnlyList<TokenViewModel> GetTokens(IEnumerable<string> keys)
@@ -687,6 +707,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (tokens.Any(t => !t.IsMatch))
             TokenSearch = string.Empty;
+        foreach (var group in Groups.Where(g => g.Tokens.Any(tokens.Contains)))
+            group.IsExpanded = true;
         foreach (var t in tokens) t.IsFlashing = false;
         await Task.Delay(30);
         foreach (var t in tokens) t.IsFlashing = true;

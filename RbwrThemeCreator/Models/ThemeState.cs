@@ -6,10 +6,20 @@ namespace RbwrThemeCreator.Models;
 /// <summary>
 /// Value of a brush token. <see cref="Color"/> is the solid colour, or the first stop of the gradient.
 /// </summary>
-public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec? Gradient = null)
+public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec? Gradient = null, TokenAnimation? Animation = null)
 {
     /// <summary>Single representative colour (used for &lt;Color&gt; mirrors, glow and contrast).</summary>
     public Color Representative => Gradient == null ? Color : GradientSpec.Average(Color, Gradient);
+}
+
+/// <summary>
+/// A colour token that changes by itself in the overlay.
+/// <see cref="Flow"/> = false: the whole element goes through <see cref="Colors"/> at once.
+/// <see cref="Flow"/> = true: a gradient of <see cref="Colors"/> whose colours move along, one after another.
+/// </summary>
+public sealed record TokenAnimation(IReadOnlyList<Color> Colors, bool Flow, double Seconds, double Angle = 0)
+{
+    public const int MaxColors = 4;
 }
 
 /// <summary>

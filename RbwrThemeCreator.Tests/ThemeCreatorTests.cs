@@ -559,6 +559,93 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public void AnimatedTokens_AllAtOnceAndFlow_AreWrittenForEveryOverlayUsage_AndComeBackOnOpen()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "token-anim";
+        state.Manifest.Name = "Token Anim";
+        var red = Color.Parse("#ff0000");
+        var green = Color.Parse("#00ff00");
+        var blue = Color.Parse("#0000ff");
+        state.Tokens["CyberCardBg"] = state.Tokens["CyberCardBg"] with { Animation = new TokenAnimation([red, green, blue], Flow: true, Seconds: 5) };
+        state.Tokens["NeonCyan"] = state.Tokens["NeonCyan"] with { Animation = new TokenAnimation([red, blue], Flow: false, Seconds: 3) };
+
+        string xaml = ThemeXamlGenerator.Generate(state);
+
+        // Every style where the overlay uses the colour gets an animation.
+        foreach (var usage in TokenUsages.For("CyberCardBg").Concat(TokenUsages.For("NeonCyan")))
+            Assert.Contains($"<Style Selector=\"{System.Security.SecurityElement.Escape(usage.Selector)}\">", xaml);
+        Assert.True(TokenUsages.For("CyberCardBg").Count >= 5);
+
+        // Flow: a gradient whose colours shift one place per frame (n + 1 frames, last = first).
+        var flow = ThemeXamlGenerator.TokenFrames(state.Tokens["CyberCardBg"], state.Tokens["CyberCardBg"].Animation!);
+        Assert.Equal(4, flow.Count);
+        Assert.All(flow, f => Assert.StartsWith("<LinearGradientBrush", f));
+        Assert.Equal(flow[0], flow[^1]);
+        Assert.NotEqual(flow[0], flow[1]);
+
+        // All at once: solid colours and back to the first.
+        var whole = ThemeXamlGenerator.TokenFrames(state.Tokens["NeonCyan"], state.Tokens["NeonCyan"].Animation!);
+        Assert.Equal(["#ff0000", "#0000ff", "#ff0000"], whole);
+
+        // Opening the theme again: same animations, nothing leaks into the custom styles, stable output.
+        var reopened = ThemeImporter.FromXaml(xaml, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        var card = reopened.Tokens["CyberCardBg"].Animation;
+        Assert.NotNull(card);
+        Assert.True(card!.Flow);
+        Assert.Equal([red, green, blue], card.Colors);
+        Assert.Equal(5, card.Seconds);
+        Assert.False(reopened.Tokens["NeonCyan"].Animation!.Flow);
+        Assert.Null(reopened.Tokens["CyberBorder"].Animation);
+        Assert.DoesNotContain("Style.Animations", reopened.CustomStyles);
+        Assert.Equal(xaml, ThemeXamlGenerator.Generate(reopened));
+
+        // Colours the overlay styles never use get no ANIMATE button (it would do nothing).
+        var vm = new MainViewModel();
+        var tokens = vm.Groups.SelectMany(g => g.Tokens).ToDictionary(t => t.Key);
+
+        // GRADIENT and ANIMATE are one or the other.
+        var cardRow = tokens["CyberCardBg"];
+        cardRow.IsGradient = true;
+        cardRow.IsAnimated = true;
+        Assert.False(cardRow.IsGradient);
+        Assert.Null(cardRow.ToValue().Gradient);
+        Assert.NotNull(cardRow.ToValue().Animation);
+        cardRow.IsGradient = true;
+        Assert.False(cardRow.IsAnimated);
+        Assert.Null(cardRow.ToValue().Animation);
+        Assert.NotNull(cardRow.ToValue().Gradient);
+        Assert.True(tokens["CyberCardBg"].SupportsAnimation);
+        Assert.False(tokens["NeonPurple"].SupportsAnimation);
+        Assert.False(tokens["TextLight"].SupportsAnimation); // no gradient, no animation
+    }
+
+    [Fact]
+    public void OldAnimatedColoursSection_IsDroppedOnOpen_NotKeptAsCustomStyles()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        string xaml = ThemeXamlGenerator.Generate(state);
+        // A theme saved by an earlier build that still had the "Animated colours" card.
+        string old = xaml.Replace("</Styles>", $$"""
+                {{ThemeXamlGenerator.AnimationBegin}}
+                <Style Selector="TextBlock.overlay-title">
+                    <Style.Animations>
+                        <Animation Duration="0:0:6" IterationCount="Infinite">
+                            <KeyFrame Cue="0%"><Setter Property="Foreground" Value="#ff0000" /></KeyFrame>
+                            <KeyFrame Cue="100%"><Setter Property="Foreground" Value="#0000ff" /></KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+                {{ThemeXamlGenerator.AnimationEnd}}
+            </Styles>
+            """);
+
+        var reopened = ThemeImporter.FromXaml(old, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        Assert.DoesNotContain("overlay-title", reopened.CustomStyles);
+        Assert.DoesNotContain("Style.Animations", ThemeXamlGenerator.Generate(reopened));
+    }
+
+    [Fact]
     public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
     {
         var vm = new MainViewModel();

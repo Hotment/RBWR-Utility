@@ -102,6 +102,14 @@ For each colour you can:
   (see [section 5](#5-picking-colours-from-the-screen-eyedropper));
 - use the **opacity slider** (backgrounds only). Lower values let the game show through the overlay.
 
+### Folding
+
+- Click a group's title (SURFACES, ACCENTS, …) to fold or unfold it.
+- **▾ / ▸** at the end of a colour's second line folds its gradient or animation settings. A folded row
+  still shows a thin strip with the gradient, or the animation playing.
+- **COLLAPSE ALL** folds everything; **EXPAND ALL** unfolds the groups. Searching and FIND COLOUR always
+  unfold what they show.
+
 ### Search
 
 Type in the search box (or press **Ctrl+F**) to filter the list. It searches names, keys, where the
@@ -119,6 +127,22 @@ Under **Generate from one colour**:
 
 Tick *Also change status colours* if you want green, red and gold to follow the accent too.
 **Reset to default** brings back the original Cyberpunk colours.
+
+### Animated colours
+
+Colours that can be a gradient have a switch under their name: **SOLID | GRADIENT | ANIMATED** (one of
+the three). **ANIMATED** opens a panel built like the gradient one:
+
+- The strip at the top plays the animation live.
+- 2 to 4 colours: **+** adds one, **×** removes one. **REVERSE** flips the order, **SHIFT** moves every
+  colour one place, **RANDOM** picks new colours that go well together.
+- **ALL AT ONCE**: the whole thing (every card, button or border that uses this colour) changes colour
+  together. **FLOW**: the colours move along it one after another, like a running gradient; the arrows,
+  slider and degree box set the direction, like for a gradient.
+- The slider or the box next to it sets the seconds for one loop (1 to 20).
+
+You see it in the live preview, and it is saved in `theme.axaml`, so it comes back when you open the
+theme again.
 
 ### Contrast check
 
@@ -155,7 +179,7 @@ Tips:
 
 Backgrounds, borders and accents can be gradients instead of solid colours.
 
-1. Click **GRADIENT** on a colour row.
+1. Choose **GRADIENT** in the switch under the colour's name.
 2. Each colour of the gradient is a small card. Click **+** to add colours (up to 6) and **×** to remove one.
 3. Set where each colour sits along the gradient (0% = start, 100% = end).
 4. Choose a direction with the arrow buttons, the angle slider, or by typing degrees.

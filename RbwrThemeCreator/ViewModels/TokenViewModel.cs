@@ -80,6 +80,9 @@ public partial class TokenViewModel : ObservableObject
     public string Hint => Definition.Hint;
     public bool SupportsOpacity => Definition.SupportsOpacity;
     public bool SupportsGradient => Definition.SupportsGradient;
+
+    /// <summary>ANIMATE is offered only where the overlay's styles use this colour (else it would do nothing).</summary>
+    public bool SupportsAnimation => SupportsGradient && TokenUsages.For(Key).Count > 0;
     public string GroupName => Definition.Group;
 
     /// <summary>False when the row is hidden by the COLOURS search box.</summary>
@@ -108,6 +111,213 @@ public partial class TokenViewModel : ObservableObject
 
     [ObservableProperty]
     private double _angle = 90;
+
+    // ---------- Animation (ANIMATE on the row) ----------
+    [ObservableProperty]
+    private bool _isAnimated;
+
+    /// <summary>0 = all at once, 1 = flow (one after another).</summary>
+    [ObservableProperty]
+    private int _animMode;
+
+    [ObservableProperty]
+    private double _animSeconds = 6;
+
+    /// <summary>Flow direction in degrees (same meaning as the gradient angle).</summary>
+    [ObservableProperty]
+    private double _animAngle;
+
+    public ObservableCollection<AnimationColourViewModel> AnimColours { get; } = new();
+    public bool CanAddAnimColour => AnimColours.Count < TokenAnimation.MaxColors;
+    public string AnimSecondsText => $"{Math.Round(AnimSeconds)} s";
+    public string AnimStopCountText => $"{AnimColours.Count}/{TokenAnimation.MaxColors}";
+    public bool IsFlow => AnimMode == 1;
+
+    /// <summary>The animation as it is now (drives the live strip in the ANIMATE panel).</summary>
+    public TokenAnimation? AnimPreview => IsAnimated && AnimColours.Count >= 2
+        ? new TokenAnimation(AnimColours.Select(a => a.Color).ToList(), AnimMode == 1, Math.Round(AnimSeconds), AnimAngle)
+        : null;
+
+    // ---------- Fold the GRADIENT / ANIMATED editor of the row ----------
+    /// <summary>Whether the gradient / animation editor is unfolded. Folded rows show a small live strip instead.</summary>
+    [ObservableProperty]
+    private bool _isEditorOpen;
+
+    public bool HasEditor => IsGradient || IsAnimated;
+    public bool ShowGradientEditor => IsGradient && IsEditorOpen;
+    public bool ShowAnimEditor => IsAnimated && IsEditorOpen;
+    public bool ShowGradientMini => IsGradient && !IsEditorOpen;
+    public bool ShowAnimMini => IsAnimated && !IsEditorOpen;
+    public string EditorGlyph => IsEditorOpen ? "▾" : "▸";
+    public string EditorToggleTip => IsEditorOpen ? "Fold the settings" : "Show the settings";
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ToggleEditor() => IsEditorOpen = !IsEditorOpen;
+
+    partial void OnIsEditorOpenChanged(bool value) => NotifyEditor();
+
+    private void NotifyEditor()
+    {
+        foreach (string name in new[] { nameof(HasEditor), nameof(ShowGradientEditor), nameof(ShowAnimEditor),
+                     nameof(ShowGradientMini), nameof(ShowAnimMini), nameof(EditorGlyph), nameof(EditorToggleTip) })
+            OnPropertyChanged(name);
+    }
+
+    /// <summary>SOLID / GRADIENT / ANIMATED switch on the row (0 / 1 / 2).</summary>
+    public int FillMode
+    {
+        get => IsAnimated ? 2 : IsGradient ? 1 : 0;
+        set
+        {
+            if (value == FillMode) return;
+            IsGradient = value == 1;
+            IsAnimated = value == 2;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Typed loop time in seconds (1..20).</summary>
+    public string AnimSecondsInput
+    {
+        get => ColorUtil.FormatNumber(Math.Round(AnimSeconds));
+        set
+        {
+            if (ColorUtil.TryParseUserNumber(value, out var v))
+                AnimSeconds = Math.Clamp(Math.Round(v), 1, 20);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(AnimSecondsInput)));
+        }
+    }
+
+    /// <summary>Typed flow direction in degrees.</summary>
+    public string AnimAngleInput
+    {
+        get => ColorUtil.FormatNumber(Math.Round(AnimAngle));
+        set
+        {
+            if (ColorUtil.TryParseUserNumber(value, out var v) && double.IsFinite(v))
+                AnimAngle = ((Math.Round(v) % 360) + 360) % 360;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(AnimAngleInput)));
+        }
+    }
+
+    partial void OnAnimAngleChanged(double value)
+    {
+        OnPropertyChanged(nameof(AnimAngleInput));
+        Changed();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void SetAnimDirection(string? degrees)
+    {
+        if (double.TryParse(degrees, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            AnimAngle = d;
+    }
+
+    /// <summary>REVERSE: the colours in the opposite order.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ReverseAnimColours() => SetAnimColours(AnimColours.Select(a => a.Color).Reverse().ToList());
+
+    /// <summary>SHIFT: every colour moves one place (the last one becomes the first).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ShiftAnimColours()
+    {
+        var list = AnimColours.Select(a => a.Color).ToList();
+        if (list.Count < 2) return;
+        SetAnimColours([list[^1], .. list.Take(list.Count - 1)]);
+    }
+
+    /// <summary>RANDOM: fresh colours that go well together (evenly spaced hues around a random start).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void RandomAnimColours()
+    {
+        int n = Math.Max(2, AnimColours.Count);
+        double start = Random.Shared.NextDouble() * 360;
+        SetAnimColours(Enumerable.Range(0, n).Select(i => ColorUtil.FromHsl(start + i * 360.0 / n, 0.85, 0.55, 255)).ToList());
+    }
+
+    private void SetAnimColours(IReadOnlyList<Color> colours)
+    {
+        ResetAnimColours(colours);
+        Changed();
+    }
+
+    partial void OnIsAnimatedChanged(bool value)
+    {
+        if (value && !SupportsAnimation)
+        {
+            IsAnimated = false;
+            return;
+        }
+        if (value && AnimColours.Count < 2 && !_loading)
+            ResetAnimColours([Color, AnimPartner(Color)]);
+        // An animation already has its own colours: GRADIENT and ANIMATE are one or the other.
+        if (value && IsGradient)
+            IsGradient = false;
+        if (value && !_loading)
+            IsEditorOpen = true;
+        OnPropertyChanged(nameof(FillMode));
+        NotifyEditor();
+        Changed();
+    }
+
+    partial void OnAnimModeChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsFlow));
+        Changed();
+    }
+
+    partial void OnAnimSecondsChanged(double value)
+    {
+        OnPropertyChanged(nameof(AnimSecondsText));
+        OnPropertyChanged(nameof(AnimSecondsInput));
+        Changed();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void AddAnimColour()
+    {
+        if (AnimColours.Count >= TokenAnimation.MaxColors) return;
+        AnimColours.Add(NewAnimColour(AnimPartner(AnimColours.Count > 0 ? AnimColours[^1].Color : Color)));
+        UpdateAnimColourState();
+        Changed();
+    }
+
+    private AnimationColourViewModel NewAnimColour(Color c) => new(Changed, RemoveAnimColour, c);
+
+    private void RemoveAnimColour(AnimationColourViewModel colour)
+    {
+        if (AnimColours.Count <= 2) return;
+        AnimColours.Remove(colour);
+        UpdateAnimColourState();
+        Changed();
+    }
+
+    private void ResetAnimColours(IEnumerable<Color> colours)
+    {
+        AnimColours.Clear();
+        foreach (var c in colours.Take(TokenAnimation.MaxColors))
+            AnimColours.Add(NewAnimColour(c));
+        UpdateAnimColourState();
+    }
+
+    private void UpdateAnimColourState()
+    {
+        int number = 1;
+        foreach (var c in AnimColours)
+        {
+            c.CanRemove = AnimColours.Count > 2;
+            c.Number = number++;
+        }
+        OnPropertyChanged(nameof(CanAddAnimColour));
+        OnPropertyChanged(nameof(AnimStopCountText));
+    }
+
+    /// <summary>A second animation colour that clearly differs: the hue turned by 120°.</summary>
+    private static Color AnimPartner(Color c)
+    {
+        var (h, s, l) = ColorUtil.ToHsl(c);
+        return ColorUtil.FromHsl(h + 120, Math.Max(s, 0.6), Math.Clamp(l, 0.35, 0.65), c.A);
+    }
 
     /// <summary>All gradient colours in order; Stops[0] is always the token colour.</summary>
     public ObservableCollection<GradientStopViewModel> Stops { get; } = new();
@@ -185,7 +395,10 @@ public partial class TokenViewModel : ObservableObject
     public TokenValue ToValue() => new(
         Color,
         SupportsOpacity ? Opacity : 1.0,
-        IsGradient && SupportsGradient && Stops.Count >= 2 ? CurrentGradient() : null);
+        IsGradient && !IsAnimated && SupportsGradient && Stops.Count >= 2 ? CurrentGradient() : null,
+        IsAnimated && SupportsAnimation && AnimColours.Count >= 2
+            ? new TokenAnimation(AnimColours.Select(a => a.Color).ToList(), AnimMode == 1, Math.Round(AnimSeconds), AnimAngle)
+            : null);
 
     public void SetValue(TokenValue value)
     {
@@ -206,6 +419,23 @@ public partial class TokenViewModel : ObservableObject
                 ReplaceStops([value.Color, DefaultEnd(value.Color)]);
                 Angle = 90;
                 IsGradient = false;
+            }
+
+            if (value.Animation is { Colors.Count: >= 2 } anim && SupportsAnimation)
+            {
+                ResetAnimColours(anim.Colors);
+                AnimMode = anim.Flow ? 1 : 0;
+                AnimSeconds = Math.Clamp(anim.Seconds, 1, 20);
+                AnimAngle = anim.Angle;
+                IsAnimated = true;
+            }
+            else
+            {
+                ResetAnimColours([value.Color, AnimPartner(value.Color)]);
+                AnimMode = 0;
+                AnimSeconds = 6;
+                AnimAngle = 0;
+                IsAnimated = false;
             }
         }
         finally
@@ -378,6 +608,7 @@ public partial class TokenViewModel : ObservableObject
     private void Changed()
     {
         OnPropertyChanged(nameof(PreviewBrush));
+        OnPropertyChanged(nameof(AnimPreview));
         if (!_loading)
             ValueChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -417,6 +648,12 @@ public partial class TokenViewModel : ObservableObject
             IsGradient = false;
             return;
         }
+        if (value && IsAnimated)
+            IsAnimated = false; // one or the other, see OnIsAnimatedChanged
+        if (value && !_loading)
+            IsEditorOpen = true;
+        OnPropertyChanged(nameof(FillMode));
+        NotifyEditor();
         Changed();
     }
 
@@ -450,6 +687,16 @@ public partial class TokenViewModel : ObservableObject
 
 public sealed partial class TokenGroupViewModel : ObservableObject
 {
+    /// <summary>Unfolded group card (the header arrow folds it).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    private bool _isExpanded = true;
+
+    public string Glyph => IsExpanded ? "▾" : "▸";
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void Toggle() => IsExpanded = !IsExpanded;
+
     public string Name { get; }
     public string Description { get; }
     public IReadOnlyList<TokenViewModel> Tokens { get; }
