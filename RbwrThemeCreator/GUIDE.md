@@ -249,6 +249,11 @@ The card at the top of the THEME tab shows how your theme will look in the overl
 thumbnail, name, version and author, drawn in your theme's own colours. It updates live
 while you edit.
 
+**Thumbnail**: by default it is the MONITOR view of your theme. **CUSTOM IMAGE…** uses your own picture
+instead (`.png`, `.jpg`, `.webp` or `.bmp`, up to 20 MB; it is scaled down and saved as `preview.png`).
+**USE AUTO** goes back to the automatic one. A custom thumbnail is kept when you save again and is
+never replaced by the automatic thumbnails.
+
 ### Where your theme goes
 
 | Action | What happens |

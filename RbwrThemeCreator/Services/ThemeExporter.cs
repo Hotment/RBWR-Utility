@@ -17,6 +17,12 @@ public static class ThemeExporter
     public const string PreviewFileName = "preview.png";
 
     /// <summary>
+    /// Marker next to preview.png: the thumbnail is a custom image, so the creator keeps it instead of
+    /// rendering a new one. The overlay ignores this file.
+    /// </summary>
+    public const string CustomPreviewMarker = "preview.custom";
+
+    /// <summary>
     /// Writes the theme into <paramref name="themeDir"/> (created if needed). When
     /// <paramref name="previewPng"/> is given it is saved as preview.png. Returns warnings.
     /// </summary>
@@ -46,6 +52,19 @@ public static class ThemeExporter
             {
                 warnings.Add($"Could not write {PreviewFileName}: {ex.Message}");
             }
+        }
+
+        string marker = Path.Combine(themeDir, CustomPreviewMarker);
+        try
+        {
+            if (state.CustomPreviewPath != null && previewPng is { Length: > 0 })
+                File.WriteAllText(marker, "This theme uses a custom preview.png (RBWR Theme Creator keeps it instead of rendering one).");
+            else if (File.Exists(marker))
+                File.Delete(marker);
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"Could not update {CustomPreviewMarker}: {ex.Message}");
         }
         return warnings;
     }

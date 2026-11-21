@@ -161,6 +161,11 @@ public static class ThemeImporter
                 state.Assets.Add(new ThemeFile(Path.GetFileName(f), Path.GetFullPath(f)));
         }
 
+        // A custom thumbnail (marked by preview.custom) is kept as the theme's thumbnail.
+        string preview = Path.Combine(dir, ThemeExporter.PreviewFileName);
+        if (File.Exists(Path.Combine(dir, ThemeExporter.CustomPreviewMarker)) && File.Exists(preview))
+            state.CustomPreviewPath = Path.GetFullPath(preview);
+
         if (state.BackgroundImage != null && state.Assets.All(a => !a.FileName.Equals(state.BackgroundImage.FileName, StringComparison.OrdinalIgnoreCase)))
         {
             state.ImportWarnings.Add($"Background image assets/{state.BackgroundImage.FileName} is missing; background image removed.");

@@ -489,6 +489,37 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public void CustomThumbnail_IsMarkedOnSave_FoundOnOpen_AndRemovedWhenAuto()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "custom-thumb";
+        state.Manifest.Name = "Custom Thumb";
+        string xaml = ThemeXamlGenerator.Generate(state);
+        string folder = Path.Combine(_tempDir, "custom-thumb");
+        string marker = Path.Combine(folder, ThemeExporter.CustomPreviewMarker);
+        string preview = Path.Combine(folder, ThemeExporter.PreviewFileName);
+
+        // Saved with a custom thumbnail: preview.png + marker.
+        string custom = Path.Combine(_tempDir, "my-thumb.png");
+        File.WriteAllBytes(custom, TinyPng);
+        state.CustomPreviewPath = custom;
+        ThemeExporter.WriteFolder(state, xaml, folder, File.ReadAllBytes(custom));
+        Assert.True(File.Exists(marker));
+        Assert.Equal(TinyPng, File.ReadAllBytes(preview));
+
+        // Opening the folder again knows the thumbnail is custom.
+        var reopened = ThemeImporter.Load(folder, BuiltInThemes.Cyberpunk);
+        Assert.Equal(Path.GetFullPath(preview), reopened.CustomPreviewPath);
+        Assert.Equal(reopened.CustomPreviewPath, reopened.Clone().CustomPreviewPath);
+
+        // Back to automatic: the marker goes away, so the thumbnail is rendered again next time.
+        reopened.CustomPreviewPath = null;
+        ThemeExporter.WriteFolder(reopened, xaml, folder, TinyPng);
+        Assert.False(File.Exists(marker));
+        Assert.Null(ThemeImporter.Load(folder, BuiltInThemes.Cyberpunk).CustomPreviewPath);
+    }
+
+    [Fact]
     public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
     {
         var vm = new MainViewModel();

@@ -180,8 +180,13 @@ public partial class MainWindow
         Bitmap? image = null;
         try
         {
+            // The user's own thumbnail image.
+            if (_vm?.CustomThumbnailPath is { } custom)
+            {
+                image = PreviewImage.TryLoad(custom, 120);
+            }
             // Cheap path: the MONITOR window of the live preview, when it is on screen.
-            if (Preview.FindControl<Control>("DetailedShell") is { IsEffectivelyVisible: true, Bounds.Width: >= 1 } shell)
+            else if (Preview.FindControl<Control>("DetailedShell") is { IsEffectivelyVisible: true, Bounds.Width: >= 1 } shell)
             {
                 // Rendered at half size, then turned into a plain 96-DPI bitmap: a low-DPI
                 // RenderTargetBitmap is not drawn reliably by an Image.

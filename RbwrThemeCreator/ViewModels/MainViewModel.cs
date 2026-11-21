@@ -117,6 +117,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _previewFit = true;
     [ObservableProperty] private int _previewMode;
 
+    // ---------- THEME tab: custom thumbnail ----------
+    /// <summary>PNG used as preview.png instead of the rendered MONITOR view (null = automatic).</summary>
+    [ObservableProperty] private string? _customThumbnailPath;
+    public bool HasCustomThumbnail => CustomThumbnailPath != null;
+    public string ThumbnailModeText => HasCustomThumbnail ? "Custom image" : "Automatic (MONITOR view)";
+
+    partial void OnCustomThumbnailPathChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasCustomThumbnail));
+        OnPropertyChanged(nameof(ThumbnailModeText));
+        OnEdited();
+    }
+
     // ---------- THEME tab: Theme Manager card preview + recent themes ----------
     /// <summary>How the theme's card looks in the overlay's Theme Manager (same texts as the overlay).</summary>
     public string CardName => string.IsNullOrWhiteSpace(ThemeName) ? "Untitled" : ThemeName.Trim();
@@ -447,6 +460,29 @@ public partial class MainViewModel : ObservableObject
     // THEME tab: Theme Manager card + recent themes
     // =====================================================================
 
+    [RelayCommand]
+    private async Task ChooseCustomThumbnailAsync()
+    {
+        if (Dialogs == null) return;
+        var files = await Dialogs.PickFilesAsync("Choose a thumbnail image", "Images", PreviewImage.PickPatterns, allowMultiple: false);
+        if (files.Count == 0) return;
+        string? png = PreviewImage.MakeThumbnail(files[0], out string error);
+        if (png == null)
+        {
+            SetStatus($"Thumbnail not changed: {error}", isError: true);
+            return;
+        }
+        CustomThumbnailPath = png;
+        SetStatus("Custom thumbnail set. It is saved as preview.png on Save, Export and Install.");
+    }
+
+    [RelayCommand]
+    private void UseAutoThumbnail()
+    {
+        CustomThumbnailPath = null;
+        SetStatus("Thumbnail is automatic again (the MONITOR view of your theme).");
+    }
+
     /// <summary>The token's brush as the theme draws it (gradient and opacity included).</summary>
     private IBrush TokenBrush(string key)
     {
@@ -618,6 +654,7 @@ public partial class MainViewModel : ObservableObject
             Assets = Assets.ToList(),
             CustomResources = CustomResources ?? string.Empty,
             CustomStyles = CustomStyles ?? string.Empty,
+            CustomPreviewPath = CustomThumbnailPath,
         };
         foreach (var (key, vm) in _tokens)
             state.Tokens[key] = vm.ToValue();
@@ -674,6 +711,7 @@ public partial class MainViewModel : ObservableObject
 
             CustomResources = state.CustomResources;
             CustomStyles = state.CustomStyles;
+            CustomThumbnailPath = state.CustomPreviewPath;
 
             GeneratorAccent = _tokens["NeonCyan"].Color;
             CurrentFolder = folder;
@@ -776,6 +814,7 @@ public partial class MainViewModel : ObservableObject
 
             CustomResources = snapshot.CustomResources;
             CustomStyles = snapshot.CustomStyles;
+            CustomThumbnailPath = snapshot.CustomPreviewPath;
             GeneratorAccent = _tokens["NeonCyan"].Color;
         }
         finally
@@ -826,7 +865,7 @@ public partial class MainViewModel : ObservableObject
         var m = state.Manifest;
         string fonts = string.Join("|", state.Fonts.Select(f => $"{f.FileName}:{f.SourcePath}"));
         string assets = string.Join("|", state.Assets.Select(a => $"{a.FileName}:{a.SourcePath}"));
-        return $"{m.Id}\n{m.Name}\n{m.Author}\n{m.Version}\n{m.Description}\n{m.MinAppVersion}\n{fonts}\n{assets}\n---\n{xaml}";
+        return $"{m.Id}\n{m.Name}\n{m.Author}\n{m.Version}\n{m.Description}\n{m.MinAppVersion}\n{fonts}\n{assets}\n{state.CustomPreviewPath}\n---\n{xaml}";
     }
 
     // =====================================================================
@@ -1287,6 +1326,8 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
+            if (CustomThumbnailPath != null && File.Exists(CustomThumbnailPath))
+                return File.ReadAllBytes(CustomThumbnailPath);
             return Dialogs?.RenderThumbnailPng();
         }
         catch

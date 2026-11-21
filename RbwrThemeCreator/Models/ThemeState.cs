@@ -139,6 +139,12 @@ public sealed class ThemeState
     /// <summary>Raw XAML &lt;Style&gt; elements appended after the generated sections.</summary>
     public string CustomStyles { get; set; } = string.Empty;
 
+    /// <summary>
+    /// A PNG chosen by the user as the theme's thumbnail (preview.png). Null = the thumbnail is
+    /// rendered automatically from the MONITOR view.
+    /// </summary>
+    public string? CustomPreviewPath { get; set; }
+
     /// <summary>Non-fatal notes produced while importing.</summary>
     public List<string> ImportWarnings { get; } = new();
 
@@ -164,6 +170,7 @@ public sealed class ThemeState
             Fonts = new List<ThemeFile>(Fonts),
             Assets = new List<ThemeFile>(Assets),
             CustomResources = CustomResources,
+            CustomPreviewPath = CustomPreviewPath,
             CustomStyles = CustomStyles,
         };
         copy.ImportWarnings.AddRange(ImportWarnings);

@@ -33,6 +33,47 @@ public static class PreviewImage
         }
     }
 
+    /// <summary>Image files the user can pick as a custom thumbnail.</summary>
+    public static readonly string[] PickPatterns = ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp"];
+
+    private const long MaxSourceBytes = 20L * 1024 * 1024;
+    private const int ThumbnailWidth = 705; // same width as the rendered thumbnails
+
+    /// <summary>
+    /// Turns any picked image into a thumbnail-sized PNG in the temp folder (so preview.png is always a
+    /// normal PNG the overlay accepts). Returns the new file, or null with <paramref name="error"/>.
+    /// </summary>
+    public static string? MakeThumbnail(string sourcePath, out string error)
+    {
+        error = string.Empty;
+        try
+        {
+            var file = new FileInfo(sourcePath);
+            if (!file.Exists) { error = "The file does not exist."; return null; }
+            if (file.Length > MaxSourceBytes) { error = "The image is larger than 20 MB."; return null; }
+
+            using var fs = file.OpenRead();
+            if (Path.GetExtension(sourcePath).Equals(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!IsSafePng(fs)) { error = "This PNG is broken or its size is too large (max 8192 px per side)."; return null; }
+                fs.Position = 0;
+            }
+            using var bitmap = Bitmap.DecodeToWidth(fs, ThumbnailWidth, BitmapInterpolationMode.HighQuality);
+
+            string dir = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator", "thumbnails");
+            Directory.CreateDirectory(dir);
+            string target = Path.Combine(dir, Guid.NewGuid().ToString("N") + ".png");
+            using (var output = File.Create(target))
+                bitmap.Save(output, new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+            return target;
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not read the image: {ex.Message}";
+            return null;
+        }
+    }
+
     /// <summary>True when the stream starts with a PNG header of a reasonable size.</summary>
     public static bool IsSafePng(Stream stream)
     {
