@@ -168,6 +168,54 @@ public static class ThemeValidator
     }
 
     /// <summary>
+    /// Rejects any FontFamily whose key is an unresolved relative URI (e.g. while typing "Comic" right
+    /// before "fonts/MyFont.ttf#Family" without a comma), which would otherwise crash Avalonia's renderer
+    /// inside TextBlock.RenderCore with ArgumentException.
+    /// </summary>
+    public static void ValidateFontFamilies(Styles styles)
+    {
+        foreach (var key in styles.Resources.Keys)
+        {
+            if (styles.Resources.TryGetResource(key, null, out var value) && value is FontFamily ff)
+                ValidateFontFamily(ff);
+        }
+
+        foreach (var style in styles.OfType<Style>())
+        {
+            foreach (var setter in style.Setters.OfType<Setter>())
+            {
+                if (setter.Value is FontFamily ff)
+                    ValidateFontFamily(ff);
+            }
+        }
+    }
+
+    private static void ValidateFontFamily(FontFamily ff)
+    {
+        if (ff.Key == null) return;
+        var src = ff.Key.Source;
+        if (src.IsAbsoluteUri && string.Equals(src.Scheme, "compositefont", StringComparison.OrdinalIgnoreCase))
+        {
+            string raw = src.OriginalString;
+            string body = raw.StartsWith("compositefont:", StringComparison.OrdinalIgnoreCase)
+                ? raw["compositefont:".Length..]
+                : raw;
+            foreach (string rawPart in body.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string part = rawPart.Trim();
+                if (part.Length == 0) continue;
+                var sub = FontFamily.Parse(part);
+                if (sub.Key != null && !sub.Key.Source.IsAbsoluteUri && sub.Key.BaseUri == null)
+                    throw new InvalidOperationException($"Invalid font reference '{part}'. Separate font names with commas (e.g. 'Comic Sans MS, fonts/MyFont.ttf#My Font').");
+            }
+            return;
+        }
+
+        if (!src.IsAbsoluteUri && ff.Key.BaseUri == null)
+            throw new InvalidOperationException($"Invalid font reference '{ff}'. Separate font names with commas (e.g. 'Comic Sans MS, fonts/MyFont.ttf#My Font').");
+    }
+
+    /// <summary>
     /// Fully loads the theme like the overlay does. Returns the parsed styles (with bitmaps attached) for the preview.
     /// The caller owns the returned bitmaps.
     /// </summary>
@@ -177,6 +225,7 @@ public static class ThemeValidator
         if (UsesOverlayOnlyNamespaces(prepared))
             throw new InvalidOperationException("This theme uses RbwrOverlay.UI behaviors/converters, which only exist inside the overlay. It can still be exported, but the creator cannot preview it.");
         var parsed = AvaloniaRuntimeXamlLoader.Parse<Styles>(prepared);
+        ValidateFontFamilies(parsed);
         var bitmaps = new List<Bitmap>();
         try
         {

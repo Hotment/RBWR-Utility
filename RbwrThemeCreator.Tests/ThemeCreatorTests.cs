@@ -981,6 +981,17 @@ public class ThemeCreatorTests : IDisposable
         """;
         string prepared = ThemeValidator.Prepare(xaml, rel => rel == "fonts/ShareTechMono-Regular.ttf" ? fontPath : null, out _);
         Assert.Contains($"{new Uri(fontPath).AbsoluteUri}#Share Tech Mono, Inter", prepared);
+
+        // Unresolved relative font URI (e.g. mid-typing "comifonts/..." without a comma) is rejected cleanly before render
+        string brokenFontXaml = """
+        <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Styles.Resources>
+                <FontFamily x:Key="AppFontFamily">comifonts/ShareTechMono-Regular.ttf#Share Tech Mono, Inter</FontFamily>
+            </Styles.Resources>
+        </Styles>
+        """;
+        var parsedBroken = Avalonia.Markup.Xaml.AvaloniaRuntimeXamlLoader.Parse<Avalonia.Styling.Styles>(brokenFontXaml);
+        Assert.Throws<InvalidOperationException>(() => ThemeValidator.ValidateFontFamilies(parsedBroken));
     }
 
     private sealed class FakeCrashApiClient : RbwrOverlay.Core.Services.IApiClient

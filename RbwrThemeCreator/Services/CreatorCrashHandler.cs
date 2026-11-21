@@ -95,7 +95,7 @@ public static class CreatorCrashHandler
         }
     }
 
-    public static void HandleFatalException(Exception ex, string contextMessage)
+    public static void HandleFatalException(Exception ex, string contextMessage, bool isTerminating = false)
     {
         lock (_syncLock)
         {
@@ -125,7 +125,9 @@ public static class CreatorCrashHandler
             // Best-effort reporting
         }
 
-        if (!TryShowAvaloniaCrashWindow(formattedDetails, reportFilePath))
+        // If the CLR is already terminating (AppDomain.UnhandledException), a non-modal Avalonia window
+        // would vanish immediately when the handler returns — show the blocking native dialog instead.
+        if (isTerminating || !TryShowAvaloniaCrashWindow(formattedDetails, reportFilePath))
             ShowNativeFallbackDialog(ex, contextMessage, reportFilePath);
     }
 

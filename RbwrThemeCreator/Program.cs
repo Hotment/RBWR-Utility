@@ -15,7 +15,13 @@ internal sealed class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             if (e.ExceptionObject is Exception ex)
-                CreatorCrashHandler.HandleFatalException(ex, "Unhandled AppDomain Exception");
+                CreatorCrashHandler.HandleFatalException(ex, "Unhandled AppDomain Exception", isTerminating: e.IsTerminating);
+        };
+
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            e.Handled = true;
+            CreatorCrashHandler.HandleFatalException(e.Exception, "Unhandled UI Thread Exception", isTerminating: false);
         };
 
         TaskScheduler.UnobservedTaskException += (_, e) =>
