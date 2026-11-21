@@ -17,6 +17,13 @@ public sealed class CreatorSettings
     public List<string> RecentThemes { get; set; } = new();
 
     // ---------- SETTINGS tab ----------
+    /// <summary>Author put into new themes. Empty = the last author a theme was saved with.</summary>
+    public string DefaultAuthor { get; set; } = string.Empty;
+
+    /// <summary>The author a new theme starts with.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string AuthorForNewThemes => string.IsNullOrWhiteSpace(DefaultAuthor) ? LastAuthor : DefaultAuthor.Trim();
+
     /// <summary>Open the most recent theme folder when the creator starts.</summary>
     public bool OpenLastThemeAtStart { get; set; }
 

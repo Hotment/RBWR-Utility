@@ -355,6 +355,11 @@ The **SETTINGS** tab. Everything here is saved on your PC and never changes your
   to installed overlay themes that have none. Turn it off if the creator should never add files to your
   theme folders on its own. Save, Export and Install always write a thumbnail.
 
+### Default author
+
+Type your name and click **SET** (or press Enter): every new theme starts with it as the **Author**.
+Clear the box and click **SET** to use the last author you saved a theme with instead.
+
 ### Updates
 
 - **Check for updates at start**: turn it off to check only by hand (the green version badge).
@@ -374,7 +379,7 @@ Some actions have no shortcut by default (for example *FIND COLOUR on / off*); g
 
 ### Reset
 
-- **RESET SETTINGS** resets the start-up and update options, the skipped update, the recent themes
+- **RESET SETTINGS** resets the start-up and update options, the default author, the skipped update, the recent themes
   list and the preview view. Your keyboard shortcuts (they have their own reset), the overlay folder and
   your themes are kept.
 - **OPEN SETTINGS FOLDER** opens the folder with `settings.json`.

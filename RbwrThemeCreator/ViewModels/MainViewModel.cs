@@ -170,6 +170,43 @@ public partial class MainViewModel : ObservableObject
         set => SetSetting(value, CreatorSettings.Current.CheckUpdatesAtStart, v => CreatorSettings.Current.CheckUpdatesAtStart = v);
     }
 
+    /// <summary>SETTINGS → Default author (empty = the last author a theme was saved with).</summary>
+    public string DefaultAuthor
+    {
+        get => CreatorSettings.Current.DefaultAuthor;
+        set
+        {
+            string v = (value ?? string.Empty).Trim();
+            if (v == CreatorSettings.Current.DefaultAuthor) return;
+            CreatorSettings.Current.DefaultAuthor = v;
+            CreatorSettings.Current.Save();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DefaultAuthorHint));
+            DefaultAuthorInput = v;
+            SetDefaultAuthorCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>What is typed in the Default author box; saved only by SET.</summary>
+    public string DefaultAuthorInput
+    {
+        get => _defaultAuthorInput ??= CreatorSettings.Current.DefaultAuthor;
+        set
+        {
+            if (value == _defaultAuthorInput) return;
+            _defaultAuthorInput = value;
+            OnPropertyChanged();
+            SetDefaultAuthorCommand.NotifyCanExecuteChanged();
+        }
+    }
+    private string? _defaultAuthorInput;
+
+    public string DefaultAuthorHint => string.IsNullOrWhiteSpace(CreatorSettings.Current.DefaultAuthor)
+        ? (string.IsNullOrWhiteSpace(CreatorSettings.Current.LastAuthor)
+            ? "Empty: new themes start without an author until you save one with a name."
+            : $"Empty: new themes use the last author you saved with ({CreatorSettings.Current.LastAuthor}).")
+        : "New themes start with this author.";
+
     public bool HasSkippedVersion => !string.IsNullOrWhiteSpace(CreatorSettings.Current.SkippedVersion);
     public string SkippedVersionText => HasSkippedVersion ? $"Skipped update: v{CreatorSettings.Current.SkippedVersion}" : "No update is skipped.";
 
@@ -298,6 +335,18 @@ public partial class MainViewModel : ObservableObject
         SetStatus("Keyboard shortcuts are back to their defaults.");
     }
 
+    private bool CanSetDefaultAuthor() => (DefaultAuthorInput ?? string.Empty).Trim() != CreatorSettings.Current.DefaultAuthor;
+
+    /// <summary>SETTINGS → SET: saves the typed default author.</summary>
+    [RelayCommand(CanExecute = nameof(CanSetDefaultAuthor))]
+    private void SetDefaultAuthor()
+    {
+        DefaultAuthor = DefaultAuthorInput;
+        SetStatus(string.IsNullOrWhiteSpace(DefaultAuthor)
+            ? "Default author cleared: new themes use the last author you saved with."
+            : $"Default author set to '{DefaultAuthor}'. New themes start with it.");
+    }
+
     [RelayCommand]
     private void UnskipVersion()
     {
@@ -316,7 +365,7 @@ public partial class MainViewModel : ObservableObject
     private async Task ResetSettingsAsync()
     {
         if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset settings",
-                "Reset the start-up options, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
+                "Reset the start-up options, the default author, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
                 "Reset settings"))
             return;
 
@@ -326,6 +375,7 @@ public partial class MainViewModel : ObservableObject
         s.CheckUpdatesAtStart = true;
         s.SkippedVersion = string.Empty;
         s.LastAuthor = string.Empty;
+        s.DefaultAuthor = string.Empty;
         s.RecentThemes.Clear();
         s.Save();
 
@@ -335,8 +385,11 @@ public partial class MainViewModel : ObservableObject
         PreviewMode = 0;
 
         foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart),
+                     nameof(DefaultAuthor), nameof(DefaultAuthorHint),
                      nameof(HasSkippedVersion), nameof(SkippedVersionText) })
             OnPropertyChanged(name);
+        DefaultAuthorInput = string.Empty;
+        SetDefaultAuthorCommand.NotifyCanExecuteChanged();
         LoadRecentThemes();
         SetStatus("Settings reset. Keyboard shortcuts were kept.");
     }
@@ -1065,6 +1118,7 @@ public partial class MainViewModel : ObservableObject
         {
             CreatorSettings.Current.LastAuthor = Author.Trim();
             CreatorSettings.Current.Save();
+            OnPropertyChanged(nameof(DefaultAuthorHint));
         }
     }
 

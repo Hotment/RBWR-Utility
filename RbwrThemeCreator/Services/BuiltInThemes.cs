@@ -216,7 +216,7 @@ public static class BuiltInThemes
             {
                 Id = id,
                 Name = name,
-                Author = CreatorSettings.Current.LastAuthor,
+                Author = CreatorSettings.Current.AuthorForNewThemes,
                 Version = "1.0.0",
                 Description = string.Empty,
                 Entry = "theme.axaml",

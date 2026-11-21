@@ -729,6 +729,24 @@
                             </Border>
 
                             <Border Classes="card">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="section-title" Text="DEFAULT AUTHOR" />
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                        <TextBox Classes="hud" Text="{Binding DefaultAuthorInput}" PlaceholderText="Your name"
+                                                 ToolTip.Tip="Type your name, then click SET or press Enter">
+                                            <TextBox.KeyBindings>
+                                                <KeyBinding Gesture="Enter" Command="{Binding SetDefaultAuthorCommand}" />
+                                            </TextBox.KeyBindings>
+                                        </TextBox>
+                                        <Button Grid.Column="1" Classes="hud-blue" Content="SET" Margin="6,0,0,0" MinWidth="64"
+                                                HorizontalContentAlignment="Center" Command="{Binding SetDefaultAuthorCommand}"
+                                                ToolTip.Tip="Save this as the author for new themes (empty = use the last author you saved with)" />
+                                    </Grid>
+                                    <TextBlock Classes="muted" Text="{Binding DefaultAuthorHint}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
                                 <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="UPDATES" />
                                     <StackPanel Spacing="2">
@@ -781,7 +799,7 @@
                                 <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="RESET" />
                                     <TextBlock Classes="muted"
-                                               Text="Resets the start-up and update options, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
+                                               Text="Resets the start-up and update options, the default author, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Button Classes="hud-red" Content="RESET SETTINGS" Command="{Binding ResetSettingsCommand}" />
                                         <Button Classes="hud" Content="OPEN SETTINGS FOLDER" Command="{Binding OpenSettingsFolderCommand}"
