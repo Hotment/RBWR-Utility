@@ -471,6 +471,37 @@ public sealed record FontEntry(string FileName, string SourcePath, string Family
     public string Display => string.IsNullOrEmpty(FamilyName) ? FileName : $"{FileName}  ·  {FamilyName}";
 }
 
+/// <summary>A theme folder in THEME → Recent themes.</summary>
+public sealed record RecentThemeEntry(string Folder, string Name, string Details, Avalonia.Media.Imaging.Bitmap? Thumbnail)
+{
+    public bool HasThumbnail => Thumbnail != null;
+
+    /// <summary>Reads the name and version from theme.json and the thumbnail from preview.png.</summary>
+    public static RecentThemeEntry Read(string folder)
+    {
+        string name = Path.GetFileName(folder);
+        string version = string.Empty;
+        try
+        {
+            string json = Path.Combine(folder, "theme.json");
+            if (File.Exists(json))
+            {
+                var m = System.Text.Json.JsonSerializer.Deserialize<RbwrOverlay.Core.Models.ThemeManifest>(File.ReadAllText(json),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (!string.IsNullOrWhiteSpace(m?.Name)) name = m!.Name;
+                if (!string.IsNullOrWhiteSpace(m?.Version)) version = "v" + m!.Version.Trim().TrimStart('v', 'V');
+            }
+        }
+        catch
+        {
+            // unreadable manifest: show the folder name
+        }
+        var thumb = PreviewImage.TryLoad(Path.Combine(folder, ThemeExporter.PreviewFileName), 96);
+        string details = string.IsNullOrEmpty(version) ? folder : $"{version}  ·  {folder}";
+        return new RecentThemeEntry(folder, name, details, thumb);
+    }
+}
+
 public sealed record InstalledThemeEntry(string Id, string Name, string Directory)
 {
     public override string ToString() => $"{Name}  ({Id})";

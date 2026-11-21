@@ -134,6 +134,55 @@
                             <TextBlock Classes="page-title" Text="THEME" />
                             <TextBlock Classes="page-sub" Text="Name and details shown in the overlay's theme list." />
 
+                            <!-- How the theme's card looks in the overlay's Theme Manager, in the theme's own colours. -->
+                            <Border Classes="card accent-card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="IN THE OVERLAY'S THEME MANAGER" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Classes="faint" Text="live preview" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Border Background="{Binding CardWindowBrush}" CornerRadius="10" Padding="12">
+                                        <Border Background="{Binding CardBackgroundBrush}" BorderBrush="{Binding CardBorderBrush}"
+                                                BorderThickness="1" CornerRadius="6" Padding="11,9">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <Border Width="56" Height="54" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True" VerticalAlignment="Center"
+                                                            ToolTip.Tip="The thumbnail (preview.png) is the MONITOR view of your theme">
+                                                        <Image x:Name="ThemeCardThumb" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding CardName}" Foreground="{Binding CardTextBrush}" FontWeight="Bold" FontSize="12"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="300" />
+                                                            <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
+                                                                    CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding CardVersionText}" Foreground="{Binding CardGoldBrush}" FontSize="9" FontWeight="Bold" />
+                                                            </Border>
+                                                            <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
+                                                                    CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="CUSTOM" Foreground="{Binding CardMutedBrush}" FontSize="8.5" FontWeight="SemiBold" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding CardAuthorText}" Foreground="{Binding CardMutedBrush}" FontSize="10" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Background="{Binding CardBackgroundBrush}" BorderBrush="{Binding CardBorderBrush}"
+                                                            BorderThickness="1" CornerRadius="4" Padding="10,4" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                        <TextBlock Text="Apply" Foreground="{Binding CardAccentBrush}" FontSize="10" FontWeight="SemiBold" />
+                                                    </Border>
+                                                </Grid>
+                                                <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
+                                                        CornerRadius="4" Padding="10,8">
+                                                    <TextBlock Text="{Binding CardDescriptionText}" Foreground="{Binding CardTextBrush}" Opacity="0.85"
+                                                               FontSize="10" LineHeight="14" TextWrapping="Wrap" />
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                    </Border>
+                                    <TextBlock Classes="faint" TextWrapping="Wrap"
+                                               Text="Shown with your theme's colours. The description appears when players click Details." />
+                                </StackPanel>
+                            </Border>
+
                             <Border Classes="card">
                                 <StackPanel>
                                     <TextBlock Classes="label" Text="NAME" Margin="0,0,0,4" />
@@ -174,6 +223,41 @@
                                     </StackPanel>
                                     <Button Grid.Column="1" Classes="hud" Content="Folder" Command="{Binding OpenCurrentFolderCommand}" VerticalAlignment="Center" />
                                 </Grid>
+                            </Border>
+
+                            <!-- Recently opened / saved theme folders -->
+                            <Border Classes="card" IsVisible="{Binding HasRecentThemes}">
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="RECENT THEMES" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="guide-link" Content="CLEAR" FontSize="9.5" Command="{Binding ClearRecentThemesCommand}"
+                                                ToolTip.Tip="Forget the recent list (the theme folders are not deleted)" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding RecentThemes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:RecentThemeEntry">
+                                                <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,2"
+                                                        Command="{ReflectionBinding $parent[Window].DataContext.OpenRecentCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{Binding Folder}">
+                                                    <Grid ColumnDefinitions="Auto,*">
+                                                        <Border Width="40" Height="39" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True"
+                                                                Background="{DynamicResource EdPanel}" VerticalAlignment="Center">
+                                                            <Panel>
+                                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                                <TextBlock Classes="icon" Text="&#xE790;" FontSize="14" Foreground="{DynamicResource EdFaint}"
+                                                                           HorizontalAlignment="Center" IsVisible="{Binding !HasThumbnail}" />
+                                                            </Panel>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{DynamicResource EdCyan}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="faint" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </Border>
 
                             <Border Classes="card">

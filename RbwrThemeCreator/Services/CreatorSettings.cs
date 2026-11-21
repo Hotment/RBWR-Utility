@@ -13,6 +13,9 @@ public sealed class CreatorSettings
     public int PreviewMode { get; set; }
     public string SkippedVersion { get; set; } = string.Empty;
 
+    /// <summary>Theme folders opened or saved recently, newest first (THEME tab → Recent themes).</summary>
+    public List<string> RecentThemes { get; set; } = new();
+
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RbwrThemeCreator", "settings.json");
 

@@ -117,6 +117,33 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _previewFit = true;
     [ObservableProperty] private int _previewMode;
 
+    // ---------- THEME tab: Theme Manager card preview + recent themes ----------
+    /// <summary>How the theme's card looks in the overlay's Theme Manager (same texts as the overlay).</summary>
+    public string CardName => string.IsNullOrWhiteSpace(ThemeName) ? "Untitled" : ThemeName.Trim();
+    public string CardVersionText => string.IsNullOrWhiteSpace(Version) ? "v1.0.0" : (Version.Trim().StartsWith('v') ? Version.Trim() : $"v{Version.Trim()}");
+    public string CardAuthorText => string.IsNullOrWhiteSpace(Author) ? "Unknown Author" : $"by {Author.Trim()}";
+    public string CardDescriptionText => string.IsNullOrWhiteSpace(Description) ? "No description provided." : Description.Trim();
+
+    // Brushes of the edited theme, so the card is drawn in the theme's own colours.
+    public IBrush CardWindowBrush => TokenBrush("CyberMainBg");
+    public IBrush CardBackgroundBrush => TokenBrush("CyberCardBg");
+    public IBrush CardBorderBrush => TokenBrush("CyberBorder");
+    public IBrush CardPanelBrush => TokenBrush("DarkPanelBg");
+    public IBrush CardTextBrush => TokenBrush("TextLight");
+    public IBrush CardMutedBrush => TokenBrush("TextMuted");
+    public IBrush CardGoldBrush => TokenBrush("NeonGold");
+    public IBrush CardAccentBrush => TokenBrush("NeonCyan");
+
+    private static readonly string[] CardBrushProperties =
+    [
+        nameof(CardWindowBrush), nameof(CardBackgroundBrush), nameof(CardBorderBrush), nameof(CardPanelBrush),
+        nameof(CardTextBrush), nameof(CardMutedBrush), nameof(CardGoldBrush), nameof(CardAccentBrush),
+    ];
+
+    private const int MaxRecentThemes = 6;
+    public ObservableCollection<RecentThemeEntry> RecentThemes { get; } = new();
+    public bool HasRecentThemes => RecentThemes.Count > 0;
+
     // ---------- Colour search ----------
     [ObservableProperty] private string _tokenSearch = string.Empty;
     [ObservableProperty] private bool _hasNoSearchResults;
@@ -165,8 +192,89 @@ public partial class MainViewModel : ObservableObject
         _previewMode = Math.Clamp(settings.PreviewMode, 0, 4);
 
         OverlayThemesDirectory = OverlayLocator.Detect() ?? string.Empty;
+        LoadRecentThemes();
         LoadState(BuiltInThemes.Presets[0].Create(), folder: null);
         SetStatus("New theme from the Cyberpunk preset. Edit colours on the left — the preview updates live.");
+    }
+
+    // =====================================================================
+    // THEME tab: Theme Manager card + recent themes
+    // =====================================================================
+
+    /// <summary>The token's brush as the theme draws it (gradient and opacity included).</summary>
+    private IBrush TokenBrush(string key)
+    {
+        if (!_tokens.TryGetValue(key, out var token))
+            return Brushes.Transparent;
+        var brush = token.PreviewBrush;
+        if (token.SupportsOpacity && brush is Brush b)
+            b.Opacity = token.Opacity;
+        return brush;
+    }
+
+    /// <summary>Puts <paramref name="folder"/> at the top of the recent list (temp folders are skipped).</summary>
+    private void RememberRecentTheme(string folder)
+    {
+        string full;
+        try
+        {
+            full = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // Extracted .zip packs and test folders live in %TEMP%: not useful to reopen later.
+            if (full.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase))
+            {
+                LoadRecentThemes();
+                return;
+            }
+        }
+        catch
+        {
+            return;
+        }
+
+        var list = CreatorSettings.Current.RecentThemes;
+        list.RemoveAll(p => string.Equals(p, full, StringComparison.OrdinalIgnoreCase));
+        list.Insert(0, full);
+        if (list.Count > MaxRecentThemes * 2)
+            list.RemoveRange(MaxRecentThemes * 2, list.Count - MaxRecentThemes * 2);
+        CreatorSettings.Current.Save();
+        LoadRecentThemes();
+    }
+
+    /// <summary>Rebuilds the recent list: existing folders only, without the theme that is open now.</summary>
+    public void LoadRecentThemes()
+    {
+        RecentThemes.Clear();
+        foreach (string folder in CreatorSettings.Current.RecentThemes)
+        {
+            if (RecentThemes.Count >= MaxRecentThemes) break;
+            if (!Directory.Exists(folder)) continue;
+            if (CurrentFolder != null && string.Equals(Path.GetFullPath(CurrentFolder).TrimEnd(Path.DirectorySeparatorChar), folder, StringComparison.OrdinalIgnoreCase))
+                continue;
+            RecentThemes.Add(RecentThemeEntry.Read(folder));
+        }
+        OnPropertyChanged(nameof(HasRecentThemes));
+    }
+
+    [RelayCommand]
+    private async Task OpenRecentAsync(RecentThemeEntry? entry)
+    {
+        if (entry == null) return;
+        if (!Directory.Exists(entry.Folder))
+        {
+            SetStatus($"'{entry.Folder}' no longer exists.", isError: true);
+            LoadRecentThemes();
+            return;
+        }
+        if (!await ConfirmDiscardAsync()) return;
+        OpenPath(entry.Folder);
+    }
+
+    [RelayCommand]
+    private void ClearRecentThemes()
+    {
+        CreatorSettings.Current.RecentThemes.Clear();
+        CreatorSettings.Current.Save();
+        LoadRecentThemes();
     }
 
     // =====================================================================
@@ -487,14 +595,22 @@ public partial class MainViewModel : ObservableObject
             case nameof(ThemeName):
             case nameof(IsDirty):
                 OnPropertyChanged(nameof(WindowTitle));
+                if (e.PropertyName == nameof(ThemeName)) OnPropertyChanged(nameof(CardName));
+                break;
+            case nameof(Description):
+                OnPropertyChanged(nameof(CardDescriptionText));
                 break;
             case nameof(ThemeId):
             case nameof(Version):
             case nameof(Author):
                 OnPropertyChanged(nameof(ThemeSubtitle));
+                if (e.PropertyName == nameof(Version)) OnPropertyChanged(nameof(CardVersionText));
+                if (e.PropertyName == nameof(Author)) OnPropertyChanged(nameof(CardAuthorText));
                 break;
             case nameof(CurrentFolder):
                 OnPropertyChanged(nameof(CurrentFolderDisplay));
+                if (CurrentFolder != null) RememberRecentTheme(CurrentFolder);
+                else LoadRecentThemes();
                 break;
             case nameof(PreviewError):
                 OnPropertyChanged(nameof(HasPreviewError));
@@ -564,6 +680,8 @@ public partial class MainViewModel : ObservableObject
 
         ManifestProblems = string.Join(Environment.NewLine, ThemeValidator.ValidateManifest(state));
         UpdateContrast();
+        foreach (string name in CardBrushProperties)
+            OnPropertyChanged(name);
 
         try
         {

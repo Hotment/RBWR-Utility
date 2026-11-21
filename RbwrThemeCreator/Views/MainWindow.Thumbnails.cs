@@ -157,6 +157,60 @@ public partial class MainWindow
             ShowToast("THUMBNAILS CREATED", $"{created.Count} installed themes got a preview.png for the overlay's Theme Manager.");
     }
 
+    private DispatcherTimer? _cardThumbTimer;
+
+    /// <summary>
+    /// THEME tab card: refreshes its thumbnail a moment after the preview changed (debounced, so
+    /// dragging a colour slider does not render on every step).
+    /// </summary>
+    private void QueueThemeCardThumbnail()
+    {
+        _cardThumbTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(600), DispatcherPriority.Background, (_, _) =>
+        {
+            _cardThumbTimer!.Stop();
+            UpdateThemeCardThumbnail();
+        });
+        _cardThumbTimer.Stop();
+        _cardThumbTimer.Start();
+    }
+
+    private void UpdateThemeCardThumbnail()
+    {
+        Bitmap? image = null;
+        try
+        {
+            // Cheap path: the MONITOR window of the live preview, when it is on screen.
+            if (Preview.FindControl<Control>("DetailedShell") is { IsEffectivelyVisible: true, Bounds.Width: >= 1 } shell)
+            {
+                // Rendered at half size, then turned into a plain 96-DPI bitmap: a low-DPI
+                // RenderTargetBitmap is not drawn reliably by an Image.
+                const double scale = 0.5;
+                using var rtb = new RenderTargetBitmap(
+                    new PixelSize((int)Math.Ceiling(shell.Bounds.Width * scale), (int)Math.Ceiling(shell.Bounds.Height * scale)),
+                    new Vector(96 * scale, 96 * scale));
+                rtb.Render(shell);
+                using var ms = new MemoryStream();
+                rtb.Save(ms, new PngBitmapEncoderOptions());
+                ms.Position = 0;
+                image = Bitmap.DecodeToWidth(ms, 120, BitmapInterpolationMode.HighQuality); // ~56 px shown; sharp at 200%
+            }
+            // Another view is shown: render the MONITOR view off screen instead.
+            else if (_vm != null && RenderThemeThumbnail(_vm.BuildState()) is { } png)
+            {
+                using var ms = new MemoryStream(png);
+                image = Bitmap.DecodeToWidth(ms, 120, BitmapInterpolationMode.HighQuality);
+            }
+        }
+        catch
+        {
+            image = null;
+        }
+
+        var old = ThemeCardThumb.Source as IDisposable;
+        ThemeCardThumb.Source = image;
+        old?.Dispose();
+    }
+
     /// <summary>Shows the bottom-right toast for a few seconds.</summary>
     public void ShowToast(string title, string message)
     {

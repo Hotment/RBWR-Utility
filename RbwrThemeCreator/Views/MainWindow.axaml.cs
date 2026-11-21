@@ -160,6 +160,8 @@ public partial class MainWindow : Window, IDialogHost
 
     private void OnPreviewReady(object? sender, PreviewReadyEventArgs e)
     {
+        QueueThemeCardThumbnail();
+
         // Keep the overlay base stylesheet at index 0 and swap the theme on top of it,
         // exactly like the overlay adds a custom theme after CyberpunkTheme.axaml.
         while (PreviewHost.Styles.Count > (_baseStyles != null ? 1 : 0))

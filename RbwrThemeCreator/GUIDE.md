@@ -244,6 +244,10 @@ The **CODE** tab shows the exact `theme.axaml` that will be saved. **COPY** puts
 - **Author**, **Version** (like `1.0.0`), **Min. overlay** (oldest overlay version the theme needs)
   and **Description**.
 
+The card at the top of the THEME tab shows how your theme will look in the overlay's **Theme Manager**:
+thumbnail, name, version, author and description, drawn in your theme's own colours. It updates live
+while you edit.
+
 ### Where your theme goes
 
 | Action | What happens |
@@ -297,6 +301,8 @@ Both capture the view you have selected, so switch to ALL first to show every vi
 
 - **OPEN** (Ctrl+O) opens `theme.json`, a `.zip` pack or a `.axaml` file. **Ctrl+Shift+O** opens a
   theme folder.
+- **Recent themes** (THEME tab) lists the last theme folders you opened or saved, with their thumbnails.
+  Click one to open it. **CLEAR** empties the list; the theme folders themselves are not deleted.
 - **Drag and drop** works too: drop a theme (`.zip`, `.axaml`, folder), a font or an image onto the
   window.
 - Hand-written themes open as well. Styles the creator doesn't recognise are kept in
