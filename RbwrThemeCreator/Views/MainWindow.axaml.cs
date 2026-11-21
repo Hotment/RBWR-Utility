@@ -59,14 +59,20 @@ public partial class MainWindow : Window, IDialogHost
         Viewport.PointerReleased += OnViewportPointerReleased;
         Viewport.PointerExited += (_, _) => ClearInspectHover();
         AddHandler(KeyDownEvent, OnShortcutKeyDown);
+        AddHandler(KeyDownEvent, OnShortcutRecordingKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
         AddHandler(DragDrop.DropEvent, OnWindowDrop);
         Opened += (_, _) =>
         {
             ApplyCornerPreference();
-            _ = _vm?.RunUpdateCheckAsync(isManual: false);
+            var settings = CreatorSettings.Current;
+            if (settings.CheckUpdatesAtStart)
+                _ = _vm?.RunUpdateCheckAsync(isManual: false);
+            if (settings.OpenLastThemeAtStart)
+                _vm?.OpenLastTheme();
             // Older installed themes without preview.png get one (shown by the overlay's Theme Manager).
-            Dispatcher.UIThread.Post(() => _ = CreateMissingInstalledThumbnailsAsync(), DispatcherPriority.ApplicationIdle);
+            if (settings.AutoCreateThumbnails)
+                Dispatcher.UIThread.Post(() => _ = CreateMissingInstalledThumbnailsAsync(), DispatcherPriority.ApplicationIdle);
         };
         // Enter in a number box commits the value (the bindings update on focus loss).
         AddHandler(KeyDownEvent, (_, e) =>
@@ -107,6 +113,8 @@ public partial class MainWindow : Window, IDialogHost
         vm.PreviewReady += OnPreviewReady;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.RequestShowUpdate += OnShowUpdate;
+        vm.Shortcuts.Changed += (_, _) => UpdateShortcutHints();
+        UpdateShortcutHints();
         ApplyBackdrop(vm.PreviewBackdrop);
         Preview.SetMode(vm.PreviewMode);
         vm.Refresh();
@@ -550,60 +558,6 @@ public partial class MainWindow : Window, IDialogHost
     /// screen (see MainWindow.Thumbnails.cs), so the live preview is never switched or redrawn.
     /// </summary>
     public byte[]? RenderThumbnailPng() => _vm == null ? null : RenderThemeThumbnail(_vm.BuildState());
-
-    // ===================== Keyboard shortcuts =====================
-
-    private void OnShortcutKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (_vm == null || e.Handled) return;
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-
-        switch (e.Key)
-        {
-            case Key.F when ctrl && !shift:
-                NavTabs.SelectedItem = ColoursTab;
-                Dispatcher.UIThread.Post(() =>
-                {
-                    TokenSearchBox.Focus();
-                    TokenSearchBox.SelectAll();
-                }, DispatcherPriority.Loaded);
-                break;
-            case Key.N when ctrl && !shift:
-                NewButton.Flyout?.ShowAt(NewButton);
-                break;
-            case Key.P when ctrl && !shift:
-                OnExportPreviewPngClick(this, new RoutedEventArgs());
-                break;
-            case Key.C when ctrl && shift:
-                _ = CopyPreviewImageAsync();
-                break;
-            case Key.D0 or Key.NumPad0 when ctrl:
-                _pan = default;
-                _vm.PreviewFit = true;
-                UpdateZoom();
-                break;
-            case >= Key.D1 and <= Key.D5 when ctrl:
-                _vm.PreviewMode = e.Key - Key.D1;
-                break;
-            case >= Key.NumPad1 and <= Key.NumPad5 when ctrl:
-                _vm.PreviewMode = e.Key - Key.NumPad1;
-                break;
-            case Key.F1:
-                NavTabs.SelectedItem = GuideTab;
-                Dispatcher.UIThread.Post(() => GuidePage.ShowSection("14-keyboard-shortcuts"), DispatcherPriority.Loaded);
-                break;
-            case Key.Escape when InspectToggle.IsChecked == true:
-                InspectToggle.IsChecked = false;
-                break;
-            case Key.Escape when !string.IsNullOrEmpty(_vm.TokenSearch):
-                _vm.TokenSearch = string.Empty;
-                break;
-            default:
-                return;
-        }
-        e.Handled = true;
-    }
 
     // ===================== FIND COLOUR (click an element in the preview) =====================
 

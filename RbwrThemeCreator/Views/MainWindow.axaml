@@ -14,16 +14,6 @@
         DragDrop.AllowDrop="True"
         WindowStartupLocation="CenterScreen">
 
-    <!-- Keyboard shortcuts (more in MainWindow.axaml.cs: Ctrl+F, Ctrl+N, Ctrl+1..5, Ctrl+0, Ctrl+P, Ctrl+Shift+C, F1, Esc). -->
-    <Window.KeyBindings>
-        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
-        <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
-        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
-        <KeyBinding Gesture="Ctrl+E" Command="{Binding ExportZipCommand}" />
-        <KeyBinding Gesture="Ctrl+I" Command="{Binding InstallToOverlayCommand}" />
-        <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
-    </Window.KeyBindings>
-
     <Panel>
     <Border x:Name="WindowFrame" BorderBrush="{DynamicResource EdBorder}" BorderThickness="1">
     <Grid RowDefinitions="Auto,*,Auto">
@@ -55,10 +45,10 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Button Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" HotKey="Ctrl+Z" Padding="8,5" ToolTip.Tip="Undo last change (Ctrl+Z)" />
-                    <Button Classes="hud" Content="REDO" Command="{Binding RedoCommand}" HotKey="Ctrl+Y" Padding="8,5" Margin="0,0,4,0" ToolTip.Tip="Redo change (Ctrl+Y or Ctrl+Shift+Z)" />
+                    <Button x:Name="UndoButton" Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" Padding="8,5" />
+                    <Button x:Name="RedoButton" Classes="hud" Content="REDO" Command="{Binding RedoCommand}" Padding="8,5" Margin="0,0,4,0" />
 
-                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW" ToolTip.Tip="Start a new theme from a preset (Ctrl+N)">
+                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW">
                         <DropDownButton.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Width="320" Spacing="2">
@@ -84,29 +74,28 @@
                     <DropDownButton Classes="hud" Content="OPEN" ToolTip.Tip="Open an existing theme">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" InputGesture="Ctrl+O" />
-                                <MenuItem Header="Theme folder…" Command="{Binding OpenFolderCommand}" InputGesture="Ctrl+Shift+O" />
+                                <MenuItem x:Name="MenuOpenFile" Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" />
+                                <MenuItem x:Name="MenuOpenFolder" Header="Theme folder…" Command="{Binding OpenFolderCommand}" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
 
-                    <Button Classes="hud" Content="SAVE" Command="{Binding SaveCommand}" HotKey="Ctrl+S" ToolTip.Tip="Save to the current theme folder (Ctrl+S)" />
+                    <Button x:Name="SaveButton" Classes="hud" Content="SAVE" Command="{Binding SaveCommand}" />
 
                     <DropDownButton Classes="hud" Content="EXPORT" ToolTip.Tip="Save a copy or export a shareable pack">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Save as new folder…" Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S" />
-                                <MenuItem Header="Export .zip pack…" Command="{Binding ExportZipCommand}" InputGesture="Ctrl+E" />
+                                <MenuItem x:Name="MenuSaveAs" Header="Save as new folder…" Command="{Binding SaveAsCommand}" />
+                                <MenuItem x:Name="MenuExportZip" Header="Export .zip pack…" Command="{Binding ExportZipCommand}" />
                                 <MenuItem Header="Copy theme.axaml" Command="{Binding CopyXamlCommand}" />
                                 <Separator />
-                                <MenuItem Header="Save preview image (PNG)…" Click="OnExportPreviewPngClick" InputGesture="Ctrl+P" />
-                                <MenuItem Header="Copy preview image (paste on Discord)" Click="OnCopyPreviewImageClick" InputGesture="Ctrl+Shift+C" />
+                                <MenuItem x:Name="MenuSavePreview" Header="Save preview image (PNG)…" Click="OnExportPreviewPngClick" />
+                                <MenuItem x:Name="MenuCopyPreview" Header="Copy preview image (paste on Discord)" Click="OnCopyPreviewImageClick" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
 
-                    <Button Classes="hud-green" Content="INSTALL TO OVERLAY" Command="{Binding InstallToOverlayCommand}" Margin="6,0,0,0"
-                            ToolTip.Tip="Copy the theme into the overlay's themes folder (Ctrl+I). Then click Reload in the overlay's CONFIG tab." />
+                    <Button x:Name="InstallButton" Classes="hud-green" Content="INSTALL TO OVERLAY" Command="{Binding InstallToOverlayCommand}" Margin="6,0,0,0" />
                 </StackPanel>
 
                 <!-- Window controls styled like the overlay's header buttons -->
@@ -312,8 +301,7 @@
                             </Border>
 
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                                <TextBox x:Name="TokenSearchBox" Classes="hud" Text="{Binding TokenSearch}"
-                                         PlaceholderText="Search colours… (Ctrl+F)  e.g. slider, tooltip, border, #00f0ff" />
+                                <TextBox x:Name="TokenSearchBox" Classes="hud" Text="{Binding TokenSearch}" />
                                 <Button Grid.Column="1" Classes="hud" Content="CLEAR" Margin="6,0,0,0" Command="{Binding ClearTokenSearchCommand}"
                                         IsVisible="{Binding TokenSearch, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                             </Grid>
@@ -721,6 +709,95 @@
                     </ScrollViewer>
                 </TabItem>
 
+                <!-- Settings -->
+                <TabItem x:Name="SettingsTab">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE713;" /><TextBlock Text="SETTINGS" VerticalAlignment="Center" /></StackPanel>
+                    </TabItem.Header>
+                    <ScrollViewer>
+                        <StackPanel Margin="18,16">
+                            <TextBlock Classes="page-title" Text="SETTINGS" />
+                            <TextBlock Classes="page-sub" Text="Saved for you on this PC. Nothing here changes your themes." />
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="START-UP" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Open the last theme at start" IsChecked="{Binding OpenLastThemeAtStart}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Opens the newest theme from Recent themes instead of a new Cyberpunk theme." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Create missing thumbnails automatically" IsChecked="{Binding AutoCreateThumbnails}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Adds a preview.png to opened themes, and at start-up to installed overlay themes that have none. Save, Export and Install always write one." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="UPDATES" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Check for updates at start" IsChecked="{Binding CheckUpdatesAtStart}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="You can always check by hand with the green version badge in the title bar." />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="muted" Text="{Binding SkippedVersionText}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="OFFER IT AGAIN" Command="{Binding UnskipVersionCommand}"
+                                                IsVisible="{Binding HasSkippedVersion}" ToolTip.Tip="Forget the skipped update so it is offered again" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="KEYBOARD SHORTCUTS" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud-red" Content="RESET SHORTCUTS" Command="{Binding ResetShortcutsCommand}"
+                                                ToolTip.Tip="Set every shortcut back to its default (other settings are kept)" />
+                                    </Grid>
+                                    <TextBlock Classes="muted"
+                                               Text="Click a shortcut, then press the new keys. Hold Ctrl, Alt or Win, or use an F-key. Esc cancels, Backspace removes the shortcut. If another action used those keys, it loses them. Esc and Ctrl+click in the preview are fixed." />
+                                    <ItemsControl ItemsSource="{Binding ShortcutEntries}" Margin="0,4,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ShortcutEntryViewModel">
+                                                <Border Classes="token-row">
+                                                    <Grid ColumnDefinitions="70,*,160,34">
+                                                        <TextBlock Classes="faint" Text="{Binding Group}" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" />
+                                                            <TextBlock Classes="faint" Text="{Binding DefaultText, StringFormat='default: {0}'}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Classes="hud shortcut" Classes.recording="{Binding IsRecording}" Classes.custom="{Binding IsCustom}"
+                                                                Content="{Binding ButtonText}" Command="{Binding RecordCommand}"
+                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                                                ToolTip.Tip="Click, then press the new keys" />
+                                                        <Button Grid.Column="3" Classes="guide-link" Content="↺" FontSize="13" Margin="4,0,0,0"
+                                                                Command="{Binding ResetToDefaultCommand}" IsVisible="{Binding IsCustom}"
+                                                                ToolTip.Tip="Back to the default shortcut" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="RESET" />
+                                    <TextBlock Classes="muted"
+                                               Text="Resets the start-up and update options, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="hud-red" Content="RESET SETTINGS" Command="{Binding ResetSettingsCommand}" />
+                                        <Button Classes="hud" Content="OPEN SETTINGS FOLDER" Command="{Binding OpenSettingsFolderCommand}"
+                                                ToolTip.Tip="The folder with settings.json" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
                 <!-- User guide (GUIDE.md rendered in the editor's style) -->
                 <TabItem x:Name="GuideTab">
                     <TabItem.Header>
@@ -753,12 +830,9 @@
                             <TextBlock x:Name="ZoomText" Width="36" VerticalAlignment="Center" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
                         </StackPanel>
                         <ToggleButton x:Name="InspectToggle" Classes="hud" Content="FIND COLOUR" VerticalAlignment="Center"
-                                      IsCheckedChanged="OnInspectToggled"
-                                      ToolTip.Tip="Click an element in the preview to jump to the colours that paint it (or Ctrl+click any time). Esc to stop." />
-                        <Button Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center"
-                                ToolTip.Tip="Save a high-DPI PNG screenshot of the current preview (Ctrl+P)" />
-                        <Button Classes="hud" Content="COPY" Click="OnCopyPreviewImageClick" Padding="9,5" VerticalAlignment="Center"
-                                ToolTip.Tip="Copy the preview as an image, then paste it on Discord with Ctrl+V (Ctrl+Shift+C)" />
+                                      IsCheckedChanged="OnInspectToggled" />
+                        <Button x:Name="PngButton" Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center" />
+                        <Button x:Name="CopyButton" Classes="hud" Content="COPY" Click="OnCopyPreviewImageClick" Padding="9,5" VerticalAlignment="Center" />
                     </WrapPanel>
                 </Border>
 

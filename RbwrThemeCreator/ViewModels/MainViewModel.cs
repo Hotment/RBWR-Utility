@@ -145,6 +145,35 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<RecentThemeEntry> RecentThemes { get; } = new();
     public bool HasRecentThemes => RecentThemes.Count > 0;
 
+    // ---------- SETTINGS tab ----------
+    /// <summary>The keyboard shortcuts in use (defaults + the user's changes).</summary>
+    public ShortcutMap Shortcuts { get; }
+    public IReadOnlyList<ShortcutEntryViewModel> ShortcutEntries { get; }
+
+    /// <summary>The shortcut row waiting for a key press, if any.</summary>
+    public ShortcutEntryViewModel? RecordingShortcut { get; private set; }
+
+    public bool OpenLastThemeAtStart
+    {
+        get => CreatorSettings.Current.OpenLastThemeAtStart;
+        set => SetSetting(value, CreatorSettings.Current.OpenLastThemeAtStart, v => CreatorSettings.Current.OpenLastThemeAtStart = v);
+    }
+
+    public bool AutoCreateThumbnails
+    {
+        get => CreatorSettings.Current.AutoCreateThumbnails;
+        set => SetSetting(value, CreatorSettings.Current.AutoCreateThumbnails, v => CreatorSettings.Current.AutoCreateThumbnails = v);
+    }
+
+    public bool CheckUpdatesAtStart
+    {
+        get => CreatorSettings.Current.CheckUpdatesAtStart;
+        set => SetSetting(value, CreatorSettings.Current.CheckUpdatesAtStart, v => CreatorSettings.Current.CheckUpdatesAtStart = v);
+    }
+
+    public bool HasSkippedVersion => !string.IsNullOrWhiteSpace(CreatorSettings.Current.SkippedVersion);
+    public string SkippedVersionText => HasSkippedVersion ? $"Skipped update: v{CreatorSettings.Current.SkippedVersion}" : "No update is skipped.";
+
     // ---------- Colour search ----------
     [ObservableProperty] private string _tokenSearch = string.Empty;
     [ObservableProperty] private bool _hasNoSearchResults;
@@ -194,8 +223,134 @@ public partial class MainViewModel : ObservableObject
 
         OverlayThemesDirectory = OverlayLocator.Detect() ?? string.Empty;
         LoadRecentThemes();
+
+        Shortcuts = new ShortcutMap(CreatorSettings.Current.Shortcuts, CreatorSettings.Current.Save);
+        ShortcutEntries = ShortcutCatalog.All.Select(d => new ShortcutEntryViewModel(d, this)).ToList();
+        Shortcuts.Changed += (_, _) => RefreshShortcutEntries();
+        RefreshShortcutEntries();
         LoadState(BuiltInThemes.Presets[0].Create(), folder: null);
         SetStatus("New theme from the Cyberpunk preset. Edit colours on the left — the preview updates live.");
+    }
+
+    // =====================================================================
+    // SETTINGS tab
+    // =====================================================================
+
+    private void SetSetting(bool value, bool current, Action<bool> store, [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        if (value == current) return;
+        store(value);
+        CreatorSettings.Current.Save();
+        OnPropertyChanged(name);
+    }
+
+    private void RefreshShortcutEntries()
+    {
+        foreach (var entry in ShortcutEntries)
+            entry.Refresh(Shortcuts);
+    }
+
+    /// <summary>Clicked a shortcut: the next key press (see MainWindow) becomes its new shortcut.</summary>
+    public void StartRecordingShortcut(ShortcutEntryViewModel entry)
+    {
+        CancelShortcutRecording();
+        RecordingShortcut = entry;
+        entry.IsRecording = true;
+        SetStatus($"Press the new keys for '{entry.Label}'. Esc cancels, Backspace removes the shortcut.");
+    }
+
+    public void CancelShortcutRecording()
+    {
+        if (RecordingShortcut == null) return;
+        RecordingShortcut.IsRecording = false;
+        RecordingShortcut = null;
+    }
+
+    /// <summary>Ends recording with <paramref name="gesture"/> (null = remove the shortcut).</summary>
+    public void FinishShortcutRecording(ShortcutGesture? gesture)
+    {
+        var entry = RecordingShortcut;
+        if (entry == null) return;
+        CancelShortcutRecording();
+
+        string? taken = Shortcuts.Set(entry.Id, gesture);
+        if (gesture == null)
+            SetStatus($"'{entry.Label}' has no shortcut now.");
+        else if (taken != null)
+            SetStatus($"'{entry.Label}' is now {gesture}. It was used by '{ShortcutCatalog.Find(taken)?.Label}', which has no shortcut now.");
+        else
+            SetStatus($"'{entry.Label}' is now {gesture}.");
+    }
+
+    public void ResetShortcut(ShortcutEntryViewModel entry)
+    {
+        CancelShortcutRecording();
+        Shortcuts.ResetToDefault(entry.Id);
+        SetStatus($"'{entry.Label}' is back to its default shortcut ({entry.DefaultText}).");
+    }
+
+    [RelayCommand]
+    private async Task ResetShortcutsAsync()
+    {
+        CancelShortcutRecording();
+        if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset shortcuts", "Set every keyboard shortcut back to its default?", "Reset shortcuts"))
+            return;
+        Shortcuts.ResetAll();
+        SetStatus("Keyboard shortcuts are back to their defaults.");
+    }
+
+    [RelayCommand]
+    private void UnskipVersion()
+    {
+        CreatorSettings.Current.SkippedVersion = string.Empty;
+        CreatorSettings.Current.Save();
+        OnPropertyChanged(nameof(HasSkippedVersion));
+        OnPropertyChanged(nameof(SkippedVersionText));
+        SetStatus("The skipped update will be offered again.");
+    }
+
+    /// <summary>
+    /// Resets the app settings (start-up options, skipped update, recent themes, preview view, last
+    /// author). Keyboard shortcuts, the overlay folder and the themes themselves are not touched.
+    /// </summary>
+    [RelayCommand]
+    private async Task ResetSettingsAsync()
+    {
+        if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset settings",
+                "Reset the start-up options, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
+                "Reset settings"))
+            return;
+
+        var s = CreatorSettings.Current;
+        s.OpenLastThemeAtStart = false;
+        s.AutoCreateThumbnails = true;
+        s.CheckUpdatesAtStart = true;
+        s.SkippedVersion = string.Empty;
+        s.LastAuthor = string.Empty;
+        s.RecentThemes.Clear();
+        s.Save();
+
+        PreviewBackdrop = 0;
+        PreviewZoom = 1.0;
+        PreviewFit = true;
+        PreviewMode = 0;
+
+        foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart),
+                     nameof(HasSkippedVersion), nameof(SkippedVersionText) })
+            OnPropertyChanged(name);
+        LoadRecentThemes();
+        SetStatus("Settings reset. Keyboard shortcuts were kept.");
+    }
+
+    [RelayCommand]
+    private void OpenSettingsFolder() => OpenInExplorer(CreatorSettings.FolderPath, create: true);
+
+    /// <summary>SETTINGS → Open the last theme at start: opens the newest folder of the recent list.</summary>
+    public void OpenLastTheme()
+    {
+        string? folder = CreatorSettings.Current.RecentThemes.FirstOrDefault(Directory.Exists);
+        if (folder != null)
+            OpenPath(folder);
     }
 
     // =====================================================================
@@ -1474,6 +1629,8 @@ public partial class MainViewModel : ObservableObject
     {
         CreatorSettings.Current.SkippedVersion = version;
         CreatorSettings.Current.Save();
+        OnPropertyChanged(nameof(HasSkippedVersion));
+        OnPropertyChanged(nameof(SkippedVersionText));
         UpdateStatusText = $"Version v{version} skipped.";
         SetStatus($"Skipped update v{version}.");
     }

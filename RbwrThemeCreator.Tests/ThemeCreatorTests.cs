@@ -397,6 +397,84 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
+    public void ShortcutGesture_ParsesFormatsAndChecksAllowedKeys()
+    {
+        Assert.True(ShortcutGesture.TryParse("Ctrl+Shift+S", out var save));
+        Assert.Equal(new ShortcutGesture(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.Control | Avalonia.Input.KeyModifiers.Shift), save);
+        Assert.Equal("Ctrl+Shift+S", save.ToString());
+
+        Assert.True(ShortcutGesture.TryParse("ctrl+1", out var one));
+        Assert.Equal("Ctrl+1", one.ToString());
+        // The number pad digit counts as the same shortcut.
+        Assert.Equal(one, ShortcutGesture.FromKeyPress(Avalonia.Input.Key.NumPad1, Avalonia.Input.KeyModifiers.Control));
+
+        Assert.True(ShortcutGesture.TryParse("F1", out var f1));
+        Assert.True(f1.IsAllowed);
+        Assert.True(save.IsAllowed);
+        // Plain letters would fire while typing a name: not allowed.
+        Assert.False(new ShortcutGesture(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.Shift).IsAllowed);
+        Assert.False(new ShortcutGesture(Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.None).IsAllowed);
+
+        Assert.False(ShortcutGesture.TryParse("", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+NotAKey", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+A+B", out _));
+
+        // Every default in the catalogue parses (or is empty = no shortcut) and is unique.
+        var defaults = ShortcutCatalog.All.Where(d => d.DefaultGesture.Length > 0).Select(d =>
+        {
+            Assert.True(ShortcutGesture.TryParse(d.DefaultGesture, out var g), d.Id);
+            return g;
+        }).ToList();
+        Assert.Equal(defaults.Count, defaults.Distinct().Count());
+    }
+
+    [Fact]
+    public void ShortcutMap_ChangesResolveConflictsAndReset()
+    {
+        var stored = new Dictionary<string, string>();
+        int saves = 0;
+        var map = new ShortcutMap(stored, () => saves++);
+        ShortcutGesture.TryParse("Ctrl+E", out var ctrlE);
+        ShortcutGesture.TryParse("Ctrl+K", out var ctrlK);
+
+        Assert.Equal("export-zip", map.FindAction(ctrlE));
+        Assert.Null(map.FindAction(ctrlK));
+
+        // Give Ctrl+E to "save": export loses it.
+        string? taken = map.Set("save", ctrlE);
+        Assert.Equal("export-zip", taken);
+        Assert.Equal("save", map.FindAction(ctrlE));
+        Assert.Null(map.Get("export-zip"));
+        Assert.Equal("Ctrl+E", stored["save"]);
+        Assert.Equal("", stored["export-zip"]);
+        Assert.True(saves > 0);
+
+        // Remove a shortcut, set a free one.
+        map.Set("search", null);
+        Assert.Null(map.Get("search"));
+        map.Set("find-colour", ctrlK);
+        Assert.Equal("find-colour", map.FindAction(ctrlK));
+
+        // Setting the default again stores nothing for it.
+        ShortcutGesture.TryParse("Ctrl+I", out var ctrlI);
+        map.Set("install", ctrlI);
+        Assert.False(map.IsCustom("install"));
+
+        // One reset back to default: export takes Ctrl+E back from "save".
+        map.ResetToDefault("export-zip");
+        Assert.Equal("export-zip", map.FindAction(ctrlE));
+        Assert.Null(map.Get("save"));
+
+        // Reset everything.
+        map.ResetAll();
+        Assert.Empty(stored);
+        ShortcutGesture.TryParse("Ctrl+S", out var ctrlS);
+        Assert.Equal("save", map.FindAction(ctrlS));
+        Assert.Equal("search", map.FindAction(ShortcutGesture.FromKeyPress(Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.Control)));
+    }
+
+    [Fact]
     public void Guide_InlinesAndSlugs()
     {
         var parts = GuideParser.ParseInlines("Press **Ctrl+S**, type `#00f0ff`, pick *Dark* or see [section 5](#5-x).");

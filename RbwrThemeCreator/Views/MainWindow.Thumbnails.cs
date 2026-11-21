@@ -120,6 +120,7 @@ public partial class MainWindow
     private void OnThemeFolderOpened()
     {
         if (_vm?.CurrentFolder is not { } folder) return;
+        if (!CreatorSettings.Current.AutoCreateThumbnails) return; // SETTINGS → Auto-create thumbnails
         if (File.Exists(Path.Combine(folder, ThemeExporter.PreviewFileName))) return;
 
         // After the preview refresh that follows loading, so the state is complete.

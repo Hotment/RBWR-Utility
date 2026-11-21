@@ -24,8 +24,9 @@ This guide is also built into the creator: open the **GUIDE** tab, or press **F1
 12. [Thumbnails and sharing on Discord](#12-thumbnails-and-sharing-on-discord)
 13. [Opening and editing existing themes](#13-opening-and-editing-existing-themes)
 14. [Keyboard shortcuts](#14-keyboard-shortcuts)
-15. [Updates](#15-updates)
-16. [Troubleshooting](#16-troubleshooting)
+15. [Settings](#15-settings)
+16. [Updates](#16-updates)
+17. [Troubleshooting](#17-troubleshooting)
 
 ---
 
@@ -49,7 +50,7 @@ That's it. Everything below explains each feature in more detail.
 | Area | What it does |
 |---|---|
 | **Top bar** | Undo/redo, NEW, OPEN, SAVE, EXPORT, INSTALL TO OVERLAY. The green version badge checks for updates. |
-| **Left tabs** | THEME, COLOURS, FONTS, SHAPE, IMAGES, ADVANCED, CODE, OVERLAY and GUIDE (this guide). |
+| **Left tabs** | THEME, COLOURS, FONTS, SHAPE, IMAGES, ADVANCED, CODE, OVERLAY, SETTINGS and GUIDE (this guide). |
 | **Right side** | The live preview of the overlay with your theme. |
 | **Status bar** (bottom) | What just happened, errors, and where the theme is saved. |
 
@@ -316,6 +317,9 @@ Both capture the view you have selected, so switch to ALL first to show every vi
 
 ## 14. Keyboard shortcuts
 
+These are the defaults. You can change every one of them in **SETTINGS → Keyboard shortcuts**
+(see [section 15](#15-settings)); menus and tooltips always show the shortcuts you use now.
+
 | Shortcut | Action |
 |---|---|
 | **Ctrl+S** | Save |
@@ -339,15 +343,53 @@ Both capture the view you have selected, so switch to ALL first to show every vi
 
 ---
 
-## 15. Updates
+## 15. Settings
 
-The creator checks for new versions when it starts. Click the **green version badge** next to the
+The **SETTINGS** tab. Everything here is saved on your PC and never changes your themes.
+
+### Start-up
+
+- **Open the last theme at start**: the creator opens the newest theme from *Recent themes* instead of
+  a new Cyberpunk theme.
+- **Create missing thumbnails automatically**: adds a `preview.png` to themes you open and, at start-up,
+  to installed overlay themes that have none. Turn it off if the creator should never add files to your
+  theme folders on its own. Save, Export and Install always write a thumbnail.
+
+### Updates
+
+- **Check for updates at start**: turn it off to check only by hand (the green version badge).
+- **OFFER IT AGAIN** shows up when you skipped an update; it makes the creator offer that version again.
+
+### Keyboard shortcuts
+
+1. Click the shortcut next to an action. It changes to *Press keys…*.
+2. Press the new keys, e.g. **Ctrl+Alt+S**.
+   - Hold **Ctrl**, **Alt** or **Win**, or use an **F-key**, so shortcuts never fire while you type.
+   - **Esc** cancels, **Backspace** removes the shortcut.
+   - If another action used those keys, it loses them; the status bar tells you which one.
+3. **↺** next to a changed shortcut puts back its default. **RESET SHORTCUTS** puts back all of them.
+
+Some actions have no shortcut by default (for example *FIND COLOUR on / off*); give them one here.
+**Esc** and **Ctrl+click** in the preview can't be changed.
+
+### Reset
+
+- **RESET SETTINGS** resets the start-up and update options, the skipped update, the recent themes
+  list and the preview view. Your keyboard shortcuts (they have their own reset), the overlay folder and
+  your themes are kept.
+- **OPEN SETTINGS FOLDER** opens the folder with `settings.json`.
+
+---
+
+## 16. Updates
+
+The creator checks for new versions when it starts (turn this off in **SETTINGS**). Click the **green version badge** next to the
 title (or **CHECK UPDATES** in the THEME tab) to check now. When an update is found you can read what
 changed, install it, or skip that version.
 
 ---
 
-## 16. Troubleshooting
+## 17. Troubleshooting
 
 **My theme doesn't appear in the overlay.**
 Click **CONFIG → Reload** in the overlay after installing. Check that **OVERLAY → Themes folder**
@@ -364,6 +406,10 @@ the style.
 **The text is hard to read in the game.**
 Check the contrast box in COLOURS, raise the background opacity, and preview with the *Game scene*
 and *Light desktop* backdrops.
+
+**A shortcut doesn't work.**
+Check **SETTINGS → Keyboard shortcuts**: it may have been changed or given to another action.
+**RESET SHORTCUTS** puts back the defaults.
 
 **The eyedropper button is missing.**
 It is available on Windows only.
