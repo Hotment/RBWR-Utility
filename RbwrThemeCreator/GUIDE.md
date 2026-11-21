@@ -34,7 +34,7 @@ This guide is also built into the creator: open the **GUIDE** tab, or press **F1
 
 Five steps from nothing to a working theme:
 
-1. **NEW** (top bar) → pick a preset, for example *Cyberpunk* or *Synthwave*.
+1. **NEW** (top bar) → pick a preset, for example *Cyberpunk*, *Synthwave* or *Aurora Drift*.
 2. **THEME** tab → give it a **Name**. The **ID** fills in by itself.
 3. **COLOURS** tab → pick one accent colour under *Generate from one colour* and click **GENERATE**.
    Then fine-tune any colour you like.
@@ -143,6 +143,12 @@ the three). **ANIMATED** opens a panel built like the gradient one:
 
 You see it in the live preview, and it is saved in `theme.axaml`, so it comes back when you open the
 theme again.
+
+Animated colours need overlay **2.3.1** or newer. Choosing **ANIMATED** raises **Min. overlay** (THEME
+tab) to 2.3.1 by itself if it was lower; a message in the bottom-right corner tells you
+(see [section 11](#11-saving-exporting-and-installing)).
+
+For a ready-made example, start from **NEW → Aurora Drift (animated)**.
 
 ### Contrast check
 
@@ -265,18 +271,19 @@ The **CODE** tab shows the exact `theme.axaml` that will be saved. **COPY** puts
 
 - **Name**: what players see in the overlay.
 - **ID**: the folder name. Lowercase letters, digits, `-` and `_` only. It follows the name until you
-  edit it yourself. `default` and `reactor-amber` are reserved for the built-in themes.
+  edit it yourself. `default`, `reactor-amber` and `aurora-drift` are reserved for the built-in themes.
 - **Author**, **Version** (like `1.0.0`), **Min. overlay** (oldest overlay version the theme needs)
   and **Description**. **ANIMATED** colours need overlay **2.3.1** or newer (older overlays can crash
   on them; from 2.3.1 on, overlays also hide themes made for a newer version). So:
-  - with Min. overlay below 2.3.1, **ANIMATED** is dimmed and can't be chosen: a warning in the
-    bottom-right corner says to raise Min. overlay first;
-  - while the theme has animated colours, Min. overlay can't be set lower than 2.3.1 (same warning).
-    Set every colour to SOLID or GRADIENT to target an older overlay.
+  - choosing **ANIMATED** while Min. overlay is below 2.3.1 raises it to 2.3.1 automatically; a
+    message in the bottom-right corner tells you;
+  - while the theme has animated colours, Min. overlay can't be set lower than 2.3.1: it goes back to
+    2.3.1 with a warning. Set every colour to SOLID or GRADIENT to target an older overlay.
 
 The card at the top of the THEME tab shows how your theme will look in the overlay's **Theme Manager**:
 thumbnail, name, version and author, drawn in your theme's own colours. It updates live
-while you edit.
+while you edit. If the theme has animated colours, the card plays them too: its background and border
+and the frame around the thumbnail animate just like in the overlay.
 
 **Thumbnail**: by default it is the MONITOR view of your theme. **CUSTOM IMAGE…** uses your own picture
 instead (`.png`, `.jpg`, `.webp` or `.bmp`, up to 20 MB; it is scaled down and saved as `preview.png`).
@@ -447,7 +454,7 @@ points to the right overlay, and use **Detect** or **Find overlay…** if not.
 
 **"Fix the theme info first" when saving.**
 Fill in the **Name**. The **ID** must be lowercase letters, digits, `-` or `_`, and must not be
-`default` or `reactor-amber`. The **Version** must look like `1.0.0`.
+`default`, `reactor-amber` or `aurora-drift`. The **Version** must look like `1.0.0`.
 
 **A red message appears above the preview.**
 Your custom styles in ADVANCED contain an error. The message says what is wrong. Fix it or remove
