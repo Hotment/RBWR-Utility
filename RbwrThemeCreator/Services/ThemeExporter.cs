@@ -7,13 +7,20 @@ namespace RbwrThemeCreator.Services;
 /// <summary>
 /// Writes a theme in the overlay's pack format:
 ///   &lt;id&gt;/theme.json, &lt;id&gt;/theme.axaml, &lt;id&gt;/fonts/*, &lt;id&gt;/assets/*
+/// plus an optional &lt;id&gt;/preview.png thumbnail (the overlay ignores files it does not know).
 /// </summary>
 public static class ThemeExporter
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    /// <summary>Writes the theme into <paramref name="themeDir"/> (created if needed). Returns warnings.</summary>
-    public static List<string> WriteFolder(ThemeState state, string xaml, string themeDir)
+    /// <summary>File name of the thumbnail written next to theme.json.</summary>
+    public const string PreviewFileName = "preview.png";
+
+    /// <summary>
+    /// Writes the theme into <paramref name="themeDir"/> (created if needed). When
+    /// <paramref name="previewPng"/> is given it is saved as preview.png. Returns warnings.
+    /// </summary>
+    public static List<string> WriteFolder(ThemeState state, string xaml, string themeDir, byte[]? previewPng = null)
     {
         var warnings = new List<string>();
         Directory.CreateDirectory(themeDir);
@@ -28,17 +35,29 @@ public static class ThemeExporter
 
         SyncFiles(state.Fonts, fontsDir, warnings);
         SyncFiles(state.Assets, assetsDir, warnings);
+
+        if (previewPng is { Length: > 0 })
+        {
+            try
+            {
+                File.WriteAllBytes(Path.Combine(themeDir, PreviewFileName), previewPng);
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Could not write {PreviewFileName}: {ex.Message}");
+            }
+        }
         return warnings;
     }
 
     /// <summary>Creates a .zip theme pack that the overlay's "Install" button accepts.</summary>
-    public static List<string> WriteZip(ThemeState state, string xaml, string zipPath)
+    public static List<string> WriteZip(ThemeState state, string xaml, string zipPath, byte[]? previewPng = null)
     {
         string staging = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator", "export", Guid.NewGuid().ToString("N"));
         try
         {
             string themeDir = Path.Combine(staging, state.Manifest.Id);
-            var warnings = WriteFolder(state, xaml, themeDir);
+            var warnings = WriteFolder(state, xaml, themeDir, previewPng);
             if (File.Exists(zipPath))
                 File.Delete(zipPath);
             ZipFile.CreateFromDirectory(staging, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);

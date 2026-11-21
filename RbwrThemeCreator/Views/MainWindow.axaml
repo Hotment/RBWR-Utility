@@ -14,6 +14,16 @@
         DragDrop.AllowDrop="True"
         WindowStartupLocation="CenterScreen">
 
+    <!-- Keyboard shortcuts (more in MainWindow.axaml.cs: Ctrl+F, Ctrl+N, Ctrl+1..5, Ctrl+0, Ctrl+P, Ctrl+Shift+C, F1, Esc). -->
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
+        <KeyBinding Gesture="Ctrl+E" Command="{Binding ExportZipCommand}" />
+        <KeyBinding Gesture="Ctrl+I" Command="{Binding InstallToOverlayCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
+    </Window.KeyBindings>
+
     <Panel>
     <Border x:Name="WindowFrame" BorderBrush="{DynamicResource EdBorder}" BorderThickness="1">
     <Grid RowDefinitions="Auto,*,Auto">
@@ -46,9 +56,9 @@
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <Button Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" HotKey="Ctrl+Z" Padding="8,5" ToolTip.Tip="Undo last change (Ctrl+Z)" />
-                    <Button Classes="hud" Content="REDO" Command="{Binding RedoCommand}" HotKey="Ctrl+Y" Padding="8,5" Margin="0,0,4,0" ToolTip.Tip="Redo change (Ctrl+Y)" />
+                    <Button Classes="hud" Content="REDO" Command="{Binding RedoCommand}" HotKey="Ctrl+Y" Padding="8,5" Margin="0,0,4,0" ToolTip.Tip="Redo change (Ctrl+Y or Ctrl+Shift+Z)" />
 
-                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW" ToolTip.Tip="Start a new theme from a preset">
+                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW" ToolTip.Tip="Start a new theme from a preset (Ctrl+N)">
                         <DropDownButton.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Width="320" Spacing="2">
@@ -74,8 +84,8 @@
                     <DropDownButton Classes="hud" Content="OPEN" ToolTip.Tip="Open an existing theme">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" />
-                                <MenuItem Header="Theme folder…" Command="{Binding OpenFolderCommand}" />
+                                <MenuItem Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" InputGesture="Ctrl+O" />
+                                <MenuItem Header="Theme folder…" Command="{Binding OpenFolderCommand}" InputGesture="Ctrl+Shift+O" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
@@ -85,15 +95,18 @@
                     <DropDownButton Classes="hud" Content="EXPORT" ToolTip.Tip="Save a copy or export a shareable pack">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Save as new folder…" Command="{Binding SaveAsCommand}" />
-                                <MenuItem Header="Export .zip pack…" Command="{Binding ExportZipCommand}" />
+                                <MenuItem Header="Save as new folder…" Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S" />
+                                <MenuItem Header="Export .zip pack…" Command="{Binding ExportZipCommand}" InputGesture="Ctrl+E" />
                                 <MenuItem Header="Copy theme.axaml" Command="{Binding CopyXamlCommand}" />
+                                <Separator />
+                                <MenuItem Header="Save preview image (PNG)…" Click="OnExportPreviewPngClick" InputGesture="Ctrl+P" />
+                                <MenuItem Header="Copy preview image (paste on Discord)" Click="OnCopyPreviewImageClick" InputGesture="Ctrl+Shift+C" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
 
                     <Button Classes="hud-green" Content="INSTALL TO OVERLAY" Command="{Binding InstallToOverlayCommand}" Margin="6,0,0,0"
-                            ToolTip.Tip="Copy the theme into the overlay's themes folder. Then click Reload in the overlay's CONFIG tab." />
+                            ToolTip.Tip="Copy the theme into the overlay's themes folder (Ctrl+I). Then click Reload in the overlay's CONFIG tab." />
                 </StackPanel>
 
                 <!-- Window controls styled like the overlay's header buttons -->
@@ -109,10 +122,10 @@
         <!-- =============== Body =============== -->
         <Grid Grid.Row="1" ColumnDefinitions="740,1,*">
 
-            <TabControl Grid.Column="0" Classes="nav" TabStripPlacement="Left">
+            <TabControl x:Name="NavTabs" Grid.Column="0" Classes="nav" TabStripPlacement="Left">
 
                 <!-- Theme info -->
-                <TabItem>
+                <TabItem x:Name="ThemeTab">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE946;" /><TextBlock Text="THEME" VerticalAlignment="Center" /></StackPanel>
                     </TabItem.Header>
@@ -189,12 +202,67 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <Border x:Name="ShortcutsCard" Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section-title" Text="KEYBOARD SHORTCUTS  (F1)" />
+                                    <Grid ColumnDefinitions="150,*,150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                        <Grid.Styles>
+                                            <Style Selector="TextBlock.key">
+                                                <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+                                                <Setter Property="FontWeight" Value="Bold" />
+                                                <Setter Property="FontSize" Value="11" />
+                                                <Setter Property="Margin" Value="0,0,8,5" />
+                                                <Setter Property="TextWrapping" Value="Wrap" />
+                                            </Style>
+                                            <Style Selector="TextBlock.what">
+                                                <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+                                                <Setter Property="FontSize" Value="11" />
+                                                <Setter Property="Margin" Value="0,0,12,5" />
+                                                <Setter Property="TextWrapping" Value="Wrap" />
+                                            </Style>
+                                        </Grid.Styles>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="key" Text="Ctrl+S" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="what" Text="Save" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Classes="key" Text="Ctrl+Shift+S" />
+                                        <TextBlock Grid.Row="0" Grid.Column="3" Classes="what" Text="Save as new folder" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="key" Text="Ctrl+O" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="what" Text="Open theme file" />
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Classes="key" Text="Ctrl+Shift+O" />
+                                        <TextBlock Grid.Row="1" Grid.Column="3" Classes="what" Text="Open theme folder" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="key" Text="Ctrl+N" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="what" Text="New from preset" />
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Classes="key" Text="Ctrl+E" />
+                                        <TextBlock Grid.Row="2" Grid.Column="3" Classes="what" Text="Export .zip pack" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="key" Text="Ctrl+Z" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="what" Text="Undo" />
+                                        <TextBlock Grid.Row="3" Grid.Column="2" Classes="key" Text="Ctrl+Y / Ctrl+Shift+Z" />
+                                        <TextBlock Grid.Row="3" Grid.Column="3" Classes="what" Text="Redo" />
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="key" Text="Ctrl+I" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="what" Text="Install to overlay" />
+                                        <TextBlock Grid.Row="4" Grid.Column="2" Classes="key" Text="Ctrl+F" />
+                                        <TextBlock Grid.Row="4" Grid.Column="3" Classes="what" Text="Search colours" />
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="key" Text="Ctrl+1 … Ctrl+5" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="what" Text="Preview view" />
+                                        <TextBlock Grid.Row="5" Grid.Column="2" Classes="key" Text="Ctrl+0" />
+                                        <TextBlock Grid.Row="5" Grid.Column="3" Classes="what" Text="Fit preview" />
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="key" Text="Ctrl+P" />
+                                        <TextBlock Grid.Row="6" Grid.Column="1" Classes="what" Text="Save preview image" />
+                                        <TextBlock Grid.Row="6" Grid.Column="2" Classes="key" Text="Ctrl+Shift+C" />
+                                        <TextBlock Grid.Row="6" Grid.Column="3" Classes="what" Text="Copy preview image" />
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Classes="key" Text="Ctrl+click preview" />
+                                        <TextBlock Grid.Row="7" Grid.Column="1" Classes="what" Text="Find the colours of an element" />
+                                        <TextBlock Grid.Row="7" Grid.Column="2" Classes="key" Text="Esc" />
+                                        <TextBlock Grid.Row="7" Grid.Column="3" Classes="what" Text="Clear search / stop finding" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
                 <!-- Colours -->
-                <TabItem>
+                <TabItem x:Name="ColoursTab">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE790;" /><TextBlock Text="COLOURS" VerticalAlignment="Center" /></StackPanel>
                     </TabItem.Header>
@@ -229,17 +297,25 @@
                                 <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGold}" TextWrapping="Wrap" />
                             </Border>
 
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                <TextBox x:Name="TokenSearchBox" Classes="hud" Text="{Binding TokenSearch}"
+                                         PlaceholderText="Search colours… (Ctrl+F)  e.g. slider, tooltip, border, #00f0ff" />
+                                <Button Grid.Column="1" Classes="hud" Content="CLEAR" Margin="6,0,0,0" Command="{Binding ClearTokenSearchCommand}"
+                                        IsVisible="{Binding TokenSearch, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </Grid>
+                            <TextBlock Classes="muted" Text="No colours match the search." Margin="4,0,0,10" IsVisible="{Binding HasNoSearchResults}" />
+
                             <ItemsControl ItemsSource="{Binding Groups}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TokenGroupViewModel">
-                                        <Border Classes="card">
+                                        <Border Classes="card" IsVisible="{Binding HasMatches}">
                                             <StackPanel>
                                                 <TextBlock Classes="section-title" Text="{Binding Name}" />
                                                 <TextBlock Classes="muted" Text="{Binding Description}" Margin="0,2,0,8" />
                                                 <ItemsControl ItemsSource="{Binding Tokens}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate x:DataType="vm:TokenViewModel">
-                                                            <Border Classes="token-row" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
+                                                            <Border Classes="token-row" Classes.flash="{Binding IsFlashing}" IsVisible="{Binding IsMatch}" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
                                                                     ToolTip.Tip="Double-click to show where this colour is used" ToolTip.ShowDelay="900">
                                                                 <StackPanel>
                                                                     <Grid ColumnDefinitions="Auto,*,Auto,90,148">
@@ -654,8 +730,13 @@
                             <Slider Minimum="0.25" Maximum="4" Value="{Binding PreviewZoom}" TickFrequency="0.05" IsSnapToTickEnabled="True" Width="90" VerticalAlignment="Center" />
                             <TextBlock x:Name="ZoomText" Width="36" VerticalAlignment="Center" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
                         </StackPanel>
+                        <ToggleButton x:Name="InspectToggle" Classes="hud" Content="FIND COLOUR" VerticalAlignment="Center"
+                                      IsCheckedChanged="OnInspectToggled"
+                                      ToolTip.Tip="Click an element in the preview to jump to the colours that paint it (or Ctrl+click any time). Esc to stop." />
                         <Button Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center"
-                                ToolTip.Tip="Save a high-DPI PNG screenshot of the current preview" />
+                                ToolTip.Tip="Save a high-DPI PNG screenshot of the current preview (Ctrl+P)" />
+                        <Button Classes="hud" Content="COPY" Click="OnCopyPreviewImageClick" Padding="9,5" VerticalAlignment="Center"
+                                ToolTip.Tip="Copy the preview as an image, then paste it on Discord with Ctrl+V (Ctrl+Shift+C)" />
                     </WrapPanel>
                 </Border>
 
@@ -674,7 +755,7 @@
                             </LayoutTransformControl>
                         </Canvas>
                         <Border Classes="canvas-hint" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" IsHitTestVisible="False">
-                            <TextBlock Text="SCROLL: ZOOM  ·  DRAG: MOVE  ·  DOUBLE-CLICK: FIT" />
+                            <TextBlock Text="SCROLL: ZOOM  ·  DRAG: MOVE  ·  DOUBLE-CLICK: FIT  ·  CTRL+CLICK: FIND COLOUR" />
                         </Border>
                     </Panel>
                 </Border>
@@ -690,6 +771,22 @@
             </Grid>
         </Border>
     </Grid>
+    </Border>
+
+    <!-- Off-screen area where theme thumbnails (preview.png) are rendered: zero size and clipped. -->
+    <Canvas x:Name="ThumbRenderHost" Width="0" Height="0" ClipToBounds="True" IsHitTestVisible="False"
+            HorizontalAlignment="Left" VerticalAlignment="Top" />
+
+    <!-- Toast (bottom-right), e.g. "THUMBNAIL CREATED" -->
+    <Border x:Name="Toast" Classes="toast" IsVisible="False" Opacity="0" IsHitTestVisible="False"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,46">
+        <Grid ColumnDefinitions="Auto,*">
+            <Border Width="3" CornerRadius="2" Background="{DynamicResource EdGreen}" Margin="0,0,10,0" />
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock x:Name="ToastTitle" Text="THUMBNAIL CREATED" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource EdGreen}" />
+                <TextBlock x:Name="ToastText" FontSize="11" Foreground="{DynamicResource EdText}" TextWrapping="Wrap" MaxWidth="320" />
+            </StackPanel>
+        </Grid>
     </Border>
 
     <!-- Resize grips (the window has no native frame at all) -->

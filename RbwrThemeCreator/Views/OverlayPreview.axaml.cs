@@ -54,12 +54,17 @@ public partial class OverlayPreview : UserControl
     /// Briefly outlines the named elements with a soft glow that fades out, so the user can see
     /// where a colour token is used.
     /// </summary>
-    public void Highlight(IEnumerable<string> elementNames)
+    public void Highlight(IEnumerable<string> elementNames) =>
+        Highlight(elementNames.Select(n => this.FindControl<Control>(n)).OfType<Control>());
+
+    /// <summary>Same as <see cref="Highlight(IEnumerable{string})"/> for controls found directly.</summary>
+    public void Highlight(IEnumerable<Control> targets)
     {
-        HighlightLayer.Children.Clear();
-        foreach (string name in elementNames)
+        foreach (var old in HighlightLayer.Children.Where(c => c != _hoverMarker).ToList())
+            HighlightLayer.Children.Remove(old);
+        foreach (var target in targets)
         {
-            if (this.FindControl<Control>(name) is not { IsEffectivelyVisible: true } target)
+            if (!target.IsEffectivelyVisible)
                 continue;
             var topLeft = target.TranslatePoint(new Point(0, 0), HighlightLayer);
             if (topLeft == null || target.Bounds.Width < 1)
@@ -89,6 +94,40 @@ public partial class OverlayPreview : UserControl
             HighlightLayer.Children.Add(marker);
             _ = AnimateAndRemove(marker);
         }
+    }
+
+    private Border? _hoverMarker;
+
+    /// <summary>
+    /// Shows a steady dashed-style outline around <paramref name="target"/> (inspect mode hover),
+    /// or hides it when null.
+    /// </summary>
+    public void SetHoverTarget(Control? target)
+    {
+        var topLeft = target?.TranslatePoint(new Point(0, 0), HighlightLayer);
+        if (target == null || topLeft == null || target.Bounds.Width < 1)
+        {
+            if (_hoverMarker != null) _hoverMarker.IsVisible = false;
+            return;
+        }
+
+        if (_hoverMarker == null)
+        {
+            _hoverMarker = new Border
+            {
+                BorderThickness = new Thickness(2),
+                BorderBrush = new SolidColorBrush(Color.Parse("#00f0ff")),
+                Background = new SolidColorBrush(Color.Parse("#1a00f0ff")),
+                CornerRadius = new CornerRadius(6),
+            };
+            HighlightLayer.Children.Add(_hoverMarker);
+        }
+        const double pad = 2;
+        _hoverMarker.Width = target.Bounds.Width + pad * 2;
+        _hoverMarker.Height = target.Bounds.Height + pad * 2;
+        Canvas.SetLeft(_hoverMarker, topLeft.Value.X - pad);
+        Canvas.SetTop(_hoverMarker, topLeft.Value.Y - pad);
+        _hoverMarker.IsVisible = true;
     }
 
     private async Task AnimateAndRemove(Border marker)

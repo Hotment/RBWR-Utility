@@ -80,6 +80,15 @@ public partial class TokenViewModel : ObservableObject
     public string Hint => Definition.Hint;
     public bool SupportsOpacity => Definition.SupportsOpacity;
     public bool SupportsGradient => Definition.SupportsGradient;
+    public string GroupName => Definition.Group;
+
+    /// <summary>False when the row is hidden by the COLOURS search box.</summary>
+    [ObservableProperty]
+    private bool _isMatch = true;
+
+    /// <summary>Briefly true after the token is picked by clicking its element in the preview.</summary>
+    [ObservableProperty]
+    private bool _isFlashing;
 
     [ObservableProperty]
     private Color _color;
@@ -439,11 +448,15 @@ public partial class TokenViewModel : ObservableObject
     }
 }
 
-public sealed class TokenGroupViewModel
+public sealed partial class TokenGroupViewModel : ObservableObject
 {
     public string Name { get; }
     public string Description { get; }
     public IReadOnlyList<TokenViewModel> Tokens { get; }
+
+    /// <summary>False when the search box hides every token of this group.</summary>
+    [ObservableProperty]
+    private bool _hasMatches = true;
 
     public TokenGroupViewModel(string name, string description, IReadOnlyList<TokenViewModel> tokens)
     {

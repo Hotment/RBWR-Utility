@@ -21,7 +21,7 @@ public sealed class PreviewReadyEventArgs(Styles? styles, List<Bitmap> bitmaps) 
 
 public partial class MainViewModel : ObservableObject
 {
-    public const string AppVersion = "1.0.0";
+    public const string AppVersion = "1.1.0-dev";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionBadge => $"v{AppVersion}";
     public string AppVersionText => $"RBWR Theme Creator v{AppVersion}";
@@ -117,6 +117,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _previewFit = true;
     [ObservableProperty] private int _previewMode;
 
+    // ---------- Colour search ----------
+    [ObservableProperty] private string _tokenSearch = string.Empty;
+    [ObservableProperty] private bool _hasNoSearchResults;
+
     // ---------- Updates ----------
     [ObservableProperty] private bool _isCheckingUpdates;
     [ObservableProperty] private string _updateStatusText = $"Installed version: v{AppVersion}";
@@ -163,6 +167,63 @@ public partial class MainViewModel : ObservableObject
         OverlayThemesDirectory = OverlayLocator.Detect() ?? string.Empty;
         LoadState(BuiltInThemes.Presets[0].Create(), folder: null);
         SetStatus("New theme from the Cyberpunk preset. Edit colours on the left — the preview updates live.");
+    }
+
+    // =====================================================================
+    // Colour search + "which colour is this?" from the preview
+    // =====================================================================
+
+    partial void OnTokenSearchChanged(string value) => ApplyTokenSearch();
+
+    /// <summary>
+    /// Filters the COLOURS list. Every word must appear in the label, key, hint, group or hex value,
+    /// so "slider hover" or "#00f0ff" both work.
+    /// </summary>
+    private void ApplyTokenSearch()
+    {
+        string[] words = (TokenSearch ?? string.Empty)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        int visible = 0;
+        foreach (var group in Groups)
+        {
+            bool any = false;
+            foreach (var token in group.Tokens)
+            {
+                bool match = words.Length == 0 || words.All(w =>
+                    token.Label.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.Key.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.Hint.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || group.Name.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.HexText.Contains(w.TrimStart('#'), StringComparison.OrdinalIgnoreCase));
+                token.IsMatch = match;
+                any |= match;
+                if (match) visible++;
+            }
+            group.HasMatches = any;
+        }
+        HasNoSearchResults = visible == 0;
+    }
+
+    [RelayCommand]
+    private void ClearTokenSearch() => TokenSearch = string.Empty;
+
+    /// <summary>Token view models for the given keys, in catalogue order.</summary>
+    public IReadOnlyList<TokenViewModel> GetTokens(IEnumerable<string> keys)
+    {
+        var wanted = new HashSet<string>(keys, StringComparer.Ordinal);
+        return TokenCatalog.Tokens.Where(t => wanted.Contains(t.Key)).Select(t => _tokens[t.Key]).ToList();
+    }
+
+    /// <summary>Makes sure the tokens are visible in the list and makes their rows flash briefly.</summary>
+    public async Task FlashTokensAsync(IReadOnlyList<TokenViewModel> tokens)
+    {
+        if (tokens.Any(t => !t.IsMatch))
+            TokenSearch = string.Empty;
+        foreach (var t in tokens) t.IsFlashing = false;
+        await Task.Delay(30);
+        foreach (var t in tokens) t.IsFlashing = true;
+        await Task.Delay(1800);
+        foreach (var t in tokens) t.IsFlashing = false;
     }
 
     // =====================================================================
@@ -791,7 +852,7 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, folder);
+            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, folder, RenderThumbnail());
             MarkSaved(folder);
             SetStatus(warnings.Count == 0 ? $"Saved to {folder}" : $"Saved with warnings: {string.Join(" ", warnings)}", warnings.Count > 0);
             RefreshInstalledThemes();
@@ -810,7 +871,7 @@ public partial class MainViewModel : ObservableObject
         if (path == null) return;
         try
         {
-            var warnings = ThemeExporter.WriteZip(state, GeneratedXaml, path);
+            var warnings = ThemeExporter.WriteZip(state, GeneratedXaml, path, RenderThumbnail());
             RememberAuthor();
             SetStatus(warnings.Count == 0
                 ? $"Exported {Path.GetFileName(path)} — share it; users install it with CONFIG → Install in the overlay."
@@ -840,7 +901,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, target);
+            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, target, RenderThumbnail());
             RememberAuthor();
             if (isCurrent)
                 MarkSaved(target);
@@ -852,6 +913,19 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             SetStatus($"Install failed: {ex.Message}", isError: true);
+        }
+    }
+
+    /// <summary>preview.png for saved/exported themes; a failed render never blocks saving.</summary>
+    private byte[]? RenderThumbnail()
+    {
+        try
+        {
+            return Dialogs?.RenderThumbnailPng();
+        }
+        catch
+        {
+            return null;
         }
     }
 

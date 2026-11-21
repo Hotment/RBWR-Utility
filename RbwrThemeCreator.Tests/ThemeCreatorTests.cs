@@ -343,6 +343,56 @@ public class ThemeCreatorTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => ThemeImporter.Load(bigZip, BuiltInThemes.Cyberpunk));
     }
 
+    [Fact]
+    public void Exporter_WritesPreviewThumbnail_InFolderAndZip_AndImportStillWorks()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "thumb-theme";
+        state.Manifest.Name = "Thumb Theme";
+        string xaml = ThemeXamlGenerator.Generate(state);
+
+        string folder = Path.Combine(_tempDir, "thumb-theme");
+        Assert.Empty(ThemeExporter.WriteFolder(state, xaml, folder, TinyPng));
+        Assert.Equal(TinyPng, File.ReadAllBytes(Path.Combine(folder, ThemeExporter.PreviewFileName)));
+
+        string zip = Path.Combine(_tempDir, "thumb-theme.zip");
+        Assert.Empty(ThemeExporter.WriteZip(state, xaml, zip, TinyPng));
+        using (var archive = ZipFile.OpenRead(zip))
+            Assert.Contains(archive.Entries, e => e.FullName.Replace('\\', '/') == "thumb-theme/preview.png");
+
+        // The thumbnail must not show up as a theme asset when the theme is opened again.
+        var imported = ThemeImporter.Load(zip, BuiltInThemes.Cyberpunk);
+        Assert.DoesNotContain(imported.Assets, a => a.FileName == ThemeExporter.PreviewFileName);
+
+        // No thumbnail given: nothing is written.
+        string plain = Path.Combine(_tempDir, "plain-theme");
+        ThemeExporter.WriteFolder(state, xaml, plain);
+        Assert.False(File.Exists(Path.Combine(plain, ThemeExporter.PreviewFileName)));
+    }
+
+    [Fact]
+    public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
+    {
+        var vm = new MainViewModel();
+        var all = vm.Groups.SelectMany(g => g.Tokens).ToList();
+
+        vm.TokenSearch = "slider thumb";
+        Assert.All(all, t => Assert.Equal(t.Key.StartsWith("SliderThumb", StringComparison.Ordinal), t.IsMatch));
+        Assert.Contains(vm.Groups, g => !g.HasMatches);
+        Assert.False(vm.HasNoSearchResults);
+
+        string hex = all.First(t => t.Key == "NeonCyan").HexText;
+        vm.TokenSearch = hex;
+        Assert.Contains(all, t => t.Key == "NeonCyan" && t.IsMatch);
+
+        vm.TokenSearch = "no-such-colour-xyz";
+        Assert.True(vm.HasNoSearchResults);
+
+        vm.ClearTokenSearchCommand.Execute(null);
+        Assert.All(all, t => Assert.True(t.IsMatch));
+        Assert.All(vm.Groups, g => Assert.True(g.HasMatches));
+    }
+
     // ==================== OverlayLocator & FontTools ====================
 
     [Fact]

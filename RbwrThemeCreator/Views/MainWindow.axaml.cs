@@ -57,12 +57,16 @@ public partial class MainWindow : Window, IDialogHost
         Viewport.AddHandler(PointerPressedEvent, OnViewportPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         Viewport.PointerMoved += OnViewportPointerMoved;
         Viewport.PointerReleased += OnViewportPointerReleased;
+        Viewport.PointerExited += (_, _) => ClearInspectHover();
+        AddHandler(KeyDownEvent, OnShortcutKeyDown);
         AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
         AddHandler(DragDrop.DropEvent, OnWindowDrop);
         Opened += (_, _) =>
         {
             ApplyCornerPreference();
             _ = _vm?.RunUpdateCheckAsync(isManual: false);
+            // Older installed themes without preview.png get one (shown by the overlay's Theme Manager).
+            Dispatcher.UIThread.Post(() => _ = CreateMissingInstalledThumbnailsAsync(), DispatcherPriority.ApplicationIdle);
         };
         // Enter in a number box commits the value (the bindings update on focus loss).
         AddHandler(KeyDownEvent, (_, e) =>
@@ -140,6 +144,8 @@ public partial class MainWindow : Window, IDialogHost
         if (_vm == null) return;
         if (e.PropertyName == nameof(MainViewModel.PreviewBackdrop))
             ApplyBackdrop(_vm.PreviewBackdrop);
+        else if (e.PropertyName == nameof(MainViewModel.CurrentFolder))
+            OnThemeFolderOpened();
         else if (e.PropertyName == nameof(MainViewModel.PreviewMode))
         {
             _pan = default;
@@ -265,6 +271,24 @@ public partial class MainWindow : Window, IDialogHost
     private void OnViewportPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(Viewport).Properties;
+
+        // FIND COLOUR: Ctrl+click (or a click while the toggle is on) jumps to the element's colours.
+        if (props.IsLeftButtonPressed && IsInspecting(e.KeyModifiers))
+        {
+            if (FindTokenElement(e.Source) is { } hit)
+            {
+                e.Handled = true;
+                _ = ShowTokensForElementAsync(hit.Element, hit.Keys);
+                return;
+            }
+            if (InspectToggle.IsChecked == true)
+            {
+                _vm?.SetStatus("No editable colour is mapped to that spot. Try a card, title, button, slider or the window background.");
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Middle/right button always pans; left button pans unless it is on a control in the mock overlay.
         bool pan = props.IsMiddleButtonPressed || props.IsRightButtonPressed
                    || (props.IsLeftButtonPressed && !IsInteractive(e.Source, Viewport));
@@ -290,7 +314,11 @@ public partial class MainWindow : Window, IDialogHost
 
     private void OnViewportPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_panning) return;
+        if (!_panning)
+        {
+            UpdateInspectHover(e);
+            return;
+        }
         var p = e.GetPosition(Viewport);
         _pan = _panAtStart + (p - _panStart);
         if (_vm is { PreviewFit: true } && Math.Abs(p.X - _panStart.X) + Math.Abs(p.Y - _panStart.Y) > 3)
@@ -459,6 +487,20 @@ public partial class MainWindow : Window, IDialogHost
         }
     }
 
+    /// <summary>Renders the preview as it is shown now (current view), at <paramref name="scale"/>x.</summary>
+    private RenderTargetBitmap RenderPreview(double scale)
+    {
+        var size = PreviewHost.Bounds.Size;
+        if (size.Width < 1 || size.Height < 1)
+            size = PreviewHost.DesiredSize;
+        int pxW = Math.Max(1, (int)Math.Ceiling(size.Width * scale));
+        int pxH = Math.Max(1, (int)Math.Ceiling(size.Height * scale));
+
+        var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96 * scale, 96 * scale));
+        rtb.Render(PreviewHost);
+        return rtb;
+    }
+
     private async void OnExportPreviewPngClick(object? sender, RoutedEventArgs e)
     {
         if (_vm == null) return;
@@ -468,25 +510,167 @@ public partial class MainWindow : Window, IDialogHost
 
         try
         {
-            const double scale = 2.0;
-            var size = PreviewHost.Bounds.Size;
-            if (size.Width < 1 || size.Height < 1)
-                size = PreviewHost.DesiredSize;
-            int pxW = Math.Max(1, (int)Math.Ceiling(size.Width * scale));
-            int pxH = Math.Max(1, (int)Math.Ceiling(size.Height * scale));
-
-            using var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96 * scale, 96 * scale));
-            rtb.Render(PreviewHost);
+            ClearInspectHover();
+            using var rtb = RenderPreview(2.0);
             using (var fs = File.Create(outPath))
             {
                 rtb.Save(fs, new PngBitmapEncoderOptions());
             }
-            _vm.SetStatus($"Saved preview screenshot to {Path.GetFileName(outPath)} ({pxW}x{pxH}).");
+            _vm.SetStatus($"Saved preview screenshot to {Path.GetFileName(outPath)} ({rtb.PixelSize.Width}x{rtb.PixelSize.Height}).");
         }
         catch (Exception ex)
         {
             _vm.SetStatus($"Could not export preview PNG: {ex.Message}", isError: true);
         }
+    }
+
+    /// <summary>Copies the preview as an image so it can be pasted straight into Discord.</summary>
+    private async void OnCopyPreviewImageClick(object? sender, RoutedEventArgs e) => await CopyPreviewImageAsync();
+
+    private async Task CopyPreviewImageAsync()
+    {
+        if (_vm == null || Clipboard == null) return;
+        try
+        {
+            ClearInspectHover();
+            using var rtb = RenderPreview(2.0);
+            await Clipboard.SetBitmapAsync(rtb);
+            _vm.SetStatus("Preview image copied. Paste it on Discord (or anywhere) with Ctrl+V.");
+        }
+        catch (Exception ex)
+        {
+            _vm.SetStatus($"Could not copy the preview image: {ex.Message}", isError: true);
+        }
+    }
+
+    /// <summary>
+    /// preview.png for saved and exported themes: the MONITOR view of the edited theme, rendered off
+    /// screen (see MainWindow.Thumbnails.cs), so the live preview is never switched or redrawn.
+    /// </summary>
+    public byte[]? RenderThumbnailPng() => _vm == null ? null : RenderThemeThumbnail(_vm.BuildState());
+
+    // ===================== Keyboard shortcuts =====================
+
+    private void OnShortcutKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_vm == null || e.Handled) return;
+        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        switch (e.Key)
+        {
+            case Key.F when ctrl && !shift:
+                NavTabs.SelectedItem = ColoursTab;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    TokenSearchBox.Focus();
+                    TokenSearchBox.SelectAll();
+                }, DispatcherPriority.Loaded);
+                break;
+            case Key.N when ctrl && !shift:
+                NewButton.Flyout?.ShowAt(NewButton);
+                break;
+            case Key.P when ctrl && !shift:
+                OnExportPreviewPngClick(this, new RoutedEventArgs());
+                break;
+            case Key.C when ctrl && shift:
+                _ = CopyPreviewImageAsync();
+                break;
+            case Key.D0 or Key.NumPad0 when ctrl:
+                _pan = default;
+                _vm.PreviewFit = true;
+                UpdateZoom();
+                break;
+            case >= Key.D1 and <= Key.D5 when ctrl:
+                _vm.PreviewMode = e.Key - Key.D1;
+                break;
+            case >= Key.NumPad1 and <= Key.NumPad5 when ctrl:
+                _vm.PreviewMode = e.Key - Key.NumPad1;
+                break;
+            case Key.F1:
+                NavTabs.SelectedItem = ThemeTab;
+                Dispatcher.UIThread.Post(() => ShortcutsCard.BringIntoView(), DispatcherPriority.Loaded);
+                break;
+            case Key.Escape when InspectToggle.IsChecked == true:
+                InspectToggle.IsChecked = false;
+                break;
+            case Key.Escape when !string.IsNullOrEmpty(_vm.TokenSearch):
+                _vm.TokenSearch = string.Empty;
+                break;
+            default:
+                return;
+        }
+        e.Handled = true;
+    }
+
+    // ===================== FIND COLOUR (click an element in the preview) =====================
+
+    private bool IsInspecting(KeyModifiers modifiers) =>
+        InspectToggle.IsChecked == true || modifiers.HasFlag(KeyModifiers.Control);
+
+    private void OnInspectToggled(object? sender, RoutedEventArgs e)
+    {
+        bool on = InspectToggle.IsChecked == true;
+        if (!on) ClearInspectHover();
+        _vm?.SetStatus(on
+            ? "FIND COLOUR: click an element in the preview to jump to its colours. Esc to stop."
+            : "Ready.");
+    }
+
+    /// <summary>The innermost preview element under the pointer that a colour token is mapped to.</summary>
+    private (Control Element, string[] Keys)? FindTokenElement(object? source)
+    {
+        for (var v = source as Visual; v != null && v != Viewport; v = v.GetVisualParent())
+        {
+            if (v is not Control c) continue;
+            if (TokenLocations.TryGetTokensForElement(c.Name, out var keys))
+                return (c, keys);
+            if (c is Slider)
+                return (c, TokenLocations.SliderTokens);
+        }
+        return null;
+    }
+
+    private void UpdateInspectHover(PointerEventArgs e)
+    {
+        if (!IsInspecting(e.KeyModifiers))
+        {
+            ClearInspectHover();
+            return;
+        }
+        var hit = FindTokenElement(e.Source);
+        Preview.SetHoverTarget(hit?.Element);
+        Viewport.Cursor = hit != null ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
+    }
+
+    private void ClearInspectHover()
+    {
+        Preview.SetHoverTarget(null);
+        if (!_panning) Viewport.Cursor = Cursor.Default;
+    }
+
+    private async Task ShowTokensForElementAsync(Control element, string[] keys)
+    {
+        if (_vm == null) return;
+        var tokens = _vm.GetTokens(keys);
+        if (tokens.Count == 0) return;
+
+        Preview.Highlight([element]);
+        NavTabs.SelectedItem = ColoursTab;
+        string name = string.IsNullOrEmpty(element.Name) ? element.GetType().Name : element.Name;
+        _vm.SetStatus($"{name} uses: {string.Join(", ", tokens.Select(t => t.Label))}");
+
+        // Starts the flash (and clears a search that would hide these rows) before the scroll.
+        var flash = _vm.FlashTokensAsync(tokens);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+
+        string firstKey = tokens[0].Key;
+        var row = NavTabs.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.Classes.Contains("token-row") && Equals(b.Tag, firstKey));
+        // A little extra room above and below so the neighbouring rows are visible too.
+        row?.BringIntoView(new Rect(0, -60, row.Bounds.Width, row.Bounds.Height + 120));
+
+        await flash;
     }
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)

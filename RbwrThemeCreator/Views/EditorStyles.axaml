@@ -22,6 +22,7 @@
         <SolidColorBrush x:Key="EdRed" Color="#ff003c" />
         <SolidColorBrush x:Key="EdGold" Color="#ffaa00" />
         <FontFamily x:Key="EdFont">Consolas, Segoe UI, monospace</FontFamily>
+        <StreamGeometry x:Key="EyedropperIcon">M13.4,2.6 C12.6,1.8 11.4,1.8 10.6,2.6 L8.9,4.3 L8.2,3.6 L7.1,4.7 L7.8,5.4 L2.5,10.7 L2,14 L5.3,13.5 L10.6,8.2 L11.3,8.9 L12.4,7.8 L11.7,7.1 L13.4,5.4 C14.2,4.6 14.2,3.4 13.4,2.6 Z M4.8,12.4 L3.4,12.6 L3.6,11.2 L8.9,5.9 L10.1,7.1 Z</StreamGeometry>
         <FontFamily x:Key="EdIcons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
         <!-- Fluent control resources re-coloured to the HUD palette -->
@@ -274,6 +275,11 @@
         <Setter Property="Margin" Value="0,6" />
     </Style>
     <Style Selector="Border.token-row">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.3" />
+            </Transitions>
+        </Setter>
         <Setter Property="Padding" Value="10,8" />
         <Setter Property="Margin" Value="0,1" />
         <Setter Property="CornerRadius" Value="8" />
@@ -283,6 +289,12 @@
     </Style>
     <Style Selector="Border.token-row:pointerover">
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
+    <!-- Row flash after FIND COLOUR in the preview -->
+    <Style Selector="Border.token-row.flash">
+        <Setter Property="Background" Value="#2600f0ff" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderThickness" Value="1" />
     </Style>
 
     <!-- ===== Buttons (cyber, cyber-blue, cyber-green, cyber-red) ===== -->
@@ -538,6 +550,23 @@
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
     </Style>
+    <Style Selector="Button.dropper">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.dropper:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
     <Style Selector="Button.palette">
         <Setter Property="Width" Value="24" />
         <Setter Property="Height" Value="24" />
@@ -554,6 +583,19 @@
     </Style>
     <Style Selector="Button.palette:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{TemplateBinding Background}" />
+    </Style>
+    <Style Selector="Border.toast">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="#8839ff14" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,10,16,10" />
+        <Setter Property="BoxShadow" Value="0 6 24 0 #aa000000" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.25" />
+            </Transitions>
+        </Setter>
     </Style>
     <Style Selector="FlyoutPresenter.hud-color">
         <Setter Property="Background" Value="{DynamicResource EdCard}" />
