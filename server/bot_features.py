@@ -427,6 +427,41 @@ def list_text_channels() -> list[dict]:
     return _run(_channels, timeout=6)
 
 
+def list_forum_posts(archived_limit: int = 25) -> list[dict]:
+    """Forum channels on the Piano Weave server with their posts (active + recently archived),
+    for the embed builder (blocking)."""
+    async def _forums():
+        guild = _panel_guild()
+        me = guild.me
+        out = []
+        forums = sorted(guild.forum_channels, key=lambda c: ((c.category.position if c.category else -1), c.position))
+        for forum in forums:
+            perms = forum.permissions_for(me)
+            if not (perms.view_channel and perms.embed_links and perms.send_messages_in_threads):
+                continue
+            posts = {t.id: t for t in forum.threads}
+            if perms.read_message_history:
+                try:
+                    async for t in forum.archived_threads(limit=archived_limit):
+                        posts.setdefault(t.id, t)
+                except disnake.HTTPException:
+                    pass
+            ordered = sorted(posts.values(), key=lambda t: (t.archived, -(t.id)))
+            out.append({
+                "id": str(forum.id),
+                "name": forum.name,
+                "category": forum.category.name if forum.category else "",
+                "can_create": bool(perms.send_messages),
+                "requires_tag": forum.requires_tag(),
+                "tags": [{"id": str(tag.id), "name": tag.name, "emoji": str(tag.emoji) if tag.emoji else ""}
+                         for tag in forum.available_tags if not tag.moderated or perms.manage_threads],
+                "posts": [{"id": str(t.id), "name": t.name, "archived": t.archived, "locked": t.locked}
+                          for t in ordered if not t.locked or perms.manage_threads],
+            })
+        return out
+    return _run(_forums, timeout=10)
+
+
 def list_roles() -> dict:
     """Roles on the server that the embed builder can ping (blocking)."""
     async def _roles():
@@ -443,32 +478,63 @@ def list_roles() -> dict:
     return _run(_roles, timeout=6)
 
 
-async def _post_embed(channel, content: str, embed_dict: dict | None, allow_mentions: bool, edit_message_id: str | None = None) -> dict:
-    if not isinstance(channel, disnake.TextChannel) or channel.guild.id != _guild_id():
-        raise BotActionError("Pick a text channel on the RBWR server.")
+def _is_panel_post(channel) -> bool:
+    """A thread (forum post or channel thread) on the RBWR server."""
+    return isinstance(channel, disnake.Thread) and channel.guild.id == _guild_id()
+
+
+async def _post_embed(channel, content: str, embed_dict: dict | None, allow_mentions: bool, edit_message_id: str | None = None,
+                      post_title: str = "", post_tag_id: str | None = None) -> dict:
     kwargs = {
         "content": content or None,
         "embed": disnake.Embed.from_dict(embed_dict) if embed_dict else None,  # pyright: ignore[reportArgumentType]
         "allowed_mentions": _mentions(allow_mentions),
     }
+    if isinstance(channel, disnake.ForumChannel) and channel.guild.id == _guild_id():
+        # a new post in a forum: the message becomes the post's first message
+        if edit_message_id:
+            raise BotActionError("To edit a message, pick the post it's in, not the forum.")
+        title = (post_title or "").strip()[:100]
+        if not title:
+            raise BotActionError("Give the new post a title.")
+        tags = []
+        if post_tag_id:
+            tag = channel.get_tag(int(post_tag_id))
+            if not tag:
+                raise BotActionError("That forum tag no longer exists.")
+            tags.append(tag)
+        if channel.requires_tag() and not tags:
+            raise BotActionError(f"The #{channel.name} forum requires a tag on every post. Pick one.")
+        created = await channel.create_thread(name=title, applied_tags=tags, **{k: v for k, v in kwargs.items() if v is not None})
+        thread, msg = created.thread, created.message
+        return {"message_id": str(msg.id), "channel_id": str(thread.id), "channel_name": thread.name,
+                "forum_name": channel.name, "jump_url": msg.jump_url}
+    if not (isinstance(channel, disnake.TextChannel) and channel.guild.id == _guild_id()) and not _is_panel_post(channel):
+        raise BotActionError("Pick a text channel or a forum post on the RBWR server.")
     if edit_message_id:
         msg = await channel.fetch_message(int(edit_message_id))
         if not _bot or not _bot.user or msg.author.id != _bot.user.id:
             raise BotActionError("The bot can only edit messages it sent itself.")
         await msg.edit(**kwargs)
     else:
-        msg = await channel.send(**kwargs)
-    return {"message_id": str(msg.id), "channel_id": str(channel.id), "channel_name": channel.name, "jump_url": msg.jump_url}
+        if _is_panel_post(channel) and channel.locked and not channel.permissions_for(channel.guild.me).manage_threads:
+            raise BotActionError("That post is locked.")
+        msg = await channel.send(**kwargs)  # sending into an archived post unarchives it
+    result = {"message_id": str(msg.id), "channel_id": str(channel.id), "channel_name": channel.name, "jump_url": msg.jump_url}
+    if _is_panel_post(channel) and isinstance(channel.parent, disnake.ForumChannel):
+        result["forum_name"] = channel.parent.name
+    return result
 
 
 def send_embed(channel_id: str, content: str, embed_dict: dict | None, allow_mentions: bool = False,
-               edit_message_id: str | None = None) -> dict:
-    """Posts (or edits) an embed message from the web panel (blocking). Raises BotActionError."""
+               edit_message_id: str | None = None, post_title: str = "", post_tag_id: str | None = None) -> dict:
+    """Posts (or edits) an embed message from the web panel (blocking). The target can be a text channel,
+    a forum post, or a forum (then a new post titled `post_title` is created). Raises BotActionError."""
     async def _send():
         channel = await _get_channel(channel_id)
         if channel is None:
             raise BotActionError("Channel not found.")
-        return await _post_embed(channel, content, embed_dict, allow_mentions, edit_message_id)
+        return await _post_embed(channel, content, embed_dict, allow_mentions, edit_message_id, post_title, post_tag_id)
     return _run(_send)
 
 

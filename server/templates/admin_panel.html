@@ -1337,6 +1337,17 @@
                             </div>
                             <button type="button" class="mono-btn" id="eb-reload-channels" title="Reload channels">&#8635;</button>
                         </div>
+                        <div class="adm-hint" style="margin:-10px 0 16px">Forum posts are listed under their forum. Pick <em>+ New post</em> to start a new post with this message.</div>
+                        <div id="eb-new-post" class="hidden">
+                            <div class="adm-field">
+                                <label class="adm-label" for="eb-post-title">Post title</label>
+                                <input id="eb-post-title" class="adm-input" maxlength="100" placeholder="Title of the new forum post">
+                            </div>
+                            <div class="adm-field" id="eb-post-tag-wrap">
+                                <label class="adm-label" for="eb-post-tag">Tag <span class="adm-optional" id="eb-post-tag-note">(optional)</span></label>
+                                <select id="eb-post-tag" class="adm-select"></select>
+                            </div>
+                        </div>
                         <div class="adm-field">
                             <label class="adm-label" for="eb-content">Message text <span class="adm-optional">(above the embed)</span></label>
                             <textarea id="eb-content" class="adm-textarea" maxlength="2000" rows="2" style="min-height:60px"></textarea>
