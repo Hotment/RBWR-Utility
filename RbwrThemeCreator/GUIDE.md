@@ -267,8 +267,12 @@ The **CODE** tab shows the exact `theme.axaml` that will be saved. **COPY** puts
 - **ID**: the folder name. Lowercase letters, digits, `-` and `_` only. It follows the name until you
   edit it yourself. `default` and `reactor-amber` are reserved for the built-in themes.
 - **Author**, **Version** (like `1.0.0`), **Min. overlay** (oldest overlay version the theme needs)
-  and **Description**. A theme with **ANIMATED** colours needs overlay **2.3.1** or newer (older
-  overlays can crash on some animations), so the creator raises Min. overlay to 2.3.1 by itself.
+  and **Description**. **ANIMATED** colours need overlay **2.3.1** or newer (older overlays can crash
+  on them; from 2.3.1 on, overlays also hide themes made for a newer version). So:
+  - with Min. overlay below 2.3.1, **ANIMATED** is dimmed and can't be chosen: a warning in the
+    bottom-right corner says to raise Min. overlay first;
+  - while the theme has animated colours, Min. overlay can't be set lower than 2.3.1 (same warning).
+    Set every colour to SOLID or GRADIENT to target an older overlay.
 
 The card at the top of the THEME tab shows how your theme will look in the overlay's **Theme Manager**:
 thumbnail, name, version and author, drawn in your theme's own colours. It updates live

@@ -99,6 +99,8 @@
                                      with the theme's window glow colour as the outline. -->
                                 <Border Classes="hud-card"
                                         behaviors:ThemeCardBehaviors.Resources="{Binding CardResources}"
+                                        behaviors:ThemeCardBehaviors.BackgroundAnimation="{Binding CardBackgroundAnimation}"
+                                        behaviors:ThemeCardBehaviors.BorderAnimation="{Binding CardBorderAnimation}"
                                         Padding="11,9"
                                         Margin="0,0,0,8"
                                         Cursor="Hand"

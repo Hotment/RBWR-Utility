@@ -214,15 +214,26 @@ public partial class MainWindow
 
         var old = ThemeCardThumb.Source as IDisposable;
         ThemeCardThumb.Source = image;
+        // The same thumbnail in the preview's CONFIG theme list, like the overlay shows it.
+        if (Preview.FindControl<Image>("ThemeComboThumb") is { } comboThumb)
+            comboThumb.Source = image;
         old?.Dispose();
     }
 
     /// <summary>Shows the bottom-right toast for a few seconds.</summary>
-    public void ShowToast(string title, string message)
+    public void ShowToast(string title, string message, bool warning = false)
     {
         int version = ++_toastVersion;
         ToastTitle.Text = title;
         ToastText.Text = message;
+        // Green = done, gold = warning.
+        string accent = warning ? "EdGold" : "EdGreen";
+        if (this.TryFindResource(accent, out var brush) && brush is Avalonia.Media.IBrush b)
+        {
+            ToastTitle.Foreground = b;
+            ToastBar.Background = b;
+        }
+        Toast.Classes.Set("warning", warning);
         Toast.IsVisible = true;
         Dispatcher.UIThread.Post(() => Toast.Opacity = 1, DispatcherPriority.Background);
 

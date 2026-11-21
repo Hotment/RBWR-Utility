@@ -300,6 +300,14 @@ public partial class MainViewModel : ObservableObject
         {
             var vm = new TokenViewModel(def, BuiltInThemes.Cyberpunk.Tokens.GetValueOrDefault(def.Key) ?? new TokenValue(Colors.Gray));
             vm.ValueChanged += (_, _) => OnEdited();
+            vm.CanAnimate = () => IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay);
+            vm.AnimationRefused = () =>
+            {
+                SetStatus($"ANIMATED needs Min. overlay {AnimatedColoursMinOverlay} or newer (THEME tab).", isError: true);
+                RequestWarningToast?.Invoke("ANIMATED IS LOCKED",
+                    $"Animated colours only work on overlay {AnimatedColoursMinOverlay} or newer (older overlays can crash). "
+                    + $"Set Min. overlay to {AnimatedColoursMinOverlay} or higher in the THEME tab first.");
+            };
             _tokens[def.Key] = vm;
         }
 
@@ -1064,6 +1072,9 @@ public partial class MainViewModel : ObservableObject
 
     public bool HasAnimatedColours => _tokens.Values.Any(t => t.IsAnimated);
 
+    /// <summary>Asks the window to show a warning toast (bottom-right): title, message.</summary>
+    public event Action<string, string>? RequestWarningToast;
+
     /// <summary>Raises Min. overlay to <see cref="AnimatedColoursMinOverlay"/> when the theme has animated colours.</summary>
     private void EnsureMinOverlayForAnimations()
     {
@@ -1072,6 +1083,30 @@ public partial class MainViewModel : ObservableObject
             return;
         MinAppVersion = AnimatedColoursMinOverlay;
         SetStatus($"Min. overlay set to {AnimatedColoursMinOverlay}: animated colours need overlay v{AnimatedColoursMinOverlay} or newer.");
+        RequestWarningToast?.Invoke("MIN. OVERLAY RAISED",
+            $"Animated colours need overlay {AnimatedColoursMinOverlay} or newer (older overlays can crash), so Min. overlay is now {AnimatedColoursMinOverlay}.");
+    }
+
+    /// <summary>
+    /// A theme with animated colours cannot target an older overlay: a lower Min. overlay typed by hand
+    /// goes straight back to <see cref="AnimatedColoursMinOverlay"/>, with a warning toast.
+    /// </summary>
+    partial void OnMinAppVersionChanged(string value)
+    {
+        foreach (var token in _tokens.Values)
+            token.NotifyAnimationAllowed();
+        if (_suppressChanges || !HasAnimatedColours || IsVersionAtLeast(value, AnimatedColoursMinOverlay))
+            return;
+        // After the text box has finished writing, so it shows the corrected value.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!HasAnimatedColours || IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay)) return;
+            MinAppVersion = AnimatedColoursMinOverlay;
+            SetStatus($"Min. overlay can't be lower than {AnimatedColoursMinOverlay} while the theme has animated colours.", isError: true);
+        });
+        RequestWarningToast?.Invoke("NOT POSSIBLE WITH ANIMATED COLOURS",
+            $"Overlays older than {AnimatedColoursMinOverlay} can't use animated colours (they can crash), so Min. overlay stays at {AnimatedColoursMinOverlay}. "
+            + "Set every colour to SOLID or GRADIENT to target an older overlay.");
     }
 
     /// <summary>"2.4" >= "2.3.1"; empty or unreadable counts as too old.</summary>

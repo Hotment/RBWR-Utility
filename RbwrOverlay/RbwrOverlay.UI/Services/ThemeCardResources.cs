@@ -56,6 +56,57 @@ public static class ThemeCardResources
         }
     }
 
+    // ===================== Animated colours (Theme Creator "ANIMATED") =====================
+
+    private static readonly System.Text.RegularExpressions.Regex AnimationsComment = new(
+        @"<!--\s*@creator:token-animations\s+(?<json>\{.*?\})\s*-->",
+        System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromMilliseconds(200));
+
+    private sealed record AnimationJson(string[]? Colors, bool Flow, double Seconds, double Angle = 0);
+
+    private static readonly Dictionary<string, (DateTime Stamp, IReadOnlyDictionary<string, CardAnimation> Map)> AnimationCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The animated colours of a theme (key → animation), read from the settings the Theme Creator stores
+    /// in theme.axaml. Empty for built-in themes, themes without animations or unreadable files.
+    /// </summary>
+    public static IReadOnlyDictionary<string, CardAnimation> GetAnimations(InstalledThemeInfo info)
+    {
+        if (info.IsBuiltIn || string.IsNullOrWhiteSpace(info.EntryFilePath))
+            return new Dictionary<string, CardAnimation>();
+        try
+        {
+            var file = new FileInfo(info.EntryFilePath);
+            if (!file.Exists || file.Length > MaxXamlBytes)
+                return new Dictionary<string, CardAnimation>();
+            string key = info.Id + "|" + info.EntryFilePath;
+            if (AnimationCache.TryGetValue(key, out var hit) && hit.Stamp == file.LastWriteTimeUtc)
+                return hit.Map;
+
+            var map = new Dictionary<string, CardAnimation>(StringComparer.Ordinal);
+            var m = AnimationsComment.Match(File.ReadAllText(file.FullName));
+            if (m.Success)
+            {
+                var parsed = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, AnimationJson>>(m.Groups["json"].Value);
+                foreach (var (token, json) in parsed ?? new Dictionary<string, AnimationJson>())
+                {
+                    var colours = (json.Colors ?? []).Select(h => Color.TryParse(h, out var c) ? (Color?)c : null)
+                        .OfType<Color>().Take(4).ToList();
+                    if (colours.Count >= 2)
+                        map[token] = new CardAnimation(colours, json.Flow, Math.Clamp(json.Seconds, 1, 60), json.Angle);
+                }
+            }
+            AnimationCache[key] = (file.LastWriteTimeUtc, map);
+            return map;
+        }
+        catch
+        {
+            return new Dictionary<string, CardAnimation>(); // a card without animation, never an error
+        }
+    }
+
     private static IReadOnlyDictionary<object, object?>? Build(InstalledThemeInfo info)
     {
         _base ??= Collect(Load(CyberpunkUri), null);

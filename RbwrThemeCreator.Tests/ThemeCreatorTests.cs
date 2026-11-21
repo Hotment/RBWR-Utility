@@ -604,7 +604,8 @@ public class ThemeCreatorTests : IDisposable
         var vm = new MainViewModel();
         var tokens = vm.Groups.SelectMany(g => g.Tokens).ToDictionary(t => t.Key);
 
-        // GRADIENT and ANIMATE are one or the other.
+        // GRADIENT and ANIMATE are one or the other (ANIMATED needs Min. overlay 2.3.1+).
+        vm.MinAppVersion = MainViewModel.AnimatedColoursMinOverlay;
         var cardRow = tokens["CyberCardBg"];
         cardRow.IsGradient = true;
         cardRow.IsAnimated = true;
@@ -621,7 +622,7 @@ public class ThemeCreatorTests : IDisposable
     }
 
     [Fact]
-    public void AnimatedColours_RaiseMinOverlayTo231_ButNeverLowerIt()
+    public void Animated_IsLockedBelowMinOverlay231_AndMinOverlayCantGoLowerWhileAnimated()
     {
         Assert.True(MainViewModel.IsVersionAtLeast("2.3.1", "2.3.1"));
         Assert.True(MainViewModel.IsVersionAtLeast("v2.4.0-dev", "2.3.1"));
@@ -629,25 +630,38 @@ public class ThemeCreatorTests : IDisposable
         Assert.False(MainViewModel.IsVersionAtLeast("", "2.3.1"));
 
         var vm = new MainViewModel();
-        vm.MinAppVersion = "2.3.0";
+        var toasts = new List<string>();
+        vm.RequestWarningToast += (title, _) => toasts.Add(title);
         var card = vm.Groups.SelectMany(g => g.Tokens).First(t => t.Key == "CyberCardBg");
-        Assert.False(vm.HasAnimatedColours);
 
-        card.FillMode = 2; // ANIMATED
+        // Min. overlay 2.3.0: ANIMATED is locked and refused with a warning.
+        vm.MinAppVersion = "2.3.0";
+        Assert.False(card.AnimationAllowed);
+        card.FillMode = 2;
+        Assert.False(card.IsAnimated);
+        Assert.Contains("ANIMATED IS LOCKED", toasts);
+        Assert.Equal("2.3.0", vm.MinAppVersion); // nothing is changed behind the user's back
+
+        // Raised to 2.3.1: ANIMATED can be chosen.
+        vm.MinAppVersion = "2.3.1";
+        Assert.True(card.AnimationAllowed);
+        card.FillMode = 2;
+        Assert.True(card.IsAnimated);
         vm.Refresh();
         Assert.True(vm.HasAnimatedColours);
-        Assert.Equal(MainViewModel.AnimatedColoursMinOverlay, vm.MinAppVersion);
 
-        // A higher version typed by hand is kept.
+        // A higher version is fine; a lower one is refused while animated (checked via the guard).
         vm.MinAppVersion = "2.5.0";
-        vm.Refresh();
         Assert.Equal("2.5.0", vm.MinAppVersion);
-
-        // Without animations nothing is forced.
-        card.FillMode = 0;
+        toasts.Clear();
         vm.MinAppVersion = "2.3.0";
+        Assert.Contains("NOT POSSIBLE WITH ANIMATED COLOURS", toasts);
+
+        // Without animations any version is accepted.
+        card.FillMode = 0;
+        vm.MinAppVersion = "2.2.0";
         vm.Refresh();
-        Assert.Equal("2.3.0", vm.MinAppVersion);
+        Assert.Equal("2.2.0", vm.MinAppVersion);
     }
 
     [Fact]

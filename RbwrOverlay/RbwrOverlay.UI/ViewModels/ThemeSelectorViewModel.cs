@@ -53,6 +53,10 @@ public partial class ThemeEntryViewModel : ObservableObject
     /// <summary>This theme's colours and fonts: the card is drawn in the theme's own look.</summary>
     public IReadOnlyDictionary<object, object?>? CardResources { get; }
 
+    /// <summary>The theme's animated main background / window outline, played on the card (null = still).</summary>
+    public CardAnimation? CardBackgroundAnimation { get; }
+    public CardAnimation? CardBorderAnimation { get; }
+
     public ThemeEntryViewModel(InstalledThemeInfo info, bool isActive, bool isExpanded, ThemeSelectorViewModel owner)
     {
         Info = info;
@@ -62,6 +66,9 @@ public partial class ThemeEntryViewModel : ObservableObject
 
         Thumbnail = ThemeThumbnailService.Get(info);
         CardResources = ThemeCardResources.Get(info);
+        var animations = ThemeCardResources.GetAnimations(info);
+        CardBackgroundAnimation = animations.GetValueOrDefault("CyberMainBg");
+        CardBorderAnimation = animations.GetValueOrDefault("CyberBorderGlow");
     }
 
     partial void OnIsExpandedChanged(bool value)

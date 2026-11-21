@@ -2061,7 +2061,11 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             var result = _themeService.ApplyTheme(_settings.SelectedThemeId);
             if (!result.Success)
             {
-                SetThemeStatus($"Saved theme '{_settings.SelectedThemeId}' failed: {result.ErrorMessage}", isError: true);
+                bool tooNew = result.ErrorMessage?.Contains("needs overlay v", StringComparison.Ordinal) == true;
+                SetThemeStatus(tooNew
+                        ? $"{result.ErrorMessage} Using the default theme for now."
+                        : $"Saved theme '{_settings.SelectedThemeId}' failed: {result.ErrorMessage}",
+                    isError: !tooNew, isWarning: tooNew);
                 _themeService.ApplyTheme(ThemeService.DefaultThemeId);
                 _settings.SelectedThemeId = ThemeService.DefaultThemeId;
                 _settingsService.SaveSettings(_settings);

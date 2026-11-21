@@ -113,6 +113,19 @@ public partial class TokenViewModel : ObservableObject
     private double _angle = 90;
 
     // ---------- Animation (ANIMATE on the row) ----------
+    /// <summary>
+    /// Whether ANIMATED may be chosen (the theme's Min. overlay is new enough). Set by the main view model;
+    /// null = always allowed.
+    /// </summary>
+    public Func<bool>? CanAnimate { get; set; }
+
+    /// <summary>Called when ANIMATED was refused, so the window can say why.</summary>
+    public Action? AnimationRefused { get; set; }
+
+    /// <summary>False when ANIMATED is locked by an old Min. overlay (the switch shows it dimmed).</summary>
+    public bool AnimationAllowed => CanAnimate?.Invoke() ?? true;
+
+    public void NotifyAnimationAllowed() => OnPropertyChanged(nameof(AnimationAllowed));
     [ObservableProperty]
     private bool _isAnimated;
 
@@ -246,6 +259,15 @@ public partial class TokenViewModel : ObservableObject
         if (value && !SupportsAnimation)
         {
             IsAnimated = false;
+            return;
+        }
+        // Locked while Min. overlay is older than the first overlay that runs animations safely.
+        if (value && !_loading && !AnimationAllowed)
+        {
+            IsAnimated = false;
+            AnimationRefused?.Invoke();
+            // Let the SOLID / GRADIENT / ANIMATED switch jump back after it finished selecting.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(FillMode)));
             return;
         }
         if (value && AnimColours.Count < 2 && !_loading)

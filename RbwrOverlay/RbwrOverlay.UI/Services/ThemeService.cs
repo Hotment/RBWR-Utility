@@ -113,6 +113,44 @@ public class ThemeService : IThemeService
         string.Equals(id, DefaultThemeId, StringComparison.OrdinalIgnoreCase)
         || string.Equals(id, ReactorAmberThemeId, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Version used to decide which themes this overlay can run (themes whose Min. overlay is newer are
+    /// hidden and cannot be installed). Settable for tests.
+    /// </summary>
+    public static string CurrentAppVersion { get; set; } = RbwrOverlay.UI.ViewModels.MainOverlayViewModel.AppVersion;
+
+    /// <summary>True when this overlay is new enough for the theme (its manifest's Min. overlay).</summary>
+    public static bool CanRun(InstalledThemeInfo theme) =>
+        theme.IsBuiltIn || IsCompatibleWithAppVersion(theme.Manifest?.MinAppVersion, CurrentAppVersion);
+
+    private static string NeedsNewerMessage(InstalledThemeInfo theme) =>
+        $"'{theme.Name}' needs overlay v{theme.Manifest?.MinAppVersion?.Trim().TrimStart('v', 'V')} or newer "
+        + $"(this is v{CurrentAppVersion}). Update the overlay to use it.";
+
+    /// <summary>
+    /// Themes in the themes folder that this overlay is too old for (e.g. themes with animated colours
+    /// on an older overlay). They are left out of the theme list instead of failing when applied.
+    /// </summary>
+    public IReadOnlyList<InstalledThemeInfo> DiscoverTooNewThemes()
+    {
+        var result = new List<InstalledThemeInfo>();
+        try
+        {
+            if (!Directory.Exists(ThemesDirectory)) return result;
+            foreach (string dir in Directory.EnumerateDirectories(ThemesDirectory))
+            {
+                var info = TryReadThemeFromDirectory(dir);
+                if (info != null && !IsBuiltInThemeId(info.Id) && !CanRun(info))
+                    result.Add(info);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Could not check the themes folder: {ex.Message}");
+        }
+        return result;
+    }
+
     public IReadOnlyList<InstalledThemeInfo> DiscoverThemes()
     {
         EnsureThemesDirectory();
@@ -129,10 +167,12 @@ public class ThemeService : IThemeService
         foreach (string dir in Directory.EnumerateDirectories(ThemesDirectory))
         {
             var info = TryReadThemeFromDirectory(dir);
-            if (info != null && !IsBuiltInThemeId(info.Id))
-            {
-                discovered.Add(info);
-            }
+            if (info == null || IsBuiltInThemeId(info.Id))
+                continue;
+            // A theme made for a newer overlay is simply not listed (it could fail or crash here).
+            if (!CanRun(info))
+                continue;
+            discovered.Add(info);
         }
 
         discovered.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
@@ -248,7 +288,8 @@ public class ThemeService : IThemeService
         var theme = DiscoverThemes().FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase));
         if (theme == null || string.IsNullOrEmpty(theme.EntryFilePath) || !File.Exists(theme.EntryFilePath))
         {
-            string msg = $"Theme '{targetId}' was not found.";
+            var tooNew = DiscoverTooNewThemes().FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase));
+            string msg = tooNew != null ? NeedsNewerMessage(tooNew) : $"Theme '{targetId}' was not found.";
             _logger.Warning(msg);
             return new ThemeApplyResult(false, ActiveThemeId, msg);
         }
@@ -395,6 +436,9 @@ public class ThemeService : IThemeService
         if (candidate == null)
             return (false, null, "Selected folder does not contain a valid theme.json or theme.axaml.");
 
+        if (!CanRun(candidate))
+            return (false, null, NeedsNewerMessage(candidate));
+
         if (IsBuiltInThemeId(candidate.Id))
             return (false, null, $"Theme ID '{candidate.Id}' is reserved for a built-in theme.");
 
@@ -499,6 +543,10 @@ public class ThemeService : IThemeService
             var candidate = TryReadThemeFromDirectory(themeRoot);
             if (candidate == null)
                 return (false, null, "Archive does not contain theme.json / theme.axaml.");
+
+            // Checked before the theme XAML is even parsed: it may use things this overlay does not have.
+            if (!CanRun(candidate))
+                return (false, null, NeedsNewerMessage(candidate));
 
             string raw = File.ReadAllText(candidate.EntryFilePath);
             string prepared = PrepareThemeXaml(raw, candidate.DirectoryPath);

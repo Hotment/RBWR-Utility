@@ -86,7 +86,7 @@ public partial class MainWindow : Window, IDialogHost
         AddHandler(KeyDownEvent, (_, e) =>
         {
             if (e.Key is Key.Enter && (e.Source as Visual)?.FindAncestorOfType<TextBox>(includeSelf: true) is { } tb
-                && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+                && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex") || tb.Classes.Contains("commit")))
             {
                 var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
                 expr?.UpdateSource();
@@ -97,7 +97,7 @@ public partial class MainWindow : Window, IDialogHost
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(LostFocusEvent, (_, e) =>
         {
-            if (e.Source is TextBox tb && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+            if (e.Source is TextBox tb && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex") || tb.Classes.Contains("commit")))
             {
                 var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
                 Dispatcher.UIThread.Post(() => expr?.UpdateTarget(), DispatcherPriority.Background);
@@ -121,6 +121,7 @@ public partial class MainWindow : Window, IDialogHost
         vm.PreviewReady += OnPreviewReady;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.RequestShowUpdate += OnShowUpdate;
+        vm.RequestWarningToast += (title, message) => ShowToast(title, message, warning: true);
         vm.Shortcuts.Changed += (_, _) => UpdateShortcutHints();
         UpdateShortcutHints();
         ApplyBackdrop(vm.PreviewBackdrop);

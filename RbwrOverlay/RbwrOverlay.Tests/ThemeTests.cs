@@ -387,6 +387,57 @@ public class ThemeTests : IDisposable
         Assert.Contains("using:RbwrOverlay.UI.Behaviors", okXaml);
     }
 
+    private static void WriteTheme(string dir, string id, string minAppVersion)
+    {
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "theme.json"),
+            $$"""{"id":"{{id}}","name":"{{id}} name","version":"1.0.0","entry":"theme.axaml","min_app_version":"{{minAppVersion}}"}""");
+        File.WriteAllText(Path.Combine(dir, "theme.axaml"), "<Styles xmlns=\"https://github.com/avaloniaui\" />");
+    }
+
+    [Fact]
+    public void ThemesForANewerOverlay_AreHidden_NotInstalled_AndNotApplied()
+    {
+        string old = ThemeService.CurrentAppVersion;
+        ThemeService.CurrentAppVersion = "2.3.1";
+        try
+        {
+            string themes = Path.Combine(_tempDir, "themes-block");
+            WriteTheme(Path.Combine(themes, "fits"), "fits", "2.3.1");
+            WriteTheme(Path.Combine(themes, "too-new"), "too-new", "2.3.2"); // dropped into the folder by hand
+            var svc = new ThemeService(themesDirectory: themes);
+
+            // Not listed at all.
+            var ids = svc.DiscoverThemes().Select(t => t.Id).ToList();
+            Assert.Contains("fits", ids);
+            Assert.DoesNotContain("too-new", ids);
+            Assert.Contains(svc.DiscoverTooNewThemes(), t => t.Id == "too-new");
+
+            // Applying it (e.g. remembered from before) fails cleanly with a clear message.
+            var apply = svc.ApplyTheme("too-new");
+            Assert.False(apply.Success);
+            Assert.Contains("needs overlay v2.3.2 or newer", apply.ErrorMessage);
+
+            // Installing from a folder or a .zip is refused before anything is copied.
+            string source = Path.Combine(_tempDir, "src-too-new");
+            WriteTheme(source, "shiny", "2.4.0");
+            var fromFolder = svc.InstallTheme(Path.Combine(source, "theme.json"));
+            Assert.False(fromFolder.Success);
+            Assert.Contains("needs overlay v2.4.0 or newer", fromFolder.ErrorMessage);
+
+            string zip = Path.Combine(_tempDir, "shiny.zip");
+            ZipFile.CreateFromDirectory(source, zip);
+            var fromZip = svc.InstallTheme(zip);
+            Assert.False(fromZip.Success);
+            Assert.Contains("needs overlay v2.4.0 or newer", fromZip.ErrorMessage);
+            Assert.False(Directory.Exists(Path.Combine(themes, "shiny")));
+        }
+        finally
+        {
+            ThemeService.CurrentAppVersion = old;
+        }
+    }
+
     [Fact]
     public void TestMinAppVersionCompatibilityCheck()
     {

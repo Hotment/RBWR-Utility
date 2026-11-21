@@ -142,12 +142,13 @@
                                         </StackPanel>
                                         <StackPanel Grid.Column="4">
                                             <TextBlock Classes="label" Text="MIN. OVERLAY" />
-                                            <TextBox Classes="hud" Text="{Binding MinAppVersion}" PlaceholderText="2.3.0" />
+                                            <TextBox Classes="hud commit" Text="{Binding MinAppVersion, UpdateSourceTrigger=LostFocus}" PlaceholderText="2.3.0"
+                                                     ToolTip.Tip="Oldest overlay version this theme needs. Press Enter or Tab to apply." />
                                         </StackPanel>
                                     </Grid>
                                     <Border Classes="warn-box" Margin="0,8,0,0" IsVisible="{Binding HasAnimatedColours}">
                                         <TextBlock Classes="warn" TextWrapping="Wrap"
-                                                   Text="This theme has animated colours, so Min. overlay is at least 2.3.1: older overlays can crash on some animations. Players on an older overlay see 'REQUIRES v2.3.1+' in the Theme Manager." />
+                                                   Text="This theme has animated colours, so Min. overlay can't be lower than 2.3.1 (older overlays can crash on them). Overlays older than that don't show this theme at all." />
                                     </Border>
 
                                     <TextBlock Classes="label" Text="DESCRIPTION" />
@@ -356,8 +357,8 @@
                                                                                 <TabStrip Classes="seg mini" SelectedIndex="{Binding FillMode}">
                                                                                     <TabStripItem Content="SOLID" ToolTip.Tip="One plain colour" />
                                                                                     <TabStripItem Content="GRADIENT" ToolTip.Tip="Two to six colours blending into each other" />
-                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}"
-                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay" />
+                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}" Classes.locked="{Binding !AnimationAllowed}"
+                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay. Needs Min. overlay 2.3.1 or newer (THEME tab)." />
                                                                                 </TabStrip>
                                                                             </Border>
                                                                             <!-- Folded: the gradient / animation stays visible as a thin strip -->
@@ -461,10 +462,6 @@
                                                                                 </StackPanel>
                                                                             </Grid>
 
-                                                                            <Border Classes="warn-box" Margin="0">
-                                                                                <TextBlock Classes="warn" TextWrapping="Wrap" FontSize="10.5"
-                                                                                           Text="Needs overlay v2.3.1 or newer: on older overlays animated colours can crash the overlay. Min. overlay is raised to 2.3.1 for you." />
-                                                                            </Border>
                                                                         </StackPanel>
                                                                     </Border>
 
@@ -1045,7 +1042,7 @@
     <Border x:Name="Toast" Classes="toast" IsVisible="False" Opacity="0" IsHitTestVisible="False"
             HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,46">
         <Grid ColumnDefinitions="Auto,*">
-            <Border Width="3" CornerRadius="2" Background="{DynamicResource EdGreen}" Margin="0,0,10,0" />
+            <Border x:Name="ToastBar" Width="3" CornerRadius="2" Background="{DynamicResource EdGreen}" Margin="0,0,10,0" />
             <StackPanel Grid.Column="1" Spacing="2">
                 <TextBlock x:Name="ToastTitle" Text="THUMBNAIL CREATED" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource EdGreen}" />
                 <TextBlock x:Name="ToastText" FontSize="11" Foreground="{DynamicResource EdText}" TextWrapping="Wrap" MaxWidth="320" />

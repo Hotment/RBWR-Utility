@@ -146,22 +146,36 @@
                         </Grid>
                     </Border>
 
-                    <Border x:Name="ThemeConfigCard" Classes="hud-card config-card" Padding="10,8">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="OVERLAY THEME" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" />
+                    <!-- Same layout as the overlay's CONFIG theme card: header + Manage, list with thumbnail, 4 equal buttons -->
+                    <Border x:Name="ThemeConfigCard" Classes="hud-card config-card" Padding="10,6">
+                        <StackPanel Spacing="7">
                             <Grid ColumnDefinitions="*,Auto">
-                                <ComboBox x:Name="ThemeCombo" Grid.Column="0" Classes="cyber" SelectedIndex="0" HorizontalAlignment="Stretch" Margin="0,0,4,0">
-                                    <ComboBoxItem Content="Your theme" />
-                                    <ComboBoxItem Content="Cyberpunk (Built-in)" />
-                                    <ComboBoxItem Content="Reactor Amber (Built-in)" />
-                                </ComboBox>
-                                <Button Grid.Column="1" Classes="cyber-blue" Content="Apply" Padding="10,4" />
+                                <TextBlock Text="Theme:" VerticalAlignment="Center" FontSize="11" />
+                                <Button Grid.Column="1" Classes="cyber-blue" Content="Manage" Padding="10,3" FontSize="10" />
                             </Grid>
+                            <!-- Looks like the overlay's closed theme list (a real ComboBox can't show the thumbnail when closed) -->
+                            <Border x:Name="ThemeCombo" Background="{DynamicResource DarkPanelBg}" BorderBrush="{DynamicResource CyberBorder}"
+                                    BorderThickness="1" CornerRadius="4" Padding="10,5,12,5">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Width="34" Height="33" Margin="0,0,9,0" CornerRadius="3" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image x:Name="ThemeComboThumb" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{ReflectionBinding CardName}" Foreground="{DynamicResource TextLight}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="CUSTOM  ·  " Foreground="{DynamicResource TextMuted}" FontSize="8.5" />
+                                            <TextBlock Text="{ReflectionBinding CardAuthorText}" Foreground="{DynamicResource TextMuted}" FontSize="8.5" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Path Grid.Column="2" Data="M0,0 L6,6 L12,0" Stroke="{DynamicResource TextLight}" StrokeThickness="1.4"
+                                          Width="12" Height="7" Stretch="Uniform" VerticalAlignment="Center" Opacity="0.8" />
+                                </Grid>
+                            </Border>
                             <Grid ColumnDefinitions="*,*,*,*">
-                                <Button Grid.Column="0" Classes="cyber" Content="Install" Margin="0,0,2,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="1" Classes="cyber" Content="Reload" Margin="2,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="2" Classes="cyber" Content="Template" Margin="2,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="3" Classes="cyber" Content="Folder" Margin="2,0,0,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="0" Classes="cyber" Content="Install" Margin="0,0,3,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button Grid.Column="1" Classes="cyber" Content="Reload" Margin="3,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button Grid.Column="2" Classes="cyber" Content="Template" Margin="3,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button Grid.Column="3" Classes="cyber" Content="Folder" Margin="3,0,0,0" FontSize="10" Padding="4,3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                             </Grid>
                         </StackPanel>
                     </Border>
