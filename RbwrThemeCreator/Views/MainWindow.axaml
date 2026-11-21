@@ -41,7 +41,7 @@
                             <TextBlock Text="UNSAVED" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource EdGold}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" TextTrimming="CharacterEllipsis" MaxWidth="420" HorizontalAlignment="Left" Margin="0,1,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
