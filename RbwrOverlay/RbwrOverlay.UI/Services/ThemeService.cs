@@ -30,6 +30,10 @@ public class ThemeService : IThemeService
     public const string DefaultThemeId = "default";
     public const string ReactorAmberThemeId = "reactor-amber";
     private const string ReactorAmberResourceUri = "avares://RbwrOverlay/Styles/ReactorAmberTheme.axaml";
+    public const string AuroraDriftThemeId = "aurora-drift";
+    // Kept as a plain (not compiled) resource: it is a Theme Creator theme with animated colours and is
+    // loaded exactly like a custom theme (same preparation and safety checks).
+    private const string AuroraDriftResourceName = "RbwrOverlay.BuiltInThemes.aurora-drift.theme";
     private const int MaxZipEntries = 200;
     private const long MaxZipUncompressedBytes = 50L * 1024 * 1024;
 
@@ -109,9 +113,34 @@ public class ThemeService : IThemeService
         IsBuiltIn = true
     };
 
+    public static InstalledThemeInfo CreateAuroraDriftThemeInfo() => new()
+    {
+        Id = AuroraDriftThemeId,
+        Name = "Aurora Drift (Built-in)",
+        Author = "Uranium-q2",
+        Version = "1.0.0",
+        Description = "Built-in animated northern lights theme.",
+        IsBuiltIn = true
+    };
+
     private static bool IsBuiltInThemeId(string? id) =>
         string.Equals(id, DefaultThemeId, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(id, ReactorAmberThemeId, StringComparison.OrdinalIgnoreCase);
+        || string.Equals(id, ReactorAmberThemeId, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(id, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Source of a built-in theme that is stored as Theme Creator XAML (Aurora Drift), or null for the
+    /// compiled built-ins (Cyberpunk, Reactor Amber).
+    /// </summary>
+    public static string? ReadBuiltInThemeXaml(string? id)
+    {
+        if (!string.Equals(id, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase))
+            return null;
+        using var stream = typeof(ThemeService).Assembly.GetManifestResourceStream(AuroraDriftResourceName)
+            ?? throw new InvalidOperationException("The built-in Aurora Drift theme is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 
     /// <summary>
     /// Version used to decide which themes this overlay can run (themes whose Min. overlay is newer are
@@ -157,7 +186,8 @@ public class ThemeService : IThemeService
         var list = new List<InstalledThemeInfo>
         {
             CreateDefaultThemeInfo(),
-            CreateReactorAmberThemeInfo()
+            CreateReactorAmberThemeInfo(),
+            CreateAuroraDriftThemeInfo()
         };
 
         if (!Directory.Exists(ThemesDirectory))
@@ -281,6 +311,34 @@ public class ThemeService : IThemeService
             catch (Exception ex)
             {
                 _logger.Error("Failed to apply built-in Reactor Amber theme", ex);
+                return new ThemeApplyResult(false, ActiveThemeId, ex.Message);
+            }
+        }
+
+        if (string.Equals(targetId, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string prepared = PrepareThemeXaml(ReadBuiltInThemeXaml(AuroraDriftThemeId)!, AppContext.BaseDirectory);
+                var parsed = AvaloniaRuntimeXamlLoader.Parse<Styles>(prepared);
+                ExecuteOnUiThread(() =>
+                {
+                    var app = Application.Current;
+                    if (app == null) return;
+                    if (_activeCustomStyle != null)
+                        app.Styles.Remove(_activeCustomStyle);
+                    DisposeActiveBitmaps();
+                    app.Styles.Add(parsed);
+                    _activeCustomStyle = parsed;
+                });
+                ActiveThemeId = AuroraDriftThemeId;
+                ThemeChanged?.Invoke(this, AuroraDriftThemeId);
+                _logger.Info("Applied built-in theme 'Aurora Drift'.");
+                return new ThemeApplyResult(true, AuroraDriftThemeId);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Failed to apply built-in Aurora Drift theme", ex);
                 return new ThemeApplyResult(false, ActiveThemeId, ex.Message);
             }
         }

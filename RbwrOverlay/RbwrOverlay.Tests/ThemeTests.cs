@@ -83,11 +83,16 @@ public class ThemeTests : IDisposable
         var svc = new ThemeService(themesDirectory: _tempDir);
         var themes = svc.DiscoverThemes();
 
-        Assert.Equal(2, themes.Count);
+        Assert.Equal(3, themes.Count);
         Assert.Equal(ThemeService.DefaultThemeId, themes[0].Id);
         Assert.Equal(ThemeService.ReactorAmberThemeId, themes[1].Id);
-        Assert.True(themes[0].IsBuiltIn);
-        Assert.True(themes[1].IsBuiltIn);
+        Assert.Equal(ThemeService.AuroraDriftThemeId, themes[2].Id);
+        Assert.All(themes, t => Assert.True(t.IsBuiltIn));
+        Assert.Equal("Uranium-q2", themes[2].Author);
+
+        var auroraRes = svc.ApplyTheme(ThemeService.AuroraDriftThemeId);
+        Assert.True(auroraRes.Success, auroraRes.ErrorMessage);
+        Assert.Equal(ThemeService.AuroraDriftThemeId, svc.ActiveThemeId);
 
         var amberRes = svc.ApplyTheme(ThemeService.ReactorAmberThemeId);
         Assert.True(amberRes.Success, amberRes.ErrorMessage);
@@ -266,7 +271,7 @@ public class ThemeTests : IDisposable
         themeSvc.CreateTemplateTheme("arctic-pack");
         using var selectorVm = mainVm.CreateThemeSelectorViewModel();
 
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
         var builtIn = selectorVm.FilteredThemes.First(t => t.Id == ThemeService.DefaultThemeId);
         var amber = selectorVm.FilteredThemes.First(t => t.Id == ThemeService.ReactorAmberThemeId);
         var custom = selectorVm.FilteredThemes.First(t => t.Id == "arctic-pack");
@@ -305,13 +310,15 @@ public class ThemeTests : IDisposable
         selectorVm.SearchQuery = "Arctic Slate";
         Assert.Single(selectorVm.FilteredThemes);
         selectorVm.SearchQuery = string.Empty;
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
 
         // Built-in themes cannot be deleted
         var (delBuiltIn, _) = themeSvc.DeleteTheme(ThemeService.DefaultThemeId);
         Assert.False(delBuiltIn);
         var (delAmber, _) = themeSvc.DeleteTheme(ThemeService.ReactorAmberThemeId);
         Assert.False(delAmber);
+        var (delAurora, _) = themeSvc.DeleteTheme(ThemeService.AuroraDriftThemeId);
+        Assert.False(delAurora);
 
         // Deleting active custom theme requires two-click confirmation
         activeCustom = selectorVm.FilteredThemes.First(t => t.Id == "arctic-pack");
@@ -319,12 +326,12 @@ public class ThemeTests : IDisposable
         selectorVm.DeleteEntry(activeCustom);
         Assert.True(activeCustom.IsConfirmingDelete);
         Assert.Equal("Confirm?", activeCustom.DeleteButtonText);
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
 
         // Second click confirms and deletes, reverting to default
         selectorVm.DeleteEntry(activeCustom);
         Assert.Equal(ThemeService.DefaultThemeId, themeSvc.ActiveThemeId);
-        Assert.Equal(2, selectorVm.FilteredThemes.Count);
+        Assert.Equal(3, selectorVm.FilteredThemes.Count);
         Assert.All(selectorVm.FilteredThemes, t => Assert.True(t.IsBuiltIn));
     }
 

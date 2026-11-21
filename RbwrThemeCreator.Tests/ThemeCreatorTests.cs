@@ -88,7 +88,7 @@ public class ThemeCreatorTests : IDisposable
 
         var hoverBridge = BuiltInThemes.LoadPreviewHoverBridgeStyles();
         Assert.True(hoverBridge.Count >= 15);
-        Assert.Equal(5, BuiltInThemes.Presets.Count);
+        Assert.Equal(6, BuiltInThemes.Presets.Count);
         foreach (var preset in BuiltInThemes.Presets)
         {
             var s = preset.Create();
@@ -944,5 +944,14 @@ public class ThemeCreatorTests : IDisposable
         Assert.Equal("Border.hud-card:not(.theme-card)", ThemeXamlGenerator.SkipThemeCards("Border.hud-card"));
         Assert.Equal("Button.cyber:not(.theme-card) /template/ ContentPresenter, Button.cyber-red:not(.theme-card)",
             ThemeXamlGenerator.SkipThemeCards("Button.cyber /template/ ContentPresenter,Button.cyber-red"));
+    }
+
+    [Fact]
+    public void AuroraPreset_KeepsAnimationsAndNeedsOverlay231()
+    {
+        var s = BuiltInThemes.Presets.First(p => p.Name.StartsWith("Aurora", StringComparison.Ordinal)).Create();
+        Assert.Equal("2.3.1", s.Manifest.MinAppVersion);
+        Assert.NotNull(s.Tokens["CyberBorderGlow"].Animation);
+        Assert.True(s.Tokens.Values.Count(v => v.Animation != null) >= 3);
     }
 }

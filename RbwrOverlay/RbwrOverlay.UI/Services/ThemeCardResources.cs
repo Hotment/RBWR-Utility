@@ -74,19 +74,15 @@ public static class ThemeCardResources
     /// </summary>
     public static IReadOnlyDictionary<string, CardAnimation> GetAnimations(InstalledThemeInfo info)
     {
-        if (info.IsBuiltIn || string.IsNullOrWhiteSpace(info.EntryFilePath))
-            return new Dictionary<string, CardAnimation>();
         try
         {
-            var file = new FileInfo(info.EntryFilePath);
-            if (!file.Exists || file.Length > MaxXamlBytes)
+            if (!TryGetSource(info, out string key, out DateTime stamp, out var read))
                 return new Dictionary<string, CardAnimation>();
-            string key = info.Id + "|" + info.EntryFilePath;
-            if (AnimationCache.TryGetValue(key, out var hit) && hit.Stamp == file.LastWriteTimeUtc)
+            if (AnimationCache.TryGetValue(key, out var hit) && hit.Stamp == stamp)
                 return hit.Map;
 
             var map = new Dictionary<string, CardAnimation>(StringComparer.Ordinal);
-            var m = AnimationsComment.Match(File.ReadAllText(file.FullName));
+            var m = AnimationsComment.Match(read());
             if (m.Success)
             {
                 var parsed = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, AnimationJson>>(m.Groups["json"].Value);
@@ -98,7 +94,7 @@ public static class ThemeCardResources
                         map[token] = new CardAnimation(colours, json.Flow, Math.Clamp(json.Seconds, 1, 60), json.Angle);
                 }
             }
-            AnimationCache[key] = (file.LastWriteTimeUtc, map);
+            AnimationCache[key] = (stamp, map);
             return map;
         }
         catch
@@ -114,14 +110,11 @@ public static class ThemeCardResources
     /// </summary>
     public static string? GetAnimationStylesXaml(InstalledThemeInfo info)
     {
-        if (info.IsBuiltIn || string.IsNullOrWhiteSpace(info.EntryFilePath))
-            return null;
         try
         {
-            var file = new FileInfo(info.EntryFilePath);
-            if (!file.Exists || file.Length > MaxXamlBytes)
+            if (!TryGetSource(info, out _, out _, out var read))
                 return null;
-            string text = File.ReadAllText(file.FullName);
+            string text = read();
             const string begin = "<!-- @creator:token-animations-begin -->";
             const string end = "<!-- @creator:token-animations-end -->";
             int b = text.IndexOf(begin, StringComparison.Ordinal);
@@ -135,12 +128,38 @@ public static class ThemeCardResources
             string xaml = "<Styles xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">"
                           + inner + "</Styles>";
             // Same safety rules as a full theme (no clr-namespace, x:Class, includes).
-            return ThemeService.PrepareThemeXaml(xaml, info.DirectoryPath);
+            return ThemeService.PrepareThemeXaml(xaml, info.IsBuiltIn ? AppContext.BaseDirectory : info.DirectoryPath);
         }
         catch
         {
             return null; // the card simply does not animate inside
         }
+    }
+
+    /// <summary>
+    /// Where a theme's Theme Creator XAML comes from: theme.axaml of a custom theme, or the resource of a
+    /// built-in Theme Creator theme (Aurora Drift). False for the compiled built-ins and unreadable files.
+    /// </summary>
+    private static bool TryGetSource(InstalledThemeInfo info, out string key, out DateTime stamp, out Func<string> read)
+    {
+        key = string.Empty; stamp = DateTime.MinValue; read = () => string.Empty;
+        if (info.IsBuiltIn)
+        {
+            if (ThemeService.ReadBuiltInThemeXaml(info.Id) is not { } xaml)
+                return false;
+            key = "builtin:" + info.Id;
+            read = () => xaml;
+            return true;
+        }
+        if (string.IsNullOrWhiteSpace(info.EntryFilePath))
+            return false;
+        var file = new FileInfo(info.EntryFilePath);
+        if (!file.Exists || file.Length > MaxXamlBytes)
+            return false;
+        key = info.Id + "|" + info.EntryFilePath;
+        stamp = file.LastWriteTimeUtc;
+        read = () => File.ReadAllText(file.FullName);
+        return true;
     }
 
     /// <summary>The animation for a thumbnail's frame: the window outline, else the main background, else any.</summary>
@@ -153,6 +172,9 @@ public static class ThemeCardResources
     private static IReadOnlyDictionary<object, object?>? Build(InstalledThemeInfo info)
     {
         _base ??= Collect(Load(CyberpunkUri), null);
+
+        if (ThemeService.ReadBuiltInThemeXaml(info.Id) is { } builtInXaml)
+            return Collect(AvaloniaRuntimeXamlLoader.Parse<Styles>(ThemeService.PrepareThemeXaml(builtInXaml, AppContext.BaseDirectory)), _base);
 
         if (info.IsBuiltIn)
         {

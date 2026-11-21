@@ -25,6 +25,7 @@ public static class BuiltInThemes
 
     public static string CyberpunkXaml => _cyberpunkXaml ??= ReadResource("Base.CyberpunkTheme.axaml");
     public static string ReactorAmberXaml => _amberXaml ??= ReadResource("Base.ReactorAmberTheme.axaml");
+    public static string AuroraDriftXaml => ReadResource("Base.AuroraDrift.axaml");
 
     /// <summary>The overlay's default theme as editable state (used as fallback for missing tokens).</summary>
     public static ThemeState Cyberpunk => _cyberpunkState ??= ThemeImporter.FromXaml(
@@ -200,6 +201,13 @@ public static class BuiltInThemes
             ReactorAmberXaml, new ThemeManifest(), Cyberpunk, includeStyles: true), "my-amber", "My Amber Theme", includeCustom: true)),
         new("Arctic Slate", "Calm blue/slate palette (the overlay's template).", () => Fresh(ArcticSlate(), "my-arctic", "My Arctic Theme", includeCustom: false)),
         new("Synthwave (gradients)", "Purple-to-navy gradients with pink/cyan neon edges.", Synthwave),
+        new("Aurora Drift (animated)", "Animated northern lights: teal, violet and pink.", () =>
+        {
+            var s = Fresh(ThemeImporter.FromXaml(AuroraDriftXaml, new ThemeManifest(), Cyberpunk, includeStyles: true),
+                "my-aurora", "My Aurora Theme", includeCustom: true);
+            s.Manifest.MinAppVersion = "2.3.1"; // animated colours
+            return s;
+        }),
         new("Blank (from accent)", "Pick one accent colour and the creator derives the rest.", () =>
         {
             var s = Fresh(Cyberpunk, "my-theme", "My Theme", includeCustom: false);
