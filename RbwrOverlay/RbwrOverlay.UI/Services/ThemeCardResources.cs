@@ -103,6 +103,9 @@ public static class ThemeCardResources
         }
     }
 
+    private static readonly Dictionary<string, (DateTime Stamp, string? Xaml)> AnimationStylesCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// The animation styles of a theme (the Theme Creator's "token animations" section of theme.axaml),
     /// as a &lt;Styles&gt; document, or null. Attached to the inside of the theme's card so its buttons,
@@ -112,23 +115,33 @@ public static class ThemeCardResources
     {
         try
         {
-            if (!TryGetSource(info, out _, out _, out var read))
+            if (!TryGetSource(info, out string key, out DateTime stamp, out var read))
                 return null;
+            if (AnimationStylesCache.TryGetValue(key, out var hit) && hit.Stamp == stamp)
+                return hit.Xaml;
+
+            string? prepared = null;
             string text = read();
             const string begin = "<!-- @creator:token-animations-begin -->";
             const string end = "<!-- @creator:token-animations-end -->";
             int b = text.IndexOf(begin, StringComparison.Ordinal);
             int e = b < 0 ? -1 : text.IndexOf(end, b, StringComparison.Ordinal);
-            if (b < 0 || e < 0) return null;
-            string inner = text.Substring(b + begin.Length, e - b - begin.Length);
-            if (!inner.Contains("<Style", StringComparison.Ordinal)) return null;
-            // Inside its own card the theme's animations must apply, so the ":not(.theme-card)" the
-            // Theme Creator adds (to keep the active theme off other cards) is removed here.
-            inner = inner.Replace(":not(.theme-card)", string.Empty, StringComparison.Ordinal);
-            string xaml = "<Styles xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">"
-                          + inner + "</Styles>";
-            // Same safety rules as a full theme (no clr-namespace, x:Class, includes).
-            return ThemeService.PrepareThemeXaml(xaml, info.IsBuiltIn ? AppContext.BaseDirectory : info.DirectoryPath);
+            if (b >= 0 && e >= 0)
+            {
+                string inner = text.Substring(b + begin.Length, e - b - begin.Length);
+                if (inner.Contains("<Style", StringComparison.Ordinal))
+                {
+                    // Inside its own card the theme's animations must apply, so the ":not(.theme-card)" the
+                    // Theme Creator adds (to keep the active theme off other cards) is removed here.
+                    inner = inner.Replace(":not(.theme-card)", string.Empty, StringComparison.Ordinal);
+                    string xaml = "<Styles xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">"
+                                  + inner + "</Styles>";
+                    // Same safety rules as a full theme (no clr-namespace, x:Class, includes).
+                    prepared = ThemeService.PrepareThemeXaml(xaml, info.IsBuiltIn ? AppContext.BaseDirectory : info.DirectoryPath);
+                }
+            }
+            AnimationStylesCache[key] = (stamp, prepared);
+            return prepared;
         }
         catch
         {
@@ -183,7 +196,10 @@ public static class ThemeCardResources
                 : _base;
         }
 
-        if (string.IsNullOrWhiteSpace(info.EntryFilePath) || new FileInfo(info.EntryFilePath).Length > MaxXamlBytes)
+        if (string.IsNullOrWhiteSpace(info.EntryFilePath))
+            return null;
+        var entryFile = new FileInfo(info.EntryFilePath);
+        if (!entryFile.Exists || entryFile.Length > MaxXamlBytes)
             return null;
 
         string raw = File.ReadAllText(info.EntryFilePath);

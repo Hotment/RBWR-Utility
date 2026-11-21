@@ -39,15 +39,17 @@ internal sealed class EyedropperSession
     public static Task<Color?> PickAsync()
     {
         if (_active != null) return Task.FromResult<Color?>(null);
+        EyedropperSession? session = null;
         try
         {
-            var session = new EyedropperSession();
+            session = new EyedropperSession();
             _active = session;
             session.Start();
             return session._result.Task;
         }
         catch
         {
+            session?.Finish(null);
             _active = null;
             return Task.FromResult<Color?>(null);
         }
@@ -59,6 +61,7 @@ internal sealed class EyedropperSession
         // Keep the delegates in fields: the hooks call them from native code.
         _mouseProc = MouseHook;
         _keyProc = KeyboardHook;
+        _loupe.Closed += (_, _) => Finish(null);
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) => Tick());
     }
 
