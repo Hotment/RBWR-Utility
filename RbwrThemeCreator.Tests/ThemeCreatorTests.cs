@@ -883,9 +883,9 @@ public class ThemeCreatorTests : IDisposable
         Assert.StartsWith("RBWR_Theme_Creator_", update.FileName);
         Assert.NotEmpty(update.DownloadUrl);
 
-        // Already up to date (1.2.0 == 1.2.0) or newer dev build (1.3.0 > 1.2.0)
+        // Already up to date (1.2.0 == 1.2.0); a different version (including rollback from 1.3.0 -> 1.2.0) is offered
         Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.2.0", string.Empty).IsAvailable);
-        Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.3.0", string.Empty).IsAvailable);
+        Assert.True(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.3.0", string.Empty).IsAvailable);
 
         // Respects skippedVersion
         Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.0.0", "1.2.0").IsAvailable);
