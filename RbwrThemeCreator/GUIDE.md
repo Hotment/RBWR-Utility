@@ -362,7 +362,8 @@ Clear the box and click **SET** to use the last author you saved a theme with in
 
 ### Updates
 
-- **Check for updates at start**: turn it off to check only by hand (the green version badge).
+- **CHECK UPDATES** looks for a new version now; the line next to it shows your version and the result.
+- **Check for updates at start**: turn it off to check only by hand.
 - **OFFER IT AGAIN** shows up when you skipped an update; it makes the creator offer that version again.
 
 ### Keyboard shortcuts
@@ -389,7 +390,7 @@ Some actions have no shortcut by default (for example *FIND COLOUR on / off*); g
 ## 16. Updates
 
 The creator checks for new versions when it starts (turn this off in **SETTINGS**). Click the **green version badge** next to the
-title (or **CHECK UPDATES** in the THEME tab) to check now. When an update is found you can read what
+title (or **CHECK UPDATES** in the SETTINGS tab) to check now. When an update is found you can read what
 changed, install it, or skip that version.
 
 ---
