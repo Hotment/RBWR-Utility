@@ -29,13 +29,18 @@ COUNTERS = {
     "channels": ("Channels: {value}", "Text and voice channels"),
     "roles": ("Roles: {value}", "Roles on the server"),
     "tickets": ("Open tickets: {value}", "Suggestions and bug reports still open on the website"),
-    "version": ("Version: {value}", "Latest RBWR Utility release on GitHub (updates by itself)"),
+    "version": ("Overlay v{value}", "Latest RBWR Overlay release on GitHub (updates by itself)"),
+    "creator_version": ("Theme Creator v{value}", "Latest RBWR Theme Creator release on GitHub (updates by itself)"),
 }
-DEFAULT_COUNTERS = ("members", "humans", "bots", "boosts", "version")
+DEFAULT_COUNTERS = ("members", "humans", "bots", "boosts", "version", "creator_version")
+VERSION_COUNTERS = ("version", "creator_version")
+# Old default templates that are swapped for the current default (counters made before the rename).
+LEGACY_TEMPLATES = {"version": "Version: {value}"}
 CLOSED_STATUSES = {"implemented", "declined", "fixed", "invalid", "resolved", "closed", "accepted", "rejected", "completed"}
 
 _tasks: dict[str, asyncio.Task] = {}
 _latest_version: str | None = None
+_latest_creator_version: str | None = None
 _star_locks: dict[int, asyncio.Lock] = {}
 
 
@@ -264,19 +269,33 @@ def stats_config() -> dict:
     return {**serverstats_store.default["config"], **serverstats_store.load().get("config", {})}
 
 
+def _core():
+    try:
+        from server import core
+    except ImportError:
+        import core  # pyright: ignore[reportMissingImports]
+    return core
+
+
 async def _update_version() -> None:
     global _latest_version
     try:
-        try:
-            from server import core
-        except ImportError:
-            import core  # pyright: ignore[reportMissingImports]
-        release = await asyncio.to_thread(core.get_github_latest_release)
+        release = await asyncio.to_thread(_core().get_github_latest_release)
         version = str(release.get("version") or "").strip()
         if version and version != "unknown":
             _latest_version = version
     except Exception as exc:
         log.warning("Could not read the latest release for the version counter: %s", exc)
+
+
+async def _update_creator_version() -> None:
+    global _latest_creator_version
+    try:
+        version = await asyncio.to_thread(_core().get_github_latest_creator_version)
+        if version:
+            _latest_creator_version = version
+    except Exception as exc:
+        log.warning("Could not read the latest Theme Creator release for the version counter: %s", exc)
 
 
 def _counter_value(kind: str, guild: disnake.Guild, bot: commands.InteractionBot) -> str:
@@ -298,12 +317,20 @@ def _counter_value(kind: str, guild: disnake.Guild, bot: commands.InteractionBot
         return str(open_ticket_count())
     if kind == "version":
         return _latest_version or "—"
+    if kind == "creator_version":
+        return _latest_creator_version or "—"
     return "?"
 
 
+def _template(counter: dict) -> str:
+    template = counter.get("template")
+    if not template or template == LEGACY_TEMPLATES.get(counter["type"]):
+        return COUNTERS[counter["type"]][0]
+    return template
+
+
 def _counter_name(counter: dict, guild: disnake.Guild, bot: commands.InteractionBot) -> str:
-    template = counter.get("template") or COUNTERS[counter["type"]][0]
-    return template.replace("{value}", _counter_value(counter["type"], guild, bot))[:100]
+    return _template(counter).replace("{value}", _counter_value(counter["type"], guild, bot))[:100]
 
 
 def _locked_overwrites(guild: disnake.Guild) -> dict:
@@ -319,8 +346,11 @@ async def refresh_stats(bot: commands.InteractionBot, guild: disnake.Guild | Non
     guild = guild or (bot.get_guild(gid) if gid else None)
     if not config["enabled"] or not guild:
         return 0
-    if any(c.get("type") == "version" for c in config["counters"]):
+    kinds = {c.get("type") for c in config["counters"]}
+    if "version" in kinds:
         await _update_version()
+    if "creator_version" in kinds:
+        await _update_creator_version()
     renamed = 0
     for counter in config["counters"]:
         channel = guild.get_channel(int(counter["channel_id"])) if counter.get("channel_id") else None
@@ -350,6 +380,8 @@ async def _create_counter(guild: disnake.Guild, category: disnake.CategoryChanne
                           bot: commands.InteractionBot) -> dict:
     if kind == "version" and not _latest_version:
         await _update_version()
+    if kind == "creator_version" and not _latest_creator_version:
+        await _update_creator_version()
     counter = {"type": kind, "template": template or COUNTERS[kind][0]}
     channel = await guild.create_voice_channel(_counter_name(counter, guild, bot), category=category,
                                                overwrites=_locked_overwrites(guild), reason="Server stats")
@@ -439,7 +471,8 @@ def offline_state() -> dict:
     return {
         "bot_online": False,
         "starboard": {"config": star_config(), "posts": len(starboard_store.load().get("posts", {}))},
-        "serverstats": {"config": stats_config(), "counters": [{**c, "preview": None, "exists": None} for c in stats_config()["counters"]]},
+        "serverstats": {"config": stats_config(), "counters": [{**c, "template": _template(c), "preview": None, "exists": None}
+                                                              for c in stats_config()["counters"]]},
         "counter_types": {k: {"template": v[0], "label": v[1]} for k, v in COUNTERS.items()},
         "text_channels": [],
         "members_intent": None,
@@ -459,7 +492,7 @@ def panel_state() -> dict:
         state["text_channels"] = [{"id": str(c.id), "name": c.name, "category": c.category.name if c.category else ""}
                                   for c in sorted(guild.text_channels, key=lambda c: ((c.category.position if c.category else -1), c.position))]
         state["serverstats"]["counters"] = [
-            {**c, "exists": bool(c.get("channel_id") and guild.get_channel(int(c["channel_id"]))),
+            {**c, "template": _template(c), "exists": bool(c.get("channel_id") and guild.get_channel(int(c["channel_id"]))),
              "preview": _counter_name(c, guild, bot)} for c in stats_config()["counters"]]  # pyright: ignore[reportArgumentType]
         return state
     try:
