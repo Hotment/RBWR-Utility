@@ -212,6 +212,46 @@ def get_github_latest_release(force_refresh: bool = False) -> dict:
         "assets": [],
     }
 
+CREATOR_TAG_PREFIX = "theme-creator-v"
+_github_creator_cache: dict[str, Any] = {"version": None, "timestamp": 0.0}
+
+
+def get_github_latest_creator_version(force_refresh: bool = False) -> str | None:
+    """Latest Theme Creator version from GitHub (newest non-draft, non-prerelease theme-creator-v* tag).
+
+    Theme Creator releases are published as non-latest, so /releases/latest always points at the overlay.
+    """
+    now = time.time()
+    with _github_version_lock:
+        if not force_refresh and _github_creator_cache["version"] and (now - _github_creator_cache["timestamp"] < GITHUB_RELEASE_CACHE_TTL):
+            return _github_creator_cache["version"]
+
+    try:
+        r = requests.get(
+            "https://api.github.com/repos/Hotment/RBWR-Utility/releases?per_page=30",
+            headers={"User-Agent": "RBWR-Utility-Server/2.0", "Accept": "application/vnd.github+json"},
+            timeout=5,
+        )
+        if r.status_code == 200:
+            for rel in r.json():
+                if rel.get("draft") or rel.get("prerelease"):
+                    continue
+                tag = (rel.get("tag_name") or "").strip()
+                if not tag.lower().startswith(CREATOR_TAG_PREFIX):
+                    continue
+                version = tag[len(CREATOR_TAG_PREFIX):].strip()
+                if version:
+                    with _github_version_lock:
+                        _github_creator_cache["version"] = version
+                        _github_creator_cache["timestamp"] = now
+                    return version
+    except Exception as e:
+        logger.warning(f"Error fetching latest Theme Creator release from GitHub: {e}")
+
+    with _github_version_lock:
+        return _github_creator_cache["version"]
+
+
 def load_suggestions() -> dict:
     if not os.path.exists(SUGGESTIONS_FILE):
         return {"suggestions": []}

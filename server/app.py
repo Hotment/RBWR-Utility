@@ -477,6 +477,34 @@ def inject_turnstile_config():
         "turnstile_enabled": enabled,
         "turnstile_site_key": site_key,
         "is_authenticated_user": is_session_authenticated(),
+        "nav_user": get_nav_user(),
+    }
+
+def get_nav_user() -> Optional[dict]:
+    """Profile shown in the header account menu, or None when signed out."""
+    d_user = session.get("discord_user") or {}
+    is_admin = bool(session.get("admin_logged_in"))
+    if not d_user and not is_admin:
+        return None
+
+    username = d_user.get("username") or session.get("username") or ""
+    display_name = d_user.get("global_name") or username or "Account"
+    avatar_url = d_user.get("avatar_url")
+    d_id = str(d_user.get("id") or session.get("discord_id") or "")
+    if not avatar_url and d_id:
+        try:
+            admin_rec = load_admins().get("admins", {}).get(d_id, {})
+            avatar_url = admin_rec.get("avatar_url")
+            display_name = admin_rec.get("display_name") or display_name
+        except Exception:
+            pass
+
+    return {
+        "display_name": display_name,
+        "username": username,
+        "avatar_url": avatar_url or "",
+        "initial": (display_name[:1] or "?").upper(),
+        "is_admin": is_admin,
     }
 
 @app.template_filter("fmt_refreshed_date")
@@ -4129,6 +4157,9 @@ def discord_callback():
 
 @app.route("/auth/discord/logout", methods=["GET"])
 def discord_logout():
+    if session.get("admin_logged_in"):
+        uname = session.get("username") or "Administrator"
+        log_audit_event("auth.logout", "auth", f"Administrator logged out: {uname}", target=uname, username=uname)
     session.clear()
     next_url = request.args.get("next") or request.referrer or "/tickets"
     if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):

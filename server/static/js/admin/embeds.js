@@ -8,6 +8,7 @@ window.EmbedBuilder = (() => {
     let initialized = false;
     let fields = [];          // [{name, value, inline}]
     let channels = [];
+    let forums = [];          // [{id, name, can_create, requires_tag, tags, posts}]
     let roles = [];           // [{id, name, color, mentionable}]
     let canPingAll = false;
     let templates = [];
@@ -216,16 +217,57 @@ window.EmbedBuilder = (() => {
         const previous = sel.value;
         sel.innerHTML = '<option value="">Loading channels…</option>';
         try {
-            ({ channels } = await api("/api/admin/discord/channels"));
+            // forums are optional: if they fail to load, text channels still work
+            const [chans, forumRes] = await Promise.all([
+                api("/api/admin/discord/channels"),
+                api("/api/admin/discord/forums").catch(() => ({ forums: [] })),
+            ]);
+            channels = chans.channels;
+            forums = forumRes.forums || [];
             const groups = {};
             channels.forEach((c) => (groups[c.category || "No category"] ||= []).push(c));
-            sel.innerHTML = '<option value="">Select a channel…</option>' + Object.entries(groups).map(([cat, list]) =>
-                `<optgroup label="${esc(cat)}">${list.map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join("")}</optgroup>`).join("");
-            if (previous) sel.value = previous;
+            const forumGroups = forums.map((f) => {
+                const opts = [
+                    f.can_create ? `<option value="new:${f.id}">+ New post in #${esc(f.name)}</option>` : "",
+                    ...f.posts.map((p) => `<option value="${p.id}">${esc(p.name)}${p.archived ? " (archived)" : ""}${p.locked ? " (locked)" : ""}</option>`),
+                ].join("");
+                return opts ? `<optgroup label="Forum: #${esc(f.name)}${f.category ? ` (${esc(f.category)})` : ""}">${opts}</optgroup>` : "";
+            }).join("");
+            sel.innerHTML = '<option value="">Select a channel or post…</option>' + Object.entries(groups).map(([cat, list]) =>
+                `<optgroup label="${esc(cat)}">${list.map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join("")}</optgroup>`).join("") + forumGroups;
+            if (previous) selectTarget(previous);
         } catch (err) {
             sel.innerHTML = `<option value="">${esc(err.message)}</option>`;
         }
+        updatePostFields();
     }
+
+    /** Selects a channel/post; a post that isn't listed (e.g. archived long ago) gets its own option. */
+    function selectTarget(id, label) {
+        const sel = $("eb-channel");
+        if (![...sel.options].some((o) => o.value === id)) {
+            sel.insertAdjacentHTML("beforeend", `<option value="${esc(id)}">${esc(label || `Channel ${id}`)}</option>`);
+        }
+        sel.value = id;
+        updatePostFields();
+    }
+
+    /** Shows the title/tag inputs when "+ New post" in a forum is picked. */
+    function updatePostFields() {
+        const value = $("eb-channel").value;
+        const forum = value.startsWith("new:") ? forums.find((f) => f.id === value.slice(4)) : null;
+        $("eb-new-post").classList.toggle("hidden", !forum);
+        if (!forum) return;
+        const tagSel = $("eb-post-tag");
+        const previous = tagSel.value;
+        $("eb-post-tag-wrap").classList.toggle("hidden", !forum.tags.length);
+        $("eb-post-tag-note").textContent = forum.requires_tag ? "(required)" : "(optional)";
+        tagSel.innerHTML = (forum.requires_tag ? '<option value="">Pick a tag…</option>' : '<option value="">No tag</option>') +
+            forum.tags.map((t) => `<option value="${t.id}">${t.emoji ? esc(t.emoji) + " " : ""}${esc(t.name)}</option>`).join("");
+        if (forum.tags.some((t) => t.id === previous)) tagSel.value = previous;
+    }
+
+    const targetLabel = (h) => h.forum_name ? `#${h.forum_name} › ${h.channel_name || "?"}` : `#${h.channel_name || "?"}`;
 
     async function loadRoles() {
         const sel = $("eb-role");
@@ -272,7 +314,7 @@ window.EmbedBuilder = (() => {
             <div class="eb-item">
                 <div class="eb-item-main">
                     <strong>${esc(title.slice(0, 60))}</strong>
-                    <span class="tk-sub">#${esc(h.channel_name || "?")} · ${esc(h.sent_by || "?")} · ${esc(AdminUtils.timeAgo(h.sent_at))}${h.source === "discord" ? " · via /embed" : ""}${h.edited ? " · edited" : ""}</span>
+                    <span class="tk-sub">${esc(targetLabel(h))} · ${esc(h.sent_by || "?")} · ${esc(AdminUtils.timeAgo(h.sent_at))}${h.source === "discord" ? " · via /embed" : ""}${h.edited ? " · edited" : ""}</span>
                 </div>
                 <div class="btn-row">
                     <button type="button" class="qbtn c-gold" data-hist="load" data-i="${i}">Load</button>
@@ -288,9 +330,18 @@ window.EmbedBuilder = (() => {
     // ------------------------------------------------------------ actions
 
     async function send() {
-        const channel_id = $("eb-channel").value;
-        if (!channel_id) return toast("Select a channel first.", "error");
+        const target = $("eb-channel").value;
+        if (!target) return toast("Select a channel or post first.", "error");
+        const newPost = target.startsWith("new:");
+        const channel_id = newPost ? target.slice(4) : target;
         const edit_message_id = $("eb-edit-id").value.trim() || null;
+        const post_title = newPost ? $("eb-post-title").value.trim() : "";
+        const post_tag_id = newPost ? ($("eb-post-tag").value || null) : null;
+        if (newPost) {
+            if (edit_message_id) return toast("To edit a message, pick the post it's in instead of \"+ New post\".", "error");
+            if (!post_title) return toast("Give the new post a title.", "error");
+            if (forums.find((f) => f.id === channel_id)?.requires_tag && !post_tag_id) return toast("This forum requires a tag — pick one.", "error");
+        }
         const msg = readForm();
         if (edit_message_id && !confirm(`Edit message ${edit_message_id} in this channel?`)) return;
         if (!edit_message_id && msg.allow_mentions && /@everyone|@here/.test(msg.content + msg.embed.description) && !confirm("This message will ping @everyone/@here. Send it?")) return;
@@ -302,9 +353,14 @@ window.EmbedBuilder = (() => {
         $("eb-send").disabled = true;
         $("eb-result").innerHTML = "";
         try {
-            const res = await api("/api/admin/embeds/send", { method: "POST", body: { ...msg, channel_id, edit_message_id } });
-            $("eb-result").innerHTML = `<div class="alert success">${edit_message_id ? "Message updated" : "Sent"} in #${esc(res.channel_name)}. <a href="${esc(res.jump_url)}" target="_blank" rel="noopener">Open in Discord</a></div>`;
+            const res = await api("/api/admin/embeds/send", { method: "POST", body: { ...msg, channel_id, edit_message_id, post_title, post_tag_id } });
+            $("eb-result").innerHTML = `<div class="alert success">${edit_message_id ? "Message updated" : newPost ? "Post created" : "Sent"} in ${esc(targetLabel(res))}. <a href="${esc(res.jump_url)}" target="_blank" rel="noopener">Open in Discord</a></div>`;
             loadSaved();
+            if (newPost) {  // the new post now exists: list it and keep it selected for follow-up messages
+                $("eb-post-title").value = "";
+                await loadChannels();
+                selectTarget(res.channel_id, targetLabel(res));
+            }
         } catch (err) {
             $("eb-result").innerHTML = `<div class="alert error">${esc(err.message)}</div>`;
         } finally {
@@ -341,6 +397,7 @@ window.EmbedBuilder = (() => {
     function clearForm() {
         fillForm({ content: "", allow_mentions: false, embed: fromDiscord({}) });
         $("eb-edit-id").value = "";
+        $("eb-post-title").value = "";
         $("eb-result").innerHTML = "";
     }
 
@@ -403,7 +460,7 @@ window.EmbedBuilder = (() => {
             const h = history[Number(btn.dataset.i)];
             fillForm(savedToMessage(h));
             if (btn.dataset.hist === "edit") {
-                $("eb-channel").value = h.channel_id;
+                selectTarget(h.channel_id, targetLabel(h));
                 $("eb-edit-id").value = h.message_id;
                 toast("Loaded — change it and click Send to update the message.");
             } else {
@@ -411,6 +468,7 @@ window.EmbedBuilder = (() => {
             }
             window.scrollTo({ top: 0, behavior: "smooth" });
         });
+        $("eb-channel").addEventListener("change", updatePostFields);
         $("eb-reload-channels").addEventListener("click", () => { loadChannels(); loadRoles(); });
         $("eb-role").addEventListener("change", (e) => {
             if (e.target.value) insertRole(e.target.value);

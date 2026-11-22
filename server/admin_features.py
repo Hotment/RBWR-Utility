@@ -139,6 +139,8 @@ class EmbedMessageIn(BaseModel):
 class EmbedSendIn(EmbedMessageIn):
     channel_id: str = Field(..., pattern=r"^\d{15,22}$")
     edit_message_id: str | None = Field(None, pattern=r"^\d{15,22}$")
+    post_title: str = Field("", max_length=100)                  # when channel_id is a forum: title of the new post
+    post_tag_id: str | None = Field(None, pattern=r"^\d{15,22}$")  # and an optional forum tag for it
 
 
 class EmbedTemplateIn(EmbedMessageIn):
@@ -404,6 +406,13 @@ def init_app(app: Flask, **hooks) -> None:
         except bf.BotActionError as exc:
             raise ApiError(503, str(exc))
 
+    @route("/api/admin/discord/forums", ["GET"], "embeds")
+    def discord_forums(user):
+        try:
+            return {"forums": bf.list_forum_posts()}
+        except bf.BotActionError as exc:
+            raise ApiError(503, str(exc))
+
     @route("/api/admin/discord/roles", ["GET"], *BOT_SECTIONS)
     def discord_roles(user):
         try:
@@ -437,7 +446,8 @@ def init_app(app: Flask, **hooks) -> None:
     def send_embed(user):
         payload: EmbedSendIn = body(EmbedSendIn)
         content, embed = _embed_payload(payload)
-        result = bf.send_embed(payload.channel_id, content, embed, payload.allow_mentions, payload.edit_message_id)
+        result = bf.send_embed(payload.channel_id, content, embed, payload.allow_mentions, payload.edit_message_id,
+                               payload.post_title, payload.post_tag_id)
         bf.add_embed_history({
             **result,
             "content": content,
@@ -448,7 +458,11 @@ def init_app(app: Flask, **hooks) -> None:
             "source": "web",
             "edited": bool(payload.edit_message_id),
         })
-        ctx.log_audit(user, "bot.send_embed", "bot", f"Sent embed to channel #{payload.channel_id}" + (" (edit)" if payload.edit_message_id else ""), target=f"Channel {payload.channel_id}", details={"channel_id": payload.channel_id, "edit_id": payload.edit_message_id})
+        target_id = result.get("channel_id", payload.channel_id)
+        new_post = target_id != payload.channel_id  # a forum was picked, so a new post was created
+        summary = (f"Created forum post '{result.get('channel_name')}' with an embed" if new_post
+                   else f"Sent embed to channel #{target_id}" + (" (edit)" if payload.edit_message_id else ""))
+        ctx.log_audit(user, "bot.send_embed", "bot", summary, target=f"Channel {target_id}", details={"channel_id": target_id, "edit_id": payload.edit_message_id})
         return result
 
     @route("/api/admin/embeds/templates", ["POST"], "embeds")
