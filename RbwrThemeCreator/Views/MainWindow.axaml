@@ -41,14 +41,14 @@
                             <TextBlock Text="UNSAVED" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource EdGold}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                    <TextBlock Classes="faint" Text="{Binding ThemeSubtitle}" TextTrimming="CharacterEllipsis" MaxWidth="420" HorizontalAlignment="Left" Margin="0,1,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Button Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" HotKey="Ctrl+Z" Padding="8,5" ToolTip.Tip="Undo last change (Ctrl+Z)" />
-                    <Button Classes="hud" Content="REDO" Command="{Binding RedoCommand}" HotKey="Ctrl+Y" Padding="8,5" Margin="0,0,4,0" ToolTip.Tip="Redo change (Ctrl+Y)" />
+                    <Button x:Name="UndoButton" Classes="hud" Content="UNDO" Command="{Binding UndoCommand}" Padding="8,5" />
+                    <Button x:Name="RedoButton" Classes="hud" Content="REDO" Command="{Binding RedoCommand}" Padding="8,5" Margin="0,0,4,0" />
 
-                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW" ToolTip.Tip="Start a new theme from a preset">
+                    <DropDownButton x:Name="NewButton" Classes="hud" Content="NEW">
                         <DropDownButton.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <StackPanel Width="320" Spacing="2">
@@ -74,26 +74,28 @@
                     <DropDownButton Classes="hud" Content="OPEN" ToolTip.Tip="Open an existing theme">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" />
-                                <MenuItem Header="Theme folder…" Command="{Binding OpenFolderCommand}" />
+                                <MenuItem x:Name="MenuOpenFile" Header="Theme file (theme.json, .zip, .axaml)…" Command="{Binding OpenFileCommand}" />
+                                <MenuItem x:Name="MenuOpenFolder" Header="Theme folder…" Command="{Binding OpenFolderCommand}" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
 
-                    <Button Classes="hud" Content="SAVE" Command="{Binding SaveCommand}" HotKey="Ctrl+S" ToolTip.Tip="Save to the current theme folder (Ctrl+S)" />
+                    <Button x:Name="SaveButton" Classes="hud" Content="SAVE" Command="{Binding SaveCommand}" />
 
                     <DropDownButton Classes="hud" Content="EXPORT" ToolTip.Tip="Save a copy or export a shareable pack">
                         <DropDownButton.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuItem Header="Save as new folder…" Command="{Binding SaveAsCommand}" />
-                                <MenuItem Header="Export .zip pack…" Command="{Binding ExportZipCommand}" />
+                                <MenuItem x:Name="MenuSaveAs" Header="Save as new folder…" Command="{Binding SaveAsCommand}" />
+                                <MenuItem x:Name="MenuExportZip" Header="Export .zip pack…" Command="{Binding ExportZipCommand}" />
                                 <MenuItem Header="Copy theme.axaml" Command="{Binding CopyXamlCommand}" />
+                                <Separator />
+                                <MenuItem x:Name="MenuSavePreview" Header="Save preview image (PNG)…" Click="OnExportPreviewPngClick" />
+                                <MenuItem x:Name="MenuCopyPreview" Header="Copy preview image" Click="OnCopyPreviewImageClick" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
 
-                    <Button Classes="hud-green" Content="INSTALL TO OVERLAY" Command="{Binding InstallToOverlayCommand}" Margin="6,0,0,0"
-                            ToolTip.Tip="Copy the theme into the overlay's themes folder. Then click Reload in the overlay's CONFIG tab." />
+                    <Button x:Name="InstallButton" Classes="hud-green" Content="INSTALL TO OVERLAY" Command="{Binding InstallToOverlayCommand}" Margin="6,0,0,0" />
                 </StackPanel>
 
                 <!-- Window controls styled like the overlay's header buttons -->
@@ -109,10 +111,10 @@
         <!-- =============== Body =============== -->
         <Grid Grid.Row="1" ColumnDefinitions="740,1,*">
 
-            <TabControl Grid.Column="0" Classes="nav" TabStripPlacement="Left">
+            <TabControl x:Name="NavTabs" Grid.Column="0" Classes="nav" TabStripPlacement="Left">
 
                 <!-- Theme info -->
-                <TabItem>
+                <TabItem x:Name="ThemeTab">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE946;" /><TextBlock Text="THEME" VerticalAlignment="Center" /></StackPanel>
                     </TabItem.Header>
@@ -140,9 +142,14 @@
                                         </StackPanel>
                                         <StackPanel Grid.Column="4">
                                             <TextBlock Classes="label" Text="MIN. OVERLAY" />
-                                            <TextBox Classes="hud" Text="{Binding MinAppVersion}" PlaceholderText="2.3.0" />
+                                            <TextBox Classes="hud commit" Text="{Binding MinAppVersion, UpdateSourceTrigger=LostFocus}" PlaceholderText="2.3.0"
+                                                     ToolTip.Tip="Oldest overlay version this theme needs. Press Enter or Tab to apply." />
                                         </StackPanel>
                                     </Grid>
+                                    <Border Classes="warn-box" Margin="0,8,0,0" IsVisible="{Binding HasAnimatedColours}">
+                                        <TextBlock Classes="warn" TextWrapping="Wrap"
+                                                   Text="This theme has animated colours, so Min. overlay can't be lower than 2.3.1 (older overlays can crash on them). Overlays older than that don't show this theme at all." />
+                                    </Border>
 
                                     <TextBlock Classes="label" Text="DESCRIPTION" />
                                     <TextBox Classes="hud" Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" PlaceholderText="Short description of the look" />
@@ -150,6 +157,68 @@
                                     <Border Classes="warn-box" Margin="0,12,0,0" IsVisible="{Binding HasManifestProblems}">
                                         <TextBlock Classes="warn" Text="{Binding ManifestProblems}" />
                                     </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- How the theme's card looks in the overlay's Theme Manager, in the theme's own colours. -->
+                            <Border Classes="card accent-card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="IN THE OVERLAY'S THEME MANAGER" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Classes="faint" Text="live preview" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Border Background="#0b0e14" CornerRadius="10" Padding="12">
+                                        <!-- Card fill = the theme's main background (gradients included), like the overlay. -->
+                                        <Border Background="{Binding CardWindowBrush}" BorderBrush="{Binding CardGlowBrush}"
+                                                views:AnimationStrip.Animation="{Binding CardBackgroundAnimationPreview}"
+                                                views:AnimationStrip.BorderAnimation="{Binding CardBorderAnimationPreview}"
+                                                BorderThickness="1" CornerRadius="4" Padding="11,9">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <Border Width="56" Height="54" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True" VerticalAlignment="Center"
+                                                            BorderThickness="1.5" BorderBrush="Transparent"
+                                                            views:AnimationStrip.BorderAnimation="{Binding ThumbAnimationPreview}"
+                                                            ToolTip.Tip="The thumbnail (preview.png) is the MONITOR view of your theme">
+                                                        <Image x:Name="ThemeCardThumb" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding CardName}" Foreground="{Binding CardTextBrush}" FontWeight="Bold" FontSize="12"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="300" />
+                                                            <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
+                                                                    CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding CardVersionText}" Foreground="{Binding CardGoldBrush}" FontSize="9" FontWeight="Bold" />
+                                                            </Border>
+                                                            <Border Background="{Binding CardPanelBrush}" BorderBrush="{Binding CardBorderBrush}" BorderThickness="1"
+                                                                    CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="CUSTOM" Foreground="{Binding CardMutedBrush}" FontSize="8.5" FontWeight="SemiBold" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding CardAuthorText}" Foreground="{Binding CardMutedBrush}" FontSize="10" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Background="{Binding CardBackgroundBrush}" BorderBrush="{Binding CardBorderBrush}"
+                                                            BorderThickness="1" CornerRadius="4" Padding="10,4" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                        <TextBlock Text="Apply" Foreground="{Binding CardAccentBrush}" FontSize="10" FontWeight="SemiBold" />
+                                                    </Border>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </Border>
+                                    <TextBlock Classes="faint" TextWrapping="Wrap"
+                                               Text="Shown with your theme's colours." />
+                                    <Border Classes="divider" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Classes="label" Text="THUMBNAIL" Margin="0" />
+                                            <TextBlock Classes="muted" Text="{Binding ThumbnailModeText}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Classes="hud-red" Content="REMOVE" Command="{Binding UseAutoThumbnailCommand}" IsVisible="{Binding HasCustomThumbnail}"
+                                                    ToolTip.Tip="Remove the custom image: the thumbnail is generated automatically again (the MONITOR view of your theme)" />
+                                            <Button Classes="hud-blue" Content="CUSTOM IMAGE…" Command="{Binding ChooseCustomThumbnailCommand}"
+                                                    ToolTip.Tip="Use your own picture (.png, .jpg, .webp, .bmp) as the thumbnail in the overlay's Theme Manager" />
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -163,38 +232,47 @@
                                 </Grid>
                             </Border>
 
-                            <Border Classes="card">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel>
-                                        <TextBlock Classes="section-title" Text="APP UPDATES" />
-                                        <TextBlock Classes="muted" Text="{Binding UpdateStatusText}" Margin="0,4,0,0" />
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Classes="hud-blue" Content="CHECK UPDATES" Command="{Binding CheckUpdatesCommand}"
-                                            IsEnabled="{Binding !IsCheckingUpdates}" VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
-
-                            <Border Classes="card">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Classes="section-title" Text="QUICK GUIDE" />
-                                    <Grid ColumnDefinitions="24,*" RowDefinitions="Auto,Auto,Auto,Auto">
-                                        <TextBlock Grid.Row="0" Text="01" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="muted" Text="Pick colours in COLOURS — or generate a palette from one accent colour." Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="1" Text="02" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" Text="Optionally add a font, round the corners, set a background image or write custom styles." Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="2" Text="03" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="muted" Text="INSTALL TO OVERLAY, then in the overlay: CONFIG → Reload → choose the theme." Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="3" Text="04" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="muted" Text="EXPORT → .zip pack to share it; others install it with CONFIG → Install." />
+                            <!-- Recently opened / saved theme folders -->
+                            <Border Classes="card" IsVisible="{Binding HasRecentThemes}">
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="RECENT THEMES" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="guide-link" Content="CLEAR" FontSize="9.5" Command="{Binding ClearRecentThemesCommand}"
+                                                ToolTip.Tip="Forget the recent list (the theme folders are not deleted)" />
                                     </Grid>
+                                    <ItemsControl ItemsSource="{Binding RecentThemes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:RecentThemeEntry">
+                                                <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="0,2"
+                                                        Command="{ReflectionBinding $parent[Window].DataContext.OpenRecentCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{Binding Folder}">
+                                                    <Grid ColumnDefinitions="Auto,*">
+                                                        <Border Width="40" Height="39" Margin="0,0,10,0" CornerRadius="4" ClipToBounds="True"
+                                                                Background="{DynamicResource EdPanel}" VerticalAlignment="Center">
+                                                            <Panel>
+                                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                                <TextBlock Classes="icon" Text="&#xE790;" FontSize="14" Foreground="{DynamicResource EdFaint}"
+                                                                           HorizontalAlignment="Center" IsVisible="{Binding !HasThumbnail}" />
+                                                            </Panel>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{DynamicResource EdCyan}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="faint" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </Border>
+
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
                 <!-- Colours -->
-                <TabItem>
+                <TabItem x:Name="ColoursTab">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE790;" /><TextBlock Text="COLOURS" VerticalAlignment="Center" /></StackPanel>
                     </TabItem.Header>
@@ -218,38 +296,111 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8">
-                                <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
-                                           Text="TIP: click GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                            <Border Classes="warn-box" Margin="0,0,0,10" Background="#120b24" BorderBrush="#66ff4fd8" IsVisible="{Binding ShowGradientTip}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock FontSize="10.5" TextWrapping="Wrap" Foreground="#ffb3f0"
+                                               Text="TIP: click GRADIENT next to a colour (backgrounds, borders, accents) to turn it into a gradient. Try the 'Synthwave (gradients)' preset under NEW for an example." />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideGradientTipCommand}" ToolTip.Tip="Hide this tip (show it again in SETTINGS)" />
+                                </Grid>
                             </Border>
-                            <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding !ContrastWarning}">
-                                <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
+                            <Border Classes="ok-box" Margin="0,0,0,10" IsVisible="{Binding ShowContrastOk}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGreen}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideContrastCheckCommand}" ToolTip.Tip="Hide the contrast check (show it again in SETTINGS)" />
+                                </Grid>
                             </Border>
-                            <Border Classes="warn-box" Margin="0,0,0,10" IsVisible="{Binding ContrastWarning}">
-                                <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGold}" TextWrapping="Wrap" />
+                            <Border Classes="warn-box" Margin="0,0,0,10" IsVisible="{Binding ShowContrastWarning}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding ContrastSummary}" FontSize="10.5" Foreground="{DynamicResource EdGold}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Classes="guide-link" Content="×" FontSize="13" Padding="6,0" Margin="6,-4,-6,-4"
+                                            VerticalAlignment="Top" Command="{Binding HideContrastCheckCommand}" ToolTip.Tip="Hide the contrast check (show it again in SETTINGS)" />
+                                </Grid>
+                            </Border>
+
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,10">
+                                <TextBox x:Name="TokenSearchBox" Classes="hud" Text="{Binding TokenSearch}" />
+                                <Button Grid.Column="1" Classes="hud" Content="CLEAR" Margin="6,0,0,0" Command="{Binding ClearTokenSearchCommand}"
+                                        IsVisible="{Binding TokenSearch, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <Button Grid.Column="2" Classes="hud" Content="COLLAPSE ALL" Margin="6,0,0,0" Command="{Binding CollapseAllColoursCommand}"
+                                        ToolTip.Tip="Fold every group and every gradient / animation editor" />
+                                <Button Grid.Column="3" Classes="hud" Content="EXPAND ALL" Margin="6,0,0,0" Command="{Binding ExpandAllColoursCommand}"
+                                        ToolTip.Tip="Unfold every group" />
+                            </Grid>
+                            <TextBlock Classes="muted" Text="No colours match the search." Margin="4,0,0,10" IsVisible="{Binding HasNoSearchResults}" />
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section-title" Text="APRM POWER BOX" />
+                                    <TextBlock Classes="muted" Text="Independently set the APRM box border and readout text colours without changing other elements. When off, the box follows the dynamic power-level status colour." />
+                                    <ToggleSwitch IsChecked="{Binding AprmBoxEnabled}"
+                                                  OnContent="Custom APRM box colours"
+                                                  OffContent="Follow dynamic status colour" />
+                                    <StackPanel Spacing="4" IsEnabled="{Binding AprmBoxEnabled}">
+                                        <Border Classes="token-row">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <views:HudColorPicker Grid.Column="0" Color="{Binding AprmBoxBorderColor}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="APRM box border" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="faint" Text="PowerBannerBorder" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <Border Classes="token-row">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <views:HudColorPicker Grid.Column="0" Color="{Binding AprmBoxTextColor}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="APRM readout text" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="faint" Text="PowerBannerText" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
                             </Border>
 
                             <ItemsControl ItemsSource="{Binding Groups}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TokenGroupViewModel">
-                                        <Border Classes="card">
+                                        <Border Classes="card" IsVisible="{Binding HasMatches}">
                                             <StackPanel>
-                                                <TextBlock Classes="section-title" Text="{Binding Name}" />
-                                                <TextBlock Classes="muted" Text="{Binding Description}" Margin="0,2,0,8" />
-                                                <ItemsControl ItemsSource="{Binding Tokens}">
+                                                <Button Classes="group-head" Command="{Binding ToggleCommand}" ToolTip.Tip="Fold / unfold this group">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel>
+                                                            <TextBlock Classes="section-title" Text="{Binding Name}" />
+                                                            <TextBlock Classes="muted" Text="{Binding Description}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Classes="fold-glyph" Text="{Binding Glyph}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+                                                <ItemsControl ItemsSource="{Binding Tokens}" IsVisible="{Binding IsExpanded}" Margin="0,8,0,0">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate x:DataType="vm:TokenViewModel">
-                                                            <Border Classes="token-row" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
+                                                            <Border Classes="token-row" Classes.flash="{Binding IsFlashing}" IsVisible="{Binding IsMatch}" DoubleTapped="OnTokenRowDoubleTapped" Tag="{Binding Key}"
                                                                     ToolTip.Tip="Double-click to show where this colour is used" ToolTip.ShowDelay="900">
                                                                 <StackPanel>
-                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,148">
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto,90,148" RowDefinitions="Auto,Auto">
                                                                         <views:HudColorPicker Grid.Column="0" Color="{Binding Color}" VerticalAlignment="Center" />
-                                                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Hint}">
-                                                                            <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                                            <TextBlock Classes="faint" Text="{Binding Key}" />
-                                                                        </StackPanel>
-                                                                        <ToggleButton Grid.Column="2" Classes="grad-toggle" IsChecked="{Binding IsGradient}" IsVisible="{Binding SupportsGradient}"
-                                                                                      Content="GRADIENT" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip.Tip="Use a gradient instead of a solid colour" />
+                                                                        <TextBlock Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Text="{Binding Label}" FontSize="12.5" FontWeight="SemiBold"
+                                                                                   TextTrimming="CharacterEllipsis" Background="Transparent" ToolTip.Tip="{Binding Hint}" />
+                                                                        <!-- Line 2: resource key, how the colour is drawn (one of three), a small live preview, fold arrow -->
+                                                                        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" ColumnDefinitions="Auto,Auto,*,Auto" Margin="12,6,0,0">
+                                                                            <TextBlock Classes="faint" Text="{Binding Key}" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="96" />
+                                                                            <Border Grid.Column="1" Classes="seg-host" IsVisible="{Binding SupportsGradient}" VerticalAlignment="Center">
+                                                                                <TabStrip Classes="seg mini" SelectedIndex="{Binding FillMode}">
+                                                                                    <TabStripItem Content="SOLID" ToolTip.Tip="One plain colour" />
+                                                                                    <TabStripItem Content="GRADIENT" ToolTip.Tip="Two to six colours blending into each other" />
+                                                                                    <TabStripItem Content="ANIMATED" IsVisible="{Binding SupportsAnimation}"
+                                                                                                  ToolTip.Tip="Colours that change by themselves in the overlay. Automatically raises Min. overlay to 2.3.1 if needed." />
+                                                                                </TabStrip>
+                                                                            </Border>
+                                                                            <!-- Folded: the gradient / animation stays visible as a thin strip -->
+                                                                            <Border Grid.Column="2" Classes="mini-strip" Background="{Binding PreviewBrush}" IsVisible="{Binding ShowGradientMini}" />
+                                                                            <Border Grid.Column="2" Classes="mini-strip" views:AnimationStrip.Animation="{Binding AnimPreview}" IsVisible="{Binding ShowAnimMini}" />
+                                                                            <Button Grid.Column="3" Classes="fold" Content="{Binding EditorGlyph}" Command="{Binding ToggleEditorCommand}"
+                                                                                    IsVisible="{Binding HasEditor}" ToolTip.Tip="{Binding EditorToggleTip}" />
+                                                                        </Grid>
                                                                         <TextBox Grid.Column="3" Classes="hud hex" Classes.invalid="{Binding HexInvalid}"
                                                                                  Text="{Binding HexText, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
                                                                                  ToolTip.Tip="#rrggbb or #aarrggbb (press Tab to apply)" />
@@ -263,8 +414,93 @@
                                                                         </Grid>
                                                                     </Grid>
 
+                                                                    <!-- Animation editor (only when ANIMATED is on): built like the gradient editor below -->
+                                                                    <Border Classes="grad-panel" IsVisible="{Binding ShowAnimEditor}">
+                                                                        <StackPanel Spacing="10">
+                                                                            <Border Classes="grad-strip" views:AnimationStrip.Animation="{Binding AnimPreview}"
+                                                                                    ToolTip.Tip="Live preview of the animation" />
+
+                                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,10,0">
+                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,2">
+                                                                                        <ItemsControl ItemsSource="{Binding AnimColours}">
+                                                                                            <ItemsControl.ItemsPanel>
+                                                                                                <ItemsPanelTemplate>
+                                                                                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                                                                </ItemsPanelTemplate>
+                                                                                            </ItemsControl.ItemsPanel>
+                                                                                            <ItemsControl.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:AnimationColourViewModel">
+                                                                                                    <Border Classes="stop-chip">
+                                                                                                        <StackPanel Spacing="4">
+                                                                                                            <Grid ColumnDefinitions="*,Auto" Height="16">
+                                                                                                                <TextBlock Classes="label" Text="{Binding Number}" Margin="2,0,0,0" VerticalAlignment="Center" />
+                                                                                                                <Button Grid.Column="1" Classes="stop-remove" Content="×" Command="{Binding RemoveCommand}"
+                                                                                                                        IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this colour" />
+                                                                                                            </Grid>
+                                                                                                            <views:HudColorPicker Color="{Binding Color}" IsAlphaEnabled="False" HorizontalAlignment="Center" />
+                                                                                                        </StackPanel>
+                                                                                                    </Border>
+                                                                                                </DataTemplate>
+                                                                                            </ItemsControl.ItemTemplate>
+                                                                                        </ItemsControl>
+                                                                                        <Button Classes="stop-add" Command="{Binding AddAnimColourCommand}" IsEnabled="{Binding CanAddAnimColour}"
+                                                                                                ToolTip.Tip="Add another colour to the animation (up to 4)" VerticalAlignment="Stretch">
+                                                                                            <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                                                <TextBlock Text="+" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                                                                                                <TextBlock Text="{Binding AnimStopCountText}" FontSize="8.5" FontWeight="Bold" HorizontalAlignment="Center" Opacity="0.75" />
+                                                                                            </StackPanel>
+                                                                                        </Button>
+                                                                                    </StackPanel>
+                                                                                </ScrollViewer>
+                                                                                <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                                                    <Button Classes="hud" Content="REVERSE" Command="{Binding ReverseAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Reverse the order of the colours" />
+                                                                                    <Button Classes="hud" Content="SHIFT" Command="{Binding ShiftAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="Move every colour one place (the last one becomes the first)" />
+                                                                                    <Button Classes="hud" Content="RANDOM" Command="{Binding RandomAnimColoursCommand}" HorizontalAlignment="Stretch" ToolTip.Tip="New colours that go well together" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                            <!-- How it moves + how fast -->
+                                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                                <Border Classes="seg-host" VerticalAlignment="Center">
+                                                                                    <TabStrip Classes="seg mini" SelectedIndex="{Binding AnimMode}">
+                                                                                        <TabStripItem Content="ALL AT ONCE" ToolTip.Tip="Everything in this colour changes colour together" />
+                                                                                        <TabStripItem Content="FLOW" ToolTip.Tip="The colours move along one after another, like a running gradient" />
+                                                                                    </TabStrip>
+                                                                                </Border>
+                                                                                <Slider Grid.Column="1" Minimum="1" Maximum="20" Value="{Binding AnimSeconds}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
+                                                                                        ToolTip.Tip="Seconds for one full loop: higher is calmer" />
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" ToolTip.Tip="Seconds for one loop (1 to 20). Type a number and press Enter.">
+                                                                                    <TextBox Classes="num-input" Text="{Binding AnimSecondsInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                    <TextBlock Classes="num-suffix" Text="s" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                            <!-- Flow direction (same controls as the gradient direction) -->
+                                                                            <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsFlow}">
+                                                                                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                                                <Button Classes="dir" Content="→" Command="{Binding SetAnimDirectionCommand}" CommandParameter="0" ToolTip.Tip="Flow left to right" />
+                                                                                <Button Classes="dir" Content="↘" Command="{Binding SetAnimDirectionCommand}" CommandParameter="45" ToolTip.Tip="Flow top-left to bottom-right" />
+                                                                                <Button Classes="dir" Content="↓" Command="{Binding SetAnimDirectionCommand}" CommandParameter="90" ToolTip.Tip="Flow top to bottom" />
+                                                                                <Button Classes="dir" Content="↙" Command="{Binding SetAnimDirectionCommand}" CommandParameter="135" ToolTip.Tip="Flow top-right to bottom-left" />
+                                                                                <Button Classes="dir" Content="←" Command="{Binding SetAnimDirectionCommand}" CommandParameter="180" ToolTip.Tip="Flow right to left" />
+                                                                                <Button Classes="dir" Content="↖" Command="{Binding SetAnimDirectionCommand}" CommandParameter="225" ToolTip.Tip="Flow bottom-right to top-left" />
+                                                                                <Button Classes="dir" Content="↑" Command="{Binding SetAnimDirectionCommand}" CommandParameter="270" ToolTip.Tip="Flow bottom to top" />
+                                                                                <Button Classes="dir" Content="↗" Command="{Binding SetAnimDirectionCommand}" CommandParameter="315" ToolTip.Tip="Flow bottom-left to top-right" />
+                                                                                </StackPanel>
+                                                                                <Slider Grid.Column="1" Minimum="0" Maximum="359" Value="{Binding AnimAngle}" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0,6,0" VerticalAlignment="Center"
+                                                                                        ToolTip.Tip="Flow direction" />
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" ToolTip.Tip="Type the angle in degrees and press Enter">
+                                                                                    <TextBox Classes="num-input" Text="{Binding AnimAngleInput, UpdateSourceTrigger=LostFocus}" />
+                                                                                    <TextBlock Classes="num-suffix" Text="°" />
+                                                                                </StackPanel>
+                                                                            </Grid>
+
+                                                                        </StackPanel>
+                                                                    </Border>
+
                                                                     <!-- Gradient editor (only when GRAD is on) -->
-                                                                    <Border Classes="grad-panel" IsVisible="{Binding IsGradient}">
+                                                                    <Border Classes="grad-panel" IsVisible="{Binding ShowGradientEditor}">
                                                                         <StackPanel Spacing="10">
                                                                             <Border Classes="grad-strip" Background="{Binding PreviewBrush}" />
 
@@ -630,6 +866,146 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+
+                <!-- Settings -->
+                <TabItem x:Name="SettingsTab">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE713;" /><TextBlock Text="SETTINGS" VerticalAlignment="Center" /></StackPanel>
+                    </TabItem.Header>
+                    <ScrollViewer>
+                        <StackPanel Margin="18,16">
+                            <TextBlock Classes="page-title" Text="SETTINGS" />
+                            <TextBlock Classes="page-sub" Text="Saved for you on this PC. Nothing here changes your themes." />
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="START-UP" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Open the last theme at start" IsChecked="{Binding OpenLastThemeAtStart}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Opens the newest theme from Recent themes instead of a new Cyberpunk theme." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Autosave unsaved work (every 30 seconds)" IsChecked="{Binding AutosaveEnabled}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Keeps a copy of your unsaved changes. If the creator crashes or is closed by force, it offers to restore them at the next start." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Create missing thumbnails automatically" IsChecked="{Binding AutoCreateThumbnails}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="Adds a preview.png to opened themes, and at start-up to installed overlay themes that have none. Save, Export and Install always write one." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="section-title" Text="DEFAULT AUTHOR" />
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                        <TextBox Classes="hud" Text="{Binding DefaultAuthorInput}" PlaceholderText="Your name"
+                                                 ToolTip.Tip="Type your name, then click SET or press Enter">
+                                            <TextBox.KeyBindings>
+                                                <KeyBinding Gesture="Enter" Command="{Binding SetDefaultAuthorCommand}" />
+                                            </TextBox.KeyBindings>
+                                        </TextBox>
+                                        <Button Grid.Column="1" Classes="hud-blue" Content="SET" Margin="6,0,0,0" MinWidth="64"
+                                                HorizontalContentAlignment="Center" Command="{Binding SetDefaultAuthorCommand}"
+                                                ToolTip.Tip="Save this as the author for new themes (empty = use the last author you saved with)" />
+                                    </Grid>
+                                    <TextBlock Classes="muted" Text="{Binding DefaultAuthorHint}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="COLOURS TAB" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Show the gradient tip" IsChecked="{Binding ShowGradientTip}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="The pink box about GRADIENT at the top of the COLOURS tab." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Show the contrast check" IsChecked="{Binding ShowContrastCheck}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="The box that says whether text is readable on your backgrounds. When it is hidden you also miss its low-contrast warning." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="UPDATES" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="muted" Text="{Binding UpdateStatusText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        <Button Grid.Column="1" Classes="hud-blue" Content="CHECK UPDATES" Command="{Binding CheckUpdatesCommand}"
+                                                IsEnabled="{Binding !IsCheckingUpdates}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                    </Grid>
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Check for updates at start" IsChecked="{Binding CheckUpdatesAtStart}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" Text="You can also check any time with the green version badge in the title bar." />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="muted" Text="{Binding SkippedVersionText}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="OFFER IT AGAIN" Command="{Binding UnskipVersionCommand}"
+                                                IsVisible="{Binding HasSkippedVersion}" ToolTip.Tip="Forget the skipped update so it is offered again" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="KEYBOARD SHORTCUTS" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud-red" Content="RESET SHORTCUTS" Command="{Binding ResetShortcutsCommand}"
+                                                ToolTip.Tip="Set every shortcut back to its default (other settings are kept)" />
+                                    </Grid>
+                                    <TextBlock Classes="muted"
+                                               Text="Click a shortcut, then press the new keys. Hold Ctrl, Alt or Win, or use an F-key. Esc cancels, Backspace removes the shortcut. If another action used those keys, it loses them. Esc and Ctrl+click in the preview are fixed." />
+                                    <ItemsControl ItemsSource="{Binding ShortcutEntries}" Margin="0,4,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ShortcutEntryViewModel">
+                                                <Border Classes="token-row">
+                                                    <Grid ColumnDefinitions="70,*,160,34">
+                                                        <TextBlock Classes="faint" Text="{Binding Group}" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" />
+                                                            <TextBlock Classes="faint" Text="{Binding DefaultText, StringFormat='default: {0}'}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Classes="hud shortcut" Classes.recording="{Binding IsRecording}" Classes.custom="{Binding IsCustom}"
+                                                                Content="{Binding ButtonText}" Command="{Binding RecordCommand}"
+                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                                                ToolTip.Tip="Click, then press the new keys" />
+                                                        <Button Grid.Column="3" Classes="guide-link" Content="↺" FontSize="13" Margin="4,0,0,0"
+                                                                Command="{Binding ResetToDefaultCommand}" IsVisible="{Binding IsCustom}"
+                                                                ToolTip.Tip="Back to the default shortcut" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="RESET" />
+                                    <TextBlock Classes="muted"
+                                               Text="Resets the start-up and update options, the default author, the COLOURS tab boxes, the skipped update, the recent themes list and the preview view. Keyboard shortcuts (they have their own reset above), the overlay folder and your themes are kept." />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="hud-red" Content="RESET SETTINGS" Command="{Binding ResetSettingsCommand}" />
+                                        <Button Classes="hud" Content="OPEN SETTINGS FOLDER" Command="{Binding OpenSettingsFolderCommand}"
+                                                ToolTip.Tip="The folder with settings.json" />
+                                        <Button Classes="hud" Content="OPEN LOG FILE" Command="{Binding OpenLogCommand}"
+                                                ToolTip.Tip="Open the diagnostic log file (RBWR_Theme_Creator.log)" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- User guide (GUIDE.md rendered in the editor's style) -->
+                <TabItem x:Name="GuideTab">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE897;" /><TextBlock Text="GUIDE" VerticalAlignment="Center" /></StackPanel>
+                    </TabItem.Header>
+                    <views:GuideView x:Name="GuidePage" />
+                </TabItem>
             </TabControl>
 
             <Border Grid.Column="1" Background="{DynamicResource EdBorder}" />
@@ -654,8 +1030,10 @@
                             <Slider Minimum="0.25" Maximum="4" Value="{Binding PreviewZoom}" TickFrequency="0.05" IsSnapToTickEnabled="True" Width="90" VerticalAlignment="Center" />
                             <TextBlock x:Name="ZoomText" Width="36" VerticalAlignment="Center" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" FontSize="11" />
                         </StackPanel>
-                        <Button Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center"
-                                ToolTip.Tip="Save a high-DPI PNG screenshot of the current preview" />
+                        <ToggleButton x:Name="InspectToggle" Classes="hud" Content="FIND COLOUR" VerticalAlignment="Center"
+                                      IsCheckedChanged="OnInspectToggled" />
+                        <Button x:Name="PngButton" Classes="hud" Content="PNG" Click="OnExportPreviewPngClick" Padding="9,5" VerticalAlignment="Center" />
+                        <Button x:Name="CopyButton" Classes="hud" Content="COPY" Click="OnCopyPreviewImageClick" Padding="9,5" VerticalAlignment="Center" />
                     </WrapPanel>
                 </Border>
 
@@ -674,7 +1052,7 @@
                             </LayoutTransformControl>
                         </Canvas>
                         <Border Classes="canvas-hint" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" IsHitTestVisible="False">
-                            <TextBlock Text="SCROLL: ZOOM  ·  DRAG: MOVE  ·  DOUBLE-CLICK: FIT" />
+                            <TextBlock Text="SCROLL: ZOOM  ·  DRAG: MOVE  ·  DOUBLE-CLICK: FIT  ·  CTRL+CLICK: FIND COLOUR" />
                         </Border>
                     </Panel>
                 </Border>
@@ -690,6 +1068,22 @@
             </Grid>
         </Border>
     </Grid>
+    </Border>
+
+    <!-- Off-screen area where theme thumbnails (preview.png) are rendered: zero size and clipped. -->
+    <Canvas x:Name="ThumbRenderHost" Width="0" Height="0" ClipToBounds="True" IsHitTestVisible="False"
+            HorizontalAlignment="Left" VerticalAlignment="Top" />
+
+    <!-- Toast (bottom-right), e.g. "THUMBNAIL CREATED" -->
+    <Border x:Name="Toast" Classes="toast" IsVisible="False" Opacity="0" IsHitTestVisible="False"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,46">
+        <Grid ColumnDefinitions="Auto,*">
+            <Border x:Name="ToastBar" Width="3" CornerRadius="2" Background="{DynamicResource EdGreen}" Margin="0,0,10,0" />
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock x:Name="ToastTitle" Text="THUMBNAIL CREATED" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource EdGreen}" />
+                <TextBlock x:Name="ToastText" FontSize="11" Foreground="{DynamicResource EdText}" TextWrapping="Wrap" MaxWidth="320" />
+            </StackPanel>
+        </Grid>
     </Border>
 
     <!-- Resize grips (the window has no native frame at all) -->

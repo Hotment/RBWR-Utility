@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -45,12 +46,37 @@ public partial class ThemeEntryViewModel : ObservableObject
     public string ExpandButtonText => IsExpanded ? "Hide" : "Details";
     public string DeleteButtonText => IsConfirmingDelete ? "Confirm?" : "Delete";
 
+    // ---------- Thumbnail: preview.png of the theme (null = no thumbnail) ----------
+    public Bitmap? Thumbnail { get; }
+    public bool HasThumbnail => Thumbnail != null;
+
+    /// <summary>This theme's colours and fonts: the card is drawn in the theme's own look.</summary>
+    public IReadOnlyDictionary<object, object?>? CardResources { get; }
+
+    /// <summary>The theme's animated main background / window outline, played on the card (null = still).</summary>
+    public CardAnimation? CardBackgroundAnimation { get; }
+    public CardAnimation? CardBorderAnimation { get; }
+
+    /// <summary>The theme's animation styles, applied to the inside of the card (buttons, badges, frames).</summary>
+    public string? CardAnimationStyles { get; }
+
+    /// <summary>The animation the thumbnail's frame plays (null = still frame).</summary>
+    public CardAnimation? ThumbnailAnimation { get; }
+
     public ThemeEntryViewModel(InstalledThemeInfo info, bool isActive, bool isExpanded, ThemeSelectorViewModel owner)
     {
         Info = info;
         _isActive = isActive;
         _isExpanded = isExpanded;
         _owner = owner;
+
+        Thumbnail = ThemeThumbnailService.Get(info);
+        CardResources = ThemeCardResources.Get(info);
+        var animations = ThemeCardResources.GetAnimations(info);
+        CardBackgroundAnimation = animations.GetValueOrDefault("CyberMainBg");
+        CardBorderAnimation = animations.GetValueOrDefault("CyberBorderGlow");
+        CardAnimationStyles = ThemeCardResources.GetAnimationStylesXaml(info);
+        ThumbnailAnimation = ThemeCardResources.GetThumbnailAnimation(info);
     }
 
     partial void OnIsExpandedChanged(bool value)

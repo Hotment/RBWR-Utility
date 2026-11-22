@@ -43,6 +43,9 @@
   <ItemGroup>
     <EmbeddedResource Include="..\RbwrOverlay\RbwrOverlay.UI\Styles\CyberpunkTheme.axaml" LogicalName="Base.CyberpunkTheme.axaml" Link="Embedded\CyberpunkTheme.axaml" />
     <EmbeddedResource Include="..\RbwrOverlay\RbwrOverlay.UI\Styles\ReactorAmberTheme.axaml" LogicalName="Base.ReactorAmberTheme.axaml" Link="Embedded\ReactorAmberTheme.axaml" />
+    <EmbeddedResource Include="..\RbwrOverlay\RbwrOverlay.UI\Assets\BuiltInThemes\aurora-drift.theme" LogicalName="Base.AuroraDrift.axaml" Link="Embedded\AuroraDrift.axaml" />
+    <!-- The user guide shown in the GUIDE tab (same file as on GitHub). -->
+    <EmbeddedResource Include="GUIDE.md" LogicalName="Guide.GUIDE.md" />
   </ItemGroup>
 
   <ItemGroup>

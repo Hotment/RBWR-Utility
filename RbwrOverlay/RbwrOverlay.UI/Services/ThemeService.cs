@@ -1,10 +1,14 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -12,6 +16,54 @@ using RbwrOverlay.Core.Models;
 using RbwrOverlay.Core.Services;
 
 namespace RbwrOverlay.UI.Services;
+
+internal sealed class ThemeFileFontCollection(Uri key) : FontCollectionBase
+{
+    private static readonly ConcurrentDictionary<string, (Uri Key, string? FamilyName)> Registered = new(StringComparer.OrdinalIgnoreCase);
+
+    public override Uri Key { get; } = key;
+
+    public bool LoadFile(string filePath, out string? familyName)
+    {
+        familyName = null;
+        if (!File.Exists(filePath)) return false;
+        using var fs = File.OpenRead(filePath);
+        if (!TryAddGlyphTypeface(fs, out var gt)) return false;
+        familyName = gt?.FamilyName;
+        return true;
+    }
+
+    public static (Uri Uri, string? FamilyName) EnsureRegistered(string fullPath)
+    {
+        string normalized = Path.GetFullPath(fullPath);
+        if (Registered.TryGetValue(normalized, out var existing))
+            return existing;
+
+        if (!File.Exists(normalized))
+            return (new Uri(normalized), null);
+
+        string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(normalized)))[..12].ToLowerInvariant();
+        var collectionUri = new Uri($"fonts:rbwr-font-{hash}");
+
+        try
+        {
+            var collection = new ThemeFileFontCollection(collectionUri);
+            if (collection.LoadFile(normalized, out var familyName))
+            {
+                FontManager.Current.AddFontCollection(collection);
+                var entry = (collectionUri, familyName);
+                Registered[normalized] = entry;
+                return entry;
+            }
+        }
+        catch
+        {
+            // Headless unit tests without an initialized FontManager: fall back to file:/// URI.
+        }
+
+        return (new Uri(normalized), null);
+    }
+}
 
 public interface IThemeService
 {
@@ -30,6 +82,10 @@ public class ThemeService : IThemeService
     public const string DefaultThemeId = "default";
     public const string ReactorAmberThemeId = "reactor-amber";
     private const string ReactorAmberResourceUri = "avares://RbwrOverlay/Styles/ReactorAmberTheme.axaml";
+    public const string AuroraDriftThemeId = "aurora-drift";
+    // Kept as a plain (not compiled) resource: it is a Theme Creator theme with animated colours and is
+    // loaded exactly like a custom theme (same preparation and safety checks).
+    private const string AuroraDriftResourceName = "RbwrOverlay.BuiltInThemes.aurora-drift.theme";
     private const int MaxZipEntries = 200;
     private const long MaxZipUncompressedBytes = 50L * 1024 * 1024;
 
@@ -48,7 +104,7 @@ public class ThemeService : IThemeService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeFontPathRegex = new(
-        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""'\s;,)]*)?)",
+        @"(?<prefix>[>;\s,'""])(?<rel>(?:\./)?fonts/[^<""'\s;,)]+\.(?:ttf|otf|ttc)(?:#[^<""';,)]*)?)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex RelativeAssetImageRegex = new(
@@ -109,9 +165,72 @@ public class ThemeService : IThemeService
         IsBuiltIn = true
     };
 
+    public static InstalledThemeInfo CreateAuroraDriftThemeInfo() => new()
+    {
+        Id = AuroraDriftThemeId,
+        Name = "Aurora Drift (Built-in)",
+        Author = "Uranium-q2",
+        Version = "1.0.0",
+        Description = "Built-in animated northern lights theme.",
+        IsBuiltIn = true
+    };
+
     private static bool IsBuiltInThemeId(string? id) =>
         string.Equals(id, DefaultThemeId, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(id, ReactorAmberThemeId, StringComparison.OrdinalIgnoreCase);
+        || string.Equals(id, ReactorAmberThemeId, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(id, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Source of a built-in theme that is stored as Theme Creator XAML (Aurora Drift), or null for the
+    /// compiled built-ins (Cyberpunk, Reactor Amber).
+    /// </summary>
+    public static string? ReadBuiltInThemeXaml(string? id)
+    {
+        if (!string.Equals(id, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase))
+            return null;
+        using var stream = typeof(ThemeService).Assembly.GetManifestResourceStream(AuroraDriftResourceName)
+            ?? throw new InvalidOperationException("The built-in Aurora Drift theme is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    /// <summary>
+    /// Version used to decide which themes this overlay can run (themes whose Min. overlay is newer are
+    /// hidden and cannot be installed). Settable for tests.
+    /// </summary>
+    public static string CurrentAppVersion { get; set; } = RbwrOverlay.UI.ViewModels.MainOverlayViewModel.AppVersion;
+
+    /// <summary>True when this overlay is new enough for the theme (its manifest's Min. overlay).</summary>
+    public static bool CanRun(InstalledThemeInfo theme) =>
+        theme.IsBuiltIn || IsCompatibleWithAppVersion(theme.Manifest?.MinAppVersion, CurrentAppVersion);
+
+    private static string NeedsNewerMessage(InstalledThemeInfo theme) =>
+        $"'{theme.Name}' needs overlay v{theme.Manifest?.MinAppVersion?.Trim().TrimStart('v', 'V')} or newer "
+        + $"(this is v{CurrentAppVersion}). Update the overlay to use it.";
+
+    /// <summary>
+    /// Themes in the themes folder that this overlay is too old for (e.g. themes with animated colours
+    /// on an older overlay). They are left out of the theme list instead of failing when applied.
+    /// </summary>
+    public IReadOnlyList<InstalledThemeInfo> DiscoverTooNewThemes()
+    {
+        var result = new List<InstalledThemeInfo>();
+        try
+        {
+            if (!Directory.Exists(ThemesDirectory)) return result;
+            foreach (string dir in Directory.EnumerateDirectories(ThemesDirectory))
+            {
+                var info = TryReadThemeFromDirectory(dir);
+                if (info != null && !IsBuiltInThemeId(info.Id) && !CanRun(info))
+                    result.Add(info);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Could not check the themes folder: {ex.Message}");
+        }
+        return result;
+    }
 
     public IReadOnlyList<InstalledThemeInfo> DiscoverThemes()
     {
@@ -119,7 +238,8 @@ public class ThemeService : IThemeService
         var list = new List<InstalledThemeInfo>
         {
             CreateDefaultThemeInfo(),
-            CreateReactorAmberThemeInfo()
+            CreateReactorAmberThemeInfo(),
+            CreateAuroraDriftThemeInfo()
         };
 
         if (!Directory.Exists(ThemesDirectory))
@@ -129,10 +249,12 @@ public class ThemeService : IThemeService
         foreach (string dir in Directory.EnumerateDirectories(ThemesDirectory))
         {
             var info = TryReadThemeFromDirectory(dir);
-            if (info != null && !IsBuiltInThemeId(info.Id))
-            {
-                discovered.Add(info);
-            }
+            if (info == null || IsBuiltInThemeId(info.Id))
+                continue;
+            // A theme made for a newer overlay is simply not listed (it could fail or crash here).
+            if (!CanRun(info))
+                continue;
+            discovered.Add(info);
         }
 
         discovered.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
@@ -245,10 +367,39 @@ public class ThemeService : IThemeService
             }
         }
 
+        if (string.Equals(targetId, AuroraDriftThemeId, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string prepared = PrepareThemeXaml(ReadBuiltInThemeXaml(AuroraDriftThemeId)!, AppContext.BaseDirectory);
+                var parsed = AvaloniaRuntimeXamlLoader.Parse<Styles>(prepared);
+                ExecuteOnUiThread(() =>
+                {
+                    var app = Application.Current;
+                    if (app == null) return;
+                    if (_activeCustomStyle != null)
+                        app.Styles.Remove(_activeCustomStyle);
+                    DisposeActiveBitmaps();
+                    app.Styles.Add(parsed);
+                    _activeCustomStyle = parsed;
+                });
+                ActiveThemeId = AuroraDriftThemeId;
+                ThemeChanged?.Invoke(this, AuroraDriftThemeId);
+                _logger.Info("Applied built-in theme 'Aurora Drift'.");
+                return new ThemeApplyResult(true, AuroraDriftThemeId);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Failed to apply built-in Aurora Drift theme", ex);
+                return new ThemeApplyResult(false, ActiveThemeId, ex.Message);
+            }
+        }
+
         var theme = DiscoverThemes().FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase));
         if (theme == null || string.IsNullOrEmpty(theme.EntryFilePath) || !File.Exists(theme.EntryFilePath))
         {
-            string msg = $"Theme '{targetId}' was not found.";
+            var tooNew = DiscoverTooNewThemes().FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase));
+            string msg = tooNew != null ? NeedsNewerMessage(tooNew) : $"Theme '{targetId}' was not found.";
             _logger.Warning(msg);
             return new ThemeApplyResult(false, ActiveThemeId, msg);
         }
@@ -322,16 +473,26 @@ public class ThemeService : IThemeService
         string normalizedDir = Path.GetFullPath(themeDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         string baseFileUri = new Uri(normalizedDir + Path.DirectorySeparatorChar).AbsoluteUri;
 
+        string fullThemeRoot = normalizedDir + Path.DirectorySeparatorChar;
         string withFonts = RelativeFontPathRegex.Replace(strippedXaml, m =>
         {
             string prefix = m.Groups["prefix"].Value;
             string rel = m.Groups["rel"].Value.TrimStart('.', '/').Replace('\\', '/');
-            return $"{prefix}{baseFileUri}{rel}";
+            string filePart = rel.Split('#')[0];
+            string fragment = rel.Length > filePart.Length ? rel[filePart.Length..].TrimEnd() : string.Empty;
+            string fullFontPath = Path.GetFullPath(Path.Combine(normalizedDir, filePart.Replace('/', Path.DirectorySeparatorChar)));
+            if (fullFontPath.StartsWith(fullThemeRoot, StringComparison.OrdinalIgnoreCase) && File.Exists(fullFontPath))
+            {
+                var (fontUri, detectedFamily) = ThemeFileFontCollection.EnsureRegistered(fullFontPath);
+                if (string.IsNullOrEmpty(fragment) && !string.IsNullOrWhiteSpace(detectedFamily))
+                    fragment = $"#{detectedFamily}";
+                return $"{prefix}{fontUri.AbsoluteUri}{fragment}";
+            }
+            return $"{prefix}{baseFileUri}{filePart}{fragment}";
         });
 
         var assets = new List<(string Key, string FullPath)>();
         var seenPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        string fullThemeRoot = normalizedDir + Path.DirectorySeparatorChar;
 
         string withAssets = RelativeAssetImageRegex.Replace(withFonts, m =>
         {
@@ -394,6 +555,9 @@ public class ThemeService : IThemeService
         var candidate = TryReadThemeFromDirectory(sourceDir);
         if (candidate == null)
             return (false, null, "Selected folder does not contain a valid theme.json or theme.axaml.");
+
+        if (!CanRun(candidate))
+            return (false, null, NeedsNewerMessage(candidate));
 
         if (IsBuiltInThemeId(candidate.Id))
             return (false, null, $"Theme ID '{candidate.Id}' is reserved for a built-in theme.");
@@ -499,6 +663,10 @@ public class ThemeService : IThemeService
             var candidate = TryReadThemeFromDirectory(themeRoot);
             if (candidate == null)
                 return (false, null, "Archive does not contain theme.json / theme.axaml.");
+
+            // Checked before the theme XAML is even parsed: it may use things this overlay does not have.
+            if (!CanRun(candidate))
+                return (false, null, NeedsNewerMessage(candidate));
 
             string raw = File.ReadAllText(candidate.EntryFilePath);
             string prepared = PrepareThemeXaml(raw, candidate.DirectoryPath);
@@ -793,6 +961,14 @@ public class ThemeService : IThemeService
             _logger.Error($"Failed to delete theme '{themeId}'", ex);
             return (false, ex.Message);
         }
+    }
+
+    public static IBrush? TryResolveBrush(string resourceKey)
+    {
+        var app = Application.Current;
+        if (app != null && app.TryGetResource(resourceKey, app.ActualThemeVariant, out object? res) && res is IBrush brush)
+            return brush;
+        return null;
     }
 
     public static IBrush ResolveBrush(string resourceKey, string fallbackHex)

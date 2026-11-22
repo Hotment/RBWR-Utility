@@ -21,15 +21,34 @@ public class LoggingService : ILoggingService
     public static LoggingService Instance => _instance.Value;
 
     private readonly string _logPath;
+    private readonly string _appName;
     private readonly object _lock = new();
     private readonly List<(Regex Pattern, string Placeholder)> _sanitizationMappings = new();
 
-    public LoggingService()
+    public LoggingService(string? logFilePath = null, string appName = "RBWR APRM Calculator")
     {
-        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        _logPath = Path.Combine(baseDir, "RBWR_APRM_Calculator.log");
+        _appName = string.IsNullOrWhiteSpace(appName) ? "RBWR APRM Calculator" : appName;
+        if (!string.IsNullOrWhiteSpace(logFilePath))
+        {
+            _logPath = logFilePath;
+            try
+            {
+                string? dir = Path.GetDirectoryName(_logPath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+            }
+            catch
+            {
+                // Ignore if directory cannot be created immediately
+            }
+        }
+        else
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            _logPath = Path.Combine(baseDir, "RBWR_APRM_Calculator.log");
+        }
         InitializeSanitization();
-        
+
         try
         {
             File.WriteAllText(_logPath, string.Empty);
@@ -42,7 +61,7 @@ public class LoggingService : ILoggingService
 
     public void LogSystemInfo(string version)
     {
-        Info($"=== RBWR APRM Calculator (Avalonia .NET) v{version} Starting ===");
+        Info($"=== {_appName} (Avalonia .NET) v{version} Starting ===");
         Info($"Version: {version}");
         Info($"Runtime: {RuntimeInformation.FrameworkDescription} [{RuntimeInformation.RuntimeIdentifier}]");
         Info($"OS: {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})");

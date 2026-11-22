@@ -15,7 +15,12 @@ public partial class App : Application
 
     private MainViewModel? _vm;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        // Live preview of animated colours: blend solid colours and gradients without crashing.
+        Services.SafeBrushAnimator.Register();
+        AvaloniaXamlLoader.Load(this);
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

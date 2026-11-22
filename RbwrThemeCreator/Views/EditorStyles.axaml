@@ -22,6 +22,7 @@
         <SolidColorBrush x:Key="EdRed" Color="#ff003c" />
         <SolidColorBrush x:Key="EdGold" Color="#ffaa00" />
         <FontFamily x:Key="EdFont">Consolas, Segoe UI, monospace</FontFamily>
+        <StreamGeometry x:Key="EyedropperIcon">M13.4,2.6 C12.6,1.8 11.4,1.8 10.6,2.6 L8.9,4.3 L8.2,3.6 L7.1,4.7 L7.8,5.4 L2.5,10.7 L2,14 L5.3,13.5 L10.6,8.2 L11.3,8.9 L12.4,7.8 L11.7,7.1 L13.4,5.4 C14.2,4.6 14.2,3.4 13.4,2.6 Z M4.8,12.4 L3.4,12.6 L3.6,11.2 L8.9,5.9 L10.1,7.1 Z</StreamGeometry>
         <FontFamily x:Key="EdIcons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
         <!-- Fluent control resources re-coloured to the HUD palette -->
@@ -112,6 +113,34 @@
         <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#070a12" />
         <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#070a12" />
         <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#2a3a5a" />
+        <!-- Hover / press: no white flash (Fluent's defaults are near-white in the dark theme). -->
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#00f0ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#5ff5ff" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#070a12" />
+        <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="#e9edf3" />
+        <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#e9edf3" />
+        <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPressed" Color="#e9edf3" />
+        <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="#e9edf3" />
+        <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#e9edf3" />
+        <SolidColorBrush x:Key="CheckBoxForegroundCheckedPressed" Color="#e9edf3" />
+
+        <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#192338" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#0e1726" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#00f0ff" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#070a12" />
+        <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#e9edf3" />
+
+        <SolidColorBrush x:Key="DropDownButtonForegroundSecondary" Color="#73839c" />
+        <SolidColorBrush x:Key="DropDownButtonForegroundSecondaryPointerOver" Color="#73839c" />
+        <SolidColorBrush x:Key="DropDownButtonForegroundSecondaryPressed" Color="#73839c" />
 
         <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#0f1422" />
         <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#00f0ff" />
@@ -124,6 +153,23 @@
         <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#8800f0ff" />
         <SolidColorBrush x:Key="ToolTipForeground" Color="#dce6f5" />
     </Styles.Resources>
+
+    <!-- Hover and press never repaint a button's text (Fluent would turn it white for a moment):
+         the text keeps the button's own colour, only the background and outline react. Styles
+         further down that set a hover colour on purpose still win, because they come later. -->
+    <Style Selector=":is(Button):pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
+    <Style Selector=":is(Button):pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
+    <!-- Same for the left menu tabs and the preview view switch. -->
+    <Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
+    <Style Selector="TabStripItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
 
     <Style Selector="Window">
         <Setter Property="Background" Value="{DynamicResource EdBg}" />
@@ -229,6 +275,75 @@
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
         <Setter Property="Background" Value="#0b1b26" />
     </Style>
+    <!-- ===== SETTINGS: shortcut buttons ===== -->
+    <Style Selector="Button.shortcut">
+        <Setter Property="FontFamily" Value="{DynamicResource EdFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+    </Style>
+    <Style Selector="Button.shortcut.custom">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.shortcut.recording /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGold}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdGold}" />
+    </Style>
+
+    <!-- ===== GUIDE tab ===== -->
+    <Style Selector="SelectableTextBlock.guide-text">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="18" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="#c3cad6" />
+        <Setter Property="SelectionBrush" Value="#5500f0ff" />
+    </Style>
+    <Style Selector="SelectableTextBlock.guide-intro">
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="Margin" Value="0,6,0,8" />
+    </Style>
+    <Style Selector="TextBlock.guide-sub">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="TextBlock.guide-num">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Button.guide-link">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.guide-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Border.guide-table">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Margin" Value="0,2" />
+    </Style>
+    <Style Selector="Border.guide-th">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.guide-tr">
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="BorderBrush" Value="#0dffffff" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.guide-tr:pointerover">
+        <Setter Property="Background" Value="#0affffff" />
+    </Style>
     <Style Selector="Border.pill">
         <Setter Property="Background" Value="{DynamicResource EdPanel}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -284,6 +399,12 @@
     <Style Selector="Border.token-row:pointerover">
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
     </Style>
+    <!-- Row flash after FIND COLOUR in the preview -->
+    <Style Selector="Border.token-row.flash">
+        <Setter Property="Background" Value="#2600f0ff" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
 
     <!-- ===== Buttons (cyber, cyber-blue, cyber-green, cyber-red) ===== -->
     <Style Selector="Button, DropDownButton, ToggleButton, TextBox, ComboBox">
@@ -313,7 +434,6 @@
     </Style>
     <Style Selector="Button.hud-blue:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource EdActive}" />
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
     </Style>
     <Style Selector="Button.hud-blue:pressed /template/ ContentPresenter#PART_ContentPresenter">
@@ -327,7 +447,6 @@
     </Style>
     <Style Selector="Button.hud-green:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="#10291d" />
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
         <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
     </Style>
     <Style Selector="Button.hud-green:pressed /template/ ContentPresenter#PART_ContentPresenter">
@@ -341,7 +460,6 @@
     </Style>
     <Style Selector="Button.hud-red:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="#290e14" />
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
         <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
     </Style>
     <Style Selector="Button.hud-red:pressed /template/ ContentPresenter#PART_ContentPresenter">
@@ -443,9 +561,6 @@
     <Style Selector="TabControl.nav > TabItem:pointerover /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
     </Style>
-    <Style Selector="TabControl.nav > TabItem:pointerover">
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
-    </Style>
     <Style Selector="TabControl.nav > TabItem:selected">
         <Setter Property="Background" Value="{DynamicResource EdActive}" />
         <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
@@ -501,7 +616,6 @@
     </Style>
     <Style Selector="TabStrip.seg > TabStripItem:pointerover">
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
     </Style>
     <Style Selector="TabStrip.seg > TabStripItem:selected /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource EdActive}" />
@@ -519,6 +633,67 @@
     </Style>
     <Style Selector="TabStrip.seg > TabStripItem /template/ Border#PART_SelectedPipe">
         <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Fold controls on the COLOURS tab -->
+    <Style Selector="Button.group-head">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.group-head:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.group-head:pointerover TextBlock.fold-glyph">
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="TextBlock.fold-glyph">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource EdMuted}" />
+        <Setter Property="Margin" Value="8,0,2,0" />
+    </Style>
+    <Style Selector="Button.fold">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="6,0,0,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource EdCyan}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.fold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+    </Style>
+    <Style Selector="Border.mini-strip">
+        <Setter Property="Height" Value="16" />
+        <Setter Property="MinWidth" Value="40" />
+        <Setter Property="Margin" Value="10,0,0,0" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="BorderBrush" Value="#33ffffff" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ANIMATED locked by an old Min. overlay: dimmed, still clickable so it can explain why -->
+    <Style Selector="TabStrip.seg > TabStripItem.locked">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <!-- Smaller segmented switch (colour rows: SOLID / GRADIENT / ANIMATED, ALL AT ONCE / FLOW) -->
+    <Style Selector="TabStrip.seg.mini > TabStripItem">
+        <Setter Property="FontSize" Value="9.5" />
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="Padding" Value="10,0" />
     </Style>
     <!-- ===== HUD colour picker ===== -->
     <Style Selector="Button.swatch">
@@ -538,6 +713,23 @@
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
     </Style>
+    <Style Selector="Button.dropper">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.dropper:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Background" Value="{DynamicResource EdHover}" />
+    </Style>
     <Style Selector="Button.palette">
         <Setter Property="Width" Value="24" />
         <Setter Property="Height" Value="24" />
@@ -554,6 +746,22 @@
     </Style>
     <Style Selector="Button.palette:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{TemplateBinding Background}" />
+    </Style>
+    <Style Selector="Border.toast">
+        <Setter Property="Background" Value="{DynamicResource EdCard}" />
+        <Setter Property="BorderBrush" Value="#8839ff14" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,10,16,10" />
+        <Setter Property="BoxShadow" Value="0 6 24 0 #aa000000" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.25" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.toast.warning">
+        <Setter Property="BorderBrush" Value="#99ffaa00" />
     </Style>
     <Style Selector="FlyoutPresenter.hud-color">
         <Setter Property="Background" Value="{DynamicResource EdCard}" />
@@ -632,7 +840,6 @@
     </Style>
     <Style Selector="ToggleButton.grad-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource EdHover}" />
-        <Setter Property="Foreground" Value="{DynamicResource EdText}" />
         <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
     </Style>
     <Style Selector="ToggleButton.grad-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">

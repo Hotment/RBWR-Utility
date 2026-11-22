@@ -57,18 +57,36 @@ public partial class MainWindow : Window, IDialogHost
         Viewport.AddHandler(PointerPressedEvent, OnViewportPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         Viewport.PointerMoved += OnViewportPointerMoved;
         Viewport.PointerReleased += OnViewportPointerReleased;
+        Viewport.PointerExited += (_, _) => ClearInspectHover();
+        AddHandler(KeyDownEvent, OnShortcutKeyDown);
+        AddHandler(KeyDownEvent, OnShortcutRecordingKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(DragDrop.DragOverEvent, OnWindowDragOver);
         AddHandler(DragDrop.DropEvent, OnWindowDrop);
         Opened += (_, _) =>
         {
             ApplyCornerPreference();
-            _ = _vm?.RunUpdateCheckAsync(isManual: false);
+            var settings = CreatorSettings.Current;
+            if (settings.CheckUpdatesAtStart)
+                _ = _vm?.RunUpdateCheckAsync(isManual: false);
+            // Unsaved work from a crash comes first; otherwise the last theme if wanted.
+            Dispatcher.UIThread.Post(async () =>
+            {
+                if (_vm == null) return;
+                _vm.Recovery = RecoveryStore.Default;
+                bool restored = await OfferRecoveryAsync();
+                if (!restored && settings.OpenLastThemeAtStart)
+                    _vm.OpenLastTheme();
+                _vm.StartAutosave();
+            }, DispatcherPriority.Loaded);
+            // Older installed themes without preview.png get one (shown by the overlay's Theme Manager).
+            if (settings.AutoCreateThumbnails)
+                Dispatcher.UIThread.Post(() => _ = CreateMissingInstalledThumbnailsAsync(), DispatcherPriority.ApplicationIdle);
         };
         // Enter in a number box commits the value (the bindings update on focus loss).
         AddHandler(KeyDownEvent, (_, e) =>
         {
             if (e.Key is Key.Enter && (e.Source as Visual)?.FindAncestorOfType<TextBox>(includeSelf: true) is { } tb
-                && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+                && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex") || tb.Classes.Contains("commit")))
             {
                 var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
                 expr?.UpdateSource();
@@ -79,7 +97,7 @@ public partial class MainWindow : Window, IDialogHost
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(LostFocusEvent, (_, e) =>
         {
-            if (e.Source is TextBox tb && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex")))
+            if (e.Source is TextBox tb && (tb.Classes.Contains("num-input") || tb.Classes.Contains("hex") || tb.Classes.Contains("commit")))
             {
                 var expr = Avalonia.Data.BindingOperations.GetBindingExpressionBase(tb, TextBox.TextProperty);
                 Dispatcher.UIThread.Post(() => expr?.UpdateTarget(), DispatcherPriority.Background);
@@ -103,6 +121,9 @@ public partial class MainWindow : Window, IDialogHost
         vm.PreviewReady += OnPreviewReady;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.RequestShowUpdate += OnShowUpdate;
+        vm.RequestWarningToast += (title, message) => ShowToast(title, message, warning: true);
+        vm.Shortcuts.Changed += (_, _) => UpdateShortcutHints();
+        UpdateShortcutHints();
         ApplyBackdrop(vm.PreviewBackdrop);
         Preview.SetMode(vm.PreviewMode);
         vm.Refresh();
@@ -140,6 +161,8 @@ public partial class MainWindow : Window, IDialogHost
         if (_vm == null) return;
         if (e.PropertyName == nameof(MainViewModel.PreviewBackdrop))
             ApplyBackdrop(_vm.PreviewBackdrop);
+        else if (e.PropertyName == nameof(MainViewModel.CurrentFolder))
+            OnThemeFolderOpened();
         else if (e.PropertyName == nameof(MainViewModel.PreviewMode))
         {
             _pan = default;
@@ -154,12 +177,15 @@ public partial class MainWindow : Window, IDialogHost
 
     private void OnPreviewReady(object? sender, PreviewReadyEventArgs e)
     {
+        QueueThemeCardThumbnail();
+
         // Keep the overlay base stylesheet at index 0 and swap the theme on top of it,
         // exactly like the overlay adds a custom theme after CyberpunkTheme.axaml.
         while (PreviewHost.Styles.Count > (_baseStyles != null ? 1 : 0))
             PreviewHost.Styles.RemoveAt(PreviewHost.Styles.Count - 1);
         if (e.Styles != null)
             PreviewHost.Styles.Add(e.Styles);
+        Preview.ApplyAprmBoxOverride(e.Styles);
 
         var old = _activeBitmaps;
         _activeBitmaps = e.Bitmaps;
@@ -265,6 +291,24 @@ public partial class MainWindow : Window, IDialogHost
     private void OnViewportPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var props = e.GetCurrentPoint(Viewport).Properties;
+
+        // FIND COLOUR: Ctrl+click (or a click while the toggle is on) jumps to the element's colours.
+        if (props.IsLeftButtonPressed && IsInspecting(e.KeyModifiers))
+        {
+            if (FindTokenElement(e.Source) is { } hit)
+            {
+                e.Handled = true;
+                _ = ShowTokensForElementAsync(hit.Element, hit.Keys);
+                return;
+            }
+            if (InspectToggle.IsChecked == true)
+            {
+                _vm?.SetStatus("No editable colour is mapped to that spot. Try a card, title, button, slider or the window background.");
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Middle/right button always pans; left button pans unless it is on a control in the mock overlay.
         bool pan = props.IsMiddleButtonPressed || props.IsRightButtonPressed
                    || (props.IsLeftButtonPressed && !IsInteractive(e.Source, Viewport));
@@ -290,7 +334,11 @@ public partial class MainWindow : Window, IDialogHost
 
     private void OnViewportPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_panning) return;
+        if (!_panning)
+        {
+            UpdateInspectHover(e);
+            return;
+        }
         var p = e.GetPosition(Viewport);
         _pan = _panAtStart + (p - _panStart);
         if (_vm is { PreviewFit: true } && Math.Abs(p.X - _panStart.X) + Math.Abs(p.Y - _panStart.Y) > 3)
@@ -459,6 +507,20 @@ public partial class MainWindow : Window, IDialogHost
         }
     }
 
+    /// <summary>Renders the preview as it is shown now (current view), at <paramref name="scale"/>x.</summary>
+    private RenderTargetBitmap RenderPreview(double scale)
+    {
+        var size = PreviewHost.Bounds.Size;
+        if (size.Width < 1 || size.Height < 1)
+            size = PreviewHost.DesiredSize;
+        int pxW = Math.Max(1, (int)Math.Ceiling(size.Width * scale));
+        int pxH = Math.Max(1, (int)Math.Ceiling(size.Height * scale));
+
+        var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96 * scale, 96 * scale));
+        rtb.Render(PreviewHost);
+        return rtb;
+    }
+
     private async void OnExportPreviewPngClick(object? sender, RoutedEventArgs e)
     {
         if (_vm == null) return;
@@ -468,20 +530,13 @@ public partial class MainWindow : Window, IDialogHost
 
         try
         {
-            const double scale = 2.0;
-            var size = PreviewHost.Bounds.Size;
-            if (size.Width < 1 || size.Height < 1)
-                size = PreviewHost.DesiredSize;
-            int pxW = Math.Max(1, (int)Math.Ceiling(size.Width * scale));
-            int pxH = Math.Max(1, (int)Math.Ceiling(size.Height * scale));
-
-            using var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96 * scale, 96 * scale));
-            rtb.Render(PreviewHost);
+            ClearInspectHover();
+            using var rtb = RenderPreview(2.0);
             using (var fs = File.Create(outPath))
             {
                 rtb.Save(fs, new PngBitmapEncoderOptions());
             }
-            _vm.SetStatus($"Saved preview screenshot to {Path.GetFileName(outPath)} ({pxW}x{pxH}).");
+            _vm.SetStatus($"Saved preview screenshot to {Path.GetFileName(outPath)} ({rtb.PixelSize.Width}x{rtb.PixelSize.Height}).");
         }
         catch (Exception ex)
         {
@@ -489,8 +544,131 @@ public partial class MainWindow : Window, IDialogHost
         }
     }
 
+    /// <summary>Copies the preview as an image so it can be pasted straight into Discord.</summary>
+    private async void OnCopyPreviewImageClick(object? sender, RoutedEventArgs e) => await CopyPreviewImageAsync();
+
+    private async Task CopyPreviewImageAsync()
+    {
+        if (_vm == null || Clipboard == null) return;
+        try
+        {
+            ClearInspectHover();
+            using var rtb = RenderPreview(2.0);
+            await Clipboard.SetBitmapAsync(rtb);
+            _vm.SetStatus("Preview image copied. Paste it with Ctrl+V.");
+        }
+        catch (Exception ex)
+        {
+            _vm.SetStatus($"Could not copy the preview image: {ex.Message}", isError: true);
+        }
+    }
+
+    /// <summary>
+    /// preview.png for saved and exported themes: the MONITOR view of the edited theme, rendered off
+    /// screen (see MainWindow.Thumbnails.cs), so the live preview is never switched or redrawn.
+    /// </summary>
+    public byte[]? RenderThumbnailPng() => _vm == null ? null : RenderThemeThumbnail(_vm.BuildState());
+
+    // ===================== FIND COLOUR (click an element in the preview) =====================
+
+    private bool IsInspecting(KeyModifiers modifiers) =>
+        InspectToggle.IsChecked == true || modifiers.HasFlag(KeyModifiers.Control);
+
+    private void OnInspectToggled(object? sender, RoutedEventArgs e)
+    {
+        bool on = InspectToggle.IsChecked == true;
+        if (!on) ClearInspectHover();
+        _vm?.SetStatus(on
+            ? "FIND COLOUR: click an element in the preview to jump to its colours. Esc to stop."
+            : "Ready.");
+    }
+
+    /// <summary>The innermost preview element under the pointer that a colour token is mapped to.</summary>
+    private (Control Element, string[] Keys)? FindTokenElement(object? source)
+    {
+        for (var v = source as Visual; v != null && v != Viewport; v = v.GetVisualParent())
+        {
+            if (v is not Control c) continue;
+            if (TokenLocations.TryGetTokensForElement(c.Name, out var keys))
+                return (c, keys);
+            if (c is Slider)
+                return (c, TokenLocations.SliderTokens);
+        }
+        return null;
+    }
+
+    private void UpdateInspectHover(PointerEventArgs e)
+    {
+        if (!IsInspecting(e.KeyModifiers))
+        {
+            ClearInspectHover();
+            return;
+        }
+        var hit = FindTokenElement(e.Source);
+        Preview.SetHoverTarget(hit?.Element);
+        Viewport.Cursor = hit != null ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
+    }
+
+    private void ClearInspectHover()
+    {
+        Preview.SetHoverTarget(null);
+        if (!_panning) Viewport.Cursor = Cursor.Default;
+    }
+
+    private async Task ShowTokensForElementAsync(Control element, string[] keys)
+    {
+        if (_vm == null) return;
+        var tokens = _vm.GetTokens(keys);
+        if (tokens.Count == 0) return;
+
+        Preview.Highlight([element]);
+        NavTabs.SelectedItem = ColoursTab;
+        string name = string.IsNullOrEmpty(element.Name) ? element.GetType().Name : element.Name;
+        _vm.SetStatus($"{name} uses: {string.Join(", ", tokens.Select(t => t.Label))}");
+
+        // Starts the flash (and clears a search that would hide these rows) before the scroll.
+        var flash = _vm.FlashTokensAsync(tokens);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+
+        string firstKey = tokens[0].Key;
+        var row = NavTabs.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.Classes.Contains("token-row") && Equals(b.Tag, firstKey));
+        // A little extra room above and below so the neighbouring rows are visible too.
+        row?.BringIntoView(new Rect(0, -60, row.Bounds.Width, row.Bounds.Height + 120));
+
+        await flash;
+    }
+
+    /// <summary>Asks to restore the recovery copy left by a crash. Returns true when it was restored.</summary>
+    private async Task<bool> OfferRecoveryAsync()
+    {
+        if (_vm?.Recovery?.Peek() is not { } info) return false;
+        string when = info.SavedAtUtc.ToLocalTime().ToString("g");
+        string where = info.OriginalFolder != null
+            ? $" (folder '{Path.GetFileName(info.OriginalFolder.TrimEnd('/', Path.DirectorySeparatorChar))}')"
+            : string.Empty;
+        bool? answer = await AskAsync("Restore unsaved theme",
+            $"The creator closed without saving '{info.ThemeName}'{where}. The last autosave is from {when}." + Environment.NewLine + Environment.NewLine
+            + "Restore it? Discard deletes the autosaved copy.",
+            "Restore", "Discard", danger: false);
+        switch (answer)
+        {
+            case true:
+                return _vm.RestoreRecovery();
+            case false:
+                _vm.Recovery.Clear();
+                _vm.SetStatus("The autosaved theme was discarded.");
+                return false;
+            default:
+                _vm.SetStatus("The autosaved theme is kept; you will be asked again at the next start.");
+                return false;
+        }
+    }
+
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        if (_vm != null && !_vm.IsDirty)
+            _vm.Recovery?.Clear(); // closing with everything saved
         if (_closeConfirmed || _vm == null || !_vm.IsDirty)
             return;
 
@@ -502,6 +680,7 @@ public partial class MainWindow : Window, IDialogHost
         {
             if (await ConfirmAsync("Unsaved changes", "The theme has unsaved changes. Close anyway?", "Close without saving"))
             {
+                _vm.Recovery?.Clear(); // closed without saving on purpose
                 _closeConfirmed = true;
                 Close();
             }
@@ -592,9 +771,16 @@ public partial class MainWindow : Window, IDialogHost
             await Clipboard.SetTextAsync(text);
     }
 
-    public async Task<bool> ConfirmAsync(string title, string message, string okText = "OK")
+    public async Task<bool> ConfirmAsync(string title, string message, string okText = "OK") =>
+        await AskAsync(title, message, okText, "Cancel", danger: !string.Equals(okText, "OK", StringComparison.OrdinalIgnoreCase)) == true;
+
+    /// <summary>
+    /// Dialog with two buttons. Returns true for <paramref name="okText"/>, false for
+    /// <paramref name="cancelText"/>, null when closed with X or Esc.
+    /// </summary>
+    private async Task<bool?> AskAsync(string title, string message, string okText, string cancelText, bool danger)
     {
-        bool result = false;
+        bool? result = null;
         var dialog = new Window
         {
             Title = title,
@@ -609,12 +795,11 @@ public partial class MainWindow : Window, IDialogHost
             Icon = Icon,
         };
 
-        bool danger = !string.Equals(okText, "OK", StringComparison.OrdinalIgnoreCase);
         var ok = new Button { Content = okText.ToUpperInvariant(), Classes = { danger ? "hud-red" : "hud-blue" }, MinWidth = 100, Padding = new Thickness(14, 6) };
-        var cancel = new Button { Content = "CANCEL", Classes = { "hud" }, MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var cancel = new Button { Content = cancelText.ToUpperInvariant(), Classes = { "hud" }, MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
         var close = new Button { Content = "X", Classes = { "win-btn", "win-close" } };
         ok.Click += (_, _) => { result = true; dialog.Close(); };
-        cancel.Click += (_, _) => dialog.Close();
+        cancel.Click += (_, _) => { result = false; dialog.Close(); };
         close.Click += (_, _) => dialog.Close();
 
         var titleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Background = Brushes.Transparent };

@@ -122,11 +122,11 @@ public sealed class CreatorUpdateService : ICreatorUpdateService
 
             info.Version = latestVersion;
 
-            bool isNewer = IsNewerVersion(latestVersion, currentVersion);
+            bool isDifferent = !string.Equals(latestVersion, (currentVersion ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
             bool isSkipped = !string.IsNullOrWhiteSpace(skippedVersion) &&
                              string.Equals(latestVersion, skippedVersion.Trim(), StringComparison.OrdinalIgnoreCase);
 
-            if (isNewer && !isSkipped)
+            if (isDifferent && !isSkipped)
             {
                 info.IsAvailable = true;
                 if (release.TryGetProperty("body", out var bodyProp))

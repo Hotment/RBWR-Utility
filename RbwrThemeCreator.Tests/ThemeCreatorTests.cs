@@ -88,7 +88,7 @@ public class ThemeCreatorTests : IDisposable
 
         var hoverBridge = BuiltInThemes.LoadPreviewHoverBridgeStyles();
         Assert.True(hoverBridge.Count >= 15);
-        Assert.Equal(5, BuiltInThemes.Presets.Count);
+        Assert.Equal(6, BuiltInThemes.Presets.Count);
         foreach (var preset in BuiltInThemes.Presets)
         {
             var s = preset.Create();
@@ -343,6 +343,369 @@ public class ThemeCreatorTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => ThemeImporter.Load(bigZip, BuiltInThemes.Cyberpunk));
     }
 
+    [Fact]
+    public void Exporter_WritesPreviewThumbnail_InFolderAndZip_AndImportStillWorks()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "thumb-theme";
+        state.Manifest.Name = "Thumb Theme";
+        string xaml = ThemeXamlGenerator.Generate(state);
+
+        string folder = Path.Combine(_tempDir, "thumb-theme");
+        Assert.Empty(ThemeExporter.WriteFolder(state, xaml, folder, TinyPng));
+        Assert.Equal(TinyPng, File.ReadAllBytes(Path.Combine(folder, ThemeExporter.PreviewFileName)));
+
+        string zip = Path.Combine(_tempDir, "thumb-theme.zip");
+        Assert.Empty(ThemeExporter.WriteZip(state, xaml, zip, TinyPng));
+        using (var archive = ZipFile.OpenRead(zip))
+            Assert.Contains(archive.Entries, e => e.FullName.Replace('\\', '/') == "thumb-theme/preview.png");
+
+        // The thumbnail must not show up as a theme asset when the theme is opened again.
+        var imported = ThemeImporter.Load(zip, BuiltInThemes.Cyberpunk);
+        Assert.DoesNotContain(imported.Assets, a => a.FileName == ThemeExporter.PreviewFileName);
+
+        // No thumbnail given: nothing is written.
+        string plain = Path.Combine(_tempDir, "plain-theme");
+        ThemeExporter.WriteFolder(state, xaml, plain);
+        Assert.False(File.Exists(Path.Combine(plain, ThemeExporter.PreviewFileName)));
+    }
+
+    [Fact]
+    public void Guide_EmbeddedGuideParses_AndEveryContentsLinkHasASection()
+    {
+        var blocks = GuideParser.Parse(GuideParser.LoadEmbedded());
+
+        Assert.IsType<GuideTitle>(blocks[0]);
+        var anchors = blocks.OfType<GuideSection>().Select(s => s.Anchor).ToHashSet();
+        Assert.Contains("14-keyboard-shortcuts", anchors); // F1 jumps here
+
+        // Contents list: every link must point at a real section.
+        int contents = blocks.ToList().FindIndex(b => b is GuideSection { Title: "Contents" });
+        var toc = Assert.IsType<GuideList>(blocks[contents + 1]);
+        Assert.True(toc.Numbered);
+        foreach (string item in toc.Items)
+        {
+            var link = Assert.Single(GuideParser.ParseInlines(item), i => i.Kind == GuideInlineKind.Link);
+            Assert.Contains(link.Target!.TrimStart('#'), anchors);
+        }
+        Assert.Equal(toc.Items.Count, anchors.Count - 1); // every numbered section is listed (minus "Contents")
+
+        // Tables keep their rows and drop the |---| separator.
+        var shortcuts = blocks.OfType<GuideTable>().Single(t => t.Header[0] == "Shortcut");
+        Assert.Contains(shortcuts.Rows, r => r[0] == "**Ctrl+S**" && r[1] == "Save");
+        Assert.DoesNotContain(shortcuts.Rows, r => r[0].StartsWith("---", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ShortcutGesture_ParsesFormatsAndChecksAllowedKeys()
+    {
+        Assert.True(ShortcutGesture.TryParse("Ctrl+Shift+S", out var save));
+        Assert.Equal(new ShortcutGesture(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.Control | Avalonia.Input.KeyModifiers.Shift), save);
+        Assert.Equal("Ctrl+Shift+S", save.ToString());
+
+        Assert.True(ShortcutGesture.TryParse("ctrl+1", out var one));
+        Assert.Equal("Ctrl+1", one.ToString());
+        // The number pad digit counts as the same shortcut.
+        Assert.Equal(one, ShortcutGesture.FromKeyPress(Avalonia.Input.Key.NumPad1, Avalonia.Input.KeyModifiers.Control));
+
+        Assert.True(ShortcutGesture.TryParse("F1", out var f1));
+        Assert.True(f1.IsAllowed);
+        Assert.True(save.IsAllowed);
+        // Plain letters would fire while typing a name: not allowed.
+        Assert.False(new ShortcutGesture(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.Shift).IsAllowed);
+        Assert.False(new ShortcutGesture(Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.None).IsAllowed);
+
+        Assert.False(ShortcutGesture.TryParse("", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+NotAKey", out _));
+        Assert.False(ShortcutGesture.TryParse("Ctrl+A+B", out _));
+
+        // Every default in the catalogue parses (or is empty = no shortcut) and is unique.
+        var defaults = ShortcutCatalog.All.Where(d => d.DefaultGesture.Length > 0).Select(d =>
+        {
+            Assert.True(ShortcutGesture.TryParse(d.DefaultGesture, out var g), d.Id);
+            return g;
+        }).ToList();
+        Assert.Equal(defaults.Count, defaults.Distinct().Count());
+    }
+
+    [Fact]
+    public void ShortcutMap_ChangesResolveConflictsAndReset()
+    {
+        var stored = new Dictionary<string, string>();
+        int saves = 0;
+        var map = new ShortcutMap(stored, () => saves++);
+        ShortcutGesture.TryParse("Ctrl+E", out var ctrlE);
+        ShortcutGesture.TryParse("Ctrl+K", out var ctrlK);
+
+        Assert.Equal("export-zip", map.FindAction(ctrlE));
+        Assert.Null(map.FindAction(ctrlK));
+
+        // Give Ctrl+E to "save": export loses it.
+        string? taken = map.Set("save", ctrlE);
+        Assert.Equal("export-zip", taken);
+        Assert.Equal("save", map.FindAction(ctrlE));
+        Assert.Null(map.Get("export-zip"));
+        Assert.Equal("Ctrl+E", stored["save"]);
+        Assert.Equal("", stored["export-zip"]);
+        Assert.True(saves > 0);
+
+        // Remove a shortcut, set a free one.
+        map.Set("search", null);
+        Assert.Null(map.Get("search"));
+        map.Set("find-colour", ctrlK);
+        Assert.Equal("find-colour", map.FindAction(ctrlK));
+
+        // Setting the default again stores nothing for it.
+        ShortcutGesture.TryParse("Ctrl+I", out var ctrlI);
+        map.Set("install", ctrlI);
+        Assert.False(map.IsCustom("install"));
+
+        // One reset back to default: export takes Ctrl+E back from "save".
+        map.ResetToDefault("export-zip");
+        Assert.Equal("export-zip", map.FindAction(ctrlE));
+        Assert.Null(map.Get("save"));
+
+        // Reset everything.
+        map.ResetAll();
+        Assert.Empty(stored);
+        ShortcutGesture.TryParse("Ctrl+S", out var ctrlS);
+        Assert.Equal("save", map.FindAction(ctrlS));
+        Assert.Equal("search", map.FindAction(ShortcutGesture.FromKeyPress(Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.Control)));
+    }
+
+    [Fact]
+    public void Guide_InlinesAndSlugs()
+    {
+        var parts = GuideParser.ParseInlines("Press **Ctrl+S**, type `#00f0ff`, pick *Dark* or see [section 5](#5-x).");
+        Assert.Equal(
+            [GuideInlineKind.Text, GuideInlineKind.Bold, GuideInlineKind.Text, GuideInlineKind.Code, GuideInlineKind.Text,
+             GuideInlineKind.Italic, GuideInlineKind.Text, GuideInlineKind.Link, GuideInlineKind.Text],
+            parts.Select(p => p.Kind));
+        Assert.Equal("#5-x", parts[7].Target);
+
+        Assert.Equal("5-picking-colours-from-the-screen-eyedropper", GuideParser.Slug("5. Picking colours from the screen (eyedropper)"));
+        Assert.Equal("8-shape-corners-borders-glow", GuideParser.Slug("8. Shape: corners, borders, glow"));
+    }
+
+    [Fact]
+    public void CustomThumbnail_IsMarkedOnSave_FoundOnOpen_AndRemovedWhenAuto()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "custom-thumb";
+        state.Manifest.Name = "Custom Thumb";
+        string xaml = ThemeXamlGenerator.Generate(state);
+        string folder = Path.Combine(_tempDir, "custom-thumb");
+        string marker = Path.Combine(folder, ThemeExporter.CustomPreviewMarker);
+        string preview = Path.Combine(folder, ThemeExporter.PreviewFileName);
+
+        // Saved with a custom thumbnail: preview.png + marker.
+        string custom = Path.Combine(_tempDir, "my-thumb.png");
+        File.WriteAllBytes(custom, TinyPng);
+        state.CustomPreviewPath = custom;
+        ThemeExporter.WriteFolder(state, xaml, folder, File.ReadAllBytes(custom));
+        Assert.True(File.Exists(marker));
+        Assert.Equal(TinyPng, File.ReadAllBytes(preview));
+
+        // Opening the folder again knows the thumbnail is custom.
+        var reopened = ThemeImporter.Load(folder, BuiltInThemes.Cyberpunk);
+        Assert.Equal(Path.GetFullPath(preview), reopened.CustomPreviewPath);
+        Assert.Equal(reopened.CustomPreviewPath, reopened.Clone().CustomPreviewPath);
+
+        // Back to automatic: the marker goes away, so the thumbnail is rendered again next time.
+        reopened.CustomPreviewPath = null;
+        ThemeExporter.WriteFolder(reopened, xaml, folder, TinyPng);
+        Assert.False(File.Exists(marker));
+        Assert.Null(ThemeImporter.Load(folder, BuiltInThemes.Cyberpunk).CustomPreviewPath);
+    }
+
+    [Fact]
+    public async Task Autosave_SurvivesACrash_RestoresIntoTheOriginalFolder_AndSaveClearsIt()
+    {
+        if (!CreatorSettings.Current.AutosaveEnabled) return; // turned off by the user on this PC
+
+        var store = new RecoveryStore(Path.Combine(_tempDir, "recovery"));
+        var seed = BuiltInThemes.Presets[0].Create();
+        seed.Manifest.Id = "crash-theme";
+        seed.Manifest.Name = "Crash Theme";
+        string folder = Path.Combine(_tempDir, "crash-theme");
+        ThemeExporter.WriteFolder(seed, ThemeXamlGenerator.Generate(seed), folder);
+
+        var vm = new MainViewModel { Recovery = store };
+        vm.OpenPath(folder);
+        Assert.False(vm.AutosaveNow()); // just opened, nothing changed: no copy
+        Assert.False(store.Exists);
+
+        vm.Description = "Changed before the crash";
+        vm.Refresh();
+        Assert.True(vm.AutosaveNow());
+        Assert.True(store.Exists);
+        var info = store.Peek();
+        Assert.NotNull(info);
+        Assert.Equal("Crash Theme", info!.ThemeName);
+        Assert.Equal(folder, info.OriginalFolder);
+
+        // "Crash": a brand-new editor restores the copy.
+        var after = new MainViewModel { Recovery = store };
+        Assert.True(after.RestoreRecovery());
+        Assert.Equal("Changed before the crash", after.Description);
+        Assert.Equal(folder, after.CurrentFolder);
+        Assert.True(after.IsDirty);
+
+        // Saving writes the changes to the original folder and removes the copy.
+        await after.SaveCommand.ExecuteAsync(null);
+        Assert.False(store.Exists);
+        Assert.Contains("Changed before the crash", File.ReadAllText(Path.Combine(folder, "theme.json")));
+    }
+
+    [Fact]
+    public void AnimatedTokens_AllAtOnceAndFlow_AreWrittenForEveryOverlayUsage_AndComeBackOnOpen()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "token-anim";
+        state.Manifest.Name = "Token Anim";
+        var red = Color.Parse("#ff0000");
+        var green = Color.Parse("#00ff00");
+        var blue = Color.Parse("#0000ff");
+        state.Tokens["CyberCardBg"] = state.Tokens["CyberCardBg"] with { Animation = new TokenAnimation([red, green, blue], Flow: true, Seconds: 5) };
+        state.Tokens["NeonCyan"] = state.Tokens["NeonCyan"] with { Animation = new TokenAnimation([red, blue], Flow: false, Seconds: 3) };
+
+        string xaml = ThemeXamlGenerator.Generate(state);
+
+        // Every style where the overlay uses the colour gets an animation.
+        foreach (var usage in TokenUsages.For("CyberCardBg").Concat(TokenUsages.For("NeonCyan")))
+            Assert.Contains($"<Style Selector=\"{System.Security.SecurityElement.Escape(ThemeXamlGenerator.SkipThemeCards(usage.Selector))}\">", xaml);
+        Assert.True(TokenUsages.For("CyberCardBg").Count >= 5);
+
+        // Flow: a gradient whose colours shift one place per frame (n + 1 frames, last = first).
+        var flow = ThemeXamlGenerator.TokenFrames(state.Tokens["CyberCardBg"], state.Tokens["CyberCardBg"].Animation!);
+        Assert.Equal(4, flow.Count);
+        Assert.All(flow, f => Assert.StartsWith("<LinearGradientBrush", f));
+        Assert.Equal(flow[0], flow[^1]);
+        Assert.NotEqual(flow[0], flow[1]);
+
+        // All at once: solid colours and back to the first.
+        var whole = ThemeXamlGenerator.TokenFrames(state.Tokens["NeonCyan"], state.Tokens["NeonCyan"].Animation!);
+        Assert.Equal(["#ff0000", "#0000ff", "#ff0000"], whole);
+
+        // Opening the theme again: same animations, nothing leaks into the custom styles, stable output.
+        var reopened = ThemeImporter.FromXaml(xaml, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        var card = reopened.Tokens["CyberCardBg"].Animation;
+        Assert.NotNull(card);
+        Assert.True(card!.Flow);
+        Assert.Equal([red, green, blue], card.Colors);
+        Assert.Equal(5, card.Seconds);
+        Assert.False(reopened.Tokens["NeonCyan"].Animation!.Flow);
+        Assert.Null(reopened.Tokens["CyberBorder"].Animation);
+        Assert.DoesNotContain("Style.Animations", reopened.CustomStyles);
+        Assert.Equal(xaml, ThemeXamlGenerator.Generate(reopened));
+
+        // Colours the overlay styles never use get no ANIMATE button (it would do nothing).
+        var vm = new MainViewModel();
+        var tokens = vm.Groups.SelectMany(g => g.Tokens).ToDictionary(t => t.Key);
+
+        // GRADIENT and ANIMATE are one or the other (ANIMATED needs Min. overlay 2.3.1+).
+        vm.MinAppVersion = MainViewModel.AnimatedColoursMinOverlay;
+        var cardRow = tokens["CyberCardBg"];
+        cardRow.IsGradient = true;
+        cardRow.IsAnimated = true;
+        Assert.False(cardRow.IsGradient);
+        Assert.Null(cardRow.ToValue().Gradient);
+        Assert.NotNull(cardRow.ToValue().Animation);
+        cardRow.IsGradient = true;
+        Assert.False(cardRow.IsAnimated);
+        Assert.Null(cardRow.ToValue().Animation);
+        Assert.NotNull(cardRow.ToValue().Gradient);
+        Assert.True(tokens["CyberCardBg"].SupportsAnimation);
+        Assert.False(tokens["NeonPurple"].SupportsAnimation);
+        Assert.False(tokens["TextLight"].SupportsAnimation); // no gradient, no animation
+    }
+
+    [Fact]
+    public void Animated_AutoRaisesMinOverlayTo231_AndMinOverlayCantGoLowerWhileAnimated()
+    {
+        Assert.True(MainViewModel.IsVersionAtLeast("2.3.1", "2.3.1"));
+        Assert.True(MainViewModel.IsVersionAtLeast("v2.4.0-dev", "2.3.1"));
+        Assert.False(MainViewModel.IsVersionAtLeast("2.3.0", "2.3.1"));
+        Assert.False(MainViewModel.IsVersionAtLeast("", "2.3.1"));
+
+        var vm = new MainViewModel();
+        var toasts = new List<string>();
+        vm.RequestWarningToast += (title, _) => toasts.Add(title);
+        var card = vm.Groups.SelectMany(g => g.Tokens).First(t => t.Key == "CyberCardBg");
+
+        // Min. overlay 2.3.0: choosing ANIMATED succeeds and auto-raises Min. overlay to 2.3.1 with a notice.
+        vm.MinAppVersion = "2.3.0";
+        Assert.True(card.AnimationAllowed);
+        card.FillMode = 2;
+        Assert.True(card.IsAnimated);
+        Assert.Equal("2.3.1", vm.MinAppVersion);
+        Assert.Contains("MIN. OVERLAY RAISED", toasts);
+        vm.Refresh();
+        Assert.True(vm.HasAnimatedColours);
+
+        // A higher version is fine; a lower one is refused while animated (checked via the guard).
+        vm.MinAppVersion = "2.5.0";
+        Assert.Equal("2.5.0", vm.MinAppVersion);
+        toasts.Clear();
+        vm.MinAppVersion = "2.3.0";
+        Assert.Contains("NOT POSSIBLE WITH ANIMATED COLOURS", toasts);
+
+        // Without animations any version is accepted.
+        card.FillMode = 0;
+        vm.MinAppVersion = "2.2.0";
+        vm.Refresh();
+        Assert.Equal("2.2.0", vm.MinAppVersion);
+    }
+
+    [Fact]
+    public void OldAnimatedColoursSection_IsDroppedOnOpen_NotKeptAsCustomStyles()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        string xaml = ThemeXamlGenerator.Generate(state);
+        // A theme saved by an earlier build that still had the "Animated colours" card.
+        string old = xaml.Replace("</Styles>", $$"""
+                {{ThemeXamlGenerator.AnimationBegin}}
+                <Style Selector="TextBlock.overlay-title">
+                    <Style.Animations>
+                        <Animation Duration="0:0:6" IterationCount="Infinite">
+                            <KeyFrame Cue="0%"><Setter Property="Foreground" Value="#ff0000" /></KeyFrame>
+                            <KeyFrame Cue="100%"><Setter Property="Foreground" Value="#0000ff" /></KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+                {{ThemeXamlGenerator.AnimationEnd}}
+            </Styles>
+            """);
+
+        var reopened = ThemeImporter.FromXaml(old, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        Assert.DoesNotContain("overlay-title", reopened.CustomStyles);
+        Assert.DoesNotContain("Style.Animations", ThemeXamlGenerator.Generate(reopened));
+    }
+
+    [Fact]
+    public void TokenSearch_FiltersByLabelKeyAndHex_AndClears()
+    {
+        var vm = new MainViewModel();
+        var all = vm.Groups.SelectMany(g => g.Tokens).ToList();
+
+        vm.TokenSearch = "slider thumb";
+        Assert.All(all, t => Assert.Equal(t.Key.StartsWith("SliderThumb", StringComparison.Ordinal), t.IsMatch));
+        Assert.Contains(vm.Groups, g => !g.HasMatches);
+        Assert.False(vm.HasNoSearchResults);
+
+        string hex = all.First(t => t.Key == "NeonCyan").HexText;
+        vm.TokenSearch = hex;
+        Assert.Contains(all, t => t.Key == "NeonCyan" && t.IsMatch);
+
+        vm.TokenSearch = "no-such-colour-xyz";
+        Assert.True(vm.HasNoSearchResults);
+
+        vm.ClearTokenSearchCommand.Execute(null);
+        Assert.All(all, t => Assert.True(t.IsMatch));
+        Assert.All(vm.Groups, g => Assert.True(g.HasMatches));
+    }
+
     // ==================== OverlayLocator & FontTools ====================
 
     [Fact]
@@ -514,9 +877,9 @@ public class ThemeCreatorTests : IDisposable
         Assert.StartsWith("RBWR_Theme_Creator_", update.FileName);
         Assert.NotEmpty(update.DownloadUrl);
 
-        // Already up to date (1.2.0 == 1.2.0) or newer dev build (1.3.0 > 1.2.0)
+        // Already up to date (1.2.0 == 1.2.0); a different version (including rollback from 1.3.0 -> 1.2.0) is offered
         Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.2.0", string.Empty).IsAvailable);
-        Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.3.0", string.Empty).IsAvailable);
+        Assert.True(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.3.0", string.Empty).IsAvailable);
 
         // Respects skippedVersion
         Assert.False(CreatorUpdateService.ParseLatestCreatorRelease(sampleReleasesJson, "1.0.0", "1.2.0").IsAvailable);
@@ -567,5 +930,164 @@ public class ThemeCreatorTests : IDisposable
         Assert.Equal("1.5.0", shown.Version);
         Assert.Equal(string.Empty, fake.LastSkippedVersion);
         Assert.Contains("1.5.0", vm.UpdateStatusText);
+    }
+
+    [Fact]
+    public void SkipThemeCards_AddsExclusionToEveryPart()
+    {
+        Assert.Equal("Border.hud-card:not(.theme-card)", ThemeXamlGenerator.SkipThemeCards("Border.hud-card"));
+        Assert.Equal("Button.cyber:not(.theme-card) /template/ ContentPresenter, Button.cyber-red:not(.theme-card)",
+            ThemeXamlGenerator.SkipThemeCards("Button.cyber /template/ ContentPresenter,Button.cyber-red"));
+    }
+
+    [Fact]
+    public void AuroraPreset_KeepsAnimationsAndNeedsOverlay231()
+    {
+        var s = BuiltInThemes.Presets.First(p => p.Name.StartsWith("Aurora", StringComparison.Ordinal)).Create();
+        Assert.Equal("2.3.1", s.Manifest.MinAppVersion);
+        Assert.NotNull(s.Tokens["CyberBorderGlow"].Animation);
+        Assert.True(s.Tokens.Values.Count(v => v.Animation != null) >= 3);
+    }
+
+    [Fact]
+    public void Fonts_PrependPreservesExistingList_AndHandlesSpacesInFamilyName()
+    {
+        var vm = new MainViewModel();
+        vm.FontFamily = "JetBrains Mono, Inter";
+
+        string fontPath = Path.Combine(_tempDir, "ShareTechMono-Regular.ttf");
+        File.WriteAllBytes(fontPath, [0x00, 0x01, 0x00, 0x00]);
+        var entry = new FontEntry("ShareTechMono-Regular.ttf", fontPath, "Share Tech Mono");
+        vm.Fonts.Add(entry);
+
+        vm.UseFontAsMainCommand.Execute(entry);
+        Assert.Equal("fonts/ShareTechMono-Regular.ttf#Share Tech Mono, JetBrains Mono, Inter", vm.FontFamily);
+
+        // Clicking again does not duplicate
+        vm.UseFontAsMainCommand.Execute(entry);
+        Assert.Equal("fonts/ShareTechMono-Regular.ttf#Share Tech Mono, JetBrains Mono, Inter", vm.FontFamily);
+
+        // Removing the font preserves the user's custom fallbacks
+        vm.RemoveFontCommand.Execute(entry);
+        Assert.Equal("JetBrains Mono, Inter", vm.FontFamily);
+
+        // Validator preserves full family name with spaces when rewriting to file:/// URI
+        string xaml = """
+        <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Styles.Resources>
+                <FontFamily x:Key="AppFontFamily">fonts/ShareTechMono-Regular.ttf#Share Tech Mono, Inter</FontFamily>
+            </Styles.Resources>
+        </Styles>
+        """;
+        string prepared = ThemeValidator.Prepare(xaml, rel => rel == "fonts/ShareTechMono-Regular.ttf" ? fontPath : null, out _);
+        Assert.Contains($"{new Uri(fontPath).AbsoluteUri}#Share Tech Mono, Inter", prepared);
+
+        // Unresolved relative font URI (e.g. mid-typing "comifonts/..." without a comma) is rejected cleanly before render
+        string brokenFontXaml = """
+        <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Styles.Resources>
+                <FontFamily x:Key="AppFontFamily">comifonts/ShareTechMono-Regular.ttf#Share Tech Mono, Inter</FontFamily>
+            </Styles.Resources>
+        </Styles>
+        """;
+        var parsedBroken = Avalonia.Markup.Xaml.AvaloniaRuntimeXamlLoader.Parse<Avalonia.Styling.Styles>(brokenFontXaml);
+        Assert.Throws<InvalidOperationException>(() => ThemeValidator.ValidateFontFamilies(parsedBroken));
+    }
+
+    private sealed class FakeCrashApiClient : RbwrOverlay.Core.Services.IApiClient
+    {
+        public string? SubmittedVersion { get; private set; }
+        public string? SubmittedTraceback { get; private set; }
+        public Task<List<RbwrOverlay.Core.Models.ServerInfo>> GetLatestServersAsync(CancellationToken ct = default) => Task.FromResult(new List<RbwrOverlay.Core.Models.ServerInfo>());
+        public Task<RbwrOverlay.Core.Models.ServerFetchResult> GetLatestServersDetailedAsync(CancellationToken ct = default) => Task.FromResult(RbwrOverlay.Core.Models.ServerFetchResult.Success([]));
+        public RbwrOverlay.Core.Models.ServerInfo? FindServerByIdOrJobId(IEnumerable<RbwrOverlay.Core.Models.ServerInfo> servers, string query) => null;
+        public Task<bool> SubmitSuggestionAsync(string name, string suggestion, bool anonymous, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> SubmitCrashReportAsync(string version, string traceback, string logData, string osInfo, CancellationToken ct = default)
+        {
+            SubmittedVersion = version;
+            SubmittedTraceback = traceback;
+            return Task.FromResult(true);
+        }
+        public Task<RbwrOverlay.Core.Models.UpdateInfo> CheckForUpdatesAsync(string currentVersion, string skippedVersion, CancellationToken ct = default) => Task.FromResult(new RbwrOverlay.Core.Models.UpdateInfo());
+        public Task DownloadUpdateAsync(string downloadUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task CreatorCrashHandler_FormatsWritesAndSubmitsReport()
+    {
+        string logPath = Path.Combine(_tempDir, "creator_test.log");
+        var logger = new RbwrOverlay.Core.Services.LoggingService(logPath, "RBWR Theme Creator");
+        logger.LogSystemInfo(MainViewModel.AppVersion);
+        Assert.True(File.Exists(logPath));
+        Assert.Contains("RBWR Theme Creator", logger.GetLogContent());
+
+        var ex = new InvalidOperationException("Boom in theme creator");
+        string details = CreatorCrashHandler.FormatExceptionDetails(ex, "Unit Test Context", logger);
+        Assert.Contains("RBWR THEME CREATOR CRASH", details);
+        Assert.Contains(MainViewModel.AppVersion, details);
+        Assert.Contains("Boom in theme creator", details);
+
+        string writtenPath = CreatorCrashHandler.WriteCrashReportFile(details, _tempDir);
+        Assert.True(File.Exists(writtenPath));
+        Assert.Equal(details, File.ReadAllText(writtenPath));
+
+        var fakeApi = new FakeCrashApiClient();
+        var vm = new CreatorCrashReportViewModel(details, writtenPath, fakeApi, logger);
+        await vm.SendReportAsync();
+        Assert.Equal(CreatorCrashHandler.ReportVersionTag, fakeApi.SubmittedVersion);
+        Assert.Equal(details, fakeApi.SubmittedTraceback);
+        Assert.Equal("Report sent.", vm.StatusText);
+    }
+
+    [Fact]
+    public void AprmBoxOverride_EmitsResourcesAndStyles_AndRoundTrips()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "aprm-box-test";
+        state.Manifest.Name = "APRM Box Test";
+
+        // Disabled by default: neither resources nor style rules are emitted.
+        string defaultXaml = ThemeXamlGenerator.Generate(state);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxBorderKey, defaultXaml);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxTextKey, defaultXaml);
+        Assert.DoesNotContain("Border#PowerBanner", defaultXaml);
+        Assert.DoesNotContain("TextBlock#MainPowerReadout", defaultXaml);
+
+        // Enable with distinct border and text colours.
+        state.AprmBox.Enabled = true;
+        state.AprmBox.BorderColor = Color.Parse("#ff8800");
+        state.AprmBox.TextColor = Color.Parse("#00ffcc");
+
+        var cloned = state.Clone();
+        Assert.True(cloned.AprmBox.Enabled);
+        Assert.Equal(Color.Parse("#ff8800"), cloned.AprmBox.BorderColor);
+        Assert.Equal(Color.Parse("#00ffcc"), cloned.AprmBox.TextColor);
+
+        string enabledXaml = ThemeXamlGenerator.Generate(state);
+        Assert.Contains($"x:Key=\"{ThemeXamlGenerator.AprmBoxBorderKey}\"", enabledXaml);
+        Assert.Contains($"x:Key=\"{ThemeXamlGenerator.AprmBoxTextKey}\"", enabledXaml);
+        Assert.Contains("Border#PowerBanner", enabledXaml);
+        Assert.Contains("TextBlock#MainPowerReadout", enabledXaml);
+
+        // Round-trip through importer: restores settings and does not leak into custom blocks.
+        var reopened = ThemeImporter.FromXaml(enabledXaml, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        Assert.True(reopened.AprmBox.Enabled);
+        Assert.Equal(Color.Parse("#ff8800"), reopened.AprmBox.BorderColor);
+        Assert.Equal(Color.Parse("#00ffcc"), reopened.AprmBox.TextColor);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxBorderKey, reopened.CustomResources);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxTextKey, reopened.CustomResources);
+        Assert.DoesNotContain("Border#PowerBanner", reopened.CustomStyles);
+        Assert.DoesNotContain("TextBlock#MainPowerReadout", reopened.CustomStyles);
+
+        // Reset to default resets APRM box override back to defaults.
+        var vm = new MainViewModel();
+        vm.AprmBoxEnabled = true;
+        vm.AprmBoxBorderColor = Color.Parse("#ff8800");
+        vm.AprmBoxTextColor = Color.Parse("#00ffcc");
+        vm.ResetColoursToBaseCommand.Execute(null);
+        var defaultAprm = new AprmBoxSettings();
+        Assert.Equal(defaultAprm.Enabled, vm.AprmBoxEnabled);
+        Assert.Equal(defaultAprm.BorderColor, vm.AprmBoxBorderColor);
+        Assert.Equal(defaultAprm.TextColor, vm.AprmBoxTextColor);
     }
 }

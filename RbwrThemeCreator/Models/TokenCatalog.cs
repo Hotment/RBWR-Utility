@@ -104,5 +104,5 @@ public static class TokenCatalog
     public const string MonoFontKey = "AppMonoFontFamily";
 
     /// <summary>Built-in overlay theme IDs that a custom theme may not use.</summary>
-    public static readonly IReadOnlyList<string> ReservedIds = ["default", "reactor-amber"];
+    public static readonly IReadOnlyList<string> ReservedIds = ["default", "reactor-amber", "aurora-drift"];
 }

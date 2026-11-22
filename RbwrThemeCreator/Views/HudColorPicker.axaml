@@ -3,7 +3,9 @@
              xmlns:primitives="using:Avalonia.Controls.Primitives"
              x:Class="RbwrThemeCreator.Views.HudColorPicker">
 
-    <!-- Swatch button + HUD styled flyout (spectrum, hue, alpha, hex, overlay palette). -->
+    <!-- Swatch button + HUD styled flyout (spectrum, hue, alpha, hex, overlay palette),
+         plus a one-click screen eyedropper next to the swatch. -->
+    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
     <Button x:Name="SwatchButton" Classes="swatch" ToolTip.Tip="Pick a colour">
         <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="hud-color">
@@ -24,12 +26,17 @@
                                                 IsAlphaVisible="True" Orientation="Horizontal" Height="18" />
                     </StackPanel>
 
-                    <Grid ColumnDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
                         <Border x:Name="PreviewChecker" Width="44" Height="30" CornerRadius="7" ClipToBounds="True"
                                 BorderBrush="{DynamicResource EdBorder}" BorderThickness="1">
                             <Border x:Name="PreviewFill" />
                         </Border>
                         <TextBox x:Name="HexBox" Grid.Column="1" Classes="hud hex" Margin="8,0,0,0" ToolTip.Tip="#rrggbb or #aarrggbb, press Enter" />
+                        <Button x:Name="EyedropperButton" Grid.Column="2" Classes="hud" Margin="6,0,0,0" Padding="7"
+                                ToolTip.Tip="Pick a colour from anywhere on screen (game, overlay, browser...)&#10;Click: pick · Right click / Esc: cancel · Arrows: move 1 px">
+                            <Path Width="14" Height="14" Stretch="Uniform" Fill="{DynamicResource EdCyan}"
+                                  Data="{StaticResource EyedropperIcon}" />
+                        </Button>
                     </Grid>
 
                     <StackPanel Spacing="6">
@@ -44,4 +51,9 @@
             <Border x:Name="SwatchFill" />
         </Border>
     </Button>
+    <Button x:Name="InlineEyedropperButton" Classes="dropper"
+            ToolTip.Tip="Pick this colour from anywhere on screen&#10;Click: pick · Right click / Esc: cancel · Arrows: move 1 px">
+        <Path Width="12" Height="12" Stretch="Uniform" Fill="{DynamicResource EdCyan}" Data="{StaticResource EyedropperIcon}" />
+    </Button>
+    </StackPanel>
 </UserControl>

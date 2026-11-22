@@ -42,7 +42,9 @@
 
   <ItemGroup>
     <Folder Include="Models\" />
-    <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\BuiltInThemes\**" />
+    <!-- Built-in Theme Creator themes (Aurora Drift): plain XAML text, loaded like a custom theme. -->
+    <EmbeddedResource Include="Assets\BuiltInThemes\*.theme" LogicalName="RbwrOverlay.BuiltInThemes.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

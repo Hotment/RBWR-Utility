@@ -60,7 +60,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
-    private bool _demandChangeNotified;
+    private readonly HashSet<int> _triggeredDemandNotifications = new();
     private double? _lastNotifiedNextDemand;
     private const long RbwrPlaceId = RobloxLogReader.RbwrPlaceId;
 
@@ -129,7 +129,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private double _thermalPowerPercent;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PowerBannerBorderBrush))]
+    [NotifyPropertyChangedFor(nameof(PowerBannerTextBrush))]
     private IBrush _mainPowerBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+
+    public IBrush PowerBannerBorderBrush => ThemeService.TryResolveBrush("PowerBannerBorder") ?? MainPowerBrush;
+    public IBrush PowerBannerTextBrush => ThemeService.TryResolveBrush("PowerBannerText") ?? MainPowerBrush;
 
     [ObservableProperty]
     private IBrush _powerBarBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
@@ -363,7 +368,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _enableDemandChangeNotification = true;
 
     [ObservableProperty]
-    private string _demandNotifySecondsInput = "300";
+    private string _demandNotifyNewTimeInput = string.Empty;
+
+    public ObservableCollection<int> DemandNotifyTriggerTimes { get; } = new();
+    public bool HasDemandNotifyTriggerTimes => DemandNotifyTriggerTimes.Count > 0;
 
     [ObservableProperty]
     private string _demandNotifyStatusText = "ENABLED";
@@ -511,7 +519,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         _enableTurbineHealthAlert = _settings.EnableTurbineHealthAlert;
         _turbineHealthThresholdInput = ((int)_settings.TurbineHealthThreshold).ToString();
         _enableDemandChangeNotification = _settings.EnableDemandChangeNotification;
-        _demandNotifySecondsInput = _settings.DemandChangeNotificationSeconds.ToString();
+        SyncDemandNotifyTriggerTimesFromSettings();
         _showTooltips = _settings.ShowTooltips;
         TooltipCatalog.SetEnabled(_showTooltips);
         _enableDiscordPresence = _settings.EnableDiscordPresence;
@@ -1509,35 +1517,53 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         CompactServerDtlText = formatDemand(nextDem, true);
         UpdateCompactCounterDisplay(liveDtl, nextDem);
 
-        int notifySec = _settings.DemandChangeNotificationSeconds;
-        if (_demandChangeNotified)
+        if (_triggeredDemandNotifications.Count > 0)
         {
-            if (liveDtl > notifySec || (nextDem.HasValue && _lastNotifiedNextDemand.HasValue && nextDem.Value != _lastNotifiedNextDemand.Value))
+            if (nextDem.HasValue && _lastNotifiedNextDemand.HasValue && nextDem.Value != _lastNotifiedNextDemand.Value)
             {
-                _demandChangeNotified = false;
+                _triggeredDemandNotifications.Clear();
+            }
+            else
+            {
+                _triggeredDemandNotifications.RemoveWhere(t => liveDtl > t + 2.0);
             }
         }
 
-        if (_settings.EnableDemandChangeNotification && notifySec > 0 && liveDtl > 0.0 && liveDtl <= notifySec && !_demandChangeNotified && nextDem.HasValue)
+        if (_settings.EnableDemandChangeNotification && DemandNotifyTriggerTimes.Count > 0 && liveDtl > 0.0 && nextDem.HasValue)
         {
-            _demandChangeNotified = true;
-            _lastNotifiedNextDemand = nextDem.Value;
-
-            int secsLeft = Math.Max(1, (int)Math.Ceiling(liveDtl));
-            string timeFormatted = $"{secsLeft / 60:D2}:{secsLeft % 60:D2}";
-            string unitLabel = _calc.SelectedUnit == 1 ? "Unit 1" : "Unit 2";
-            string nextLabel = formatDemand(nextDem, false);
-            string curLabel = formatDemand(uState?.Demand, false);
-
-            if (OperatingSystem.IsWindows())
+            List<int>? newlyCrossed = null;
+            foreach (int triggerSec in DemandNotifyTriggerTimes)
             {
-                try { MessageBeep(0x00000040); } catch { }
+                double windowFloor = Math.Max(0.0, triggerSec - 10.0);
+                if (triggerSec > 0 && liveDtl <= triggerSec && liveDtl > windowFloor && !_triggeredDemandNotifications.Contains(triggerSec))
+                {
+                    newlyCrossed ??= new List<int>();
+                    newlyCrossed.Add(triggerSec);
+                }
             }
 
-            RequestShowMessage?.Invoke(
-                "UPCOMING DEMAND CHANGE",
-                $"{unitLabel} demand changes to {nextLabel} in {timeFormatted} ({secsLeft}s).\nCurrent Demand: {curLabel}.",
-                false);
+            if (newlyCrossed is { Count: > 0 })
+            {
+                foreach (int t in newlyCrossed)
+                    _triggeredDemandNotifications.Add(t);
+                _lastNotifiedNextDemand = nextDem.Value;
+
+                int secsLeft = Math.Max(1, (int)Math.Ceiling(liveDtl));
+                string timeFormatted = $"{secsLeft / 60:D2}:{secsLeft % 60:D2}";
+                string unitLabel = _calc.SelectedUnit == 1 ? "Unit 1" : "Unit 2";
+                string nextLabel = formatDemand(nextDem, false);
+                string curLabel = formatDemand(uState?.Demand, false);
+
+                if (OperatingSystem.IsWindows())
+                {
+                    try { MessageBeep(0x00000040); } catch { }
+                }
+
+                RequestShowMessage?.Invoke(
+                    "UPCOMING DEMAND CHANGE",
+                    $"{unitLabel} demand changes to {nextLabel} in {timeFormatted} ({secsLeft}s).\nCurrent Demand: {curLabel}.",
+                    false);
+            }
         }
 
         int thresh = _settings.NextDemandThresholdSeconds;
@@ -1652,19 +1678,50 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         EnableDemandChangeNotification = !EnableDemandChangeNotification;
         _settings.EnableDemandChangeNotification = EnableDemandChangeNotification;
         if (!EnableDemandChangeNotification)
-            _demandChangeNotified = false;
+            _triggeredDemandNotifications.Clear();
         UpdateSettingsVisuals();
         _settingsService.SaveSettings(_settings);
     }
 
-    partial void OnDemandNotifySecondsInputChanged(string value)
+    [RelayCommand]
+    public void AddDemandNotifyTime()
     {
-        if (int.TryParse(value, out int sec))
+        if (!int.TryParse(DemandNotifyNewTimeInput?.Trim(), out int sec))
+            return;
+        sec = Math.Clamp(sec, 1, 3600);
+        if (!DemandNotifyTriggerTimes.Contains(sec))
         {
-            _settings.DemandChangeNotificationSeconds = Math.Clamp(sec, 1, 3600);
-            _demandChangeNotified = false;
+            _settings.DemandChangeNotificationTimes ??= new List<int>();
+            if (!_settings.DemandChangeNotificationTimes.Contains(sec))
+                _settings.DemandChangeNotificationTimes.Add(sec);
+            SyncDemandNotifyTriggerTimesFromSettings();
             _settingsService.SaveSettings(_settings);
         }
+        DemandNotifyNewTimeInput = string.Empty;
+    }
+
+    [RelayCommand]
+    public void RemoveDemandNotifyTime(int sec)
+    {
+        _settings.DemandChangeNotificationTimes?.Remove(sec);
+        _triggeredDemandNotifications.Remove(sec);
+        SyncDemandNotifyTriggerTimesFromSettings();
+        _settingsService.SaveSettings(_settings);
+    }
+
+    private void SyncDemandNotifyTriggerTimesFromSettings()
+    {
+        var normalized = (_settings.DemandChangeNotificationTimes ?? new List<int>())
+            .Where(t => t >= 1 && t <= 3600)
+            .Distinct()
+            .OrderByDescending(t => t)
+            .ToList();
+        _settings.DemandChangeNotificationTimes = normalized;
+
+        DemandNotifyTriggerTimes.Clear();
+        foreach (int t in normalized)
+            DemandNotifyTriggerTimes.Add(t);
+        OnPropertyChanged(nameof(HasDemandNotifyTriggerTimes));
     }
 
     partial void OnDemandThresholdSecondsInputChanged(string value)
@@ -2061,7 +2118,11 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             var result = _themeService.ApplyTheme(_settings.SelectedThemeId);
             if (!result.Success)
             {
-                SetThemeStatus($"Saved theme '{_settings.SelectedThemeId}' failed: {result.ErrorMessage}", isError: true);
+                bool tooNew = result.ErrorMessage?.Contains("needs overlay v", StringComparison.Ordinal) == true;
+                SetThemeStatus(tooNew
+                        ? $"{result.ErrorMessage} Using the default theme for now."
+                        : $"Saved theme '{_settings.SelectedThemeId}' failed: {result.ErrorMessage}",
+                    isError: !tooNew, isWarning: tooNew);
                 _themeService.ApplyTheme(ThemeService.DefaultThemeId);
                 _settings.SelectedThemeId = ThemeService.DefaultThemeId;
                 _settingsService.SaveSettings(_settings);
@@ -2191,6 +2252,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             MainPowerBrush = cyan;
             PowerBarBrush = cyan;
         }
+        OnPropertyChanged(nameof(PowerBannerBorderBrush));
+        OnPropertyChanged(nameof(PowerBannerTextBrush));
 
         ConnectionStatusBrush = ConnectionStatusText switch
         {

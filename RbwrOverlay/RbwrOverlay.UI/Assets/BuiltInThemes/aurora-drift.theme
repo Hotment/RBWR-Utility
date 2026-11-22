@@ -1,0 +1,851 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+      Aurora Drift v1.0.0 by Uranium-q2
+      Generated with RBWR Theme Creator. You can reopen this folder in the creator,
+      or edit by hand: keep the @creator markers so the creator can read your changes back.
+    -->
+
+    <Styles.Resources>
+        <FontFamily x:Key="AppFontFamily">Consolas, &apos;Segoe UI&apos;, Inter, monospace</FontFamily>
+        <FontFamily x:Key="AppMonoFontFamily">Consolas, monospace</FontFamily>
+
+        <Color x:Key="CyberMainColor">#0a0d22</Color>
+        <Color x:Key="CyberCardColor">#0a1f2a</Color>
+        <Color x:Key="CyberHeaderColor">#0d162d</Color>
+        <Color x:Key="CyberBorderColor">#1e3a4a</Color>
+        <Color x:Key="CyberBorderGlowColor">#2fffd0</Color>
+        <Color x:Key="NeonCyanColor">#3ff5e0</Color>
+        <Color x:Key="NeonGreenColor">#48ffa0</Color>
+        <Color x:Key="NeonRedColor">#ff5f8a</Color>
+        <Color x:Key="NeonGoldColor">#ffd36e</Color>
+        <Color x:Key="NeonPurpleColor">#b07cff</Color>
+        <Color x:Key="TextLightColor">#e8f6ff</Color>
+        <Color x:Key="TextMutedColor">#8ca3c0</Color>
+
+        <LinearGradientBrush x:Key="CyberMainBg" StartPoint="97%,32.9%" EndPoint="3%,67.1%">
+            <GradientStop Offset="0" Color="#070b1a" />
+            <GradientStop Offset="0.333" Color="#070b1a" />
+            <GradientStop Offset="0.667" Color="#0b1430" />
+            <GradientStop Offset="1" Color="#120a26" />
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="CyberCardBg" Color="#0a1f2a" />
+        <LinearGradientBrush x:Key="CyberHeaderBg" StartPoint="50%,0%" EndPoint="50%,100%">
+            <GradientStop Offset="0" Color="#0a1a2c" />
+            <GradientStop Offset="0.5" Color="#0a1a2c" />
+            <GradientStop Offset="1" Color="#150f30" />
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="DarkPanelBg" Color="#090e1e" />
+        <SolidColorBrush x:Key="CyberBorder" Color="#1e3a4a" />
+        <SolidColorBrush x:Key="CyberBorderGlow" Color="#2fffd0" />
+
+        <SolidColorBrush x:Key="NeonCyan" Color="#3ff5e0" />
+        <SolidColorBrush x:Key="NeonGreen" Color="#48ffa0" />
+        <SolidColorBrush x:Key="NeonRed" Color="#ff5f8a" />
+        <SolidColorBrush x:Key="NeonGold" Color="#ffd36e" />
+        <SolidColorBrush x:Key="NeonPurple" Color="#b07cff" />
+
+        <SolidColorBrush x:Key="TextLight" Color="#e8f6ff" />
+        <SolidColorBrush x:Key="TextMuted" Color="#8ca3c0" />
+
+        <SolidColorBrush x:Key="ControlHoverBg" Color="#192338" />
+        <SolidColorBrush x:Key="ControlActiveBg" Color="#141f33" />
+        <SolidColorBrush x:Key="ControlPressedBg" Color="#0e1726" />
+        <SolidColorBrush x:Key="TextBoxFocusBg" Color="#131b2e" />
+
+        <SolidColorBrush x:Key="TooltipBg" Color="#f5080d18" />
+        <SolidColorBrush x:Key="TooltipBorder" Color="#8800f0ff" />
+        <SolidColorBrush x:Key="TooltipBodyBrush" Color="#dce6f5" />
+
+        <SolidColorBrush x:Key="SliderTrackFill" Color="#1b253b" />
+        <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#243352" />
+        <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#243352" />
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="#00f0ff" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#33f3ff" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#00c4d4" />
+        <SolidColorBrush x:Key="SliderThumbBackground" Color="#00f0ff" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#5ff5ff" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#a0faff" />
+
+        <!-- @creator:custom-resources-begin -->
+        <!-- @creator:custom-resources-end -->
+    </Styles.Resources>
+
+    <!-- @creator:custom-begin -->
+    <!-- @creator:custom-end -->
+
+    <!-- @creator:shape-begin -->
+    <!-- @creator:shape-end -->
+
+    <!-- @creator:token-animations-begin -->
+    <!-- @creator:token-animations {"CyberCardBg":{"Colors":["#0a1f2a","#140e2e","#0c1830","#1a0f28"],"Flow":true,"Seconds":12,"Angle":120},"CyberBorderGlow":{"Colors":["#2fffd0","#7a5cff","#ff5fcb","#3fa9ff"],"Flow":true,"Seconds":6,"Angle":90},"NeonCyan":{"Colors":["#3ff5e0","#8c7cff","#5fd0ff"],"Flow":false,"Seconds":5,"Angle":0},"NeonGreen":{"Colors":["#48ffa0","#2fffd0"],"Flow":false,"Seconds":7,"Angle":0}} -->
+    <!-- CyberCardBg -->
+    <Style Selector="Border.hud-card:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-blue:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-green:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-gold:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-red:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="TextBox.cyber:not(.theme-card)">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ComboBox.cyber:not(.theme-card) /template/ Border#PopupBorder">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:12" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#140e2e" /><GradientStop Offset="0.25" Color="#0c1830" /><GradientStop Offset="0.5" Color="#1a0f28" /><GradientStop Offset="0.75" Color="#0a1f2a" /><GradientStop Offset="1" Color="#140e2e" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0c1830" /><GradientStop Offset="0.25" Color="#1a0f28" /><GradientStop Offset="0.5" Color="#0a1f2a" /><GradientStop Offset="0.75" Color="#140e2e" /><GradientStop Offset="1" Color="#0c1830" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#1a0f28" /><GradientStop Offset="0.25" Color="#0a1f2a" /><GradientStop Offset="0.5" Color="#140e2e" /><GradientStop Offset="0.75" Color="#0c1830" /><GradientStop Offset="1" Color="#1a0f28" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background">
+                        <LinearGradientBrush StartPoint="75%,6.7%" EndPoint="25%,93.3%"><GradientStop Offset="0" Color="#0a1f2a" /><GradientStop Offset="0.25" Color="#140e2e" /><GradientStop Offset="0.5" Color="#0c1830" /><GradientStop Offset="0.75" Color="#1a0f28" /><GradientStop Offset="1" Color="#0a1f2a" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <!-- CyberBorderGlow -->
+    <Style Selector="Border.overlay-shell:not(.theme-card)">
+        <Setter Property="BorderBrush">
+            <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#2fffd0" /><GradientStop Offset="0.25" Color="#7a5cff" /><GradientStop Offset="0.5" Color="#ff5fcb" /><GradientStop Offset="0.75" Color="#3fa9ff" /><GradientStop Offset="1" Color="#2fffd0" /></LinearGradientBrush>
+        </Setter>
+        <Style.Animations>
+            <Animation Duration="00:00:06" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush">
+                        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#2fffd0" /><GradientStop Offset="0.25" Color="#7a5cff" /><GradientStop Offset="0.5" Color="#ff5fcb" /><GradientStop Offset="0.75" Color="#3fa9ff" /><GradientStop Offset="1" Color="#2fffd0" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="25%">
+                    <Setter Property="BorderBrush">
+                        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#7a5cff" /><GradientStop Offset="0.25" Color="#ff5fcb" /><GradientStop Offset="0.5" Color="#3fa9ff" /><GradientStop Offset="0.75" Color="#2fffd0" /><GradientStop Offset="1" Color="#7a5cff" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="BorderBrush">
+                        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#ff5fcb" /><GradientStop Offset="0.25" Color="#3fa9ff" /><GradientStop Offset="0.5" Color="#2fffd0" /><GradientStop Offset="0.75" Color="#7a5cff" /><GradientStop Offset="1" Color="#ff5fcb" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="75%">
+                    <Setter Property="BorderBrush">
+                        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#3fa9ff" /><GradientStop Offset="0.25" Color="#2fffd0" /><GradientStop Offset="0.5" Color="#7a5cff" /><GradientStop Offset="0.75" Color="#ff5fcb" /><GradientStop Offset="1" Color="#3fa9ff" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush">
+                        <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%"><GradientStop Offset="0" Color="#2fffd0" /><GradientStop Offset="0.25" Color="#7a5cff" /><GradientStop Offset="0.5" Color="#ff5fcb" /><GradientStop Offset="0.75" Color="#3fa9ff" /><GradientStop Offset="1" Color="#2fffd0" /></LinearGradientBrush>
+                    </Setter>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <!-- NeonCyan -->
+    <Style Selector="Border.compact-shell:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-nav.active:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber:pointerover:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber.active:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-blue:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-blue:pointerover:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-header-btn:pointerover:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-preset:pointerover:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-preset.active:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-tick:pointerover:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-tick.active:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="TextBox.cyber:not(.theme-card)">
+        <Setter Property="CaretBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="CaretBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="CaretBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="CaretBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="CaretBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="TextBox.cyber:focus:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ComboBox.cyber:pointerover:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ComboBox.cyber:not(.theme-card) /template/ Border#PopupBorder">
+        <Setter Property="BorderBrush" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="BorderBrush" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="BorderBrush" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ComboBox.cyber ComboBoxItem:pointerover:not(.theme-card) /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ComboBox.cyber ComboBoxItem:selected:not(.theme-card) /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ScrollBar:vertical:not(.theme-card) /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Background" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Background" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ScrollBar:vertical:not(.theme-card) /template/ Thumb:pressed">
+        <Setter Property="Background" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Background" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Background" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Background" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Background" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="ProgressBar.cyber-power:not(.theme-card)">
+        <Setter Property="Foreground" Value="#3ff5e0" />
+        <Style.Animations>
+            <Animation Duration="00:00:05" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+                <KeyFrame Cue="33.333%">
+                    <Setter Property="Foreground" Value="#8c7cff" />
+                </KeyFrame>
+                <KeyFrame Cue="66.667%">
+                    <Setter Property="Foreground" Value="#5fd0ff" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#3ff5e0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <!-- NeonGreen -->
+    <Style Selector="Button.cyber-green:not(.theme-card)">
+        <Setter Property="Foreground" Value="#48ffa0" />
+        <Style.Animations>
+            <Animation Duration="00:00:07" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Foreground" Value="#48ffa0" />
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Foreground" Value="#2fffd0" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Foreground" Value="#48ffa0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector="Button.cyber-green:pointerover:not(.theme-card)">
+        <Setter Property="BorderBrush" Value="#48ffa0" />
+        <Style.Animations>
+            <Animation Duration="00:00:07" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="BorderBrush" Value="#48ffa0" />
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="BorderBrush" Value="#2fffd0" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="BorderBrush" Value="#48ffa0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <!-- @creator:token-animations-end -->
+
+</Styles>

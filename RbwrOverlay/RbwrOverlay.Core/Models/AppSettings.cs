@@ -64,8 +64,8 @@ public class AppSettings
     [JsonPropertyName("enable_demand_change_notification")]
     public bool EnableDemandChangeNotification { get; set; } = true;
 
-    [JsonPropertyName("demand_change_notification_seconds")]
-    public int DemandChangeNotificationSeconds { get; set; } = 300;
+    [JsonPropertyName("demand_change_notification_times")]
+    public List<int> DemandChangeNotificationTimes { get; set; } = new() { 300 };
 
     [JsonPropertyName("show_tooltips")]
     public bool ShowTooltips { get; set; } = true;

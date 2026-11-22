@@ -93,6 +93,11 @@ public partial class HudColorPicker : UserControl
         };
         HexBox.LostFocus += (_, _) => ApplyHex();
 
+        EyedropperButton.IsVisible = OperatingSystem.IsWindows();
+        EyedropperButton.Click += async (_, _) => await PickFromScreenAsync(fromFlyout: true);
+        InlineEyedropperButton.IsVisible = OperatingSystem.IsWindows();
+        InlineEyedropperButton.Click += async (_, _) => await PickFromScreenAsync(fromFlyout: false);
+
         SetFromColor(Color);
         AlphaPanel.IsVisible = IsAlphaEnabled;
     }
@@ -154,6 +159,25 @@ public partial class HudColorPicker : UserControl
         {
             _updating = wasUpdating;
         }
+    }
+
+    /// <summary>
+    /// Lets the user pick a pixel anywhere on screen. When started from the flyout, the flyout is
+    /// hidden so it does not cover the screen and reopened with the result afterwards. The current
+    /// opacity is kept, like the palette swatches.
+    /// </summary>
+    private async Task PickFromScreenAsync(bool fromFlyout)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var flyout = fromFlyout ? SwatchButton.Flyout : null;
+        flyout?.Hide();
+
+        var picked = await EyedropperSession.PickAsync();
+        if (picked is { } c)
+            Color = IsAlphaEnabled ? Avalonia.Media.Color.FromArgb(Color.A, c.R, c.G, c.B) : c;
+
+        flyout?.ShowAt(SwatchButton);
     }
 
     private void ApplyHex()

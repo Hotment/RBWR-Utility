@@ -140,9 +140,15 @@
         <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
         <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
     </Style>
+    <Style Selector="Button.cyber-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
     <Style Selector="Button.cyber-nav.active">
         <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
         <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="Button.cyber-nav.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
     </Style>
 

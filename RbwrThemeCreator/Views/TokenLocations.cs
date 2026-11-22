@@ -22,8 +22,8 @@ public static class TokenLocations
         ["CyberBorder"] = (Monitor, [.. MetricCards, "NavBar", "DemandPresetCard"]),
         ["CyberBorderGlow"] = (Monitor, ["DetailedShell"]),
 
-        ["NeonCyan"] = (Monitor, ["OverlayTitle", "NavMonitorTab", "Unit1Button", "GenLoadValue"]),
-        ["NeonGreen"] = (Monitor, ["SyncBadge", "PowerBanner"]),
+        ["NeonCyan"] = (Monitor, ["OverlayTitle", "NavMonitorTab", "Unit1Button", "PowerBanner", "GenLoadValue"]),
+        ["NeonGreen"] = (Monitor, ["SyncBadge"]),
         ["NeonRed"] = (Config, ["ResetButton"]),
         ["NeonGold"] = (Monitor, ["FlowValue", "DtlText"]),
         ["NeonPurple"] = (Config, ["SpecialText"]),
@@ -50,6 +50,27 @@ public static class TokenLocations
         ["SliderThumbBackgroundPointerOver"] = (Monitor, Slider),
         ["SliderThumbBackgroundPressed"] = (Monitor, Slider),
     };
+
+    /// <summary>Reverse map: preview element name -> tokens that colour it (catalogue order).</summary>
+    private static readonly Dictionary<string, string[]> ByElement = Map
+        .SelectMany(kv => kv.Value.Names.Select(name => (Name: name, Key: kv.Key)))
+        .GroupBy(x => x.Name, StringComparer.Ordinal)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.Key).Distinct().ToArray(), StringComparer.Ordinal);
+
+    /// <summary>Slider tokens, used when the user clicks any slider in the preview.</summary>
+    public static readonly string[] SliderTokens = Map.Keys.Where(k => k.StartsWith("Slider", StringComparison.Ordinal)).ToArray();
+
+    /// <summary>Tokens that colour the named preview element (used by "click an element to find its colour").</summary>
+    public static bool TryGetTokensForElement(string? elementName, out string[] keys)
+    {
+        if (!string.IsNullOrEmpty(elementName) && ByElement.TryGetValue(elementName, out var found))
+        {
+            keys = found;
+            return true;
+        }
+        keys = [];
+        return false;
+    }
 
     public static bool TryGet(string key, out int mode, out string[] names)
     {

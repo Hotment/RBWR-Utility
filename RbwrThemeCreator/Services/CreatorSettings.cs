@@ -13,6 +13,41 @@ public sealed class CreatorSettings
     public int PreviewMode { get; set; }
     public string SkippedVersion { get; set; } = string.Empty;
 
+    /// <summary>Theme folders opened or saved recently, newest first (THEME tab → Recent themes).</summary>
+    public List<string> RecentThemes { get; set; } = new();
+
+    // ---------- SETTINGS tab ----------
+    /// <summary>Author put into new themes. Empty = the last author a theme was saved with.</summary>
+    public string DefaultAuthor { get; set; } = string.Empty;
+
+    /// <summary>The author a new theme starts with.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string AuthorForNewThemes => string.IsNullOrWhiteSpace(DefaultAuthor) ? LastAuthor : DefaultAuthor.Trim();
+
+    /// <summary>Open the most recent theme folder when the creator starts.</summary>
+    public bool OpenLastThemeAtStart { get; set; }
+
+    /// <summary>Create missing preview.png thumbnails (installed themes at start-up, opened themes).</summary>
+    public bool AutoCreateThumbnails { get; set; } = true;
+
+    /// <summary>Keep a recovery copy of unsaved work every 30 s (restored after a crash).</summary>
+    public bool AutosaveEnabled { get; set; } = true;
+
+    /// <summary>Look for a new creator version when it starts.</summary>
+    public bool CheckUpdatesAtStart { get; set; } = true;
+
+    /// <summary>COLOURS tab: show the gradient tip box.</summary>
+    public bool ShowGradientTip { get; set; } = true;
+
+    /// <summary>COLOURS tab: show the contrast check box.</summary>
+    public bool ShowContrastCheck { get; set; } = true;
+
+    /// <summary>Changed keyboard shortcuts: action id -> gesture ("" = none). Missing = default.</summary>
+    public Dictionary<string, string> Shortcuts { get; set; } = new();
+
+    /// <summary>Folder that holds settings.json (SETTINGS → Open settings folder).</summary>
+    public static string FolderPath => Path.GetDirectoryName(SettingsPath)!;
+
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RbwrThemeCreator", "settings.json");
 

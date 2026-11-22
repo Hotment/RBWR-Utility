@@ -13,10 +13,24 @@ public static class ThemeXamlGenerator
 {
     public const string ShapeBegin = "<!-- @creator:shape-begin -->";
     public const string ShapeEnd = "<!-- @creator:shape-end -->";
+    public const string AprmBoxBegin = "<!-- @creator:aprm-box-begin -->";
+    public const string AprmBoxEnd = "<!-- @creator:aprm-box-end -->";
+    public const string AprmBoxBorderKey = "PowerBannerBorder";
+    public const string AprmBoxTextKey = "PowerBannerText";
     public const string ResourcesBegin = "<!-- @creator:custom-resources-begin -->";
     public const string ResourcesEnd = "<!-- @creator:custom-resources-end -->";
     public const string CustomBegin = "<!-- @creator:custom-begin -->";
     public const string CustomEnd = "<!-- @creator:custom-end -->";
+    public const string TokenAnimationsBegin = "<!-- @creator:token-animations-begin -->";
+    public const string TokenAnimationsEnd = "<!-- @creator:token-animations-end -->";
+    /// <summary>Prefix of the comment that stores the animated tokens as JSON (read back by the importer).</summary>
+    public const string TokenAnimationsPrefix = "@creator:token-animations ";
+    /// <summary>
+    /// Section of an earlier development build ("Animated colours" card). No longer written; the importer
+    /// still removes it so such themes open cleanly.
+    /// </summary>
+    public const string AnimationBegin = "<!-- @creator:animation-begin -->";
+    public const string AnimationEnd = "<!-- @creator:animation-end -->";
 
     private const string BackgroundToken = "CyberMainBg";
 
@@ -79,12 +93,33 @@ public static class ThemeXamlGenerator
             sb.AppendLine($"        <SolidColorBrush x:Key=\"{def.Key}\" Color=\"{ColorUtil.ToHex(value.Color)}\"{opacity} />");
         }
 
+        if (state.AprmBox.Enabled)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxBorderKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.BorderColor)}\" />");
+            sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxTextKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.TextColor)}\" />");
+        }
+
         sb.AppendLine();
         sb.AppendLine("        " + ResourcesBegin);
         if (!string.IsNullOrWhiteSpace(state.CustomResources))
             sb.AppendLine(Indent(state.CustomResources.Trim('\r', '\n'), 8));
         sb.AppendLine("        " + ResourcesEnd);
         sb.AppendLine("    </Styles.Resources>");
+        sb.AppendLine();
+
+        // ---------- APRM power box independent override ----------
+        sb.AppendLine("    " + AprmBoxBegin);
+        if (state.AprmBox.Enabled)
+        {
+            sb.AppendLine("    <Style Selector=\"Border#PowerBanner\">");
+            sb.AppendLine($"        <Setter Property=\"BorderBrush\" Value=\"{{DynamicResource {AprmBoxBorderKey}}}\" />");
+            sb.AppendLine("    </Style>");
+            sb.AppendLine("    <Style Selector=\"TextBlock#MainPowerReadout\">");
+            sb.AppendLine($"        <Setter Property=\"Foreground\" Value=\"{{DynamicResource {AprmBoxTextKey}}}\" />");
+            sb.AppendLine("    </Style>");
+        }
+        sb.AppendLine("    " + AprmBoxEnd);
         sb.AppendLine();
 
         // ---------- Custom styles ----------
@@ -121,8 +156,137 @@ public static class ThemeXamlGenerator
         sb.AppendLine("    " + ShapeEnd);
         sb.AppendLine();
 
+        // ---------- Animated colour tokens (ANIMATE on a colour row) ----------
+        sb.AppendLine("    " + TokenAnimationsBegin);
+        AppendTokenAnimations(sb, state);
+        sb.AppendLine("    " + TokenAnimationsEnd);
+        sb.AppendLine();
+
         sb.AppendLine("</Styles>");
         return sb.ToString();
+    }
+
+    /// <summary>JSON stored in the theme for one animated token.</summary>
+    public sealed record TokenAnimationJson(string[] Colors, bool Flow, double Seconds, double Angle = 0);
+
+    private static void AppendTokenAnimations(StringBuilder sb, ThemeState state)
+    {
+        var animated = TokenCatalog.Tokens
+            .Where(d => d.SupportsGradient && state.Tokens.TryGetValue(d.Key, out var v) && v.Animation is { Colors.Count: >= 2 })
+            .Select(d => (d.Key, Value: state.Tokens[d.Key], Anim: state.Tokens[d.Key].Animation!))
+            .ToList();
+        if (animated.Count == 0) return;
+
+        var json = animated.ToDictionary(t => t.Key, t => new TokenAnimationJson(
+            t.Anim.Colors.Take(TokenAnimation.MaxColors).Select(ColorUtil.ToHex).ToArray(), t.Anim.Flow, Math.Clamp(t.Anim.Seconds, 1, 60), t.Anim.Angle));
+        sb.AppendLine($"    <!-- {TokenAnimationsPrefix}{CommentSafe(System.Text.Json.JsonSerializer.Serialize(json))} -->");
+
+        foreach (var (key, value, anim) in animated)
+        {
+            var usages = TokenUsages.For(key);
+            if (usages.Count == 0) continue;
+            string duration = TimeSpan.FromSeconds(Math.Clamp(anim.Seconds, 1, 60)).ToString("c", CultureInfo.InvariantCulture);
+            var frames = TokenFrames(value, anim);
+
+            sb.AppendLine($"    <!-- {CommentSafe(key)} -->");
+            foreach (var group in usages.GroupBy(u => u.Selector))
+            {
+                string selector = SkipThemeCards(group.Key);
+                if (state.AprmBox.Enabled
+                    && string.Equals(key, "CyberBorder", StringComparison.Ordinal)
+                    && string.Equals(group.Key, "Border.hud-card", StringComparison.Ordinal))
+                {
+                    selector += ":not(.power-banner)";
+                }
+                sb.AppendLine($"    <Style Selector=\"{Escape(selector)}\">");
+                // Base value of the same kind as the frames (solid or gradient): older overlays without
+                // the safe brush animator would otherwise crash when a solid colour animates into a gradient.
+                foreach (var usage in group)
+                    AppendSetter(sb, "        ", usage.Property, frames[0]);
+                sb.AppendLine("        <Style.Animations>");
+                sb.AppendLine($"            <Animation Duration=\"{duration}\" IterationCount=\"Infinite\">");
+                for (int i = 0; i < frames.Count; i++)
+                {
+                    double cue = 100.0 * i / (frames.Count - 1);
+                    sb.AppendLine($"                <KeyFrame Cue=\"{Num(cue)}%\">");
+                    foreach (var usage in group)
+                        AppendSetter(sb, "                    ", usage.Property, frames[i]);
+                    sb.AppendLine("                </KeyFrame>");
+                }
+                sb.AppendLine("            </Animation>");
+                sb.AppendLine("        </Style.Animations>");
+                sb.AppendLine("    </Style>");
+            }
+        }
+    }
+
+    /// <summary>Class the overlay puts on the Theme Manager's theme cards (and the buttons on them).</summary>
+    public const string ThemeCardClass = "theme-card";
+
+    /// <summary>
+    /// Adds :not(.theme-card) to every part of a selector, so the active theme's animations leave the
+    /// Theme Manager's cards alone (each card shows its own theme). For "/template/" selectors the
+    /// check goes on the control before "/template/".
+    /// </summary>
+    public static string SkipThemeCards(string selector)
+    {
+        string not = $":not(.{ThemeCardClass})";
+        return string.Join(", ", selector.Split(',').Select(part =>
+        {
+            string p = part.Trim();
+            int t = p.IndexOf(" /template/", StringComparison.Ordinal);
+            return t >= 0 ? p[..t] + not + p[t..] : p + not;
+        }));
+    }
+
+    /// <summary>A setter whose value is a colour ("#rrggbb") or a brush element ("&lt;LinearGradientBrush …").</summary>
+    private static void AppendSetter(StringBuilder sb, string indent, string property, string value)
+    {
+        if (value.StartsWith('<'))
+        {
+            sb.AppendLine($"{indent}<Setter Property=\"{property}\">");
+            sb.AppendLine($"{indent}    {value}");
+            sb.AppendLine($"{indent}</Setter>");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}<Setter Property=\"{property}\" Value=\"{value}\" />");
+        }
+    }
+
+    /// <summary>
+    /// Key frames of one animated token. All at once: solid colours and back to the first. Flow: the same
+    /// gradient with its colours shifted one place per frame, so they travel along it and loop seamlessly.
+    /// </summary>
+    public static IReadOnlyList<string> TokenFrames(TokenValue value, TokenAnimation anim)
+    {
+        var colours = anim.Colors.Take(TokenAnimation.MaxColors).ToList();
+        double opacity = Math.Clamp(value.Opacity, 0, 1);
+        var frames = new List<string>();
+        if (!anim.Flow)
+        {
+            foreach (var c in colours.Append(colours[0]))
+                frames.Add(ColorUtil.ToHex(Avalonia.Media.Color.FromArgb((byte)Math.Round(c.A * opacity), c.R, c.G, c.B)));
+            return frames;
+        }
+
+        double angle = anim.Angle;
+        var (sx, sy, ex, ey) = new GradientSpec([colours[0]], angle).Points();
+        string opacityAttr = opacity < 0.999 ? $" Opacity=\"{Num(opacity)}\"" : string.Empty;
+        int n = colours.Count;
+        for (int shift = 0; shift <= n; shift++)
+        {
+            var rb = new StringBuilder();
+            rb.Append($"<LinearGradientBrush StartPoint=\"{Num(sx)}%,{Num(sy)}%\" EndPoint=\"{Num(ex)}%,{Num(ey)}%\"{opacityAttr}>");
+            for (int k = 0; k <= n; k++) // n + 1 stops: the last repeats the first so the loop has no seam
+            {
+                var c = colours[(k + shift) % n];
+                rb.Append($"<GradientStop Offset=\"{Num((double)k / n)}\" Color=\"{ColorUtil.ToHex(c)}\" />");
+            }
+            rb.Append("</LinearGradientBrush>");
+            frames.Add(rb.ToString());
+        }
+        return frames;
     }
 
     private static TokenValue GetToken(ThemeState state, string key) =>

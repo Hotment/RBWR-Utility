@@ -18,7 +18,7 @@ public static class FontTools
         DateTime cutoff = DateTime.UtcNow - (maxAge ?? TimeSpan.FromHours(24));
         int removed = 0;
 
-        foreach (string bucket in new[] { "imports", "preview-files", "export" })
+        foreach (string bucket in new[] { "imports", "preview-files", "export", "restored" })
         {
             string bucketPath = Path.Combine(root, bucket);
             if (!Directory.Exists(bucketPath)) continue;
@@ -35,6 +35,26 @@ public static class FontTools
                 catch
                 {
                     // Ignore locked or in-use temp directories
+                }
+            }
+        }
+
+        string thumbDir = Path.Combine(root, "thumbnails");
+        if (Directory.Exists(thumbDir))
+        {
+            foreach (string file in Directory.EnumerateFiles(thumbDir))
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    {
+                        File.Delete(file);
+                        removed++;
+                    }
+                }
+                catch
+                {
+                    // Ignore locked or in-use thumbnail files
                 }
             }
         }

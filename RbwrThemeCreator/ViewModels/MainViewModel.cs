@@ -21,7 +21,7 @@ public sealed class PreviewReadyEventArgs(Styles? styles, List<Bitmap> bitmaps) 
 
 public partial class MainViewModel : ObservableObject
 {
-    public const string AppVersion = "1.0.0";
+    public const string AppVersion = "1.1.0-dev";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionBadge => $"v{AppVersion}";
     public string AppVersionText => $"RBWR Theme Creator v{AppVersion}";
@@ -82,6 +82,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _shellGlow;
     [ObservableProperty] private double _shellGlowBlur = 14;
 
+    // ---------- APRM power box independent colours ----------
+    [ObservableProperty] private bool _aprmBoxEnabled;
+    [ObservableProperty] private Color _aprmBoxBorderColor = Color.Parse("#00f0ff");
+    [ObservableProperty] private Color _aprmBoxTextColor = Color.Parse("#00f0ff");
+
     // ---------- Background image ----------
     [ObservableProperty] private string? _backgroundImageFile;
     [ObservableProperty] private double _backgroundImageOpacity = 0.35;
@@ -117,6 +122,175 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _previewFit = true;
     [ObservableProperty] private int _previewMode;
 
+    // ---------- THEME tab: custom thumbnail ----------
+    /// <summary>PNG used as preview.png instead of the rendered MONITOR view (null = automatic).</summary>
+    [ObservableProperty] private string? _customThumbnailPath;
+    public bool HasCustomThumbnail => CustomThumbnailPath != null;
+    public string ThumbnailModeText => HasCustomThumbnail ? "Custom image" : "Automatic (MONITOR view)";
+
+    partial void OnCustomThumbnailPathChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasCustomThumbnail));
+        OnPropertyChanged(nameof(ThumbnailModeText));
+        OnEdited();
+    }
+
+    // ---------- THEME tab: Theme Manager card preview + recent themes ----------
+    /// <summary>How the theme's card looks in the overlay's Theme Manager (same texts as the overlay).</summary>
+    public string CardName => string.IsNullOrWhiteSpace(ThemeName) ? "Untitled" : ThemeName.Trim();
+    public string CardVersionText => string.IsNullOrWhiteSpace(Version) ? "v1.0.0" : (Version.Trim().StartsWith('v') ? Version.Trim() : $"v{Version.Trim()}");
+    public string CardAuthorText => string.IsNullOrWhiteSpace(Author) ? "Unknown Author" : $"by {Author.Trim()}";
+
+    // Brushes of the edited theme, so the card is drawn in the theme's own colours.
+    public IBrush CardWindowBrush => TokenBrush("CyberMainBg");
+    public IBrush CardBackgroundBrush => TokenBrush("CyberCardBg");
+    public IBrush CardBorderBrush => TokenBrush("CyberBorder");
+    public IBrush CardGlowBrush => TokenBrush("CyberBorderGlow"); // the card outline in the Theme Manager
+    public IBrush CardPanelBrush => TokenBrush("DarkPanelBg");
+    public IBrush CardTextBrush => TokenBrush("TextLight");
+    public IBrush CardMutedBrush => TokenBrush("TextMuted");
+    public IBrush CardGoldBrush => TokenBrush("NeonGold");
+    public IBrush CardAccentBrush => TokenBrush("NeonCyan");
+
+    /// <summary>Animations played on the THEME tab card and the thumbnails, like the overlay shows them.</summary>
+    public TokenAnimation? CardBackgroundAnimationPreview => _tokens["CyberMainBg"].AnimPreview;
+    public TokenAnimation? CardBorderAnimationPreview => _tokens["CyberBorderGlow"].AnimPreview;
+    public TokenAnimation? ThumbAnimationPreview =>
+        _tokens["CyberBorderGlow"].AnimPreview ?? _tokens["CyberMainBg"].AnimPreview
+        ?? _tokens.Values.Select(t => t.AnimPreview).FirstOrDefault(a => a != null);
+
+    private static readonly string[] CardBrushProperties =
+    [
+        nameof(CardBackgroundAnimationPreview), nameof(CardBorderAnimationPreview), nameof(ThumbAnimationPreview),
+        nameof(CardWindowBrush), nameof(CardBackgroundBrush), nameof(CardBorderBrush), nameof(CardGlowBrush), nameof(CardPanelBrush),
+        nameof(CardTextBrush), nameof(CardMutedBrush), nameof(CardGoldBrush), nameof(CardAccentBrush),
+    ];
+
+    private const int MaxRecentThemes = 6;
+    public ObservableCollection<RecentThemeEntry> RecentThemes { get; } = new();
+    public bool HasRecentThemes => RecentThemes.Count > 0;
+
+    // ---------- SETTINGS tab ----------
+    /// <summary>The keyboard shortcuts in use (defaults + the user's changes).</summary>
+    public ShortcutMap Shortcuts { get; }
+    public IReadOnlyList<ShortcutEntryViewModel> ShortcutEntries { get; }
+
+    /// <summary>The shortcut row waiting for a key press, if any.</summary>
+    public ShortcutEntryViewModel? RecordingShortcut { get; private set; }
+
+    public bool OpenLastThemeAtStart
+    {
+        get => CreatorSettings.Current.OpenLastThemeAtStart;
+        set => SetSetting(value, CreatorSettings.Current.OpenLastThemeAtStart, v => CreatorSettings.Current.OpenLastThemeAtStart = v);
+    }
+
+    public bool AutoCreateThumbnails
+    {
+        get => CreatorSettings.Current.AutoCreateThumbnails;
+        set => SetSetting(value, CreatorSettings.Current.AutoCreateThumbnails, v => CreatorSettings.Current.AutoCreateThumbnails = v);
+    }
+
+    public bool AutosaveEnabled
+    {
+        get => CreatorSettings.Current.AutosaveEnabled;
+        set
+        {
+            SetSetting(value, CreatorSettings.Current.AutosaveEnabled, v => CreatorSettings.Current.AutosaveEnabled = v);
+            if (!value) Recovery?.Clear();
+        }
+    }
+
+    // ---------- Autosave / crash recovery ----------
+    /// <summary>Where the recovery copy lives. Null (tests) = no autosave at all.</summary>
+    public RecoveryStore? Recovery { get; set; }
+    private DispatcherTimer? _autosaveTimer;
+    private string _loadedFingerprint = string.Empty;
+
+    public bool CheckUpdatesAtStart
+    {
+        get => CreatorSettings.Current.CheckUpdatesAtStart;
+        set => SetSetting(value, CreatorSettings.Current.CheckUpdatesAtStart, v => CreatorSettings.Current.CheckUpdatesAtStart = v);
+    }
+
+    /// <summary>SETTINGS → Default author (empty = the last author a theme was saved with).</summary>
+    public string DefaultAuthor
+    {
+        get => CreatorSettings.Current.DefaultAuthor;
+        set
+        {
+            string v = (value ?? string.Empty).Trim();
+            if (v == CreatorSettings.Current.DefaultAuthor) return;
+            CreatorSettings.Current.DefaultAuthor = v;
+            CreatorSettings.Current.Save();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DefaultAuthorHint));
+            DefaultAuthorInput = v;
+            SetDefaultAuthorCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>What is typed in the Default author box; saved only by SET.</summary>
+    public string DefaultAuthorInput
+    {
+        get => _defaultAuthorInput ??= CreatorSettings.Current.DefaultAuthor;
+        set
+        {
+            if (value == _defaultAuthorInput) return;
+            _defaultAuthorInput = value;
+            OnPropertyChanged();
+            SetDefaultAuthorCommand.NotifyCanExecuteChanged();
+        }
+    }
+    private string? _defaultAuthorInput;
+
+    public string DefaultAuthorHint => string.IsNullOrWhiteSpace(CreatorSettings.Current.DefaultAuthor)
+        ? (string.IsNullOrWhiteSpace(CreatorSettings.Current.LastAuthor)
+            ? "Empty: new themes start without an author until you save one with a name."
+            : $"Empty: new themes use the last author you saved with ({CreatorSettings.Current.LastAuthor}).")
+        : "New themes start with this author.";
+
+    /// <summary>COLOURS tab boxes; hidden with their × button, shown again in SETTINGS.</summary>
+    public bool ShowGradientTip
+    {
+        get => CreatorSettings.Current.ShowGradientTip;
+        set => SetSetting(value, CreatorSettings.Current.ShowGradientTip, v => CreatorSettings.Current.ShowGradientTip = v);
+    }
+
+    public bool ShowContrastCheck
+    {
+        get => CreatorSettings.Current.ShowContrastCheck;
+        set
+        {
+            SetSetting(value, CreatorSettings.Current.ShowContrastCheck, v => CreatorSettings.Current.ShowContrastCheck = v);
+            OnPropertyChanged(nameof(ShowContrastOk));
+            OnPropertyChanged(nameof(ShowContrastWarning));
+        }
+    }
+
+    public bool ShowContrastOk => ShowContrastCheck && !ContrastWarning;
+    public bool ShowContrastWarning => ShowContrastCheck && ContrastWarning;
+
+    [RelayCommand]
+    private void HideGradientTip()
+    {
+        ShowGradientTip = false;
+        SetStatus("Gradient tip hidden. Show it again in SETTINGS.");
+    }
+
+    [RelayCommand]
+    private void HideContrastCheck()
+    {
+        ShowContrastCheck = false;
+        SetStatus("Contrast check hidden. Show it again in SETTINGS.");
+    }
+
+    public bool HasSkippedVersion => !string.IsNullOrWhiteSpace(CreatorSettings.Current.SkippedVersion);
+    public string SkippedVersionText => HasSkippedVersion ? $"Skipped update: v{CreatorSettings.Current.SkippedVersion}" : "No update is skipped.";
+
+    // ---------- Colour search ----------
+    [ObservableProperty] private string _tokenSearch = string.Empty;
+    [ObservableProperty] private bool _hasNoSearchResults;
+
     // ---------- Updates ----------
     [ObservableProperty] private bool _isCheckingUpdates;
     [ObservableProperty] private string _updateStatusText = $"Installed version: v{AppVersion}";
@@ -138,7 +312,11 @@ public partial class MainViewModel : ObservableObject
         foreach (var def in TokenCatalog.Tokens)
         {
             var vm = new TokenViewModel(def, BuiltInThemes.Cyberpunk.Tokens.GetValueOrDefault(def.Key) ?? new TokenValue(Colors.Gray));
-            vm.ValueChanged += (_, _) => OnEdited();
+            vm.ValueChanged += (_, _) =>
+            {
+                EnsureMinOverlayForAnimations();
+                OnEdited();
+            };
             _tokens[def.Key] = vm;
         }
 
@@ -161,8 +339,398 @@ public partial class MainViewModel : ObservableObject
         _previewMode = Math.Clamp(settings.PreviewMode, 0, 4);
 
         OverlayThemesDirectory = OverlayLocator.Detect() ?? string.Empty;
+        LoadRecentThemes();
+
+        Shortcuts = new ShortcutMap(CreatorSettings.Current.Shortcuts, CreatorSettings.Current.Save);
+        ShortcutEntries = ShortcutCatalog.All.Select(d => new ShortcutEntryViewModel(d, this)).ToList();
+        Shortcuts.Changed += (_, _) => RefreshShortcutEntries();
+        RefreshShortcutEntries();
         LoadState(BuiltInThemes.Presets[0].Create(), folder: null);
         SetStatus("New theme from the Cyberpunk preset. Edit colours on the left — the preview updates live.");
+    }
+
+    // =====================================================================
+    // Autosave / crash recovery
+    // =====================================================================
+
+    /// <summary>Starts the 30-second autosave (MainWindow calls this once the window is open).</summary>
+    public void StartAutosave()
+    {
+        _autosaveTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => AutosaveNow());
+        _autosaveTimer.Start();
+    }
+
+    /// <summary>
+    /// Writes the recovery copy when there are unsaved changes (a theme that was just opened or
+    /// created and not touched is not copied). Returns true when a copy was written.
+    /// </summary>
+    public bool AutosaveNow()
+    {
+        if (Recovery == null || !AutosaveEnabled) return false;
+        var state = BuildState();
+        string fingerprint = ComputeSaveFingerprint(state, GeneratedXaml);
+        if (!IsDirty || fingerprint == _loadedFingerprint)
+            return false;
+        try
+        {
+            byte[]? custom = CustomThumbnailPath != null && File.Exists(CustomThumbnailPath) ? File.ReadAllBytes(CustomThumbnailPath) : null;
+            Recovery.Save(state, GeneratedXaml, CurrentFolder, custom);
+            return true;
+        }
+        catch
+        {
+            return false; // never interrupt the user over an autosave
+        }
+    }
+
+    /// <summary>
+    /// Loads the recovery copy: the theme comes back with all its changes, unsaved, and attached to
+    /// its original folder (when that still exists) so SAVE writes it there.
+    /// </summary>
+    public bool RestoreRecovery()
+    {
+        if (Recovery?.Peek() is not { } info) return false;
+        try
+        {
+            var state = Recovery.Load();
+            if (state == null) return false;
+            string? folder = info.OriginalFolder != null && Directory.Exists(info.OriginalFolder) ? info.OriginalFolder : null;
+            LoadState(state, folder);
+            _lastSavedFingerprint = string.Empty; // the restored changes are not saved yet
+            IsDirty = true;
+            SetStatus(folder != null
+                ? $"Restored unsaved changes to '{info.ThemeName}'. SAVE to keep them in {folder}."
+                : $"Restored unsaved theme '{info.ThemeName}'. Save it to a folder to keep it.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Could not restore the unsaved theme: {ex.Message}", isError: true);
+            return false;
+        }
+    }
+
+    // =====================================================================
+    // SETTINGS tab
+    // =====================================================================
+
+    private void SetSetting(bool value, bool current, Action<bool> store, [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        if (value == current) return;
+        store(value);
+        CreatorSettings.Current.Save();
+        OnPropertyChanged(name);
+    }
+
+    private void RefreshShortcutEntries()
+    {
+        foreach (var entry in ShortcutEntries)
+            entry.Refresh(Shortcuts);
+    }
+
+    /// <summary>Clicked a shortcut: the next key press (see MainWindow) becomes its new shortcut.</summary>
+    public void StartRecordingShortcut(ShortcutEntryViewModel entry)
+    {
+        CancelShortcutRecording();
+        RecordingShortcut = entry;
+        entry.IsRecording = true;
+        SetStatus($"Press the new keys for '{entry.Label}'. Esc cancels, Backspace removes the shortcut.");
+    }
+
+    public void CancelShortcutRecording()
+    {
+        if (RecordingShortcut == null) return;
+        RecordingShortcut.IsRecording = false;
+        RecordingShortcut = null;
+    }
+
+    /// <summary>Ends recording with <paramref name="gesture"/> (null = remove the shortcut).</summary>
+    public void FinishShortcutRecording(ShortcutGesture? gesture)
+    {
+        var entry = RecordingShortcut;
+        if (entry == null) return;
+        CancelShortcutRecording();
+
+        string? taken = Shortcuts.Set(entry.Id, gesture);
+        if (gesture == null)
+            SetStatus($"'{entry.Label}' has no shortcut now.");
+        else if (taken != null)
+            SetStatus($"'{entry.Label}' is now {gesture}. It was used by '{ShortcutCatalog.Find(taken)?.Label}', which has no shortcut now.");
+        else
+            SetStatus($"'{entry.Label}' is now {gesture}.");
+    }
+
+    public void ResetShortcut(ShortcutEntryViewModel entry)
+    {
+        CancelShortcutRecording();
+        Shortcuts.ResetToDefault(entry.Id);
+        SetStatus($"'{entry.Label}' is back to its default shortcut ({entry.DefaultText}).");
+    }
+
+    [RelayCommand]
+    private async Task ResetShortcutsAsync()
+    {
+        CancelShortcutRecording();
+        if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset shortcuts", "Set every keyboard shortcut back to its default?", "Reset shortcuts"))
+            return;
+        Shortcuts.ResetAll();
+        SetStatus("Keyboard shortcuts are back to their defaults.");
+    }
+
+    private bool CanSetDefaultAuthor() => (DefaultAuthorInput ?? string.Empty).Trim() != CreatorSettings.Current.DefaultAuthor;
+
+    /// <summary>SETTINGS → SET: saves the typed default author.</summary>
+    [RelayCommand(CanExecute = nameof(CanSetDefaultAuthor))]
+    private void SetDefaultAuthor()
+    {
+        DefaultAuthor = DefaultAuthorInput;
+        SetStatus(string.IsNullOrWhiteSpace(DefaultAuthor)
+            ? "Default author cleared: new themes use the last author you saved with."
+            : $"Default author set to '{DefaultAuthor}'. New themes start with it.");
+    }
+
+    [RelayCommand]
+    private void UnskipVersion()
+    {
+        CreatorSettings.Current.SkippedVersion = string.Empty;
+        CreatorSettings.Current.Save();
+        OnPropertyChanged(nameof(HasSkippedVersion));
+        OnPropertyChanged(nameof(SkippedVersionText));
+        SetStatus("The skipped update will be offered again.");
+    }
+
+    /// <summary>
+    /// Resets the app settings (start-up options, skipped update, recent themes, preview view, last
+    /// author). Keyboard shortcuts, the overlay folder and the themes themselves are not touched.
+    /// </summary>
+    [RelayCommand]
+    private async Task ResetSettingsAsync()
+    {
+        if (Dialogs != null && !await Dialogs.ConfirmAsync("Reset settings",
+                "Reset the start-up options, the default author, the COLOURS tab boxes, the skipped update, the recent themes list and the preview view? Keyboard shortcuts, the overlay folder and your themes are kept.",
+                "Reset settings"))
+            return;
+
+        var s = CreatorSettings.Current;
+        s.OpenLastThemeAtStart = false;
+        s.AutoCreateThumbnails = true;
+        s.CheckUpdatesAtStart = true;
+        s.AutosaveEnabled = true;
+        s.SkippedVersion = string.Empty;
+        s.LastAuthor = string.Empty;
+        s.DefaultAuthor = string.Empty;
+        s.ShowGradientTip = true;
+        s.ShowContrastCheck = true;
+        s.RecentThemes.Clear();
+        s.Save();
+
+        PreviewBackdrop = 0;
+        PreviewZoom = 1.0;
+        PreviewFit = true;
+        PreviewMode = 0;
+
+        foreach (string name in new[] { nameof(OpenLastThemeAtStart), nameof(AutoCreateThumbnails), nameof(CheckUpdatesAtStart), nameof(AutosaveEnabled),
+                     nameof(DefaultAuthor), nameof(DefaultAuthorHint),
+                     nameof(ShowGradientTip), nameof(ShowContrastCheck), nameof(ShowContrastOk), nameof(ShowContrastWarning),
+                     nameof(HasSkippedVersion), nameof(SkippedVersionText) })
+            OnPropertyChanged(name);
+        DefaultAuthorInput = string.Empty;
+        SetDefaultAuthorCommand.NotifyCanExecuteChanged();
+        LoadRecentThemes();
+        SetStatus("Settings reset. Keyboard shortcuts were kept.");
+    }
+
+    [RelayCommand]
+    private void OpenSettingsFolder() => OpenInExplorer(CreatorSettings.FolderPath, create: true);
+
+    /// <summary>SETTINGS → Open the last theme at start: opens the newest folder of the recent list.</summary>
+    public void OpenLastTheme()
+    {
+        string? folder = CreatorSettings.Current.RecentThemes.FirstOrDefault(Directory.Exists);
+        if (folder != null)
+            OpenPath(folder);
+    }
+
+    // =====================================================================
+    // THEME tab: Theme Manager card + recent themes
+    // =====================================================================
+
+    [RelayCommand]
+    private async Task ChooseCustomThumbnailAsync()
+    {
+        if (Dialogs == null) return;
+        var files = await Dialogs.PickFilesAsync("Choose a thumbnail image", "Images", PreviewImage.PickPatterns, allowMultiple: false);
+        if (files.Count == 0) return;
+        string? png = PreviewImage.MakeThumbnail(files[0], out string error);
+        if (png == null)
+        {
+            SetStatus($"Thumbnail not changed: {error}", isError: true);
+            return;
+        }
+        CustomThumbnailPath = png;
+        SetStatus("Custom thumbnail set. It is saved as preview.png on Save, Export and Install.");
+    }
+
+    [RelayCommand]
+    private void UseAutoThumbnail()
+    {
+        CustomThumbnailPath = null;
+        SetStatus("Custom thumbnail removed. The thumbnail is generated automatically again; Save to update preview.png.");
+    }
+
+    /// <summary>The token's brush as the theme draws it (gradient and opacity included).</summary>
+    private IBrush TokenBrush(string key)
+    {
+        if (!_tokens.TryGetValue(key, out var token))
+            return Brushes.Transparent;
+        var brush = token.PreviewBrush;
+        if (token.SupportsOpacity && brush is Brush b)
+            b.Opacity = token.Opacity;
+        return brush;
+    }
+
+    /// <summary>Puts <paramref name="folder"/> at the top of the recent list (temp folders are skipped).</summary>
+    private void RememberRecentTheme(string folder)
+    {
+        string full;
+        try
+        {
+            full = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // Extracted .zip packs and test folders live in %TEMP%: not useful to reopen later.
+            if (full.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase))
+            {
+                LoadRecentThemes();
+                return;
+            }
+        }
+        catch
+        {
+            return;
+        }
+
+        var list = CreatorSettings.Current.RecentThemes;
+        list.RemoveAll(p => string.Equals(p, full, StringComparison.OrdinalIgnoreCase));
+        list.Insert(0, full);
+        if (list.Count > MaxRecentThemes * 2)
+            list.RemoveRange(MaxRecentThemes * 2, list.Count - MaxRecentThemes * 2);
+        CreatorSettings.Current.Save();
+        LoadRecentThemes();
+    }
+
+    /// <summary>Rebuilds the recent list: existing folders only, without the theme that is open now.</summary>
+    public void LoadRecentThemes()
+    {
+        RecentThemes.Clear();
+        foreach (string folder in CreatorSettings.Current.RecentThemes)
+        {
+            if (RecentThemes.Count >= MaxRecentThemes) break;
+            if (!Directory.Exists(folder)) continue;
+            if (CurrentFolder != null && string.Equals(Path.GetFullPath(CurrentFolder).TrimEnd(Path.DirectorySeparatorChar), folder, StringComparison.OrdinalIgnoreCase))
+                continue;
+            RecentThemes.Add(RecentThemeEntry.Read(folder));
+        }
+        OnPropertyChanged(nameof(HasRecentThemes));
+    }
+
+    [RelayCommand]
+    private async Task OpenRecentAsync(RecentThemeEntry? entry)
+    {
+        if (entry == null) return;
+        if (!Directory.Exists(entry.Folder))
+        {
+            SetStatus($"'{entry.Folder}' no longer exists.", isError: true);
+            LoadRecentThemes();
+            return;
+        }
+        if (!await ConfirmDiscardAsync()) return;
+        OpenPath(entry.Folder);
+    }
+
+    [RelayCommand]
+    private void ClearRecentThemes()
+    {
+        CreatorSettings.Current.RecentThemes.Clear();
+        CreatorSettings.Current.Save();
+        LoadRecentThemes();
+    }
+
+    // =====================================================================
+    // Colour search + "which colour is this?" from the preview
+    // =====================================================================
+
+    partial void OnTokenSearchChanged(string value) => ApplyTokenSearch();
+
+    /// <summary>
+    /// Filters the COLOURS list. Every word must appear in the label, key, hint, group or hex value,
+    /// so "slider hover" or "#00f0ff" both work.
+    /// </summary>
+    private void ApplyTokenSearch()
+    {
+        string[] words = (TokenSearch ?? string.Empty)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        int visible = 0;
+        foreach (var group in Groups)
+        {
+            bool any = false;
+            foreach (var token in group.Tokens)
+            {
+                bool match = words.Length == 0 || words.All(w =>
+                    token.Label.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.Key.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.Hint.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || group.Name.Contains(w, StringComparison.OrdinalIgnoreCase)
+                    || token.HexText.Contains(w.TrimStart('#'), StringComparison.OrdinalIgnoreCase));
+                token.IsMatch = match;
+                any |= match;
+                if (match) visible++;
+            }
+            group.HasMatches = any;
+            if (words.Length > 0 && any)
+                group.IsExpanded = true; // a search never hides its results in a folded group
+        }
+        HasNoSearchResults = visible == 0;
+    }
+
+    [RelayCommand]
+    private void ClearTokenSearch() => TokenSearch = string.Empty;
+
+    /// <summary>COLOURS → COLLAPSE ALL: fold every group and every gradient / animation editor.</summary>
+    [RelayCommand]
+    private void CollapseAllColours()
+    {
+        foreach (var group in Groups)
+        {
+            group.IsExpanded = false;
+            foreach (var token in group.Tokens) token.IsEditorOpen = false;
+        }
+    }
+
+    /// <summary>COLOURS → EXPAND ALL: unfold every group (editors stay as they are).</summary>
+    [RelayCommand]
+    private void ExpandAllColours()
+    {
+        foreach (var group in Groups) group.IsExpanded = true;
+    }
+
+    /// <summary>Token view models for the given keys, in catalogue order.</summary>
+    public IReadOnlyList<TokenViewModel> GetTokens(IEnumerable<string> keys)
+    {
+        var wanted = new HashSet<string>(keys, StringComparer.Ordinal);
+        return TokenCatalog.Tokens.Where(t => wanted.Contains(t.Key)).Select(t => _tokens[t.Key]).ToList();
+    }
+
+    /// <summary>Makes sure the tokens are visible in the list and makes their rows flash briefly.</summary>
+    public async Task FlashTokensAsync(IReadOnlyList<TokenViewModel> tokens)
+    {
+        if (tokens.Any(t => !t.IsMatch))
+            TokenSearch = string.Empty;
+        foreach (var group in Groups.Where(g => g.Tokens.Any(tokens.Contains)))
+            group.IsExpanded = true;
+        foreach (var t in tokens) t.IsFlashing = false;
+        await Task.Delay(30);
+        foreach (var t in tokens) t.IsFlashing = true;
+        await Task.Delay(1800);
+        foreach (var t in tokens) t.IsFlashing = false;
     }
 
     // =====================================================================
@@ -196,6 +764,12 @@ public partial class MainViewModel : ObservableObject
                 ShellGlow = ShellGlow,
                 ShellGlowBlur = ShellGlowBlur,
             },
+            AprmBox = new AprmBoxSettings
+            {
+                Enabled = AprmBoxEnabled,
+                BorderColor = AprmBoxBorderColor,
+                TextColor = AprmBoxTextColor,
+            },
             BackgroundImage = HasBackgroundImage
                 ? new BackgroundImageSettings { FileName = BackgroundImageFile!, Opacity = BackgroundImageOpacity, Stretch = BackgroundStretch }
                 : null,
@@ -203,6 +777,7 @@ public partial class MainViewModel : ObservableObject
             Assets = Assets.ToList(),
             CustomResources = CustomResources ?? string.Empty,
             CustomStyles = CustomStyles ?? string.Empty,
+            CustomPreviewPath = CustomThumbnailPath,
         };
         foreach (var (key, vm) in _tokens)
             state.Tokens[key] = vm.ToValue();
@@ -241,6 +816,11 @@ public partial class MainViewModel : ObservableObject
             ShellGlow = s.ShellGlow;
             ShellGlowBlur = s.ShellGlowBlur;
 
+            var aprm = state.AprmBox;
+            AprmBoxEnabled = aprm.Enabled;
+            AprmBoxBorderColor = aprm.BorderColor;
+            AprmBoxTextColor = aprm.TextColor;
+
             Fonts.Clear();
             foreach (var f in state.Fonts)
                 Fonts.Add(new FontEntry(f.FileName, f.SourcePath, FontTools.ReadFamilyName(f.SourcePath)));
@@ -259,6 +839,7 @@ public partial class MainViewModel : ObservableObject
 
             CustomResources = state.CustomResources;
             CustomStyles = state.CustomStyles;
+            CustomThumbnailPath = state.CustomPreviewPath;
 
             GeneratorAccent = _tokens["NeonCyan"].Color;
             CurrentFolder = folder;
@@ -276,6 +857,7 @@ public partial class MainViewModel : ObservableObject
 
         Refresh();
         _lastSavedFingerprint = folder != null ? ComputeSaveFingerprint(BuildState(), GeneratedXaml) : string.Empty;
+        _loadedFingerprint = ComputeSaveFingerprint(BuildState(), GeneratedXaml);
         IsDirty = folder == null;
         if (state.ImportWarnings.Count > 0)
             SetStatus(string.Join(" ", state.ImportWarnings), isError: true);
@@ -343,6 +925,11 @@ public partial class MainViewModel : ObservableObject
             ShellGlow = s.ShellGlow;
             ShellGlowBlur = s.ShellGlowBlur;
 
+            var aprm = snapshot.AprmBox;
+            AprmBoxEnabled = aprm.Enabled;
+            AprmBoxBorderColor = aprm.BorderColor;
+            AprmBoxTextColor = aprm.TextColor;
+
             Fonts.Clear();
             foreach (var f in snapshot.Fonts)
                 Fonts.Add(new FontEntry(f.FileName, f.SourcePath, FontTools.ReadFamilyName(f.SourcePath)));
@@ -361,6 +948,7 @@ public partial class MainViewModel : ObservableObject
 
             CustomResources = snapshot.CustomResources;
             CustomStyles = snapshot.CustomStyles;
+            CustomThumbnailPath = snapshot.CustomPreviewPath;
             GeneratorAccent = _tokens["NeonCyan"].Color;
         }
         finally
@@ -411,7 +999,7 @@ public partial class MainViewModel : ObservableObject
         var m = state.Manifest;
         string fonts = string.Join("|", state.Fonts.Select(f => $"{f.FileName}:{f.SourcePath}"));
         string assets = string.Join("|", state.Assets.Select(a => $"{a.FileName}:{a.SourcePath}"));
-        return $"{m.Id}\n{m.Name}\n{m.Author}\n{m.Version}\n{m.Description}\n{m.MinAppVersion}\n{fonts}\n{assets}\n---\n{xaml}";
+        return $"{m.Id}\n{m.Name}\n{m.Author}\n{m.Version}\n{m.Description}\n{m.MinAppVersion}\n{fonts}\n{assets}\n{state.CustomPreviewPath}\n---\n{xaml}";
     }
 
     // =====================================================================
@@ -426,20 +1014,29 @@ public partial class MainViewModel : ObservableObject
             case nameof(ThemeName):
             case nameof(IsDirty):
                 OnPropertyChanged(nameof(WindowTitle));
+                if (e.PropertyName == nameof(ThemeName)) OnPropertyChanged(nameof(CardName));
                 break;
             case nameof(ThemeId):
             case nameof(Version):
             case nameof(Author):
                 OnPropertyChanged(nameof(ThemeSubtitle));
+                if (e.PropertyName == nameof(Version)) OnPropertyChanged(nameof(CardVersionText));
+                if (e.PropertyName == nameof(Author)) OnPropertyChanged(nameof(CardAuthorText));
                 break;
             case nameof(CurrentFolder):
                 OnPropertyChanged(nameof(CurrentFolderDisplay));
+                if (CurrentFolder != null) RememberRecentTheme(CurrentFolder);
+                else LoadRecentThemes();
                 break;
             case nameof(PreviewError):
                 OnPropertyChanged(nameof(HasPreviewError));
                 break;
             case nameof(ManifestProblems):
                 OnPropertyChanged(nameof(HasManifestProblems));
+                break;
+            case nameof(ContrastWarning):
+                OnPropertyChanged(nameof(ShowContrastOk));
+                OnPropertyChanged(nameof(ShowContrastWarning));
                 break;
             case nameof(BackgroundImageFile):
                 OnPropertyChanged(nameof(HasBackgroundImage));
@@ -469,8 +1066,10 @@ public partial class MainViewModel : ObservableObject
         if (e.PropertyName is nameof(ThemeId) or nameof(ThemeName) or nameof(Author) or nameof(Version) or nameof(Description)
             or nameof(MinAppVersion) or nameof(FontFamily) or nameof(MonoFontFamily) or nameof(ShapeEnabled)
             or nameof(ShellCornerRadius) or nameof(ShellBorderThickness) or nameof(CardCornerRadius) or nameof(ButtonCornerRadius)
-            or nameof(CompactCornerRadius) or nameof(ShellGlow) or nameof(ShellGlowBlur) or nameof(BackgroundImageFile)
-            or nameof(BackgroundImageOpacity) or nameof(BackgroundStretch) or nameof(CustomResources) or nameof(CustomStyles))
+            or nameof(CompactCornerRadius) or nameof(ShellGlow) or nameof(ShellGlowBlur)
+            or nameof(AprmBoxEnabled) or nameof(AprmBoxBorderColor) or nameof(AprmBoxTextColor)
+            or nameof(BackgroundImageFile) or nameof(BackgroundImageOpacity) or nameof(BackgroundStretch)
+            or nameof(CustomResources) or nameof(CustomStyles))
         {
             OnEdited();
         }
@@ -492,8 +1091,67 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Regenerates XAML, validates it and rebuilds the preview.</summary>
+    /// <summary>
+    /// First overlay version with the safe brush animator. Older overlays can crash on some animated
+    /// colours, so a theme with ANIMATED colours needs at least this version.
+    /// </summary>
+    public const string AnimatedColoursMinOverlay = "2.3.1";
+
+    public bool HasAnimatedColours => _tokens.Values.Any(t => t.IsAnimated);
+
+    /// <summary>Asks the window to show a warning toast (bottom-right): title, message.</summary>
+    public event Action<string, string>? RequestWarningToast;
+
+    /// <summary>Raises Min. overlay to <see cref="AnimatedColoursMinOverlay"/> when the theme has animated colours.</summary>
+    private void EnsureMinOverlayForAnimations()
+    {
+        OnPropertyChanged(nameof(HasAnimatedColours));
+        if (!HasAnimatedColours || IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay))
+            return;
+        MinAppVersion = AnimatedColoursMinOverlay;
+        SetStatus($"Min. overlay set to {AnimatedColoursMinOverlay}: animated colours need overlay v{AnimatedColoursMinOverlay} or newer.");
+        RequestWarningToast?.Invoke("MIN. OVERLAY RAISED",
+            $"Animated colours need overlay {AnimatedColoursMinOverlay} or newer (older overlays can crash), so Min. overlay is now {AnimatedColoursMinOverlay}.");
+    }
+
+    /// <summary>
+    /// A theme with animated colours cannot target an older overlay: a lower Min. overlay typed by hand
+    /// goes straight back to <see cref="AnimatedColoursMinOverlay"/>, with a warning toast.
+    /// </summary>
+    partial void OnMinAppVersionChanged(string value)
+    {
+        foreach (var token in _tokens.Values)
+            token.NotifyAnimationAllowed();
+        if (_suppressChanges || !HasAnimatedColours || IsVersionAtLeast(value, AnimatedColoursMinOverlay))
+            return;
+        // After the text box has finished writing, so it shows the corrected value.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!HasAnimatedColours || IsVersionAtLeast(MinAppVersion, AnimatedColoursMinOverlay)) return;
+            MinAppVersion = AnimatedColoursMinOverlay;
+            SetStatus($"Min. overlay can't be lower than {AnimatedColoursMinOverlay} while the theme has animated colours.", isError: true);
+        });
+        RequestWarningToast?.Invoke("NOT POSSIBLE WITH ANIMATED COLOURS",
+            $"Overlays older than {AnimatedColoursMinOverlay} can't use animated colours (they can crash), so Min. overlay stays at {AnimatedColoursMinOverlay}. "
+            + "Set every colour to SOLID or GRADIENT to target an older overlay.");
+    }
+
+    /// <summary>"2.4" >= "2.3.1"; empty or unreadable counts as too old.</summary>
+    public static bool IsVersionAtLeast(string? version, string minimum)
+    {
+        static System.Version? Parse(string? v)
+        {
+            string clean = (v ?? string.Empty).Trim().TrimStart('v', 'V').Split('-', '+')[0];
+            return System.Version.TryParse(clean, out var parsed) ? parsed : null;
+        }
+        var a = Parse(version);
+        var b = Parse(minimum);
+        return a != null && b != null && a >= b;
+    }
+
     public void Refresh()
     {
+        EnsureMinOverlayForAnimations();
         var state = BuildState();
         string xaml = ThemeXamlGenerator.Generate(state);
         GeneratedXaml = xaml;
@@ -503,6 +1161,8 @@ public partial class MainViewModel : ObservableObject
 
         ManifestProblems = string.Join(Environment.NewLine, ThemeValidator.ValidateManifest(state));
         UpdateContrast();
+        foreach (string name in CardBrushProperties)
+            OnPropertyChanged(name);
 
         try
         {
@@ -580,7 +1240,9 @@ public partial class MainViewModel : ObservableObject
     private async Task<bool> ConfirmDiscardAsync()
     {
         if (!IsDirty || Dialogs == null) return true;
-        return await Dialogs.ConfirmAsync("Unsaved changes", "The current theme has unsaved changes. Discard them?", "Discard");
+        bool discard = await Dialogs.ConfirmAsync("Unsaved changes", "The current theme has unsaved changes. Discard them?", "Discard");
+        if (discard) Recovery?.Clear(); // the changes are thrown away on purpose
+        return discard;
     }
 
     [RelayCommand]
@@ -734,11 +1396,13 @@ public partial class MainViewModel : ObservableObject
         {
             CreatorSettings.Current.LastAuthor = Author.Trim();
             CreatorSettings.Current.Save();
+            OnPropertyChanged(nameof(DefaultAuthorHint));
         }
     }
 
     private void MarkSaved(string folder)
     {
+        Recovery?.Clear(); // saved: nothing left to recover
         // After writing, fonts and assets live in the saved folder; point the editor at those copies.
         _suppressChanges = true;
         try
@@ -791,7 +1455,7 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, folder);
+            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, folder, RenderThumbnail());
             MarkSaved(folder);
             SetStatus(warnings.Count == 0 ? $"Saved to {folder}" : $"Saved with warnings: {string.Join(" ", warnings)}", warnings.Count > 0);
             RefreshInstalledThemes();
@@ -810,7 +1474,7 @@ public partial class MainViewModel : ObservableObject
         if (path == null) return;
         try
         {
-            var warnings = ThemeExporter.WriteZip(state, GeneratedXaml, path);
+            var warnings = ThemeExporter.WriteZip(state, GeneratedXaml, path, RenderThumbnail());
             RememberAuthor();
             SetStatus(warnings.Count == 0
                 ? $"Exported {Path.GetFileName(path)} — share it; users install it with CONFIG → Install in the overlay."
@@ -840,7 +1504,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, target);
+            var warnings = ThemeExporter.WriteFolder(state, GeneratedXaml, target, RenderThumbnail());
             RememberAuthor();
             if (isCurrent)
                 MarkSaved(target);
@@ -852,6 +1516,21 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             SetStatus($"Install failed: {ex.Message}", isError: true);
+        }
+    }
+
+    /// <summary>preview.png for saved/exported themes; a failed render never blocks saving.</summary>
+    private byte[]? RenderThumbnail()
+    {
+        try
+        {
+            if (CustomThumbnailPath != null && File.Exists(CustomThumbnailPath))
+                return File.ReadAllBytes(CustomThumbnailPath);
+            return Dialogs?.RenderThumbnailPng();
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -999,28 +1678,53 @@ public partial class MainViewModel : ObservableObject
         Fonts.Remove(font);
         string reference = $"fonts/{font.FileName}";
         if (FontFamily.Contains(reference, StringComparison.OrdinalIgnoreCase))
-            FontFamily = BuiltInThemes.Cyberpunk.FontFamily;
+            FontFamily = RemoveFontReference(FontFamily, reference, BuiltInThemes.Cyberpunk.FontFamily);
         if (MonoFontFamily.Contains(reference, StringComparison.OrdinalIgnoreCase))
-            MonoFontFamily = BuiltInThemes.Cyberpunk.MonoFontFamily;
+            MonoFontFamily = RemoveFontReference(MonoFontFamily, reference, BuiltInThemes.Cyberpunk.MonoFontFamily);
         OnEdited();
     }
 
     [RelayCommand]
     private void UseFontAsMain(FontEntry? font)
     {
-        if (font != null) FontFamily = FontReference(font, "Consolas, 'Segoe UI', Inter, monospace");
+        if (font != null)
+            FontFamily = PrependFontReference(font, FontFamily, BuiltInThemes.Cyberpunk.FontFamily);
     }
 
     [RelayCommand]
     private void UseFontAsMono(FontEntry? font)
     {
-        if (font != null) MonoFontFamily = FontReference(font, "Consolas, monospace");
+        if (font != null)
+            MonoFontFamily = PrependFontReference(font, MonoFontFamily, BuiltInThemes.Cyberpunk.MonoFontFamily);
     }
 
-    private static string FontReference(FontEntry font, string fallbacks)
+    private static string PrependFontReference(FontEntry font, string currentList, string defaultFallbacks)
     {
-        string family = string.IsNullOrWhiteSpace(font.FamilyName) ? Path.GetFileNameWithoutExtension(font.FileName) : font.FamilyName;
-        return $"fonts/{font.FileName}#{family}, {fallbacks}";
+        string family = string.IsNullOrWhiteSpace(font.FamilyName)
+            ? Path.GetFileNameWithoutExtension(font.FileName)
+            : font.FamilyName.Trim();
+        string filePrefix = $"fonts/{font.FileName}";
+        string entry = $"{filePrefix}#{family}";
+
+        string source = string.IsNullOrWhiteSpace(currentList) ? defaultFallbacks : currentList;
+        var existing = source
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0 && !p.Contains(filePrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        existing.Insert(0, entry);
+        return string.Join(", ", existing);
+    }
+
+    private static string RemoveFontReference(string currentList, string filePrefix, string defaultFallbacks)
+    {
+        var remaining = currentList
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0 && !p.Contains(filePrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return remaining.Count > 0 ? string.Join(", ", remaining) : defaultFallbacks;
     }
 
     [RelayCommand]
@@ -1163,12 +1867,16 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ResetColoursToBase()
     {
+        var defaultAprm = new AprmBoxSettings();
         _suppressChanges = true;
         try
         {
             foreach (var (key, vm) in _tokens)
                 if (BuiltInThemes.Cyberpunk.Tokens.TryGetValue(key, out var v))
                     vm.SetValue(v);
+            AprmBoxEnabled = defaultAprm.Enabled;
+            AprmBoxBorderColor = defaultAprm.BorderColor;
+            AprmBoxTextColor = defaultAprm.TextColor;
         }
         finally
         {
@@ -1281,7 +1989,26 @@ public partial class MainViewModel : ObservableObject
     {
         CreatorSettings.Current.SkippedVersion = version;
         CreatorSettings.Current.Save();
+        OnPropertyChanged(nameof(HasSkippedVersion));
+        OnPropertyChanged(nameof(SkippedVersionText));
         UpdateStatusText = $"Version v{version} skipped.";
         SetStatus($"Skipped update v{version}.");
+    }
+
+    [RelayCommand]
+    private void OpenLog()
+    {
+        try
+        {
+            string path = CreatorLogging.Instance.GetLogFilePath();
+            if (!File.Exists(path))
+                CreatorLogging.Instance.Info("Log file opened by user.");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            CreatorLogging.Instance.Error("Could not open log file", ex);
+            SetStatus($"Could not open log file: {ex.Message}", isError: true);
+        }
     }
 }

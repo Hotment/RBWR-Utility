@@ -25,6 +25,7 @@ public static class BuiltInThemes
 
     public static string CyberpunkXaml => _cyberpunkXaml ??= ReadResource("Base.CyberpunkTheme.axaml");
     public static string ReactorAmberXaml => _amberXaml ??= ReadResource("Base.ReactorAmberTheme.axaml");
+    public static string AuroraDriftXaml => ReadResource("Base.AuroraDrift.axaml");
 
     /// <summary>The overlay's default theme as editable state (used as fallback for missing tokens).</summary>
     public static ThemeState Cyberpunk => _cyberpunkState ??= ThemeImporter.FromXaml(
@@ -62,14 +63,17 @@ public static class BuiltInThemes
     </Style>
     <Style Selector="Button.cyber-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Foreground" Value="{DynamicResource TextLight}" />
     </Style>
     <Style Selector="Button.cyber-nav.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
     </Style>
     <Style Selector="Button.cyber-nav:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlPressedBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
     </Style>
     <Style Selector="Button.cyber-blue:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ControlActiveBg}" />
@@ -174,6 +178,12 @@ public static class BuiltInThemes
         <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
     </Style>
+    <Style Selector="Border#PowerBanner">
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBlock#MainPowerReadout">
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
 </Styles>
 """;
 
@@ -200,6 +210,13 @@ public static class BuiltInThemes
             ReactorAmberXaml, new ThemeManifest(), Cyberpunk, includeStyles: true), "my-amber", "My Amber Theme", includeCustom: true)),
         new("Arctic Slate", "Calm blue/slate palette (the overlay's template).", () => Fresh(ArcticSlate(), "my-arctic", "My Arctic Theme", includeCustom: false)),
         new("Synthwave (gradients)", "Purple-to-navy gradients with pink/cyan neon edges.", Synthwave),
+        new("Aurora Drift (animated)", "Animated northern lights: teal, violet and pink.", () =>
+        {
+            var s = Fresh(ThemeImporter.FromXaml(AuroraDriftXaml, new ThemeManifest(), Cyberpunk, includeStyles: true),
+                "my-aurora", "My Aurora Theme", includeCustom: true);
+            s.Manifest.MinAppVersion = "2.3.1"; // animated colours
+            return s;
+        }),
         new("Blank (from accent)", "Pick one accent colour and the creator derives the rest.", () =>
         {
             var s = Fresh(Cyberpunk, "my-theme", "My Theme", includeCustom: false);
@@ -216,7 +233,7 @@ public static class BuiltInThemes
             {
                 Id = id,
                 Name = name,
-                Author = CreatorSettings.Current.LastAuthor,
+                Author = CreatorSettings.Current.AuthorForNewThemes,
                 Version = "1.0.0",
                 Description = string.Empty,
                 Entry = "theme.axaml",

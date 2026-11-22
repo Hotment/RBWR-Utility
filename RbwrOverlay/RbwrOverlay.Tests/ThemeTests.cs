@@ -30,17 +30,69 @@ public class ThemeTests : IDisposable
         }
     }
 
+    private static byte[] PngHeader(uint width, uint height)
+    {
+        var bytes = new byte[33];
+        new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R' }.CopyTo(bytes, 0);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(16), width);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(20), height);
+        return bytes;
+    }
+
+    [Fact]
+    public void ThumbnailGuard_AcceptsNormalPng_RejectsHugeOrFakeImages()
+    {
+        Assert.True(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(705, 683))));
+        Assert.True(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(4000, 4000))));
+
+        // Small file declaring enormous dimensions: must not be decoded.
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(30000, 30000))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(8000, 8000))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(0, 100))));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream(PngHeader(uint.MaxValue, 1))));
+
+        // Not a PNG (e.g. a JPEG renamed to preview.png), or a truncated file.
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 0x4A, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0])));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream([0x89, 0x50, 0x4E])));
+        Assert.False(ThemeThumbnailService.IsSafePng(new MemoryStream()));
+    }
+
+    [Fact]
+    public void Thumbnail_HugeOrBrokenPreviewPng_GivesNoThumbnailInsteadOfCrashing()
+    {
+        string dir = Path.Combine(_tempDir, "huge-preview");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "theme.axaml"), "<Styles />");
+        var info = new InstalledThemeInfo { Id = "huge-preview", DirectoryPath = dir, EntryFilePath = Path.Combine(dir, "theme.axaml") };
+
+        File.WriteAllBytes(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), PngHeader(50000, 50000));
+        Assert.Null(ThemeThumbnailService.Get(info));
+
+        File.WriteAllText(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), "this is not an image");
+        File.SetLastWriteTimeUtc(Path.Combine(dir, ThemeThumbnailService.PreviewFileName), DateTime.UtcNow.AddMinutes(1));
+        Assert.Null(ThemeThumbnailService.Get(info));
+
+        // No preview.png at all: still fine, just no thumbnail.
+        File.Delete(Path.Combine(dir, ThemeThumbnailService.PreviewFileName));
+        Assert.Null(ThemeThumbnailService.Get(info));
+    }
+
     [Fact]
     public void TestDiscoverThemesIncludesBothBuiltInThemesFirst()
     {
         var svc = new ThemeService(themesDirectory: _tempDir);
         var themes = svc.DiscoverThemes();
 
-        Assert.Equal(2, themes.Count);
+        Assert.Equal(3, themes.Count);
         Assert.Equal(ThemeService.DefaultThemeId, themes[0].Id);
         Assert.Equal(ThemeService.ReactorAmberThemeId, themes[1].Id);
-        Assert.True(themes[0].IsBuiltIn);
-        Assert.True(themes[1].IsBuiltIn);
+        Assert.Equal(ThemeService.AuroraDriftThemeId, themes[2].Id);
+        Assert.All(themes, t => Assert.True(t.IsBuiltIn));
+        Assert.Equal("Uranium-q2", themes[2].Author);
+
+        var auroraRes = svc.ApplyTheme(ThemeService.AuroraDriftThemeId);
+        Assert.True(auroraRes.Success, auroraRes.ErrorMessage);
+        Assert.Equal(ThemeService.AuroraDriftThemeId, svc.ActiveThemeId);
 
         var amberRes = svc.ApplyTheme(ThemeService.ReactorAmberThemeId);
         Assert.True(amberRes.Success, amberRes.ErrorMessage);
@@ -219,7 +271,7 @@ public class ThemeTests : IDisposable
         themeSvc.CreateTemplateTheme("arctic-pack");
         using var selectorVm = mainVm.CreateThemeSelectorViewModel();
 
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
         var builtIn = selectorVm.FilteredThemes.First(t => t.Id == ThemeService.DefaultThemeId);
         var amber = selectorVm.FilteredThemes.First(t => t.Id == ThemeService.ReactorAmberThemeId);
         var custom = selectorVm.FilteredThemes.First(t => t.Id == "arctic-pack");
@@ -258,13 +310,15 @@ public class ThemeTests : IDisposable
         selectorVm.SearchQuery = "Arctic Slate";
         Assert.Single(selectorVm.FilteredThemes);
         selectorVm.SearchQuery = string.Empty;
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
 
         // Built-in themes cannot be deleted
         var (delBuiltIn, _) = themeSvc.DeleteTheme(ThemeService.DefaultThemeId);
         Assert.False(delBuiltIn);
         var (delAmber, _) = themeSvc.DeleteTheme(ThemeService.ReactorAmberThemeId);
         Assert.False(delAmber);
+        var (delAurora, _) = themeSvc.DeleteTheme(ThemeService.AuroraDriftThemeId);
+        Assert.False(delAurora);
 
         // Deleting active custom theme requires two-click confirmation
         activeCustom = selectorVm.FilteredThemes.First(t => t.Id == "arctic-pack");
@@ -272,12 +326,12 @@ public class ThemeTests : IDisposable
         selectorVm.DeleteEntry(activeCustom);
         Assert.True(activeCustom.IsConfirmingDelete);
         Assert.Equal("Confirm?", activeCustom.DeleteButtonText);
-        Assert.Equal(3, selectorVm.FilteredThemes.Count);
+        Assert.Equal(4, selectorVm.FilteredThemes.Count);
 
         // Second click confirms and deletes, reverting to default
         selectorVm.DeleteEntry(activeCustom);
         Assert.Equal(ThemeService.DefaultThemeId, themeSvc.ActiveThemeId);
-        Assert.Equal(2, selectorVm.FilteredThemes.Count);
+        Assert.Equal(3, selectorVm.FilteredThemes.Count);
         Assert.All(selectorVm.FilteredThemes, t => Assert.True(t.IsBuiltIn));
     }
 
@@ -338,6 +392,57 @@ public class ThemeTests : IDisposable
         string okXaml = ThemeService.PrepareThemeXaml(
             "<Styles xmlns=\"https://github.com/avaloniaui\" xmlns:b=\"using:RbwrOverlay.UI.Behaviors\" xmlns:a=\"using:Avalonia.Controls\"></Styles>", themeDir);
         Assert.Contains("using:RbwrOverlay.UI.Behaviors", okXaml);
+    }
+
+    private static void WriteTheme(string dir, string id, string minAppVersion)
+    {
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "theme.json"),
+            $$"""{"id":"{{id}}","name":"{{id}} name","version":"1.0.0","entry":"theme.axaml","min_app_version":"{{minAppVersion}}"}""");
+        File.WriteAllText(Path.Combine(dir, "theme.axaml"), "<Styles xmlns=\"https://github.com/avaloniaui\" />");
+    }
+
+    [Fact]
+    public void ThemesForANewerOverlay_AreHidden_NotInstalled_AndNotApplied()
+    {
+        string old = ThemeService.CurrentAppVersion;
+        ThemeService.CurrentAppVersion = "2.3.1";
+        try
+        {
+            string themes = Path.Combine(_tempDir, "themes-block");
+            WriteTheme(Path.Combine(themes, "fits"), "fits", "2.3.1");
+            WriteTheme(Path.Combine(themes, "too-new"), "too-new", "2.3.2"); // dropped into the folder by hand
+            var svc = new ThemeService(themesDirectory: themes);
+
+            // Not listed at all.
+            var ids = svc.DiscoverThemes().Select(t => t.Id).ToList();
+            Assert.Contains("fits", ids);
+            Assert.DoesNotContain("too-new", ids);
+            Assert.Contains(svc.DiscoverTooNewThemes(), t => t.Id == "too-new");
+
+            // Applying it (e.g. remembered from before) fails cleanly with a clear message.
+            var apply = svc.ApplyTheme("too-new");
+            Assert.False(apply.Success);
+            Assert.Contains("needs overlay v2.3.2 or newer", apply.ErrorMessage);
+
+            // Installing from a folder or a .zip is refused before anything is copied.
+            string source = Path.Combine(_tempDir, "src-too-new");
+            WriteTheme(source, "shiny", "2.4.0");
+            var fromFolder = svc.InstallTheme(Path.Combine(source, "theme.json"));
+            Assert.False(fromFolder.Success);
+            Assert.Contains("needs overlay v2.4.0 or newer", fromFolder.ErrorMessage);
+
+            string zip = Path.Combine(_tempDir, "shiny.zip");
+            ZipFile.CreateFromDirectory(source, zip);
+            var fromZip = svc.InstallTheme(zip);
+            Assert.False(fromZip.Success);
+            Assert.Contains("needs overlay v2.4.0 or newer", fromZip.ErrorMessage);
+            Assert.False(Directory.Exists(Path.Combine(themes, "shiny")));
+        }
+        finally
+        {
+            ThemeService.CurrentAppVersion = old;
+        }
     }
 
     [Fact]

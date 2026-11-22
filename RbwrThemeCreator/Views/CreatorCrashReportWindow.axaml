@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RbwrThemeCreator.ViewModels"
+        xmlns:views="using:RbwrThemeCreator.Views"
+        x:Class="RbwrThemeCreator.Views.CreatorCrashReportWindow"
+        x:DataType="vm:CreatorCrashReportViewModel"
+        Title="RBWR Theme Creator - Crash Report"
+        Icon="/Assets/icon.ico"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="None"
+        CanResize="False"
+        Width="560"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen">
+
+    <Border x:Name="RootBorder" Classes="dialog-frame" BorderBrush="{DynamicResource EdRed}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+            <Border Grid.Row="0"
+                    Classes="hud-header"
+                    CornerRadius="{Binding #RootBorder.CornerRadius, Converter={x:Static views:CornerRadiusEdgeConverter.TopOnly}}"
+                    Padding="16,10"
+                    PointerPressed="OnHeaderPointerPressed">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Border Width="3" Height="13" CornerRadius="1.5" Background="{DynamicResource EdRed}" VerticalAlignment="Center" />
+                        <TextBlock Text="FATAL APPLICATION CRASH" Foreground="{DynamicResource EdRed}" FontWeight="Bold" FontSize="11" LetterSpacing="1.2" VerticalAlignment="Center" />
+                        <TextBlock Text="· RBWR THEME CREATOR" Classes="faint" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="win-btn win-close" Content="X" Command="{Binding ExitAppCommand}" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource EdBorder}" />
+
+            <StackPanel Grid.Row="2" Margin="16,14" Spacing="10">
+                <TextBlock Text="RBWR Theme Creator encountered an unexpected error and needs to close. Unsaved work is preserved in autosave recovery when enabled."
+                           Classes="muted" FontSize="11.5" />
+
+                <TextBox Classes="hud code"
+                         Text="{Binding Traceback, Mode=OneWay}"
+                         IsReadOnly="True"
+                         Height="210"
+                         TextWrapping="NoWrap" />
+
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{DynamicResource EdCyan}"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <Border Grid.Row="3"
+                    Background="{DynamicResource EdPanel}"
+                    BorderBrush="{DynamicResource EdBorder}"
+                    BorderThickness="0,1,0,0"
+                    CornerRadius="0,0,12,12"
+                    Padding="16,10">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                    <Button Grid.Column="0" Classes="hud" Content="{Binding CopyButtonText}" Command="{Binding CopyTracebackCommand}" Margin="0,0,6,0" />
+                    <Button Grid.Column="1" Classes="hud" Content="OPEN LOG" Command="{Binding OpenLogCommand}" Margin="0,0,6,0" />
+                    <Button Grid.Column="3" Classes="hud-blue" Content="SEND REPORT" Command="{Binding SendReportCommand}" IsEnabled="{Binding !IsSending}" Margin="0,0,8,0" />
+                    <Button Grid.Column="4" Classes="hud-red" Content="EXIT" Command="{Binding ExitAppCommand}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

@@ -6,10 +6,20 @@ namespace RbwrThemeCreator.Models;
 /// <summary>
 /// Value of a brush token. <see cref="Color"/> is the solid colour, or the first stop of the gradient.
 /// </summary>
-public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec? Gradient = null)
+public sealed record TokenValue(Color Color, double Opacity = 1.0, GradientSpec? Gradient = null, TokenAnimation? Animation = null)
 {
     /// <summary>Single representative colour (used for &lt;Color&gt; mirrors, glow and contrast).</summary>
     public Color Representative => Gradient == null ? Color : GradientSpec.Average(Color, Gradient);
+}
+
+/// <summary>
+/// A colour token that changes by itself in the overlay.
+/// <see cref="Flow"/> = false: the whole element goes through <see cref="Colors"/> at once.
+/// <see cref="Flow"/> = true: a gradient of <see cref="Colors"/> whose colours move along, one after another.
+/// </summary>
+public sealed record TokenAnimation(IReadOnlyList<Color> Colors, bool Flow, double Seconds, double Angle = 0)
+{
+    public const int MaxColors = 4;
 }
 
 /// <summary>
@@ -114,6 +124,16 @@ public sealed class BackgroundImageSettings
     public BackgroundImageSettings Clone() => (BackgroundImageSettings)MemberwiseClone();
 }
 
+/// <summary>Optional independent border and readout text colours for the APRM power box (#PowerBanner).</summary>
+public sealed class AprmBoxSettings
+{
+    public bool Enabled { get; set; }
+    public Color BorderColor { get; set; } = Color.Parse("#00f0ff");
+    public Color TextColor { get; set; } = Color.Parse("#00f0ff");
+
+    public AprmBoxSettings Clone() => (AprmBoxSettings)MemberwiseClone();
+}
+
 /// <summary>
 /// Complete, UI-independent description of a theme. The generator turns it into theme.axaml,
 /// the importer rebuilds it from an existing theme folder.
@@ -125,6 +145,7 @@ public sealed class ThemeState
     public string MonoFontFamily { get; set; } = "Consolas, monospace";
     public Dictionary<string, TokenValue> Tokens { get; set; } = new(StringComparer.Ordinal);
     public ShapeSettings Shape { get; set; } = new();
+    public AprmBoxSettings AprmBox { get; set; } = new();
     public BackgroundImageSettings? BackgroundImage { get; set; }
 
     /// <summary>Font files that end up in fonts/.</summary>
@@ -138,6 +159,12 @@ public sealed class ThemeState
 
     /// <summary>Raw XAML &lt;Style&gt; elements appended after the generated sections.</summary>
     public string CustomStyles { get; set; } = string.Empty;
+
+    /// <summary>
+    /// A PNG chosen by the user as the theme's thumbnail (preview.png). Null = the thumbnail is
+    /// rendered automatically from the MONITOR view.
+    /// </summary>
+    public string? CustomPreviewPath { get; set; }
 
     /// <summary>Non-fatal notes produced while importing.</summary>
     public List<string> ImportWarnings { get; } = new();
@@ -160,10 +187,12 @@ public sealed class ThemeState
             MonoFontFamily = MonoFontFamily,
             Tokens = new Dictionary<string, TokenValue>(Tokens, StringComparer.Ordinal),
             Shape = Shape.Clone(),
+            AprmBox = AprmBox.Clone(),
             BackgroundImage = BackgroundImage?.Clone(),
             Fonts = new List<ThemeFile>(Fonts),
             Assets = new List<ThemeFile>(Assets),
             CustomResources = CustomResources,
+            CustomPreviewPath = CustomPreviewPath,
             CustomStyles = CustomStyles,
         };
         copy.ImportWarnings.AddRange(ImportWarnings);

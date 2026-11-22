@@ -161,6 +161,11 @@ public static class ThemeImporter
                 state.Assets.Add(new ThemeFile(Path.GetFileName(f), Path.GetFullPath(f)));
         }
 
+        // A custom thumbnail (marked by preview.custom) is kept as the theme's thumbnail.
+        string preview = Path.Combine(dir, ThemeExporter.PreviewFileName);
+        if (File.Exists(Path.Combine(dir, ThemeExporter.CustomPreviewMarker)) && File.Exists(preview))
+            state.CustomPreviewPath = Path.GetFullPath(preview);
+
         if (state.BackgroundImage != null && state.Assets.All(a => !a.FileName.Equals(state.BackgroundImage.FileName, StringComparison.OrdinalIgnoreCase)))
         {
             state.ImportWarnings.Add($"Background image assets/{state.BackgroundImage.FileName} is missing; background image removed.");
@@ -181,6 +186,9 @@ public static class ThemeImporter
 
         string rest = xaml;
         string? shapeXml = ExtractRegion(ref rest, ThemeXamlGenerator.ShapeBegin, ThemeXamlGenerator.ShapeEnd);
+        _ = ExtractRegion(ref rest, ThemeXamlGenerator.AprmBoxBegin, ThemeXamlGenerator.AprmBoxEnd);
+        _ = ExtractRegion(ref rest, ThemeXamlGenerator.AnimationBegin, ThemeXamlGenerator.AnimationEnd); // old dev-build section, dropped
+        string? tokenAnimationsXml = ExtractRegion(ref rest, ThemeXamlGenerator.TokenAnimationsBegin, ThemeXamlGenerator.TokenAnimationsEnd);
         string? customResources = ExtractRegion(ref rest, ThemeXamlGenerator.ResourcesBegin, ThemeXamlGenerator.ResourcesEnd);
         string? customStyles = ExtractRegion(ref rest, ThemeXamlGenerator.CustomBegin, ThemeXamlGenerator.CustomEnd);
 
@@ -221,6 +229,18 @@ public static class ThemeImporter
                          && ColorUtil.TryParse(el.Value, out var mirror))
                 {
                     mirrorColors[key] = mirror;
+                }
+                else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key == ThemeXamlGenerator.AprmBoxBorderKey
+                         && ColorUtil.TryParse((string?)el.Attribute("Color"), out var aprmBorder))
+                {
+                    state.AprmBox.Enabled = true;
+                    state.AprmBox.BorderColor = aprmBorder;
+                }
+                else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key == ThemeXamlGenerator.AprmBoxTextKey
+                         && ColorUtil.TryParse((string?)el.Attribute("Color"), out var aprmText))
+                {
+                    state.AprmBox.Enabled = true;
+                    state.AprmBox.TextColor = aprmText;
                 }
                 else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key != null && TokenCatalog.ByKey.ContainsKey(key)
                          && ColorUtil.TryParse((string?)el.Attribute("Color"), out var brushColor)
@@ -291,6 +311,8 @@ public static class ThemeImporter
 
         if (!string.IsNullOrWhiteSpace(shapeXml))
             state.Shape = ParseShape(shapeXml);
+        if (!string.IsNullOrWhiteSpace(tokenAnimationsXml))
+            ApplyTokenAnimations(state, tokenAnimationsXml);
 
         return state;
     }
@@ -393,6 +415,34 @@ public static class ThemeImporter
                 shape.ButtonCornerRadius = Get("CornerRadius", shape.ButtonCornerRadius);
         }
         return shape;
+    }
+
+    /// <summary>Puts the animated-token settings (stored as JSON in a comment) back on the tokens.</summary>
+    private static void ApplyTokenAnimations(ThemeState state, string regionXml)
+    {
+        int start = regionXml.IndexOf(ThemeXamlGenerator.TokenAnimationsPrefix, StringComparison.Ordinal);
+        if (start < 0) return;
+        start += ThemeXamlGenerator.TokenAnimationsPrefix.Length;
+        int end = regionXml.IndexOf("-->", start, StringComparison.Ordinal);
+        if (end < 0) return;
+        try
+        {
+            var map = JsonSerializer.Deserialize<Dictionary<string, ThemeXamlGenerator.TokenAnimationJson>>(regionXml[start..end].Trim());
+            if (map == null) return;
+            foreach (var (key, json) in map)
+            {
+                if (!TokenCatalog.GradientKeys.Contains(key) || !state.Tokens.TryGetValue(key, out var value)) continue;
+                var colours = (json.Colors ?? []).Select(h => ColorUtil.TryParse(h, out var c) ? (Color?)c : null)
+                    .OfType<Color>().Take(TokenAnimation.MaxColors).ToList();
+                if (colours.Count < 2) continue;
+                double angle = double.IsFinite(json.Angle) ? ((json.Angle % 360) + 360) % 360 : 0;
+                state.Tokens[key] = value with { Animation = new TokenAnimation(colours, json.Flow, Math.Clamp(json.Seconds, 1, 60), angle) };
+            }
+        }
+        catch
+        {
+            // unreadable settings: the theme opens without animated tokens
+        }
     }
 
     private static string? ExtractRegion(ref string text, string begin, string end)
