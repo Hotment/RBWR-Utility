@@ -29,7 +29,7 @@ import time
 import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Coroutine, Sequence
+from typing import Any, Callable, Coroutine, Sequence, TypeGuard
 
 import disnake
 from disnake.ext import commands
@@ -478,7 +478,7 @@ def list_roles() -> dict:
     return _run(_roles, timeout=6)
 
 
-def _is_panel_post(channel) -> bool:
+def _is_panel_post(channel: Any) -> TypeGuard[disnake.Thread]:
     """A thread (forum post or channel thread) on the RBWR server."""
     return isinstance(channel, disnake.Thread) and channel.guild.id == _guild_id()
 
