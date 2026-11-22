@@ -151,7 +151,7 @@
                                                 Padding="6,1"
                                                 RenderTransform="translateY(2px)"
                                                 IsVisible="{Binding HasEmptyJobId}">
-                                            <TextBlock Text="{Binding EmptyJobId}" Foreground="{DynamicResource NeonGold}"
+                                            <TextBlock Text="{Binding EmptyJobId}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonGold}"
                                                        FontSize="12" FontWeight="SemiBold" />
                                         </Border>
                                     </InlineUIContainer>
@@ -177,7 +177,7 @@
                                                         Classes="hud-card sub-panel"
                                                         Width="210"
                                                         Padding="10,4">
-                                                    <TextBlock Text="{Binding Value}"
+                                                    <TextBlock Text="{Binding Value}" FontFamily="{DynamicResource AppMonoFontFamily}"
                                                                Foreground="{DynamicResource NeonCyan}"
                                                                FontWeight="Bold"
                                                                FontSize="14"
@@ -217,24 +217,24 @@
                             <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
                                 <TextBlock Classes="cyber-head" Text="UI SCALE" />
                                 <TextBlock Grid.Column="1" Classes="cyber-head" Foreground="{DynamicResource NeonCyan}"
-                                           Text="{Binding UiScaleText}" />
+                                           Text="{Binding UiScaleText}" FontFamily="{DynamicResource AppMonoFontFamily}" />
                             </Grid>
                             <Slider Classes="cyber-slider" Minimum="0.75" Maximum="2.0" TickFrequency="0.05"
                                     IsSnapToTickEnabled="True" Value="{Binding UiScalePreview}" Margin="0,2" />
                             <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
-                                <Button Classes="cyber" Padding="0,6" FontSize="11" Content="75%"
+                                <Button Classes="cyber" Padding="0,6" FontSize="11" Content="75%" FontFamily="{DynamicResource AppMonoFontFamily}"
                                         Command="{Binding SetUiScaleCommand}" CommandParameter="0.75"
                                         HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="1" Classes="cyber" Padding="0,6" FontSize="11" Content="100%"
+                                <Button Grid.Column="1" Classes="cyber" Padding="0,6" FontSize="11" Content="100%" FontFamily="{DynamicResource AppMonoFontFamily}"
                                         Command="{Binding SetUiScaleCommand}" CommandParameter="1.0"
                                         HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="2" Classes="cyber" Padding="0,6" FontSize="11" Content="125%"
+                                <Button Grid.Column="2" Classes="cyber" Padding="0,6" FontSize="11" Content="125%" FontFamily="{DynamicResource AppMonoFontFamily}"
                                         Command="{Binding SetUiScaleCommand}" CommandParameter="1.25"
                                         HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="3" Classes="cyber" Padding="0,6" FontSize="11" Content="150%"
+                                <Button Grid.Column="3" Classes="cyber" Padding="0,6" FontSize="11" Content="150%" FontFamily="{DynamicResource AppMonoFontFamily}"
                                         Command="{Binding SetUiScaleCommand}" CommandParameter="1.5"
                                         HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="4" Classes="cyber" Padding="0,6" FontSize="11" Content="200%"
+                                <Button Grid.Column="4" Classes="cyber" Padding="0,6" FontSize="11" Content="200%" FontFamily="{DynamicResource AppMonoFontFamily}"
                                         Command="{Binding SetUiScaleCommand}" CommandParameter="2.0"
                                         HorizontalAlignment="Stretch" />
                             </Grid>
