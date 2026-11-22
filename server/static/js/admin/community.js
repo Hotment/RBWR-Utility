@@ -25,13 +25,17 @@ window.Community = (() => {
         return [...groups];
     };
 
-    async function call(path, options, done) {
+    // `btn` (optional) stays disabled until the request finishes, so double clicks can't fire it twice.
+    async function call(path, options, done, btn) {
+        if (btn) btn.disabled = true;
         try {
             const res = await api(path, options);
             render(res);
             if (done) toast(typeof done === "function" ? done(res) : done);
         } catch (err) {
             toast(err.message, "error");
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -177,23 +181,23 @@ window.Community = (() => {
             if (act === "sb-setup") {
                 call("/api/admin/community/starboard/setup", { method: "POST", body: {
                     emoji: $("cm-sb-setup-emoji").value.trim() || "⭐", threshold: Number($("cm-sb-setup-threshold").value) || 3,
-                } }, "Starboard created.");
+                } }, "Starboard created.", btn);
             }
-            if (act === "ss-setup") call("/api/admin/community/serverstats/setup", { method: "POST" }, "Server stats created.");
+            if (act === "ss-setup") call("/api/admin/community/serverstats/setup", { method: "POST" }, "Server stats created.", btn);
             if (act === "ss-add") {
                 call("/api/admin/community/serverstats/counters", { method: "POST", body: {
                     type: $("cm-ss-add-type").value, template: $("cm-ss-add-name").value,
-                } }, "Counter added.");
+                } }, "Counter added.", btn);
             }
             if (act === "ss-remove" && confirm(`Remove the ${btn.dataset.type} counter and its channel?`)) {
-                call(`/api/admin/community/serverstats/counters/${encodeURIComponent(btn.dataset.type)}`, { method: "DELETE" }, "Counter removed.");
+                call(`/api/admin/community/serverstats/counters/${encodeURIComponent(btn.dataset.type)}`, { method: "DELETE" }, "Counter removed.", btn);
             }
             if (act === "ss-refresh") {
                 call("/api/admin/community/serverstats/refresh", { method: "POST" },
-                    (r) => r.renamed ? `Updated ${r.renamed} channel${r.renamed === 1 ? "" : "s"}.` : "Everything is already up to date (or Discord's rename limit applies).");
+                    (r) => r.renamed ? `Updated ${r.renamed} channel${r.renamed === 1 ? "" : "s"}.` : "Everything is already up to date (or Discord's rename limit applies).", btn);
             }
             if (act === "ss-delete" && confirm("Delete the Server Stats category and all its channels?")) {
-                call("/api/admin/community/serverstats", { method: "DELETE" }, "Server stats removed.");
+                call("/api/admin/community/serverstats", { method: "DELETE" }, "Server stats removed.", btn);
             }
         });
     }

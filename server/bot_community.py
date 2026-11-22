@@ -42,6 +42,7 @@ _tasks: dict[str, asyncio.Task] = {}
 _latest_version: str | None = None
 _latest_creator_version: str | None = None
 _star_locks: dict[int, asyncio.Lock] = {}
+_stats_setup_lock = asyncio.Lock()
 
 
 class _Hooks:
@@ -405,17 +406,30 @@ def _stats_view_embed(guild: disnake.Guild, bot: commands.InteractionBot) -> dis
     return embed
 
 
+def _stats_set_up(guild: disnake.Guild) -> bool:
+    config = stats_config()
+    return bool(config.get("category_id") and guild.get_channel(int(config["category_id"])))
+
+
 async def build_serverstats(guild: disnake.Guild, by: str, bot: commands.InteractionBot) -> list[dict]:
-    category = await guild.create_category("Server Stats", overwrites=_locked_overwrites(guild), position=0,
-                                           reason=f"Server stats set up by {by}")
-    counters = []
-    for kind in DEFAULT_COUNTERS:
-        if kind in ("humans", "bots") and not bot.intents.members:
-            continue
-        counters.append(await _create_counter(guild, category, kind, None, bot))
-    with serverstats_store.edit() as data:
-        data["config"] = {"enabled": True, "category_id": str(category.id), "counters": counters}
-    return counters
+    # The lock + re-check stop double clicks / parallel requests from each building their own category.
+    async with _stats_setup_lock:
+        if _stats_set_up(guild):
+            raise bf.BotActionError("Server stats are already set up.")
+        category = await guild.create_category("Server Stats", overwrites=_locked_overwrites(guild), position=0,
+                                               reason=f"Server stats set up by {by}")
+        # Save the category right away so it's known even if a counter fails below.
+        with serverstats_store.edit() as data:
+            data["config"] = {"enabled": True, "category_id": str(category.id), "counters": []}
+        counters = []
+        for kind in DEFAULT_COUNTERS:
+            if kind in ("humans", "bots") and not bot.intents.members:
+                continue
+            counter = await _create_counter(guild, category, kind, None, bot)
+            counters.append(counter)
+            with serverstats_store.edit() as data:
+                data.setdefault("config", {}).setdefault("counters", []).append(counter)
+        return counters
 
 
 async def add_counter(guild: disnake.Guild, kind: str, template: str | None, bot: commands.InteractionBot) -> dict:
@@ -531,9 +545,6 @@ def panel_setup_starboard(by: str, emoji: str, threshold: int) -> str:
 def panel_setup_serverstats(by: str) -> int:
     async def _go():
         guild = bf._panel_guild()
-        config = stats_config()
-        if config.get("category_id") and guild.get_channel(int(config["category_id"])):
-            raise bf.BotActionError("Server stats are already set up.")
         return len(await build_serverstats(guild, by, bf._bot))  # pyright: ignore[reportArgumentType]
     return bf._run(_go, timeout=30)
 
@@ -706,14 +717,16 @@ def register(bot: commands.InteractionBot, *, guild_ids, install, contexts) -> N
         guild = await _staff_guild(inter, "serverstats")
         if not guild:
             return
-        config = stats_config()
-        if config.get("category_id") and guild.get_channel(int(config["category_id"])):
+        if _stats_set_up(guild):
             await inter.response.send_message("Server stats are already set up. Use `/serverstats add` for more counters, "
                                               "or `/serverstats delete` to start over.", ephemeral=True)
             return
         await inter.response.defer(ephemeral=True)
         try:
             await build_serverstats(guild, str(inter.author), bot)
+        except bf.BotActionError as exc:
+            await inter.followup.send(str(exc), ephemeral=True)
+            return
         except disnake.HTTPException as exc:
             await inter.followup.send(f"I couldn't create the channels: {exc}. I need **Manage Channels**.", ephemeral=True)
             return
