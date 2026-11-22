@@ -25,7 +25,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.3.1-dev";
+    public const string AppVersion = "2.3.1";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -137,7 +137,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     public IBrush PowerBannerTextBrush => ThemeService.TryResolveBrush("PowerBannerText") ?? MainPowerBrush;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PowerBannerBarBrush))]
     private IBrush _powerBarBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+
+    public IBrush PowerBannerBarBrush => ThemeService.TryResolveBrush("PowerBannerBar") ?? PowerBarBrush;
 
     [ObservableProperty]
     private string _compactRtpText = "0.0% APRM";
@@ -2254,6 +2257,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
         OnPropertyChanged(nameof(PowerBannerBorderBrush));
         OnPropertyChanged(nameof(PowerBannerTextBrush));
+        OnPropertyChanged(nameof(PowerBannerBarBrush));
 
         ConnectionStatusBrush = ConnectionStatusText switch
         {

@@ -188,7 +188,7 @@
                                          Value="{Binding ThermalPowerPercent}"
                                          Minimum="0"
                                          Maximum="120"
-                                         Foreground="{Binding PowerBarBrush}"
+                                         Foreground="{Binding PowerBannerBarBrush}"
                                          Margin="10,2" />
 
                             <TextBlock x:Name="MainPowerSubtext"

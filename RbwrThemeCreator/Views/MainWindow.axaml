@@ -333,7 +333,7 @@
                             <Border Classes="card">
                                 <StackPanel Spacing="8">
                                     <TextBlock Classes="section-title" Text="APRM POWER BOX" />
-                                    <TextBlock Classes="muted" Text="Independently set the APRM box border and readout text colours without changing other elements. When off, the box follows the dynamic power-level status colour." />
+                                    <TextBlock Classes="muted" Text="Independently set the APRM box border, readout text, and bar colours without changing other elements. When off, the box follows the dynamic power-level status colour." />
                                     <ToggleSwitch IsChecked="{Binding AprmBoxEnabled}"
                                                   OnContent="Custom APRM box colours"
                                                   OffContent="Follow dynamic status colour" />
@@ -353,6 +353,15 @@
                                                 <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
                                                     <TextBlock Text="APRM readout text" FontSize="12.5" FontWeight="SemiBold" />
                                                     <TextBlock Classes="faint" Text="PowerBannerText" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <Border Classes="token-row">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <views:HudColorPicker Grid.Column="0" Color="{Binding AprmBoxBarColor}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="APRM power bar" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="faint" Text="PowerBannerBar" />
                                                 </StackPanel>
                                             </Grid>
                                         </Border>

@@ -124,12 +124,13 @@ public sealed class BackgroundImageSettings
     public BackgroundImageSettings Clone() => (BackgroundImageSettings)MemberwiseClone();
 }
 
-/// <summary>Optional independent border and readout text colours for the APRM power box (#PowerBanner).</summary>
+/// <summary>Optional independent border, readout text, and bar colours for the APRM power box (#PowerBanner).</summary>
 public sealed class AprmBoxSettings
 {
     public bool Enabled { get; set; }
     public Color BorderColor { get; set; } = Color.Parse("#00f0ff");
     public Color TextColor { get; set; } = Color.Parse("#00f0ff");
+    public Color BarColor { get; set; } = Color.Parse("#00f0ff");
 
     public AprmBoxSettings Clone() => (AprmBoxSettings)MemberwiseClone();
 }

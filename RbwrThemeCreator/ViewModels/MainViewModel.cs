@@ -21,7 +21,7 @@ public sealed class PreviewReadyEventArgs(Styles? styles, List<Bitmap> bitmaps) 
 
 public partial class MainViewModel : ObservableObject
 {
-    public const string AppVersion = "1.1.0-dev";
+    public const string AppVersion = "1.1.0";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionBadge => $"v{AppVersion}";
     public string AppVersionText => $"RBWR Theme Creator v{AppVersion}";
@@ -86,6 +86,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _aprmBoxEnabled;
     [ObservableProperty] private Color _aprmBoxBorderColor = Color.Parse("#00f0ff");
     [ObservableProperty] private Color _aprmBoxTextColor = Color.Parse("#00f0ff");
+    [ObservableProperty] private Color _aprmBoxBarColor = Color.Parse("#00f0ff");
 
     // ---------- Background image ----------
     [ObservableProperty] private string? _backgroundImageFile;
@@ -769,6 +770,7 @@ public partial class MainViewModel : ObservableObject
                 Enabled = AprmBoxEnabled,
                 BorderColor = AprmBoxBorderColor,
                 TextColor = AprmBoxTextColor,
+                BarColor = AprmBoxBarColor,
             },
             BackgroundImage = HasBackgroundImage
                 ? new BackgroundImageSettings { FileName = BackgroundImageFile!, Opacity = BackgroundImageOpacity, Stretch = BackgroundStretch }
@@ -820,6 +822,7 @@ public partial class MainViewModel : ObservableObject
             AprmBoxEnabled = aprm.Enabled;
             AprmBoxBorderColor = aprm.BorderColor;
             AprmBoxTextColor = aprm.TextColor;
+            AprmBoxBarColor = aprm.BarColor;
 
             Fonts.Clear();
             foreach (var f in state.Fonts)
@@ -929,6 +932,7 @@ public partial class MainViewModel : ObservableObject
             AprmBoxEnabled = aprm.Enabled;
             AprmBoxBorderColor = aprm.BorderColor;
             AprmBoxTextColor = aprm.TextColor;
+            AprmBoxBarColor = aprm.BarColor;
 
             Fonts.Clear();
             foreach (var f in snapshot.Fonts)
@@ -1067,7 +1071,7 @@ public partial class MainViewModel : ObservableObject
             or nameof(MinAppVersion) or nameof(FontFamily) or nameof(MonoFontFamily) or nameof(ShapeEnabled)
             or nameof(ShellCornerRadius) or nameof(ShellBorderThickness) or nameof(CardCornerRadius) or nameof(ButtonCornerRadius)
             or nameof(CompactCornerRadius) or nameof(ShellGlow) or nameof(ShellGlowBlur)
-            or nameof(AprmBoxEnabled) or nameof(AprmBoxBorderColor) or nameof(AprmBoxTextColor)
+            or nameof(AprmBoxEnabled) or nameof(AprmBoxBorderColor) or nameof(AprmBoxTextColor) or nameof(AprmBoxBarColor)
             or nameof(BackgroundImageFile) or nameof(BackgroundImageOpacity) or nameof(BackgroundStretch)
             or nameof(CustomResources) or nameof(CustomStyles))
         {
@@ -1877,6 +1881,7 @@ public partial class MainViewModel : ObservableObject
             AprmBoxEnabled = defaultAprm.Enabled;
             AprmBoxBorderColor = defaultAprm.BorderColor;
             AprmBoxTextColor = defaultAprm.TextColor;
+            AprmBoxBarColor = defaultAprm.BarColor;
         }
         finally
         {

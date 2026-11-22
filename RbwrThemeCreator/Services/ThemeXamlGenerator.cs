@@ -17,6 +17,7 @@ public static class ThemeXamlGenerator
     public const string AprmBoxEnd = "<!-- @creator:aprm-box-end -->";
     public const string AprmBoxBorderKey = "PowerBannerBorder";
     public const string AprmBoxTextKey = "PowerBannerText";
+    public const string AprmBoxBarKey = "PowerBannerBar";
     public const string ResourcesBegin = "<!-- @creator:custom-resources-begin -->";
     public const string ResourcesEnd = "<!-- @creator:custom-resources-end -->";
     public const string CustomBegin = "<!-- @creator:custom-begin -->";
@@ -98,6 +99,7 @@ public static class ThemeXamlGenerator
             sb.AppendLine();
             sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxBorderKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.BorderColor)}\" />");
             sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxTextKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.TextColor)}\" />");
+            sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxBarKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.BarColor)}\" />");
         }
 
         sb.AppendLine();
@@ -117,6 +119,9 @@ public static class ThemeXamlGenerator
             sb.AppendLine("    </Style>");
             sb.AppendLine("    <Style Selector=\"TextBlock#MainPowerReadout\">");
             sb.AppendLine($"        <Setter Property=\"Foreground\" Value=\"{{DynamicResource {AprmBoxTextKey}}}\" />");
+            sb.AppendLine("    </Style>");
+            sb.AppendLine("    <Style Selector=\"ProgressBar#MainPowerBar\">");
+            sb.AppendLine($"        <Setter Property=\"Foreground\" Value=\"{{DynamicResource {AprmBoxBarKey}}}\" />");
             sb.AppendLine("    </Style>");
         }
         sb.AppendLine("    " + AprmBoxEnd);

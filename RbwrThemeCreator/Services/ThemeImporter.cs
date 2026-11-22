@@ -242,6 +242,12 @@ public static class ThemeImporter
                     state.AprmBox.Enabled = true;
                     state.AprmBox.TextColor = aprmText;
                 }
+                else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key == ThemeXamlGenerator.AprmBoxBarKey
+                         && ColorUtil.TryParse((string?)el.Attribute("Color"), out var aprmBar))
+                {
+                    state.AprmBox.Enabled = true;
+                    state.AprmBox.BarColor = aprmBar;
+                }
                 else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key != null && TokenCatalog.ByKey.ContainsKey(key)
                          && ColorUtil.TryParse((string?)el.Attribute("Color"), out var brushColor)
                          && el.Attributes().All(a => a.IsNamespaceDeclaration || a.Name == X + "Key" || a.Name == "Color" || a.Name == "Opacity"))

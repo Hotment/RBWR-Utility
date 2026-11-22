@@ -64,6 +64,23 @@ public partial class OverlayPreview : UserControl
         {
             MainPowerReadout.ClearValue(TextBlock.ForegroundProperty);
         }
+
+        if (themeStyles != null
+            && themeStyles.Resources.TryGetResource(Services.ThemeXamlGenerator.AprmBoxBarKey, null, out var barVal)
+            && barVal is IBrush barBrush)
+        {
+            MainPowerBar.Foreground = barBrush;
+        }
+        else if (themeStyles != null
+            && themeStyles.Resources.TryGetResource("NeonCyan", null, out var cyanBarVal)
+            && cyanBarVal is IBrush cyanBarBrush)
+        {
+            MainPowerBar.Foreground = cyanBarBrush;
+        }
+        else
+        {
+            MainPowerBar.ClearValue(ProgressBar.ForegroundProperty);
+        }
     }
 
     /// <summary>Shows one overlay view, or all of them in a fixed 2x2 layout.</summary>
