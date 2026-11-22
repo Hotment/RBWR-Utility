@@ -169,7 +169,7 @@
                     <Border x:Name="PowerBanner"
                             Classes="hud-card power-banner"
                             Grid.Row="1"
-                            BorderBrush="{Binding MainPowerBrush}"
+                            BorderBrush="{Binding PowerBannerBorderBrush}"
                             Padding="12,8"
                             behaviors:TooltipBehaviors.Item="{Binding MainBannerTooltip}"
                             Margin="0,0,0,8">
@@ -178,7 +178,7 @@
                             <TextBlock x:Name="MainPowerReadout"
                                        Classes="power-readout"
                                        Text="{Binding MainStatusPowerText}"
-                                       Foreground="{Binding MainPowerBrush}"
+                                       Foreground="{Binding PowerBannerTextBrush}"
                                        FontWeight="Bold"
                                        FontSize="24"
                                        HorizontalAlignment="Center" />

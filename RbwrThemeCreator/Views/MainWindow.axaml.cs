@@ -185,6 +185,7 @@ public partial class MainWindow : Window, IDialogHost
             PreviewHost.Styles.RemoveAt(PreviewHost.Styles.Count - 1);
         if (e.Styles != null)
             PreviewHost.Styles.Add(e.Styles);
+        Preview.ApplyAprmBoxOverride(e.Styles);
 
         var old = _activeBitmaps;
         _activeBitmaps = e.Bitmaps;
@@ -554,7 +555,7 @@ public partial class MainWindow : Window, IDialogHost
             ClearInspectHover();
             using var rtb = RenderPreview(2.0);
             await Clipboard.SetBitmapAsync(rtb);
-            _vm.SetStatus("Preview image copied. Paste it on Discord (or anywhere) with Ctrl+V.");
+            _vm.SetStatus("Preview image copied. Paste it with Ctrl+V.");
         }
         catch (Exception ex)
         {

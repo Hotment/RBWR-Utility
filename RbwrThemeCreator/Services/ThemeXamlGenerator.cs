@@ -13,6 +13,10 @@ public static class ThemeXamlGenerator
 {
     public const string ShapeBegin = "<!-- @creator:shape-begin -->";
     public const string ShapeEnd = "<!-- @creator:shape-end -->";
+    public const string AprmBoxBegin = "<!-- @creator:aprm-box-begin -->";
+    public const string AprmBoxEnd = "<!-- @creator:aprm-box-end -->";
+    public const string AprmBoxBorderKey = "PowerBannerBorder";
+    public const string AprmBoxTextKey = "PowerBannerText";
     public const string ResourcesBegin = "<!-- @creator:custom-resources-begin -->";
     public const string ResourcesEnd = "<!-- @creator:custom-resources-end -->";
     public const string CustomBegin = "<!-- @creator:custom-begin -->";
@@ -89,12 +93,33 @@ public static class ThemeXamlGenerator
             sb.AppendLine($"        <SolidColorBrush x:Key=\"{def.Key}\" Color=\"{ColorUtil.ToHex(value.Color)}\"{opacity} />");
         }
 
+        if (state.AprmBox.Enabled)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxBorderKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.BorderColor)}\" />");
+            sb.AppendLine($"        <SolidColorBrush x:Key=\"{AprmBoxTextKey}\" Color=\"{ColorUtil.ToHex(state.AprmBox.TextColor)}\" />");
+        }
+
         sb.AppendLine();
         sb.AppendLine("        " + ResourcesBegin);
         if (!string.IsNullOrWhiteSpace(state.CustomResources))
             sb.AppendLine(Indent(state.CustomResources.Trim('\r', '\n'), 8));
         sb.AppendLine("        " + ResourcesEnd);
         sb.AppendLine("    </Styles.Resources>");
+        sb.AppendLine();
+
+        // ---------- APRM power box independent override ----------
+        sb.AppendLine("    " + AprmBoxBegin);
+        if (state.AprmBox.Enabled)
+        {
+            sb.AppendLine("    <Style Selector=\"Border#PowerBanner\">");
+            sb.AppendLine($"        <Setter Property=\"BorderBrush\" Value=\"{{DynamicResource {AprmBoxBorderKey}}}\" />");
+            sb.AppendLine("    </Style>");
+            sb.AppendLine("    <Style Selector=\"TextBlock#MainPowerReadout\">");
+            sb.AppendLine($"        <Setter Property=\"Foreground\" Value=\"{{DynamicResource {AprmBoxTextKey}}}\" />");
+            sb.AppendLine("    </Style>");
+        }
+        sb.AppendLine("    " + AprmBoxEnd);
         sb.AppendLine();
 
         // ---------- Custom styles ----------
@@ -166,7 +191,14 @@ public static class ThemeXamlGenerator
             sb.AppendLine($"    <!-- {CommentSafe(key)} -->");
             foreach (var group in usages.GroupBy(u => u.Selector))
             {
-                sb.AppendLine($"    <Style Selector=\"{Escape(SkipThemeCards(group.Key))}\">");
+                string selector = SkipThemeCards(group.Key);
+                if (state.AprmBox.Enabled
+                    && string.Equals(key, "CyberBorder", StringComparison.Ordinal)
+                    && string.Equals(group.Key, "Border.hud-card", StringComparison.Ordinal))
+                {
+                    selector += ":not(.power-banner)";
+                }
+                sb.AppendLine($"    <Style Selector=\"{Escape(selector)}\">");
                 // Base value of the same kind as the frames (solid or gradient): older overlays without
                 // the safe brush animator would otherwise crash when a solid colour animates into a gradient.
                 foreach (var usage in group)

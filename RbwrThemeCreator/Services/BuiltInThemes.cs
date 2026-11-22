@@ -178,6 +178,12 @@ public static class BuiltInThemes
         <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
         <Setter Property="Background" Value="{DynamicResource ControlHoverBg}" />
     </Style>
+    <Style Selector="Border#PowerBanner">
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyan}" />
+    </Style>
+    <Style Selector="TextBlock#MainPowerReadout">
+        <Setter Property="Foreground" Value="{DynamicResource NeonCyan}" />
+    </Style>
 </Styles>
 """;
 

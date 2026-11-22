@@ -963,6 +963,14 @@ public class ThemeService : IThemeService
         }
     }
 
+    public static IBrush? TryResolveBrush(string resourceKey)
+    {
+        var app = Application.Current;
+        if (app != null && app.TryGetResource(resourceKey, app.ActualThemeVariant, out object? res) && res is IBrush brush)
+            return brush;
+        return null;
+    }
+
     public static IBrush ResolveBrush(string resourceKey, string fallbackHex)
     {
         var app = Application.Current;

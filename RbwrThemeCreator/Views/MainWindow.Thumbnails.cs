@@ -38,6 +38,7 @@ public partial class MainWindow
             if (_baseStyles != null)
                 host.Styles.Add(BuiltInThemes.LoadPreviewBaseStyles());
             host.Styles.Add(styles);
+            preview.ApplyAprmBoxOverride(styles);
 
             ThumbRenderHost.Children.Add(host);
             UpdateLayout();

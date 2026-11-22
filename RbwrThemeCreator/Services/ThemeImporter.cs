@@ -186,6 +186,7 @@ public static class ThemeImporter
 
         string rest = xaml;
         string? shapeXml = ExtractRegion(ref rest, ThemeXamlGenerator.ShapeBegin, ThemeXamlGenerator.ShapeEnd);
+        _ = ExtractRegion(ref rest, ThemeXamlGenerator.AprmBoxBegin, ThemeXamlGenerator.AprmBoxEnd);
         _ = ExtractRegion(ref rest, ThemeXamlGenerator.AnimationBegin, ThemeXamlGenerator.AnimationEnd); // old dev-build section, dropped
         string? tokenAnimationsXml = ExtractRegion(ref rest, ThemeXamlGenerator.TokenAnimationsBegin, ThemeXamlGenerator.TokenAnimationsEnd);
         string? customResources = ExtractRegion(ref rest, ThemeXamlGenerator.ResourcesBegin, ThemeXamlGenerator.ResourcesEnd);
@@ -228,6 +229,18 @@ public static class ThemeImporter
                          && ColorUtil.TryParse(el.Value, out var mirror))
                 {
                     mirrorColors[key] = mirror;
+                }
+                else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key == ThemeXamlGenerator.AprmBoxBorderKey
+                         && ColorUtil.TryParse((string?)el.Attribute("Color"), out var aprmBorder))
+                {
+                    state.AprmBox.Enabled = true;
+                    state.AprmBox.BorderColor = aprmBorder;
+                }
+                else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key == ThemeXamlGenerator.AprmBoxTextKey
+                         && ColorUtil.TryParse((string?)el.Attribute("Color"), out var aprmText))
+                {
+                    state.AprmBox.Enabled = true;
+                    state.AprmBox.TextColor = aprmText;
                 }
                 else if (el.Name.Namespace == Ns && local == "SolidColorBrush" && key != null && TokenCatalog.ByKey.ContainsKey(key)
                          && ColorUtil.TryParse((string?)el.Attribute("Color"), out var brushColor)

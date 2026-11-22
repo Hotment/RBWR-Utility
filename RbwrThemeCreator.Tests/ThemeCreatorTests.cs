@@ -1038,4 +1038,56 @@ public class ThemeCreatorTests : IDisposable
         Assert.Equal(details, fakeApi.SubmittedTraceback);
         Assert.Equal("Report sent.", vm.StatusText);
     }
+
+    [Fact]
+    public void AprmBoxOverride_EmitsResourcesAndStyles_AndRoundTrips()
+    {
+        var state = BuiltInThemes.Presets[0].Create();
+        state.Manifest.Id = "aprm-box-test";
+        state.Manifest.Name = "APRM Box Test";
+
+        // Disabled by default: neither resources nor style rules are emitted.
+        string defaultXaml = ThemeXamlGenerator.Generate(state);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxBorderKey, defaultXaml);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxTextKey, defaultXaml);
+        Assert.DoesNotContain("Border#PowerBanner", defaultXaml);
+        Assert.DoesNotContain("TextBlock#MainPowerReadout", defaultXaml);
+
+        // Enable with distinct border and text colours.
+        state.AprmBox.Enabled = true;
+        state.AprmBox.BorderColor = Color.Parse("#ff8800");
+        state.AprmBox.TextColor = Color.Parse("#00ffcc");
+
+        var cloned = state.Clone();
+        Assert.True(cloned.AprmBox.Enabled);
+        Assert.Equal(Color.Parse("#ff8800"), cloned.AprmBox.BorderColor);
+        Assert.Equal(Color.Parse("#00ffcc"), cloned.AprmBox.TextColor);
+
+        string enabledXaml = ThemeXamlGenerator.Generate(state);
+        Assert.Contains($"x:Key=\"{ThemeXamlGenerator.AprmBoxBorderKey}\"", enabledXaml);
+        Assert.Contains($"x:Key=\"{ThemeXamlGenerator.AprmBoxTextKey}\"", enabledXaml);
+        Assert.Contains("Border#PowerBanner", enabledXaml);
+        Assert.Contains("TextBlock#MainPowerReadout", enabledXaml);
+
+        // Round-trip through importer: restores settings and does not leak into custom blocks.
+        var reopened = ThemeImporter.FromXaml(enabledXaml, state.Manifest, BuiltInThemes.Cyberpunk, includeStyles: true);
+        Assert.True(reopened.AprmBox.Enabled);
+        Assert.Equal(Color.Parse("#ff8800"), reopened.AprmBox.BorderColor);
+        Assert.Equal(Color.Parse("#00ffcc"), reopened.AprmBox.TextColor);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxBorderKey, reopened.CustomResources);
+        Assert.DoesNotContain(ThemeXamlGenerator.AprmBoxTextKey, reopened.CustomResources);
+        Assert.DoesNotContain("Border#PowerBanner", reopened.CustomStyles);
+        Assert.DoesNotContain("TextBlock#MainPowerReadout", reopened.CustomStyles);
+
+        // Reset to default resets APRM box override back to defaults.
+        var vm = new MainViewModel();
+        vm.AprmBoxEnabled = true;
+        vm.AprmBoxBorderColor = Color.Parse("#ff8800");
+        vm.AprmBoxTextColor = Color.Parse("#00ffcc");
+        vm.ResetColoursToBaseCommand.Execute(null);
+        var defaultAprm = new AprmBoxSettings();
+        Assert.Equal(defaultAprm.Enabled, vm.AprmBoxEnabled);
+        Assert.Equal(defaultAprm.BorderColor, vm.AprmBoxBorderColor);
+        Assert.Equal(defaultAprm.TextColor, vm.AprmBoxTextColor);
+    }
 }

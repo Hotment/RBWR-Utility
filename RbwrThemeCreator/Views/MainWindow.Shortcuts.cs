@@ -149,7 +149,7 @@ public partial class MainWindow
         ToolTip.SetTip(InstallButton, WithHint("Copy the theme into the overlay's themes folder", "install")
                                       + ". Then click Reload in the overlay's CONFIG tab.");
         ToolTip.SetTip(PngButton, WithHint("Save a high-DPI PNG screenshot of the current preview", "save-preview"));
-        ToolTip.SetTip(CopyButton, WithHint("Copy the preview as an image, then paste it on Discord with Ctrl+V", "copy-preview"));
+        ToolTip.SetTip(CopyButton, WithHint("Copy the preview as an image, then paste with Ctrl+V", "copy-preview"));
         ToolTip.SetTip(InspectToggle, WithHint("Click an element in the preview to jump to the colours that paint it (or Ctrl+click any time). Esc to stop", "find-colour"));
         TokenSearchBox.PlaceholderText = WithHint("Search colours…", "search") + "  e.g. slider, tooltip, border, #00f0ff";
     }

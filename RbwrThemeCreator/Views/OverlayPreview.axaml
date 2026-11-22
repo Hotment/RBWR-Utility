@@ -51,12 +51,12 @@
                         </Grid>
 
                         <Border x:Name="PowerBanner" Classes="hud-card power-banner" Grid.Row="1"
-                                BorderBrush="{DynamicResource NeonGreen}" Padding="12,8" Margin="0,0,0,8">
+                                Padding="12,8" Margin="0,0,0,8">
                             <StackPanel Spacing="4">
-                                <TextBlock x:Name="MainPowerReadout" Classes="power-readout" Text="98.40% APRM"
-                                           Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="24" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="MainPowerReadout" Classes="power-readout" Text="82.40% APRM"
+                                           FontWeight="Bold" FontSize="24" HorizontalAlignment="Center" />
                                 <ProgressBar x:Name="MainPowerBar" Classes="cyber-power" Value="82" Minimum="0" Maximum="120"
-                                             Foreground="{DynamicResource NeonGreen}" Margin="10,2" />
+                                             Foreground="{DynamicResource NeonCyan}" Margin="10,2" />
                                 <TextBlock x:Name="MainPowerSubtext" Classes="power-subtext" Text="APRM REACTOR POWER STATUS"
                                            Foreground="{DynamicResource TextMuted}" FontWeight="Bold" FontSize="9" HorizontalAlignment="Center" />
                             </StackPanel>

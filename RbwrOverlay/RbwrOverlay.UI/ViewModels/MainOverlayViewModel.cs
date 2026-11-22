@@ -129,7 +129,12 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private double _thermalPowerPercent;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PowerBannerBorderBrush))]
+    [NotifyPropertyChangedFor(nameof(PowerBannerTextBrush))]
     private IBrush _mainPowerBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
+
+    public IBrush PowerBannerBorderBrush => ThemeService.TryResolveBrush("PowerBannerBorder") ?? MainPowerBrush;
+    public IBrush PowerBannerTextBrush => ThemeService.TryResolveBrush("PowerBannerText") ?? MainPowerBrush;
 
     [ObservableProperty]
     private IBrush _powerBarBrush = ThemeService.ResolveBrush("NeonCyan", "#00f0ff");
@@ -2247,6 +2252,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             MainPowerBrush = cyan;
             PowerBarBrush = cyan;
         }
+        OnPropertyChanged(nameof(PowerBannerBorderBrush));
+        OnPropertyChanged(nameof(PowerBannerTextBrush));
 
         ConnectionStatusBrush = ConnectionStatusText switch
         {

@@ -23,6 +23,49 @@ public partial class OverlayPreview : UserControl
         SetMode(ModeMonitor);
     }
 
+    /// <summary>
+    /// Applies optional independent APRM power box colours (PowerBannerBorder / PowerBannerText)
+    /// directly to #PowerBanner and #MainPowerReadout, matching how RbwrOverlay resolves them in
+    /// MainOverlayViewModel. When absent ("Follow dynamic status colour"), falls back to the theme's
+    /// NeonCyan primary accent colour so the border and readout stay visible in the preview.
+    /// </summary>
+    public void ApplyAprmBoxOverride(Styles? themeStyles)
+    {
+        if (themeStyles != null
+            && themeStyles.Resources.TryGetResource(Services.ThemeXamlGenerator.AprmBoxBorderKey, null, out var borderVal)
+            && borderVal is IBrush borderBrush)
+        {
+            PowerBanner.BorderBrush = borderBrush;
+        }
+        else if (themeStyles != null
+            && themeStyles.Resources.TryGetResource("NeonCyan", null, out var cyanBorderVal)
+            && cyanBorderVal is IBrush cyanBorderBrush)
+        {
+            PowerBanner.BorderBrush = cyanBorderBrush;
+        }
+        else
+        {
+            PowerBanner.ClearValue(Border.BorderBrushProperty);
+        }
+
+        if (themeStyles != null
+            && themeStyles.Resources.TryGetResource(Services.ThemeXamlGenerator.AprmBoxTextKey, null, out var textVal)
+            && textVal is IBrush textBrush)
+        {
+            MainPowerReadout.Foreground = textBrush;
+        }
+        else if (themeStyles != null
+            && themeStyles.Resources.TryGetResource("NeonCyan", null, out var cyanTextVal)
+            && cyanTextVal is IBrush cyanTextBrush)
+        {
+            MainPowerReadout.Foreground = cyanTextBrush;
+        }
+        else
+        {
+            MainPowerReadout.ClearValue(TextBlock.ForegroundProperty);
+        }
+    }
+
     /// <summary>Shows one overlay view, or all of them in a fixed 2x2 layout.</summary>
     public void SetMode(int mode)
     {

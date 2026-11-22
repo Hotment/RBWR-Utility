@@ -82,6 +82,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _shellGlow;
     [ObservableProperty] private double _shellGlowBlur = 14;
 
+    // ---------- APRM power box independent colours ----------
+    [ObservableProperty] private bool _aprmBoxEnabled;
+    [ObservableProperty] private Color _aprmBoxBorderColor = Color.Parse("#00f0ff");
+    [ObservableProperty] private Color _aprmBoxTextColor = Color.Parse("#00f0ff");
+
     // ---------- Background image ----------
     [ObservableProperty] private string? _backgroundImageFile;
     [ObservableProperty] private double _backgroundImageOpacity = 0.35;
@@ -759,6 +764,12 @@ public partial class MainViewModel : ObservableObject
                 ShellGlow = ShellGlow,
                 ShellGlowBlur = ShellGlowBlur,
             },
+            AprmBox = new AprmBoxSettings
+            {
+                Enabled = AprmBoxEnabled,
+                BorderColor = AprmBoxBorderColor,
+                TextColor = AprmBoxTextColor,
+            },
             BackgroundImage = HasBackgroundImage
                 ? new BackgroundImageSettings { FileName = BackgroundImageFile!, Opacity = BackgroundImageOpacity, Stretch = BackgroundStretch }
                 : null,
@@ -804,6 +815,11 @@ public partial class MainViewModel : ObservableObject
             CompactCornerRadius = s.CompactCornerRadius;
             ShellGlow = s.ShellGlow;
             ShellGlowBlur = s.ShellGlowBlur;
+
+            var aprm = state.AprmBox;
+            AprmBoxEnabled = aprm.Enabled;
+            AprmBoxBorderColor = aprm.BorderColor;
+            AprmBoxTextColor = aprm.TextColor;
 
             Fonts.Clear();
             foreach (var f in state.Fonts)
@@ -908,6 +924,11 @@ public partial class MainViewModel : ObservableObject
             CompactCornerRadius = s.CompactCornerRadius;
             ShellGlow = s.ShellGlow;
             ShellGlowBlur = s.ShellGlowBlur;
+
+            var aprm = snapshot.AprmBox;
+            AprmBoxEnabled = aprm.Enabled;
+            AprmBoxBorderColor = aprm.BorderColor;
+            AprmBoxTextColor = aprm.TextColor;
 
             Fonts.Clear();
             foreach (var f in snapshot.Fonts)
@@ -1045,8 +1066,10 @@ public partial class MainViewModel : ObservableObject
         if (e.PropertyName is nameof(ThemeId) or nameof(ThemeName) or nameof(Author) or nameof(Version) or nameof(Description)
             or nameof(MinAppVersion) or nameof(FontFamily) or nameof(MonoFontFamily) or nameof(ShapeEnabled)
             or nameof(ShellCornerRadius) or nameof(ShellBorderThickness) or nameof(CardCornerRadius) or nameof(ButtonCornerRadius)
-            or nameof(CompactCornerRadius) or nameof(ShellGlow) or nameof(ShellGlowBlur) or nameof(BackgroundImageFile)
-            or nameof(BackgroundImageOpacity) or nameof(BackgroundStretch) or nameof(CustomResources) or nameof(CustomStyles))
+            or nameof(CompactCornerRadius) or nameof(ShellGlow) or nameof(ShellGlowBlur)
+            or nameof(AprmBoxEnabled) or nameof(AprmBoxBorderColor) or nameof(AprmBoxTextColor)
+            or nameof(BackgroundImageFile) or nameof(BackgroundImageOpacity) or nameof(BackgroundStretch)
+            or nameof(CustomResources) or nameof(CustomStyles))
         {
             OnEdited();
         }
@@ -1844,12 +1867,16 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ResetColoursToBase()
     {
+        var defaultAprm = new AprmBoxSettings();
         _suppressChanges = true;
         try
         {
             foreach (var (key, vm) in _tokens)
                 if (BuiltInThemes.Cyberpunk.Tokens.TryGetValue(key, out var v))
                     vm.SetValue(v);
+            AprmBoxEnabled = defaultAprm.Enabled;
+            AprmBoxBorderColor = defaultAprm.BorderColor;
+            AprmBoxTextColor = defaultAprm.TextColor;
         }
         finally
         {

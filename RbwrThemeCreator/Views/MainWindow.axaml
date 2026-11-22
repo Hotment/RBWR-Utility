@@ -90,7 +90,7 @@
                                 <MenuItem Header="Copy theme.axaml" Command="{Binding CopyXamlCommand}" />
                                 <Separator />
                                 <MenuItem x:Name="MenuSavePreview" Header="Save preview image (PNG)…" Click="OnExportPreviewPngClick" />
-                                <MenuItem x:Name="MenuCopyPreview" Header="Copy preview image (paste on Discord)" Click="OnCopyPreviewImageClick" />
+                                <MenuItem x:Name="MenuCopyPreview" Header="Copy preview image" Click="OnCopyPreviewImageClick" />
                             </MenuFlyout>
                         </DropDownButton.Flyout>
                     </DropDownButton>
@@ -329,6 +329,36 @@
                                         ToolTip.Tip="Unfold every group" />
                             </Grid>
                             <TextBlock Classes="muted" Text="No colours match the search." Margin="4,0,0,10" IsVisible="{Binding HasNoSearchResults}" />
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section-title" Text="APRM POWER BOX" />
+                                    <TextBlock Classes="muted" Text="Independently set the APRM box border and readout text colours without changing other elements. When off, the box follows the dynamic power-level status colour." />
+                                    <ToggleSwitch IsChecked="{Binding AprmBoxEnabled}"
+                                                  OnContent="Custom APRM box colours"
+                                                  OffContent="Follow dynamic status colour" />
+                                    <StackPanel Spacing="4" IsEnabled="{Binding AprmBoxEnabled}">
+                                        <Border Classes="token-row">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <views:HudColorPicker Grid.Column="0" Color="{Binding AprmBoxBorderColor}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="APRM box border" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="faint" Text="PowerBannerBorder" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <Border Classes="token-row">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <views:HudColorPicker Grid.Column="0" Color="{Binding AprmBoxTextColor}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="APRM readout text" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="faint" Text="PowerBannerText" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
 
                             <ItemsControl ItemsSource="{Binding Groups}">
                                 <ItemsControl.ItemTemplate>

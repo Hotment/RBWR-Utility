@@ -21,7 +21,7 @@ This guide is also built into the creator: open the **GUIDE** tab, or press **F1
 9. [Images and backgrounds](#9-images-and-backgrounds)
 10. [Advanced: custom styles](#10-advanced-custom-styles)
 11. [Saving, exporting and installing](#11-saving-exporting-and-installing)
-12. [Thumbnails and sharing on Discord](#12-thumbnails-and-sharing-on-discord)
+12. [Thumbnails and sharing](#12-thumbnails-and-sharing)
 13. [Opening and editing existing themes](#13-opening-and-editing-existing-themes)
 14. [Keyboard shortcuts](#14-keyboard-shortcuts)
 15. [Settings](#15-settings)
@@ -310,7 +310,7 @@ A theme folder contains `theme.json`, `theme.axaml`, `fonts/`, `assets/` and `pr
 
 ---
 
-## 12. Thumbnails and sharing on Discord
+## 12. Thumbnails and sharing
 
 ### Thumbnails (preview.png)
 
@@ -328,10 +328,9 @@ A small message in the **bottom-right corner** tells you when thumbnails were cr
 thumbnails are never overwritten by these automatic passes. Themes without a thumbnail still work
 normally; they just show no picture.
 
-### Showing your theme on Discord
+### Showing your theme
 
-- **COPY** in the preview bar (or **Ctrl+Shift+C**) copies the preview as a picture. Paste it on
-  Discord with **Ctrl+V**.
+- **COPY** in the preview bar (or **Ctrl+Shift+C**) copies the preview as a picture. Paste it with **Ctrl+V**.
 - **PNG** (or **Ctrl+P**) saves the preview as a high-resolution image file.
 - To share the theme itself, send the `.zip` from **EXPORT → Export .zip pack**.
 

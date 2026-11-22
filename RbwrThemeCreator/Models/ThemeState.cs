@@ -124,6 +124,16 @@ public sealed class BackgroundImageSettings
     public BackgroundImageSettings Clone() => (BackgroundImageSettings)MemberwiseClone();
 }
 
+/// <summary>Optional independent border and readout text colours for the APRM power box (#PowerBanner).</summary>
+public sealed class AprmBoxSettings
+{
+    public bool Enabled { get; set; }
+    public Color BorderColor { get; set; } = Color.Parse("#00f0ff");
+    public Color TextColor { get; set; } = Color.Parse("#00f0ff");
+
+    public AprmBoxSettings Clone() => (AprmBoxSettings)MemberwiseClone();
+}
+
 /// <summary>
 /// Complete, UI-independent description of a theme. The generator turns it into theme.axaml,
 /// the importer rebuilds it from an existing theme folder.
@@ -135,6 +145,7 @@ public sealed class ThemeState
     public string MonoFontFamily { get; set; } = "Consolas, monospace";
     public Dictionary<string, TokenValue> Tokens { get; set; } = new(StringComparer.Ordinal);
     public ShapeSettings Shape { get; set; } = new();
+    public AprmBoxSettings AprmBox { get; set; } = new();
     public BackgroundImageSettings? BackgroundImage { get; set; }
 
     /// <summary>Font files that end up in fonts/.</summary>
@@ -176,6 +187,7 @@ public sealed class ThemeState
             MonoFontFamily = MonoFontFamily,
             Tokens = new Dictionary<string, TokenValue>(Tokens, StringComparer.Ordinal),
             Shape = Shape.Clone(),
+            AprmBox = AprmBox.Clone(),
             BackgroundImage = BackgroundImage?.Clone(),
             Fonts = new List<ThemeFile>(Fonts),
             Assets = new List<ThemeFile>(Assets),

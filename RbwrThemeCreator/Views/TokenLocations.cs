@@ -22,8 +22,8 @@ public static class TokenLocations
         ["CyberBorder"] = (Monitor, [.. MetricCards, "NavBar", "DemandPresetCard"]),
         ["CyberBorderGlow"] = (Monitor, ["DetailedShell"]),
 
-        ["NeonCyan"] = (Monitor, ["OverlayTitle", "NavMonitorTab", "Unit1Button", "GenLoadValue"]),
-        ["NeonGreen"] = (Monitor, ["SyncBadge", "PowerBanner"]),
+        ["NeonCyan"] = (Monitor, ["OverlayTitle", "NavMonitorTab", "Unit1Button", "PowerBanner", "GenLoadValue"]),
+        ["NeonGreen"] = (Monitor, ["SyncBadge"]),
         ["NeonRed"] = (Config, ["ResetButton"]),
         ["NeonGold"] = (Monitor, ["FlowValue", "DtlText"]),
         ["NeonPurple"] = (Config, ["SpecialText"]),

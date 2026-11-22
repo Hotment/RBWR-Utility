@@ -33,8 +33,7 @@ dotnet publish RbwrThemeCreator -c Release -r win-x64 --self-contained -p:Publis
   the overlay's Theme Manager shows it next to the theme name. Opening a theme without one creates it,
   and on start-up every installed overlay theme without one gets it (a toast in the bottom-right corner
   says so).
-  **PNG** saves the current preview as an image and **COPY** puts it on the clipboard, ready to paste
-  on Discord.
+  **PNG** saves the current preview as an image and **COPY** puts it on the clipboard.
 - Keyboard shortcuts: Ctrl+S / Ctrl+Shift+S save, Ctrl+O / Ctrl+Shift+O open, Ctrl+N new, Ctrl+E export,
   Ctrl+I install, Ctrl+Z / Ctrl+Y undo/redo, Ctrl+1…5 preview view, Ctrl+0 fit, Ctrl+P save preview image,
   Ctrl+Shift+C copy preview image, F1 shows the list.
