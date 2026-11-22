@@ -428,7 +428,7 @@ def list_text_channels() -> list[dict]:
 
 
 def list_forum_posts(archived_limit: int = 25) -> list[dict]:
-    """Forum channels on the Piano Weave server with their posts (active + recently archived),
+    """Forum channels on the RBWR server with their posts (active + recently archived),
     for the embed builder (blocking)."""
     async def _forums():
         guild = _panel_guild()
@@ -511,14 +511,16 @@ async def _post_embed(channel, content: str, embed_dict: dict | None, allow_ment
                 "forum_name": channel.name, "jump_url": msg.jump_url}
     if not (isinstance(channel, disnake.TextChannel) and channel.guild.id == _guild_id()) and not _is_panel_post(channel):
         raise BotActionError("Pick a text channel or a forum post on the RBWR server.")
+    if _is_panel_post(channel) and channel.locked and not channel.permissions_for(channel.guild.me).manage_threads:
+        raise BotActionError("That post is locked.")
     if edit_message_id:
+        if _is_panel_post(channel) and channel.archived:
+            await channel.edit(archived=False)
         msg = await channel.fetch_message(int(edit_message_id))
         if not _bot or not _bot.user or msg.author.id != _bot.user.id:
             raise BotActionError("The bot can only edit messages it sent itself.")
         await msg.edit(**kwargs)
     else:
-        if _is_panel_post(channel) and channel.locked and not channel.permissions_for(channel.guild.me).manage_threads:
-            raise BotActionError("That post is locked.")
         msg = await channel.send(**kwargs)  # sending into an archived post unarchives it
     result = {"message_id": str(msg.id), "channel_id": str(channel.id), "channel_name": channel.name, "jump_url": msg.jump_url}
     if _is_panel_post(channel) and isinstance(channel.parent, disnake.ForumChannel):

@@ -324,7 +324,9 @@
                     title="{{ nav_user.display_name }}"
                     class="block w-8 h-8 rounded-full overflow-hidden ring-2 ring-white/10 hover:ring-[#5865F2]/60 focus:outline-none focus-visible:ring-[#5865F2] transition-all cursor-pointer">
                     {% if nav_user.avatar_url %}
-                    <img src="{{ nav_user.avatar_url }}" alt="Your profile" class="w-full h-full object-cover" referrerpolicy="no-referrer">
+                    <img src="{{ nav_user.avatar_url }}" alt="Your profile" class="w-full h-full object-cover" referrerpolicy="no-referrer"
+                        onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden')">
+                    <span class="hidden w-full h-full flex items-center justify-center bg-[#5865F2] text-white text-sm font-semibold">{{ nav_user.initial }}</span>
                     {% else %}
                     <span class="w-full h-full flex items-center justify-center bg-[#5865F2] text-white text-sm font-semibold">{{ nav_user.initial }}</span>
                     {% endif %}
@@ -334,7 +336,9 @@
                     class="hidden absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[#11141c]/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/50 p-2 z-50">
                     <div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/[0.03] border border-white/5">
                         {% if nav_user.avatar_url %}
-                        <img src="{{ nav_user.avatar_url }}" alt="" class="w-11 h-11 rounded-full border border-white/10 shrink-0 object-cover" referrerpolicy="no-referrer">
+                        <img src="{{ nav_user.avatar_url }}" alt="" class="w-11 h-11 rounded-full border border-white/10 shrink-0 object-cover" referrerpolicy="no-referrer"
+                            onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden')">
+                        <span class="hidden w-11 h-11 rounded-full shrink-0 flex items-center justify-center bg-[#5865F2] text-white font-semibold">{{ nav_user.initial }}</span>
                         {% else %}
                         <span class="w-11 h-11 rounded-full shrink-0 flex items-center justify-center bg-[#5865F2] text-white font-semibold">{{ nav_user.initial }}</span>
                         {% endif %}
