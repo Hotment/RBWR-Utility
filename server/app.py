@@ -360,12 +360,34 @@ class SilentBanWSGIMiddleware:
             finally:
                 _site_ban_tarpit_sem.release()
 
-        if self._close_raw_socket(environ):
-            return []
+        closed_raw = self._close_raw_socket(environ)
 
-        # Fallback for WSGI servers/test clients without an exposed raw socket: empty body, close connection.
         start_response("408 Request Timeout", [("Connection", "close"), ("Content-Length", "0")])
-        return [b""]
+        resp_obj = getattr(start_response, "__self__", None)
+        if resp_obj is not None:
+            if hasattr(resp_obj, "force_close"):
+                try:
+                    resp_obj.force_close()
+                except Exception:
+                    pass
+            if hasattr(resp_obj, "headers_sent"):
+                try:
+                    resp_obj.headers_sent = True
+                except Exception:
+                    pass
+            if not closed_raw:
+                resp_sock = getattr(resp_obj, "sock", None)
+                if resp_sock is not None:
+                    try:
+                        resp_sock.shutdown(socket.SHUT_RDWR)
+                    except Exception:
+                        pass
+                    try:
+                        resp_sock.close()
+                        closed_raw = True
+                    except Exception:
+                        pass
+        return [] if closed_raw else [b""]
 
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
