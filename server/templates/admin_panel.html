@@ -733,23 +733,46 @@
                     </div>
                 </div>
 
-                <div
-                    class="cyber-panel p-1.5 rounded-xl flex flex-wrap items-center border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 max-w-full w-fit">
-                    <button onclick="filterStatus('all')" id="tab-all"
-                        class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
-                        Status</button>
-                    <button onclick="filterStatus('pending')" id="tab-pending"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
-                    <button onclick="filterStatus('considering')" id="tab-considering"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
-                    <button onclick="filterStatus('planned')" id="tab-planned"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
-                    <button onclick="filterStatus('accepted')" id="tab-accepted"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Implemented</button>
-                    <button onclick="filterStatus('declined')" id="tab-declined"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
-                    <button onclick="filterStatus('invalid')" id="tab-invalid"
-                        class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Invalid</button>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div
+                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap items-center border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 max-w-full w-fit">
+                        <button onclick="filterStatus('all')" id="tab-all"
+                            class="px-3 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap">All
+                            Status</button>
+                        <button onclick="filterStatus('pending')" id="tab-pending"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Pending</button>
+                        <button onclick="filterStatus('considering')" id="tab-considering"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Considering</button>
+                        <button onclick="filterStatus('planned')" id="tab-planned"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Planned</button>
+                        <button onclick="filterStatus('accepted')" id="tab-accepted"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Implemented</button>
+                        <button onclick="filterStatus('declined')" id="tab-declined"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Declined</button>
+                        <button onclick="filterStatus('invalid')" id="tab-invalid"
+                            class="px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap">Invalid</button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="admin-needs-reply-btn" onclick="toggleAdminNeedsReply()"
+                            class="px-3 py-2 rounded-xl text-xs font-bold font-mono uppercase border border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-2 whitespace-nowrap"
+                            title="Show only active tickets awaiting a developer response">
+                            <span>Needs Reply</span>
+                            <span id="admin-needs-reply-count" class="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-200 text-[10px]">0</span>
+                        </button>
+
+                        <input type="text" id="admin-ticket-search" oninput="applyFilter()"
+                            placeholder="Search #ID, title, text, author, Discord ID..."
+                            class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none w-60 sm:w-64">
+
+                        <select id="admin-ticket-sort" onchange="rerenderSortedAdminSuggestions()"
+                            class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none cursor-pointer bg-[#121217] text-slate-200 border border-white/10">
+                            <option value="newest">Newest First</option>
+                            <option value="activity">Latest Activity</option>
+                            <option value="needs_reply">Needs Reply First</option>
+                            <option value="oldest">Oldest First</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -2452,12 +2475,77 @@
             applyFilter();
         }
 
+        let adminNeedsReplyOnly = false;
+        let latestAdminSuggestions = [];
+
+        const ADMIN_CANNED_REPLIES = [
+            { label: "Quick Reply...", text: "" },
+            { label: "Need steps / logs", text: "Thanks for reporting this! Could you share exact steps to reproduce the issue, your app version, and any relevant log output so we can track it down?" },
+            { label: "Confirmed & investigating", text: "We reproduced this issue and are actively investigating a fix. We'll update this ticket once it's ready." },
+            { label: "Fixed in next release", text: "This has been fixed and will be included in the next release. Thanks for the report!" },
+            { label: "Planned for future update", text: "Great idea — we've added this to our roadmap for a future update. You'll receive a notification here when progress is made." },
+            { label: "Duplicate / Merged", text: "Thanks for submitting this! We're tracking this under an existing ticket so all updates stay in one place." },
+        ];
+
+        function isTicketClosedStatus(status) {
+            return ['implemented', 'fixed', 'accepted', 'resolved', 'completed', 'declined', 'closed', 'rejected', 'invalid'].includes((status || '').toLowerCase());
+        }
+
+        function getTicketReplyState(s) {
+            if (s.merged_into || isTicketClosedStatus(s.status)) return 'closed';
+            const msgs = Array.isArray(s.messages) ? s.messages : [];
+            if (msgs.length === 0) return 'unanswered';
+            const last = msgs[msgs.length - 1];
+            return last && last.sender_type === 'author' ? 'awaiting' : 'replied';
+        }
+
+        function getTicketLastActivityMs(s) {
+            const msgs = Array.isArray(s.messages) ? s.messages : [];
+            const lastTs = msgs.length > 0 ? msgs[msgs.length - 1].timestamp : s.timestamp;
+            const ms = new Date(lastTs || s.timestamp || 0).getTime();
+            return isNaN(ms) ? 0 : ms;
+        }
+
+        function toggleAdminNeedsReply() {
+            adminNeedsReplyOnly = !adminNeedsReplyOnly;
+            const btn = document.getElementById('admin-needs-reply-btn');
+            if (btn) {
+                btn.className = adminNeedsReplyOnly
+                    ? "px-3 py-2 rounded-xl text-xs font-bold font-mono uppercase border border-amber-400 bg-amber-500 text-black transition flex items-center gap-2 whitespace-nowrap shadow-md"
+                    : "px-3 py-2 rounded-xl text-xs font-bold font-mono uppercase border border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-2 whitespace-nowrap";
+            }
+            applyFilter();
+        }
+
+        function rerenderSortedAdminSuggestions() {
+            if (latestAdminSuggestions.length > 0) {
+                renderSuggestions(latestAdminSuggestions);
+            }
+        }
+
+        function insertCannedAdminReply(ticketId, selectEl) {
+            if (!selectEl) return;
+            const idx = parseInt(selectEl.value, 10);
+            if (!isNaN(idx) && ADMIN_CANNED_REPLIES[idx] && ADMIN_CANNED_REPLIES[idx].text) {
+                const input = document.getElementById(`admin-reply-input-${ticketId}`);
+                if (input) {
+                    input.value = ADMIN_CANNED_REPLIES[idx].text;
+                    input.focus();
+                }
+            }
+            selectEl.value = "0";
+        }
+
         function applyFilter() {
+            const searchEl = document.getElementById('admin-ticket-search');
+            const query = (searchEl ? searchEl.value : '').trim().toLowerCase();
             const cards = document.querySelectorAll('.suggestion-card');
             cards.forEach(card => {
                 const cardType = card.getAttribute('data-type') || 'suggestion';
                 const cardStatus = (card.getAttribute('data-status') || 'pending').toLowerCase();
                 const cardTarget = card.getAttribute('data-target') || 'overlay';
+                const cardReplyState = card.getAttribute('data-reply-state') || 'replied';
+                const cardSearch = card.getAttribute('data-search') || '';
 
                 const typeMatch = (currentTicketTypeFilter === 'all' || cardType === currentTicketTypeFilter);
 
@@ -2473,8 +2561,10 @@
                 }
 
                 const targetMatch = (currentTargetFilter === 'all' || cardTarget === currentTargetFilter);
+                const needsReplyMatch = !adminNeedsReplyOnly || (cardReplyState === 'awaiting' || cardReplyState === 'unanswered');
+                const searchMatch = !query || cardSearch.includes(query);
 
-                if (typeMatch && statusMatch && targetMatch) {
+                if (typeMatch && statusMatch && targetMatch && needsReplyMatch && searchMatch) {
                     card.style.display = 'flex';
                 } else {
                     card.style.display = 'none';
@@ -3145,20 +3235,56 @@
         }
 
         function renderSuggestions(suggestions) {
+            latestAdminSuggestions = Array.isArray(suggestions) ? [...suggestions] : [];
             const container = document.getElementById('feed-container');
             if (!container) return;
-            if (suggestions.length === 0) {
+
+            const needsReplyCount = latestAdminSuggestions.filter(s => {
+                const rs = getTicketReplyState(s);
+                return rs === 'awaiting' || rs === 'unanswered';
+            }).length;
+            const needsBadge = document.getElementById('admin-needs-reply-count');
+            if (needsBadge) needsBadge.innerText = needsReplyCount;
+
+            if (latestAdminSuggestions.length === 0) {
                 container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No tickets or feedback submitted yet.</p>';
                 return;
             }
 
+            const sortMode = (document.getElementById('admin-ticket-sort')?.value) || 'newest';
+            const ordered = [...latestAdminSuggestions];
+            ordered.sort((a, b) => {
+                if (sortMode === 'oldest') {
+                    return new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime();
+                }
+                if (sortMode === 'activity') {
+                    return getTicketLastActivityMs(b) - getTicketLastActivityMs(a);
+                }
+                if (sortMode === 'needs_reply') {
+                    const rank = (x) => {
+                        const rs = getTicketReplyState(x);
+                        if (rs === 'awaiting') return 0;
+                        if (rs === 'unanswered') return 1;
+                        if (rs === 'replied') return 2;
+                        return 3;
+                    };
+                    const diff = rank(a) - rank(b);
+                    if (diff !== 0) return diff;
+                    return getTicketLastActivityMs(b) - getTicketLastActivityMs(a);
+                }
+                return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+            });
+
+            const cannedOptionsHtml = ADMIN_CANNED_REPLIES.map((c, idx) => `<option value="${idx}">${escapeHtml(c.label)}</option>`).join('');
+
             let html = '';
-            for (const s of suggestions) {
+            for (const s of ordered) {
                 const timeStr = formatTimestamp(s.timestamp);
                 const isBanned = s.ip in bannedIps;
                 const hasComment = Boolean(s.admin_comment && s.admin_comment.trim());
                 const itemType = s.type || 'suggestion';
                 const isBug = itemType === 'bug_report';
+                const replyState = getTicketReplyState(s);
 
                 let badgeClass = '';
                 const st = (s.status || 'pending').toLowerCase();
@@ -3257,12 +3383,18 @@
                     const tagColor = isAdminMsg ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
                     const senderRole = isAdminMsg ? 'Administrator' : 'Author';
                     const editedBadge = m.edited ? '<span class="text-[9px] text-slate-500 font-mono">(edited)</span>' : '';
+                    const sourceBadge = m.source === 'discord_dm'
+                        ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#5865F2]/20 text-[#9aa3ff] border border-[#5865F2]/30">via Discord DM</span>'
+                        : (m.source === 'discord'
+                            ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-white/5 text-slate-400 border border-white/10">via Discord</span>'
+                            : '');
                     return `
                         <div id="ticket-msg-card-${s.id}-${m.id}" class="p-2.5 rounded-lg border ${bubbleBg} flex flex-col gap-1 text-xs">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-1.5 min-w-0">
+                                <div class="flex items-center gap-1.5 min-w-0 flex-wrap">
                                     <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
                                     <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderRole}</span>
+                                    ${sourceBadge}
                                     ${editedBadge}
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -3304,8 +3436,14 @@
                         </div>
 
                         <div class="flex flex-col gap-2 pt-2 border-t border-white/5">
-                            <textarea id="admin-reply-input-${s.id}" rows="2" placeholder="Write reply to author as Admin..." class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none"></textarea>
-                            <div class="flex justify-end items-center gap-2">
+                            <textarea id="admin-reply-input-${s.id}" rows="2" placeholder="Write reply to author as Admin... (Ctrl+Enter to send)"
+                                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();sendAdminTicketReply(${s.id});}"
+                                class="premium-input text-xs p-2.5 rounded-lg outline-none resize-none"></textarea>
+                            <div class="flex justify-between items-center gap-2 flex-wrap">
+                                <select onchange="insertCannedAdminReply(${s.id}, this)"
+                                    class="premium-input text-[11px] px-2.5 py-1.5 rounded-lg outline-none cursor-pointer bg-[#121217] text-slate-300 border border-white/10">
+                                    ${cannedOptionsHtml}
+                                </select>
                                 <button onclick="sendAdminTicketReply(${s.id})" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 shadow-md">
                                     <span>Send Admin Reply</span>
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path></svg>
@@ -3315,33 +3453,45 @@
                     </div>
                 `;
 
+                const activeRing = (matchList) => matchList.includes(st) ? ' ring-2 ring-white/50 font-bold' : '';
                 let statusActionButtons = '';
                 if (isBug) {
                     statusActionButtons = `
-                        <button onclick="updateStatus(${s.id}, 'open')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Open</button>
-                        <button onclick="updateStatus(${s.id}, 'investigating')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Investigate</button>
-                        <button onclick="updateStatus(${s.id}, 'confirmed')" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition">Confirm</button>
-                        <button onclick="updateStatus(${s.id}, 'fixed')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Fix</button>
-                        <button onclick="updateStatus(${s.id}, 'invalid')" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/30 transition">Invalid</button>
+                        <button onclick="updateStatus(${s.id}, 'open')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition${activeRing(['open', 'pending'])}">Open</button>
+                        <button onclick="updateStatus(${s.id}, 'investigating')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition${activeRing(['investigating', 'in-progress'])}">Investigate</button>
+                        <button onclick="updateStatus(${s.id}, 'confirmed')" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition${activeRing(['confirmed'])}">Confirm</button>
+                        <button onclick="updateStatus(${s.id}, 'fixed')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition${activeRing(['fixed', 'resolved'])}">Fix</button>
+                        <button onclick="updateStatus(${s.id}, 'invalid')" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/30 transition${activeRing(['invalid', 'closed'])}">Invalid</button>
                     `;
                 } else {
                     statusActionButtons = `
-                        <button onclick="updateStatus(${s.id}, 'pending')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Pending</button>
-                        <button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition">Consider</button>
-                        <button onclick="updateStatus(${s.id}, 'planned')" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition">Plan</button>
-                        <button onclick="updateStatus(${s.id}, 'implemented')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition">Implement</button>
-                        <button onclick="updateStatus(${s.id}, 'declined')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition">Decline</button>
+                        <button onclick="updateStatus(${s.id}, 'pending')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition${activeRing(['pending', 'open'])}">Pending</button>
+                        <button onclick="updateStatus(${s.id}, 'considering')" class="px-3 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-blue-500/20 transition${activeRing(['considering'])}">Consider</button>
+                        <button onclick="updateStatus(${s.id}, 'planned')" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition${activeRing(['planned'])}">Plan</button>
+                        <button onclick="updateStatus(${s.id}, 'implemented')" class="px-3 py-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-emerald-500/20 transition${activeRing(['implemented', 'accepted'])}">Implement</button>
+                        <button onclick="updateStatus(${s.id}, 'declined')" class="px-3 py-1 bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-rose-500/20 transition${activeRing(['declined', 'rejected'])}">Decline</button>
                     `;
                 }
 
+                const replyStateBadge = replyState === 'awaiting'
+                    ? '<span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/35 font-mono">Awaiting Reply</span>'
+                    : (replyState === 'unanswered'
+                        ? '<span class="px-2 py-0.5 bg-rose-500/15 text-rose-300 text-[10px] rounded font-bold uppercase border border-rose-500/30 font-mono">No Admin Reply</span>'
+                        : '');
+
+                const searchBlob = escapeHtml(
+                    `#${s.id} ${s.id} ${s.title || ''} ${s.suggestion || s.description || ''} ${s.name || ''} ${s.discord_username || ''} ${s.discord_id || ''} ${messages.map(m => m.message || '').join(' ')}`
+                ).toLowerCase();
+
                 html += `
-                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3.5" data-type="${itemType}" data-status="${s.status || 'pending'}" data-target="${targetAttr}">
+                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3.5" data-type="${itemType}" data-status="${s.status || 'pending'}" data-target="${targetAttr}" data-reply-state="${replyState}" data-search="${searchBlob}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 ${authorHtml}
                                 ${typeBadge}
                                 ${targetTag}
                                 ${hiddenTag}
+                                ${replyStateBadge}
                                 ${s.merged_into ? `<span class="px-2 py-0.5 bg-cyan-950/50 text-cyan-300 text-[10px] rounded font-bold uppercase border border-cyan-500/30 font-mono" title="Merged by ${escapeHtml(s.merged_by || 'an admin')}">Merged into #${Number(s.merged_into)}</span>` : ''}
                                 ${(s.merged_from || []).length ? `<span class="px-2 py-0.5 bg-cyan-950/30 text-cyan-400 text-[10px] rounded font-bold uppercase border border-cyan-500/20 font-mono">Merged in: ${s.merged_from.map(i => '#' + Number(i)).join(', ')}</span>` : ''}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
@@ -3349,6 +3499,7 @@
                             </div>
                             <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
                                 <span>Ticket #${s.id}</span>
+                                <a href="/tickets?ticket=${s.id}" target="_blank" class="text-blue-400 hover:text-blue-300 underline text-[10px]">Public Link</a>
                                 ${bannedTag}
                             </div>
                         </div>

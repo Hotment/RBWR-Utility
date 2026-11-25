@@ -427,9 +427,35 @@
                     <label for="submit-title" class="text-xs font-medium text-gray-400">
                         Ticket Title / Short Summary <span class="text-gray-500 font-mono">(Optional)</span>
                     </label>
-                    <input type="text" id="submit-title"
+                    <input type="text" id="submit-title" oninput="updateSimilarTickets()"
                         placeholder="e.g. Add dark mode graph toggle or APRM reading mismatch on unit 2"
                         class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
+                    <div id="similar-tickets-box"
+                        class="hidden mt-1 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex flex-col gap-2">
+                        <div class="flex items-center justify-between text-[11px] font-mono text-amber-300 font-semibold">
+                            <span>Similar existing tickets (check before submitting a duplicate)</span>
+                            <button type="button" onclick="document.getElementById('similar-tickets-box').classList.add('hidden')"
+                                class="text-gray-400 hover:text-white text-[10px] underline">Dismiss</button>
+                        </div>
+                        <div id="similar-tickets-list" class="flex flex-col gap-1.5"></div>
+                    </div>
+                </div>
+
+                <div id="bug-env-row" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1">
+                        <label for="submit-app-version" class="text-xs font-medium text-gray-400">
+                            App Version <span class="text-gray-500 font-mono">(Optional)</span>
+                        </label>
+                        <input type="text" id="submit-app-version" placeholder="e.g. v2.3.1 / Theme Creator v1.1.0"
+                            class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label for="submit-platform" class="text-xs font-medium text-gray-400">
+                            Operating System / Browser <span class="text-gray-500 font-mono">(Optional)</span>
+                        </label>
+                        <input type="text" id="submit-platform" placeholder="e.g. Windows 11, Linux AppImage, Chrome"
+                            class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none">
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-1.5 group">
@@ -649,11 +675,105 @@
         updateStats();
         initTicketWebSocket();
 
+        const ticketParam = urlParams.get('ticket') || urlParams.get('id');
+        const hashTicketMatch = (window.location.hash || '').match(/^#ticket-(\d+)$/i);
+        const deepLinkId = ticketParam ? parseInt(ticketParam, 10) : (hashTicketMatch ? parseInt(hashTicketMatch[1], 10) : null);
+        if (deepLinkId && !isNaN(deepLinkId)) {
+            setTimeout(() => jumpToTicket(deepLinkId), 120);
+        }
+
         const ticketForm = document.getElementById('public-ticket-form');
         if (ticketForm) {
             ticketForm.addEventListener('submit', handleFormSubmit);
         }
     });
+
+    function jumpToTicket(ticketId) {
+        const target = allTickets.find(t => Number(t.id) === Number(ticketId));
+        if (!target) return;
+        const cardAlreadyVisible = document.getElementById(`ticket-card-${ticketId}`);
+        if (!cardAlreadyVisible) {
+            currentTypeFilter = 'all';
+            currentStatusFilter = 'all';
+            currentCategoryFilter = 'all';
+            searchQuery = '';
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+            const catSel = document.getElementById('category-select');
+            if (catSel) catSel.value = 'all';
+            updateTypeTabsUI();
+            updateStatusTabLabels();
+            filterStatus('all');
+        }
+        const card = document.getElementById(`ticket-card-${ticketId}`);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-[#0a0c10]');
+            setTimeout(() => {
+                card.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-[#0a0c10]');
+            }, 2600);
+        }
+    }
+
+    function copyTicketLink(ticketId, btnEl) {
+        const url = `${window.location.origin}/tickets?ticket=${ticketId}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                if (btnEl) {
+                    const prev = btnEl.innerText;
+                    btnEl.innerText = 'Copied';
+                    setTimeout(() => { btnEl.innerText = prev; }, 1600);
+                }
+            }).catch(() => {});
+        }
+    }
+
+    function updateSimilarTickets() {
+        const titleInput = document.getElementById('submit-title');
+        const box = document.getElementById('similar-tickets-box');
+        const list = document.getElementById('similar-tickets-list');
+        if (!titleInput || !box || !list) return;
+
+        const raw = titleInput.value.trim().toLowerCase();
+        const words = raw.split(/\s+/).filter(w => w.length >= 3);
+        if (words.length === 0) {
+            box.classList.add('hidden');
+            list.innerHTML = '';
+            return;
+        }
+
+        const scored = [];
+        for (const t of allTickets) {
+            if (t.merged_into) continue;
+            const hay = `${t.title || ''} ${t.suggestion || t.description || ''}`.toLowerCase();
+            let hits = 0;
+            for (const w of words) {
+                if (hay.includes(w)) hits++;
+            }
+            if (hits > 0 && (hits >= Math.min(2, words.length))) {
+                scored.push({ ticket: t, hits });
+            }
+        }
+        scored.sort((a, b) => b.hits - a.hits || (b.ticket.id - a.ticket.id));
+        const top = scored.slice(0, 3);
+        if (top.length === 0) {
+            box.classList.add('hidden');
+            list.innerHTML = '';
+            return;
+        }
+
+        list.innerHTML = top.map(({ ticket }) => {
+            const label = escapeHtml(ticket.title || (ticket.suggestion || ticket.description || '').slice(0, 80));
+            return `
+                <button type="button" onclick="jumpToTicket(${ticket.id})"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-black/30 hover:bg-black/50 border border-white/10 transition text-xs font-mono">
+                    <span class="truncate text-gray-200"><strong class="text-blue-400">#${ticket.id}</strong> ${label}</span>
+                    <span class="shrink-0">${getStatusBadge(ticket.status, ticket.type || 'suggestion')}</span>
+                </button>
+            `;
+        }).join('');
+        box.classList.remove('hidden');
+    }
 
     function updateFormPlaceholders() {
         const typeRadio = document.querySelector('input[name="submit-type"]:checked');
@@ -662,6 +782,11 @@
         const textarea = document.getElementById('submit-description');
         const submitBtn = document.getElementById('submit-form-btn');
         const titleInput = document.getElementById('submit-title');
+        const envRow = document.getElementById('bug-env-row');
+
+        if (envRow) {
+            envRow.classList.toggle('hidden', !isBug);
+        }
 
         if (isBug) {
             if (label) label.innerText = 'Bug Description & Steps to Reproduce';
@@ -793,7 +918,9 @@
         if (badgeBugs) badgeBugs.innerText = bugs.length;
 
         if (LOGGED_IN_DISCORD_USER) {
-            const myCount = allTickets.filter(t => String(t.discord_id) === String(LOGGED_IN_DISCORD_USER.id)).length;
+            const myCount = allTickets.filter(t =>
+                Boolean(t.is_author || t.is_follower || (t.discord_id && String(t.discord_id) === String(LOGGED_IN_DISCORD_USER.id)))
+            ).length;
             const badgeMy = document.getElementById('badge-count-my');
             if (badgeMy) badgeMy.innerText = myCount;
         }
@@ -922,9 +1049,9 @@
             if (currentTypeFilter === 'suggestion' && itemType !== 'suggestion') return false;
             if (currentTypeFilter === 'bug_report' && itemType !== 'bug_report') return false;
             if (currentTypeFilter === 'my_tickets') {
-                if (!LOGGED_IN_DISCORD_USER || String(item.discord_id) !== String(LOGGED_IN_DISCORD_USER.id)) {
-                    return false;
-                }
+                if (!LOGGED_IN_DISCORD_USER) return false;
+                const isMine = Boolean(item.is_author || item.is_follower || (item.discord_id && String(item.discord_id) === String(LOGGED_IN_DISCORD_USER.id)));
+                if (!isMine) return false;
             }
 
             if (currentStatusFilter !== 'all') {
@@ -998,14 +1125,13 @@
             const msgCount = messages.length;
 
             const isAuthorLoggedIn = Boolean(
-                LOGGED_IN_DISCORD_USER &&
-                item.discord_id &&
-                String(LOGGED_IN_DISCORD_USER.id) === String(item.discord_id) &&
-                !item.anonymous
+                item.is_author ||
+                (LOGGED_IN_DISCORD_USER && item.discord_id && String(LOGGED_IN_DISCORD_USER.id) === String(item.discord_id))
             );
-            const canViewConversation = Boolean(IS_ADMIN || isAuthorLoggedIn);
-            const canReply = isAuthorLoggedIn || IS_ADMIN;
-            const hasChat = Boolean(item.discord_id && !item.anonymous);
+            const isFollowerLoggedIn = Boolean(item.is_follower);
+            const canViewConversation = Boolean(item.can_view_conversation || IS_ADMIN || isAuthorLoggedIn || isFollowerLoggedIn);
+            const canReply = isAuthorLoggedIn || isFollowerLoggedIn || IS_ADMIN;
+            const hasChat = Boolean(item.has_private_chat || item.discord_id);
 
             const avatarBlock = (avatarUrl && !item.anonymous) ? `
                 <img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="w-8 h-8 rounded-full border border-white/10 shrink-0">
@@ -1025,6 +1151,22 @@
                     Anonymous
                 </span>
             ` : '');
+
+            const mergedIntoBlock = item.merged_into ? `
+                <div class="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-xs font-mono text-cyan-200">
+                    <span>Merged into <strong>Ticket #${Number(item.merged_into)}</strong> — follow updates there.</span>
+                    <button type="button" onclick="jumpToTicket(${Number(item.merged_into)})"
+                        class="px-2.5 py-1 rounded-lg bg-cyan-600/25 hover:bg-cyan-600/40 border border-cyan-400/30 text-cyan-100 text-[10px] font-bold uppercase transition shrink-0">
+                        View #${Number(item.merged_into)} &rarr;
+                    </button>
+                </div>
+            ` : '';
+
+            const mergedFromBadge = (Array.isArray(item.merged_from) && item.merged_from.length > 0) ? `
+                <span class="inline-flex items-center px-1.5 py-0.5 bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 rounded text-[9px] font-mono font-semibold">
+                    Merged: ${item.merged_from.map(id => '#' + Number(id)).join(', ')}
+                </span>
+            ` : '';
 
             const titleBlock = item.title ? `
                 <h3 class="text-sm font-bold text-white font-display tracking-wide">${escapeHtml(item.title)}</h3>
@@ -1059,20 +1201,29 @@
                 `;
 
                 const editedBadge = m.edited ? '<span class="text-[9px] text-gray-400 font-mono">(edited)</span>' : '';
-                const adminActionBtns = (IS_ADMIN && isAdminMsg) ? `
+                const sourceBadge = m.source === 'discord_dm'
+                    ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#5865F2]/15 text-[#9aa3ff] border border-[#5865F2]/25">via Discord DM</span>'
+                    : (m.source === 'discord'
+                        ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-white/5 text-gray-400 border border-white/10">via Discord</span>'
+                        : '');
+                const isOwnAuthorMsg = Boolean(!isAdminMsg && LOGGED_IN_DISCORD_USER && m.sender_discord_id && String(m.sender_discord_id) === String(LOGGED_IN_DISCORD_USER.id));
+                const canEditThisMsg = (IS_ADMIN && isAdminMsg) || isOwnAuthorMsg;
+                const canDeleteThisMsg = IS_ADMIN && isAdminMsg;
+                const adminActionBtns = (canEditThisMsg || canDeleteThisMsg) ? `
                     <div class="flex items-center gap-1 shrink-0">
-                        <button onclick="startEditPublicReply(${item.id}, ${m.id})" title="Edit Reply" class="text-[10px] font-mono text-gray-400 hover:text-blue-300 px-1.5 py-0.5 rounded border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/10 transition">Edit</button>
-                        <button onclick="deletePublicReply(${item.id}, ${m.id})" title="Delete Reply" class="text-[10px] font-mono text-gray-400 hover:text-rose-400 px-1.5 py-0.5 rounded border border-white/5 hover:border-rose-500/30 hover:bg-rose-500/10 transition">Delete</button>
+                        ${canEditThisMsg ? `<button onclick="startEditPublicReply(${item.id}, ${m.id})" title="Edit Reply" class="text-[10px] font-mono text-gray-400 hover:text-blue-300 px-1.5 py-0.5 rounded border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/10 transition">Edit</button>` : ''}
+                        ${canDeleteThisMsg ? `<button onclick="deletePublicReply(${item.id}, ${m.id})" title="Delete Reply" class="text-[10px] font-mono text-gray-400 hover:text-rose-400 px-1.5 py-0.5 rounded border border-white/5 hover:border-rose-500/30 hover:bg-rose-500/10 transition">Delete</button>` : ''}
                     </div>
                 ` : '';
 
                 return `
-                    <div id="public-msg-card-${item.id}-${m.id}" class="flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg}">
+                    <div id="public-msg-card-${item.id}-${m.id}" data-msg-id="${m.id}" class="flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg}">
                         <div class="flex items-center justify-between gap-2 text-xs">
-                            <div class="flex items-center gap-2 min-w-0">
+                            <div class="flex items-center gap-2 min-w-0 flex-wrap">
                                 ${avatar}
                                 <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(m.sender_name || 'User')}</span>
                                 <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                                ${sourceBadge}
                                 ${editedBadge}
                             </div>
                             <div class="flex items-center gap-2">
@@ -1096,25 +1247,30 @@
 
             let composerHtml = '';
             if (canReply) {
+                const roleLabel = isAuthorLoggedIn ? 'Signed in as Author' : (isFollowerLoggedIn ? 'Signed in as Follower' : 'Signed in as Admin');
                 composerHtml = `
                     <div class="flex flex-col gap-2 pt-2 border-t border-white/5">
                         <label class="text-[10px] font-mono uppercase text-gray-400 font-bold flex items-center justify-between">
                             <span>Post Private Reply</span>
-                            <span class="text-emerald-400">${isAuthorLoggedIn ? 'Signed in as Author' : 'Signed in as Admin'}</span>
+                            <span class="text-emerald-400">${roleLabel}</span>
                         </label>
                         <div class="flex gap-2">
-                            <textarea id="reply-input-${item.id}" rows="2" placeholder="Write a private reply to developers..."
+                            <textarea id="reply-input-${item.id}" rows="2" placeholder="Write a private reply to developers... (Ctrl+Enter to send)"
+                                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitTicketReply(${item.id});}"
                                 class="premium-input px-3 py-2 rounded-xl text-xs font-mono resize-none w-full outline-none"></textarea>
                         </div>
-                        <div class="flex justify-end items-center gap-2">
-                            <div id="reply-status-${item.id}" class="text-[10px] font-mono hidden"></div>
-                            <button onclick="submitTicketReply(${item.id})" id="reply-btn-${item.id}"
-                                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium font-mono transition flex items-center gap-1.5 shadow-md shadow-blue-500/10">
-                                <span>Send Reply</span>
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
-                                </svg>
-                            </button>
+                        <div class="flex justify-between items-center gap-2 flex-wrap">
+                            <span class="text-[10px] text-gray-500 font-mono">You can also reply directly to Discord bot DM alerts.</span>
+                            <div class="flex items-center gap-2">
+                                <div id="reply-status-${item.id}" class="text-[10px] font-mono hidden"></div>
+                                <button onclick="submitTicketReply(${item.id})" id="reply-btn-${item.id}"
+                                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium font-mono transition flex items-center gap-1.5 shadow-md shadow-blue-500/10">
+                                    <span>Send Reply</span>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1180,7 +1336,7 @@
             }
 
             return `
-                <div class="premium-glass interactive-card p-6 rounded-2xl flex flex-col justify-between gap-4 border border-white/5">
+                <div id="ticket-card-${item.id}" class="premium-glass interactive-card p-6 rounded-2xl flex flex-col justify-between gap-4 border border-white/5 transition-shadow">
                     <div class="flex flex-col gap-3">
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2.5 min-w-0">
@@ -1191,6 +1347,7 @@
                                         ${discordTag}
                                         ${getTypeBadge(itemType)}
                                         ${getCategoryBadge(item.target, item.is_server_checker)}
+                                        ${mergedFromBadge}
                                     </div>
                                     <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
                                 </div>
@@ -1199,6 +1356,8 @@
                                 ${getStatusBadge(item.status, itemType)}
                             </div>
                         </div>
+
+                        ${mergedIntoBlock}
 
                         ${titleBlock}
 
@@ -1209,10 +1368,14 @@
                         ${threadContainer}
                     </div>
 
-                    <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
+                    <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5 gap-2">
                         <span>Ticket ID: #${item.id}</span>
                         <span>Category: ${(item.target || 'overlay').toUpperCase()}</span>
-                        <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
+                        <div class="flex items-center gap-2.5">
+                            <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
+                            <button type="button" onclick="copyTicketLink(${item.id}, this)"
+                                class="text-gray-400 hover:text-blue-400 underline transition">Copy Link</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1247,11 +1410,23 @@
             }
         }
 
+        let rawDescription = descInput.value.trim();
+        if (selectedType === 'bug_report') {
+            const verVal = (document.getElementById('submit-app-version')?.value || '').trim();
+            const osVal = (document.getElementById('submit-platform')?.value || '').trim();
+            const envParts = [];
+            if (verVal) envParts.push(`Version: ${verVal}`);
+            if (osVal) envParts.push(`Platform: ${osVal}`);
+            if (envParts.length > 0) {
+                rawDescription = `[Environment: ${envParts.join(' | ')}]\n\n${rawDescription}`;
+            }
+        }
+
         const payload = {
             type: selectedType,
             title: titleInput ? titleInput.value.trim() : '',
-            description: descInput.value.trim(),
-            suggestion: descInput.value.trim(),
+            description: rawDescription,
+            suggestion: rawDescription,
             anonymous: isAnon,
             target: selectedTarget,
             is_server_checker: selectedTarget === "server_checker",
@@ -1279,12 +1454,18 @@
                 descInput.value = '';
                 if (titleInput) titleInput.value = '';
                 if (anonCheckbox) anonCheckbox.checked = false;
+                const verInput = document.getElementById('submit-app-version');
+                const osInput = document.getElementById('submit-platform');
+                if (verInput) verInput.value = '';
+                if (osInput) osInput.value = '';
+                const simBox = document.getElementById('similar-tickets-box');
+                if (simBox) simBox.classList.add('hidden');
 
                 if (data.logged_in_discord && data.in_guild === false && typeof showDiscordGuildJoinModal === 'function') {
                     showDiscordGuildJoinModal(data.type || payload.type);
                 }
 
-                const refreshRes = await fetch('/api/tickets');
+                const refreshRes = await fetch('/tickets?format=json', { cache: 'no-store' });
                 if (refreshRes.ok) {
                     const freshData = await refreshRes.json();
                     allTickets = freshData.tickets || [];
@@ -1487,44 +1668,60 @@
 
         const threadMessagesContainer = document.getElementById(`thread-messages-${ticketId}`);
         if (threadMessagesContainer) {
-            const existingBubble = threadMessagesContainer.querySelector(`[data-msg-id="${newMsg.id}"]`);
-            if (!existingBubble) {
-                const emptyP = threadMessagesContainer.querySelector('p.italic');
-                if (emptyP) emptyP.remove();
+            if (newMsg.deleted) {
+                const delBubble = threadMessagesContainer.querySelector(`[data-msg-id="${newMsg.id}"]`)
+                    || document.getElementById(`public-msg-card-${ticketId}-${newMsg.id}`);
+                if (delBubble) delBubble.remove();
+            } else {
+                const existingBubble = threadMessagesContainer.querySelector(`[data-msg-id="${newMsg.id}"]`);
+                if (existingBubble) {
+                    const textEl = document.getElementById(`public-msg-text-${ticketId}-${newMsg.id}`) || existingBubble.querySelector('p');
+                    if (textEl && typeof newMsg.message === 'string') textEl.textContent = newMsg.message;
+                } else {
+                    const emptyP = threadMessagesContainer.querySelector('p.italic');
+                    if (emptyP) emptyP.remove();
 
-                const isAdminMsg = newMsg.sender_type === 'admin';
-                const senderTitle = isAdminMsg ? 'Administrator' : 'Author';
-                const cardBg = isAdminMsg ? 'bg-blue-950/20 border-blue-500/30' : 'bg-emerald-950/20 border-emerald-500/30';
-                const tagColor = isAdminMsg ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-                const avatar = newMsg.sender_avatar ? `
-                    <img src="${escapeHtml(newMsg.sender_avatar)}" class="w-5 h-5 rounded-full border border-white/10 shrink-0" alt="">
-                ` : `
-                    <div class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold text-gray-300 font-mono shrink-0">
-                        ${escapeHtml(newMsg.sender_name || 'U').charAt(0).toUpperCase()}
-                    </div>
-                `;
-
-                const msgEl = document.createElement('div');
-                msgEl.setAttribute('data-msg-id', newMsg.id);
-                msgEl.className = `flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg} transition-all duration-300`;
-                msgEl.innerHTML = `
-                    <div class="flex items-center justify-between gap-2 text-xs">
-                        <div class="flex items-center gap-2 min-w-0">
-                            ${avatar}
-                            <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(newMsg.sender_name || 'User')}</span>
-                            <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                    const isAdminMsg = newMsg.sender_type === 'admin';
+                    const senderTitle = isAdminMsg ? 'Administrator' : 'Author';
+                    const cardBg = isAdminMsg ? 'bg-blue-950/20 border-blue-500/30' : 'bg-emerald-950/20 border-emerald-500/30';
+                    const tagColor = isAdminMsg ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                    const sourceBadge = newMsg.source === 'discord_dm'
+                        ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#5865F2]/15 text-[#9aa3ff] border border-[#5865F2]/25">via Discord DM</span>'
+                        : (newMsg.source === 'discord'
+                            ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-white/5 text-gray-400 border border-white/10">via Discord</span>'
+                            : '');
+                    const avatar = newMsg.sender_avatar ? `
+                        <img src="${escapeHtml(newMsg.sender_avatar)}" class="w-5 h-5 rounded-full border border-white/10 shrink-0" alt="">
+                    ` : `
+                        <div class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold text-gray-300 font-mono shrink-0">
+                            ${escapeHtml(newMsg.sender_name || 'U').charAt(0).toUpperCase()}
                         </div>
-                        <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(newMsg.timestamp)}</span>
-                    </div>
-                    <p class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(newMsg.message)}</p>
-                `;
+                    `;
 
-                threadMessagesContainer.appendChild(msgEl);
+                    const msgEl = document.createElement('div');
+                    msgEl.id = `public-msg-card-${ticketId}-${newMsg.id}`;
+                    msgEl.setAttribute('data-msg-id', newMsg.id);
+                    msgEl.className = `flex flex-col gap-1.5 p-3 rounded-xl border ${cardBg} transition-all duration-300`;
+                    msgEl.innerHTML = `
+                        <div class="flex items-center justify-between gap-2 text-xs">
+                            <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                                ${avatar}
+                                <span class="font-bold text-white font-mono text-[11px] truncate">${escapeHtml(newMsg.sender_name || 'User')}</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${tagColor}">${senderTitle}</span>
+                                ${sourceBadge}
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-mono shrink-0">${formatTimestamp(newMsg.timestamp)}</span>
+                        </div>
+                        <p id="public-msg-text-${ticketId}-${newMsg.id}" class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(newMsg.message)}</p>
+                    `;
 
-                threadMessagesContainer.scrollTo({
-                    top: threadMessagesContainer.scrollHeight,
-                    behavior: 'smooth'
-                });
+                    threadMessagesContainer.appendChild(msgEl);
+
+                    threadMessagesContainer.scrollTo({
+                        top: threadMessagesContainer.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
             }
         }
 
@@ -1568,7 +1765,7 @@
             return;
         }
         try {
-            const res = await fetch('/api/tickets', { cache: 'no-store' });
+            const res = await fetch('/tickets?format=json', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 const freshTickets = data.tickets || [];

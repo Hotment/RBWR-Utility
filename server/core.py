@@ -279,9 +279,12 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
         raw_text = s.get("suggestion") or s.get("description", "")
 
         ticket_discord_id = str(s.get("discord_id") or "")
-        is_author = bool(current_discord_id and ticket_discord_id and str(current_discord_id) == ticket_discord_id and not is_anon)
+        followers = s.get("followers") or []
+        follower_ids = {str(f.get("discord_id") or "") for f in followers if isinstance(f, dict) and f.get("discord_id")}
+        is_author = bool(current_discord_id and ticket_discord_id and str(current_discord_id) == ticket_discord_id)
+        is_follower = bool(current_discord_id and str(current_discord_id) in follower_ids)
 
-        can_view_conversation = is_admin or is_author
+        can_view_conversation = is_admin or is_author or is_follower
         ticket_messages = s.get("messages", []) if can_view_conversation else []
         messages_count = len(s.get("messages", [])) if can_view_conversation else 0
 
@@ -304,8 +307,10 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
             "discord_id": None if is_anon else (s.get("discord_id") or ""),
             "discord_username": None if is_anon else (s.get("discord_username") or ""),
             "is_discord_user": bool(s.get("discord_id")) and not is_anon,
+            "has_private_chat": bool(s.get("discord_id")),
             "can_view_conversation": can_view_conversation,
             "is_author": is_author,
+            "is_follower": is_follower,
             "messages": ticket_messages,
             "messages_count": messages_count,
             "merged_into": s.get("merged_into"),

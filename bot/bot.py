@@ -975,13 +975,288 @@ def is_user_in_guild(discord_id: str | int | None) -> bool:
         log.warning(f"[Guild Check] Guild check execution error: {ex}")
         return False
 
+_TICKET_CLOSED_STATUSES = {"fixed", "resolved", "implemented", "accepted", "invalid", "declined", "closed"}
+
+
+def _ticket_follower_ids(ticket: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for f in ticket.get("followers") or []:
+        if isinstance(f, dict):
+            fid = str(f.get("discord_id") or "").strip()
+            if fid and fid.isdigit() and fid not in seen:
+                seen.add(fid)
+                out.append(fid)
+    return out
+
+
+def _ticket_recipient_ids(
+    ticket: dict[str, Any],
+    exclude_id: str | None = None,
+    include_followers: bool = True,
+) -> list[int]:
+    ids: list[int] = []
+    seen: set[str] = set()
+    exclude_str = str(exclude_id or "").strip()
+    candidates = [str(ticket.get("discord_id") or "").strip()]
+    if include_followers:
+        candidates.extend(_ticket_follower_ids(ticket))
+    for raw in candidates:
+        if not raw or not raw.isdigit() or raw in seen or (exclude_str and raw == exclude_str):
+            continue
+        seen.add(raw)
+        ids.append(int(raw))
+    return ids
+
+
+def _user_can_reply_to_ticket(ticket: dict[str, Any], user_discord_id: str) -> bool:
+    uid = str(user_discord_id or "").strip()
+    if not uid:
+        return False
+    if str(ticket.get("discord_id") or "").strip() == uid:
+        return True
+    if uid in _ticket_follower_ids(ticket):
+        return True
+    if ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(uid):
+        return True
+    return False
+
+
+def _is_ticket_active(ticket: dict[str, Any]) -> bool:
+    if ticket.get("merged_into"):
+        return False
+    status = str(ticket.get("status") or ("open" if ticket.get("type") == "bug_report" else "pending")).strip().lower()
+    return status not in _TICKET_CLOSED_STATUSES
+
+
+class TicketDmNotificationView(disnake.ui.View):
+    def __init__(self, ticket_id: int):
+        super().__init__(timeout=None)
+        self.add_item(
+            disnake.ui.Button(
+                label=f"Reply to Ticket #{ticket_id}",
+                style=disnake.ButtonStyle.primary,
+                custom_id=f"ticket_dm_reply:{ticket_id}",
+            )
+        )
+        self.add_item(
+            disnake.ui.Button(
+                label="View Ticket on Website",
+                style=disnake.ButtonStyle.link,
+                url=f"{DEFAULT_SERVER_BASE_URL}/tickets?ticket={ticket_id}",
+            )
+        )
+
+
+class TicketDmPickerView(disnake.ui.View):
+    def __init__(self, tickets: list[dict[str, Any]]):
+        super().__init__(timeout=None)
+        for t in tickets[:5]:
+            tid = t.get("id")
+            if not tid:
+                continue
+            raw_title = (t.get("title") or t.get("suggestion") or t.get("description") or f"Ticket #{tid}").strip()
+            short_title = raw_title[:45] + ("..." if len(raw_title) > 45 else "")
+            self.add_item(
+                disnake.ui.Button(
+                    label=f"Reply to #{tid}: {short_title}"[:80],
+                    style=disnake.ButtonStyle.primary,
+                    custom_id=f"ticket_dm_reply:{tid}",
+                )
+            )
+
+
+class TicketDmReplyModal(disnake.ui.Modal):
+    def __init__(self, ticket_id: int, ticket_title: str = ""):
+        self.ticket_id = ticket_id
+        components = [
+            disnake.ui.TextInput(
+                label="Your Reply",
+                custom_id="ticket_dm_reply_text",
+                style=disnake.TextInputStyle.paragraph,
+                placeholder="Type your reply to the developers (sent directly to the ticket thread)...",
+                required=True,
+                max_length=2000,
+            )
+        ]
+        modal_title = f"Reply to Ticket #{ticket_id}"
+        if ticket_title:
+            candidate = f"Reply #{ticket_id}: {ticket_title}"
+            modal_title = candidate[:45]
+        super().__init__(
+            title=modal_title,
+            custom_id=f"ticket_dm_reply_modal:{ticket_id}",
+            components=components,
+        )
+
+    async def callback(self, inter: disnake.ModalInteraction):
+        await handle_ticket_dm_reply_modal(inter, self.ticket_id)
+
+
+async def _deliver_user_dm_reply_to_ticket(
+    ticket_id: int,
+    user: disnake.User | disnake.Member,
+    msg_text: str,
+    dm_message_id: str | None = None,
+) -> tuple[bool, str, dict[str, Any] | None]:
+    """Appends a user's Discord DM reply to the ticket, broadcasts live to web, and forwards to Discord channels."""
+    if not ticket_bridge.load_suggestions or not ticket_bridge.save_suggestions:
+        return False, "Ticket bridge is currently offline. Please reply on the website.", None
+
+    clean_text = (msg_text or "").strip()[:2000]
+    if not clean_text:
+        return False, "Reply message cannot be empty.", None
+
+    sender_discord_id = str(user.id)
+    data = ticket_bridge.load_suggestions()
+    suggestions = data.get("suggestions", [])
+
+    ticket = next((s for s in suggestions if s.get("id") == ticket_id), None)
+    if not ticket:
+        return False, f"Ticket #{ticket_id} could not be found.", None
+
+    if not _user_can_reply_to_ticket(ticket, sender_discord_id):
+        return False, f"You do not have permission to reply to Ticket #{ticket_id}.", None
+
+    redirected_from: int | None = None
+    seen_ids = {ticket_id}
+    while ticket.get("merged_into"):
+        next_id = ticket.get("merged_into")
+        if next_id in seen_ids:
+            break
+        seen_ids.add(next_id)
+        nxt = next((s for s in suggestions if s.get("id") == next_id), None)
+        if not nxt:
+            break
+        redirected_from = ticket_id
+        ticket = nxt
+
+    resolved_id = ticket.get("id")
+    messages = ticket.setdefault("messages", [])
+    if dm_message_id and any(str(m.get("dm_message_id", "")) == str(dm_message_id) for m in messages):
+        return True, f"Reply already delivered to Ticket #{resolved_id}.", ticket
+
+    is_admin_sender = bool(ticket_bridge.is_website_admin and ticket_bridge.is_website_admin(sender_discord_id))
+    is_primary_author = str(ticket.get("discord_id") or "").strip() == sender_discord_id
+    sender_type = "admin" if (is_admin_sender and not is_primary_author) else "author"
+    sender_name = getattr(user, "global_name", None) or user.display_name or user.name or "Discord User"
+    sender_avatar = str(user.display_avatar.url) if getattr(user, "display_avatar", None) else ""
+
+    new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
+    new_msg_obj = {
+        "id": new_msg_id,
+        "sender_type": sender_type,
+        "sender_name": sender_name,
+        "sender_discord_id": sender_discord_id,
+        "sender_avatar": sender_avatar,
+        "message": clean_text,
+        "source": "discord_dm",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **({"dm_message_id": str(dm_message_id)} if dm_message_id else {}),
+    }
+    messages.append(new_msg_obj)
+    ticket_bridge.save_suggestions(data)
+
+    if ticket_bridge.broadcast_dashboard:
+        ticket_bridge.broadcast_dashboard()
+
+    if ticket_bridge.broadcast_ticket_update:
+        try:
+            ticket_bridge.broadcast_ticket_update(
+                resolved_id,
+                new_msg_obj,
+                messages,
+                ticket.get("discord_id"),
+                ticket.get("anonymous"),
+                follower_ids=_ticket_follower_ids(ticket),
+            )
+        except TypeError:
+            ticket_bridge.broadcast_ticket_update(
+                resolved_id,
+                new_msg_obj,
+                messages,
+                ticket.get("discord_id"),
+                ticket.get("anonymous"),
+            )
+
+    channels_to_fwd = [c for c in [ticket.get("discord_channel_id"), ticket.get("discussion_thread_id")] if c]
+    if channels_to_fwd and disnake_bot:
+        sender_label = "Administrator (via Discord DM)" if sender_type == "admin" else "Ticket Author (via Discord DM)"
+        fwd_content = f"**[{sender_label}] {sender_name}**:\n{clean_text}"
+        last_discord_msg_id = None
+        for ch_id in channels_to_fwd:
+            try:
+                ch = disnake_bot.get_channel(int(ch_id))
+                if not ch:
+                    ch = await disnake_bot.fetch_channel(int(ch_id))
+                if ch and isinstance(ch, (disnake.TextChannel, disnake.Thread)):
+                    sent = await ch.send(content=fwd_content)
+                    last_discord_msg_id = str(sent.id)
+            except Exception as fwd_err:
+                log.warning(f"[DM Reply Forward] Failed to forward DM reply to channel {ch_id}: {fwd_err}")
+        if last_discord_msg_id:
+            try:
+                d2 = ticket_bridge.load_suggestions()
+                for s in d2.get("suggestions", []):
+                    if s.get("id") == resolved_id:
+                        for m in s.get("messages", []):
+                            if m.get("id") == new_msg_id:
+                                m["discord_message_id"] = last_discord_msg_id
+                                break
+                        break
+                ticket_bridge.save_suggestions(d2)
+            except Exception as save_err:
+                log.warning(f"[DM Reply Forward] Could not persist discord_message_id: {save_err}")
+
+    log.info(f"[DM Reply] Ingested DM reply from {sender_name} (ID: {sender_discord_id}) into Ticket #{resolved_id}")
+    status_str = str(ticket.get("status") or "").strip().upper()
+    parts = [f"Reply delivered to Ticket #{resolved_id}."]
+    if redirected_from:
+        parts.append(f"Note: Ticket #{redirected_from} was merged into #{resolved_id}, so your reply was routed there.")
+    if not _is_ticket_active(ticket) and status_str:
+        parts.append(f"Note: This ticket is currently marked `{status_str}`, but developers can still see your message.")
+    return True, " ".join(parts), ticket
+
+
+async def handle_ticket_dm_reply_button(inter: disnake.MessageInteraction, ticket_id: int) -> None:
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
+        return
+    if not ticket_bridge.load_suggestions:
+        await inter.response.send_message("Ticket system is temporarily unavailable. Please reply on the website.", ephemeral=True)
+        return
+    data = ticket_bridge.load_suggestions()
+    ticket = next((s for s in data.get("suggestions", []) if s.get("id") == ticket_id), None)
+    if not ticket:
+        await inter.response.send_message(f"Ticket #{ticket_id} was not found (it may have been deleted).", ephemeral=True)
+        return
+    if not _user_can_reply_to_ticket(ticket, str(inter.author.id)):
+        await inter.response.send_message(f"You do not have permission to reply to Ticket #{ticket_id}.", ephemeral=True)
+        return
+    title = (ticket.get("title") or "").strip()
+    await inter.response.send_modal(TicketDmReplyModal(ticket_id=ticket_id, ticket_title=title))
+
+
+async def handle_ticket_dm_reply_modal(inter: disnake.ModalInteraction, ticket_id: int) -> None:
+    if _check_and_mark_interaction(inter.id) or inter.response.is_done():
+        return
+    await inter.response.defer(ephemeral=True)
+    reply_text = (inter.text_values.get("ticket_dm_reply_text") or "").strip()
+    ok, feedback, resolved = await _deliver_user_dm_reply_to_ticket(ticket_id, inter.author, reply_text)
+    if ok and resolved:
+        rid = int(resolved.get("id") or ticket_id)
+        await inter.followup.send(feedback, view=TicketDmNotificationView(rid), ephemeral=True)
+    else:
+        await inter.followup.send(feedback, ephemeral=True)
+
+
 def notify_ticket_author_dm(
     ticket: dict[str, Any],
     event_type: str,
     details: dict[str, Any],
 ) -> None:
     """
-    Sends a direct message to the ticket author.
+    Sends a direct message to the ticket author, and to merged-ticket followers for root updates ('status' / 'note').
+    Private ticket messages ('message') notify only the root ticket author unless explicitly overridden.
     Supports members in the configured guild as well as users without mutual guilds
     who authorized the application via Discord OAuth2 / user-installed app.
     event_type can be: 'message', 'note', or 'status'.
@@ -990,55 +1265,55 @@ def notify_ticket_author_dm(
     if not disnake_bot or not disnake_bot.is_ready() or not disnake_bot_loop or not disnake_bot_loop.is_running():
         return
 
-    author_id_str = ticket.get("discord_id")
-    if not author_id_str:
-        return
-    try:
-        author_id = int(str(author_id_str).strip())
-    except (ValueError, TypeError):
+    include_followers = bool(details.get("include_followers", event_type != "message"))
+    recipient_ids = _ticket_recipient_ids(
+        ticket,
+        exclude_id=details.get("exclude_discord_id"),
+        include_followers=include_followers,
+    )
+    if not recipient_ids:
         return
 
     bot_ref = disnake_bot
 
+    async def _resolve_user(uid: int) -> disnake.Member | disnake.User | None:
+        recipient: disnake.Member | disnake.User | None = None
+        if GUILD_ID and str(GUILD_ID).isdigit():
+            try:
+                guild_id = int(GUILD_ID)
+                guild = bot_ref.get_guild(guild_id)
+                if not guild:
+                    guild = await bot_ref.fetch_guild(guild_id)
+                if guild:
+                    recipient = guild.get_member(uid)
+                    if not recipient:
+                        try:
+                            recipient = await guild.fetch_member(uid)
+                        except (disnake.NotFound, disnake.HTTPException):
+                            recipient = None
+            except Exception as g_err:
+                log.debug(f"[DM Notify] Guild lookup for user {uid} skipped: {g_err}")
+
+        if not recipient:
+            recipient = bot_ref.get_user(uid)
+            if not recipient:
+                try:
+                    recipient = await bot_ref.fetch_user(uid)
+                except disnake.NotFound:
+                    log.info(f"[DM Notify] User {uid} not found on Discord.")
+                    return None
+                except Exception as u_err:
+                    log.warning(f"[DM Notify] Could not fetch user {uid}: {u_err}")
+                    return None
+        return recipient
+
     async def _send_dm_async():
         try:
-            recipient: disnake.Member | disnake.User | None = None
-
-            if GUILD_ID and str(GUILD_ID).isdigit():
-                try:
-                    guild_id = int(GUILD_ID)
-                    guild = bot_ref.get_guild(guild_id)
-                    if not guild:
-                        guild = await bot_ref.fetch_guild(guild_id)
-                    if guild:
-                        recipient = guild.get_member(author_id)
-                        if not recipient:
-                            try:
-                                recipient = await guild.fetch_member(author_id)
-                            except (disnake.NotFound, disnake.HTTPException):
-                                recipient = None
-                except Exception as g_err:
-                    log.debug(f"[DM Notify] Guild lookup for user {author_id} skipped: {g_err}")
-
-            if not recipient:
-                recipient = bot_ref.get_user(author_id)
-                if not recipient:
-                    try:
-                        recipient = await bot_ref.fetch_user(author_id)
-                    except disnake.NotFound:
-                        log.info(f"[DM Notify] User {author_id} not found on Discord.")
-                        return
-                    except Exception as u_err:
-                        log.warning(f"[DM Notify] Could not fetch user {author_id}: {u_err}")
-                        return
-
-            if not recipient:
-                return
-
             ticket_id = ticket.get("id")
             is_bug = (ticket.get("type") == "bug_report")
             type_label = "Bug Report" if is_bug else "Suggestion"
             ticket_title = ticket.get("title") or (ticket.get("suggestion") or ticket.get("description") or f"{type_label} #{ticket_id}")[:60]
+            footer_hint = f"Reply to this DM, click Reply, or start with #{ticket_id} to respond • rbwr.hotment.dev/tickets"
 
             embed = None
             if event_type == "message":
@@ -1046,12 +1321,12 @@ def notify_ticket_author_dm(
                 msg_content = details.get("message", "")
                 embed = disnake.Embed(
                     title=f"New Message: {type_label} #{ticket_id}",
-                    description=f"**{sender_name}** sent a message regarding your {type_label.lower()}:\n\n> {msg_content[:1500]}",
+                    description=f"**{sender_name}** sent a message regarding {type_label.lower()} **#{ticket_id}**:\n\n> {msg_content[:1500]}",
                     color=disnake.Color.blurple(),
                     timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Ticket Title", value=ticket_title, inline=False)
-                embed.set_footer(text="RBWR Community Portal • rbwr.hotment.dev/tickets")
+                embed.set_footer(text=footer_hint)
 
             elif event_type == "note":
                 comment_by = details.get("comment_by", "Administrator")
@@ -1063,7 +1338,7 @@ def notify_ticket_author_dm(
                     timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Ticket Title", value=ticket_title, inline=False)
-                embed.set_footer(text="RBWR Community Portal • rbwr.hotment.dev/tickets")
+                embed.set_footer(text=footer_hint)
 
             elif event_type == "status":
                 new_status = str(details.get("status", "updated")).upper()
@@ -1073,22 +1348,47 @@ def notify_ticket_author_dm(
                 )
                 embed = disnake.Embed(
                     title=f"Status Changed: {type_label} #{ticket_id}",
-                    description=f"The status of your {type_label.lower()} has been changed to **`{new_status}`** by **{changed_by}**.",
+                    description=f"The status of {type_label.lower()} **#{ticket_id}** has been changed to **`{new_status}`** by **{changed_by}**.",
                     color=embed_color,
                     timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Ticket Title", value=ticket_title, inline=False)
                 embed.add_field(name="New Status", value=f"`{new_status}`", inline=True)
-                embed.set_footer(text="RBWR Community Portal • rbwr.hotment.dev/tickets")
+                embed.set_footer(text=footer_hint)
 
-            if embed:
+            if not embed:
+                return
+
+            dm_view = TicketDmNotificationView(int(ticket_id)) if ticket_id else None
+            sent_dm_ids: list[str] = []
+
+            for uid in recipient_ids:
+                recipient = await _resolve_user(uid)
+                if not recipient:
+                    continue
                 try:
-                    await recipient.send(embed=embed)
-                    log.info(f"[DM Notify] Successfully sent {event_type} DM to user {recipient} (ID: {author_id}) for ticket #{ticket_id}")
+                    sent_msg = await recipient.send(embed=embed, view=dm_view) if dm_view else await recipient.send(embed=embed)
+                    sent_dm_ids.append(str(sent_msg.id))
+                    log.info(f"[DM Notify] Successfully sent {event_type} DM to user {recipient} (ID: {uid}) for ticket #{ticket_id}")
                 except disnake.Forbidden:
                     log.info(f"[DM Notify] Could not send DM to {recipient}: direct messages disabled by recipient or application not installed for DMs.")
                 except Exception as ex:
                     log.warning(f"[DM Notify] Failed to send DM to {recipient}: {ex}")
+
+            if sent_dm_ids and ticket_id and ticket_bridge.load_suggestions and ticket_bridge.save_suggestions:
+                try:
+                    d = ticket_bridge.load_suggestions()
+                    for s in d.get("suggestions", []):
+                        if s.get("id") == ticket_id:
+                            existing = list(s.get("dm_notification_ids") or [])
+                            for mid in sent_dm_ids:
+                                if mid not in existing:
+                                    existing.append(mid)
+                            s["dm_notification_ids"] = existing[-30:]
+                            break
+                    ticket_bridge.save_suggestions(d)
+                except Exception as track_err:
+                    log.debug(f"[DM Notify] Could not store dm_notification_ids for ticket #{ticket_id}: {track_err}")
 
         except Exception as e:
             log.warning(f"[DM Notify] Error in _send_dm_async: {e}")
@@ -4309,9 +4609,28 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                             "Channel": f"#{getattr(inter.channel, 'name', 'unknown')} (ID: {inter.channel_id})",
                         },
                     )
+            elif cid.startswith("ticket_dm_reply:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_dm_reply_button(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] DM reply button error: {ex}", exc_info=True)
+                    await send_interaction_error(
+                        inter,
+                        title="Reply Action Fault",
+                        description="Could not open the ticket reply dialog.",
+                        error=ex,
+                        ephemeral=True,
+                    )
         elif isinstance(inter, disnake.ModalInteraction):
             cid = str(getattr(inter.data, "custom_id", "") or "")
-            if cid.startswith("ticket_note_modal:"):
+            if cid.startswith("ticket_dm_reply_modal:"):
+                try:
+                    t_id = int(cid.split(":")[1])
+                    await handle_ticket_dm_reply_modal(inter, t_id)
+                except Exception as ex:
+                    log.error(f"[Component Handler] DM reply modal error: {ex}", exc_info=True)
+            elif cid.startswith("ticket_note_modal:"):
                 try:
                     t_id = int(cid.split(":")[1])
                     await handle_ticket_note_submission(inter, t_id)
@@ -4834,7 +5153,109 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         if message.author.bot:
             return
         if not message.guild:
-            # a DM to the bot -> shown in the admin panel's Messages view
+            # Check if the user is replying to a ticket DM notification, using #<id>, or has a single active ticket.
+            routed_to_ticket = False
+            if ticket_bridge.is_configured() and ticket_bridge.load_suggestions:
+                try:
+                    raw_text = (message.content or "").strip()
+                    attach_urls = [a.url for a in (message.attachments or []) if getattr(a, "url", None)]
+                    combined_text = "\n".join([p for p in [raw_text, *attach_urls] if p]).strip()
+
+                    if combined_text:
+                        data = ticket_bridge.load_suggestions()
+                        suggestions = data.get("suggestions", [])
+                        uid = str(message.author.id)
+                        matched_ticket_id: int | None = None
+                        reply_body = combined_text
+
+                        # 1. Native Discord Reply to a bot ticket DM notification
+                        ref = getattr(message, "reference", None)
+                        ref_msg_id = str(getattr(ref, "message_id", "") or "")
+                        if ref_msg_id:
+                            for s in suggestions:
+                                dm_ids = [str(x) for x in (s.get("dm_notification_ids") or [])]
+                                if ref_msg_id in dm_ids and _user_can_reply_to_ticket(s, uid):
+                                    matched_ticket_id = int(s["id"])
+                                    break
+                            if matched_ticket_id is None:
+                                ref_msg = getattr(ref, "resolved", None)
+                                if not isinstance(ref_msg, disnake.Message):
+                                    try:
+                                        ref_msg = await message.channel.fetch_message(int(ref_msg_id))
+                                    except Exception:
+                                        ref_msg = None
+                                if isinstance(ref_msg, disnake.Message) and b.user and ref_msg.author.id == b.user.id:
+                                    search_blob = " ".join(
+                                        [ref_msg.content or ""]
+                                        + [(e.title or "") + " " + (e.description or "") + " " + ((e.footer.text if e.footer else "") or "") for e in (ref_msg.embeds or [])]
+                                    )
+                                    m_ref = re.search(r"#(\d+)", search_blob)
+                                    if m_ref:
+                                        cand_id = int(m_ref.group(1))
+                                        cand = next((s for s in suggestions if s.get("id") == cand_id), None)
+                                        if cand and _user_can_reply_to_ticket(cand, uid):
+                                            matched_ticket_id = cand_id
+
+                        # 2. Explicit #<id> prefix (e.g., "#42 here is the screenshot")
+                        if matched_ticket_id is None:
+                            m_prefix = re.match(r"^#(\d+)(?:\s+([\s\S]+))?$", raw_text)
+                            if m_prefix:
+                                cand_id = int(m_prefix.group(1))
+                                cand = next((s for s in suggestions if s.get("id") == cand_id), None)
+                                if cand and _user_can_reply_to_ticket(cand, uid):
+                                    matched_ticket_id = cand_id
+                                    stripped = (m_prefix.group(2) or "").strip()
+                                    reply_body = "\n".join([p for p in [stripped, *attach_urls] if p]).strip()
+
+                        # 3. Single active ticket belonging to (or followed by) this user
+                        user_active_tickets = [
+                            s for s in suggestions
+                            if _is_ticket_active(s)
+                            and (str(s.get("discord_id") or "").strip() == uid or uid in _ticket_follower_ids(s))
+                        ]
+                        user_active_tickets.sort(key=lambda s: s.get("id", 0), reverse=True)
+
+                        if matched_ticket_id is None and len(user_active_tickets) == 1:
+                            matched_ticket_id = int(user_active_tickets[0]["id"])
+
+                        if matched_ticket_id is not None and reply_body:
+                            ok, feedback, resolved = await _deliver_user_dm_reply_to_ticket(
+                                matched_ticket_id,
+                                message.author,
+                                reply_body,
+                                dm_message_id=str(message.id),
+                            )
+                            routed_to_ticket = ok
+                            try:
+                                if ok and resolved:
+                                    rid = int(resolved.get("id") or matched_ticket_id)
+                                    await message.reply(feedback, view=TicketDmNotificationView(rid))
+                                else:
+                                    await message.reply(feedback)
+                            except disnake.HTTPException:
+                                pass
+                        elif matched_ticket_id is None and len(user_active_tickets) > 1:
+                            # Ambiguous: user has multiple open tickets -> record in admin DM inbox AND offer quick picker buttons
+                            try:
+                                pick_embed = disnake.Embed(
+                                    title="Which ticket is this reply for?",
+                                    description=(
+                                        "You have multiple open tickets. Click a button below to reply to a specific ticket, "
+                                        "use Discord's **Reply** on a ticket notification DM, or start your message with `#<id>`.\n\n"
+                                        "*(Your message was also delivered to the staff DM inbox.)*"
+                                    ),
+                                    color=disnake.Color.blurple(),
+                                )
+                                await message.reply(embed=pick_embed, view=TicketDmPickerView(user_active_tickets))
+                            except disnake.HTTPException:
+                                pass
+                except Exception as dm_ticket_err:
+                    log.warning(f"[Disnake Bot] Ticket DM routing check failed: {dm_ticket_err}")
+
+            if routed_to_ticket:
+                return
+
+            # General DM to the bot -> shown in the admin panel's Messages view
             try:
                 await bot_features.record_incoming_dm(message)
             except Exception as ex:
@@ -4892,6 +5313,9 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
                 return
 
         msg_content = (message.clean_content or message.content or "").strip()
+        if msg_content.startswith("//"):
+            # Internal staff-only note inside the Discord ticket channel: do not forward to the author or website.
+            return
         if not msg_content and message.attachments:
             msg_content = "\n".join(a.url for a in message.attachments)
         if not msg_content:
@@ -4919,6 +5343,7 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
             "sender_discord_id": sender_discord_id,
             "sender_avatar": sender_avatar,
             "message": msg_content,
+            "source": "discord",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "discord_message_id": d_msg_id
         }
@@ -4932,13 +5357,23 @@ def register_bot_events_and_commands(b: commands.InteractionBot):
         log.info(f"[Disnake Bot] Ingested admin reply from #{getattr(message.channel, 'name', ch_id)} (Author: {sender_name}) for ticket #{target_ticket.get('id')}")
 
         if ticket_bridge.broadcast_ticket_update:
-            ticket_bridge.broadcast_ticket_update(
-                target_ticket.get("id"),
-                new_msg_obj,
-                messages,
-                target_ticket.get("discord_id"),
-                target_ticket.get("anonymous")
-            )
+            try:
+                ticket_bridge.broadcast_ticket_update(
+                    target_ticket.get("id"),
+                    new_msg_obj,
+                    messages,
+                    target_ticket.get("discord_id"),
+                    target_ticket.get("anonymous"),
+                    follower_ids=_ticket_follower_ids(target_ticket),
+                )
+            except TypeError:
+                ticket_bridge.broadcast_ticket_update(
+                    target_ticket.get("id"),
+                    new_msg_obj,
+                    messages,
+                    target_ticket.get("discord_id"),
+                    target_ticket.get("anonymous")
+                )
 
         try:
             notify_ticket_author_dm(
@@ -5227,7 +5662,15 @@ def create_discord_ticket_channel(ticket: dict[str, Any]) -> str | None:
         if ticket.get("admin_comment"):
             comment_by = ticket.get("comment_by") or "Administrator"
             embed.add_field(name="Admin Note", value=f"**[{comment_by}]**:\n{ticket.get('admin_comment')}"[:1024], inline=False)
-        embed.add_field(name="Admin Replies", value="Type any message in this channel to send a reply directly to the ticket author. When the author replies on the website, their message will appear here in real time.", inline=False)
+        embed.add_field(
+            name="Admin Replies",
+            value=(
+                "Type any message in this channel to reply directly to the ticket author (and any followers). "
+                "Start a message with `//` for internal staff notes that will not be sent to the author. "
+                "Author replies from the website or bot DMs appear here in real time."
+            ),
+            inline=False,
+        )
         embed.set_footer(text=f"RBWR Utility Ticket #{ticket_id}")
 
         main_msg = await ch.send(embed=embed)
@@ -5294,7 +5737,7 @@ def forward_ticket_reply_to_discord(
                 if not ch:
                     ch = await bot_ref.fetch_channel(int(ch_id))
 
-                if not ch or not hasattr(ch, "send") or not isinstance(ch, disnake.TextChannel):
+                if not ch or not hasattr(ch, "send") or not isinstance(ch, (disnake.TextChannel, disnake.Thread)):
                     continue
 
                 sent = await ch.send(content=content)
@@ -5338,7 +5781,7 @@ def edit_ticket_reply_in_discord(
                 ch = bot_ref.get_channel(int(ch_id))
                 if not ch:
                     ch = await bot_ref.fetch_channel(int(ch_id))
-                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, disnake.TextChannel):
+                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, (disnake.TextChannel, disnake.Thread)):
                     continue
                 try:
                     target_msg = await ch.fetch_message(msg_id_int)
@@ -5384,7 +5827,7 @@ def delete_ticket_reply_in_discord(
                 ch = bot_ref.get_channel(int(ch_id))
                 if not ch:
                     ch = await bot_ref.fetch_channel(int(ch_id))
-                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, disnake.TextChannel):
+                if not ch or not hasattr(ch, "fetch_message") or not isinstance(ch, (disnake.TextChannel, disnake.Thread)):
                     continue
                 try:
                     target_msg = await ch.fetch_message(msg_id_int)

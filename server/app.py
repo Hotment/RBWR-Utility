@@ -705,16 +705,26 @@ def broadcast_update(data_type):
 
 active_ticket_connections = set()
 
-def broadcast_ticket_update(ticket_id: int, new_message: dict, full_messages: list, ticket_discord_id: str|None = None, is_anonymous: bool = False):
+def broadcast_ticket_update(
+    ticket_id: int,
+    new_message: dict,
+    full_messages: list,
+    ticket_discord_id: str | None = None,
+    is_anonymous: bool = False,
+    follower_ids: list[str] | set[str] | None = None,
+):
     """
     Broadcasts real-time ticket messages to connected web users on tickets.html.
     """
+    allowed_followers = {str(fid) for fid in (follower_ids or []) if fid}
     for conn in list(active_ticket_connections):
         ws = conn[0] if isinstance(conn, tuple) else conn
         user_d_id = conn[1] if isinstance(conn, tuple) else ""
         is_admin_user = conn[2] if isinstance(conn, tuple) else False
-        
-        can_view = is_admin_user or (user_d_id and ticket_discord_id and str(user_d_id) == str(ticket_discord_id) and not is_anonymous)
+
+        is_author_user = bool(user_d_id and ticket_discord_id and str(user_d_id) == str(ticket_discord_id))
+        is_follower_user = bool(user_d_id and str(user_d_id) in allowed_followers)
+        can_view = is_admin_user or is_author_user or is_follower_user
         if not can_view:
             continue
             
@@ -2308,10 +2318,12 @@ def get_ticket_messages_api(ticket_id):
     discord_user = session.get("discord_user") or {}
     user_discord_id = str(discord_user.get("id") or "")
     ticket_discord_id = str(target_ticket.get("discord_id") or "")
+    follower_ids = {str(f.get("discord_id") or "") for f in (target_ticket.get("followers") or []) if isinstance(f, dict) and f.get("discord_id")}
 
-    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id and not target_ticket.get("anonymous"))
+    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id)
+    is_follower = bool(user_discord_id and user_discord_id in follower_ids)
 
-    if not is_admin and not is_author:
+    if not is_admin and not is_author and not is_follower:
         return jsonify({"detail": "Ticket discussions are private between the author and administrators."}), 403
 
     return jsonify({"ticket_id": ticket_id, "messages": target_ticket.get("messages", [])})
@@ -2350,11 +2362,13 @@ def add_ticket_message_api(ticket_id):
     discord_user = session.get("discord_user") or {}
     user_discord_id = str(discord_user.get("id") or "")
     ticket_discord_id = str(target_ticket.get("discord_id") or "")
+    follower_ids = {str(f.get("discord_id") or "") for f in (target_ticket.get("followers") or []) if isinstance(f, dict) and f.get("discord_id")}
 
-    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id and not target_ticket.get("anonymous"))
+    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id)
+    is_follower = bool(user_discord_id and user_discord_id in follower_ids)
 
-    if not is_admin and not is_author:
-        return jsonify({"detail": "Only the ticket author and administrators can post messages in this discussion."}), 403
+    if not is_admin and not is_author and not is_follower:
+        return jsonify({"detail": "Only the ticket author, followers, and administrators can post messages in this discussion."}), 403
 
     msg_text = payload.message.strip()
     if not msg_text:
@@ -2385,11 +2399,12 @@ def add_ticket_message_api(ticket_id):
             "sender_discord_id": admin_d_id,
             "sender_avatar": admin_avatar,
             "message": msg_text,
+            "source": "web",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         log_audit_event("tickets.reply", "tickets", f"Posted admin reply on ticket #{ticket_id}", target=f"Ticket #{ticket_id}", details={"ticket_id": ticket_id, "message_id": new_msg_id}, username=admin_name)
     else:
-        author_name = discord_user.get("global_name") or discord_user.get("username") or "Author"
+        author_name = discord_user.get("global_name") or discord_user.get("username") or ("Follower" if is_follower and not is_author else "Author")
         msg_obj = {
             "id": new_msg_id,
             "sender_type": "author",
@@ -2397,6 +2412,7 @@ def add_ticket_message_api(ticket_id):
             "sender_discord_id": user_discord_id,
             "sender_avatar": discord_user.get("avatar_url"),
             "message": msg_text,
+            "source": "web",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
@@ -2409,7 +2425,8 @@ def add_ticket_message_api(ticket_id):
         msg_obj,
         messages,
         target_ticket.get("discord_id"),
-        target_ticket.get("anonymous")
+        target_ticket.get("anonymous"),
+        follower_ids=follower_ids
     )
 
     if is_admin:
@@ -2465,13 +2482,18 @@ def add_ticket_message_api(ticket_id):
 
 @app.route("/tickets/<int:ticket_id>/messages/<int:message_id>", methods=["PATCH", "PUT"])
 def edit_ticket_message_api(ticket_id, message_id):
-    if not session.get("admin_logged_in"):
-        return jsonify({"detail": "Administrator authentication required."}), 403
+    is_admin = bool(session.get("admin_logged_in"))
+    discord_user = session.get("discord_user") or {}
+    user_discord_id = str(discord_user.get("id") or "")
+    if not is_admin and not user_discord_id:
+        return jsonify({"detail": "Authentication required to edit replies."}), 403
 
     req_json = request.get_json() or {}
     new_text = str(req_json.get("message", "")).strip()
     if not new_text:
         return jsonify({"detail": "Message content cannot be empty."}), 400
+    if len(new_text) > 2000:
+        return jsonify({"detail": "Message content exceeds 2000 characters."}), 400
 
     data = load_suggestions()
     suggestions = data.get("suggestions", [])
@@ -2489,6 +2511,11 @@ def edit_ticket_message_api(ticket_id, message_id):
     if not target_msg:
         return jsonify({"detail": f"Message #{message_id} not found in Ticket #{ticket_id}."}), 404
 
+    if not is_admin:
+        msg_sender_id = str(target_msg.get("sender_discord_id") or "")
+        if target_msg.get("sender_type") != "author" or not msg_sender_id or msg_sender_id != user_discord_id:
+            return jsonify({"detail": "You can only edit your own replies."}), 403
+
     target_msg["message"] = new_text
     target_msg["edited"] = True
     target_msg["edited_at"] = datetime.now(timezone.utc).isoformat()
@@ -2496,12 +2523,14 @@ def edit_ticket_message_api(ticket_id, message_id):
     save_suggestions(data)
     broadcast_update("dashboard")
 
+    follower_ids = {str(f.get("discord_id") or "") for f in (target_ticket.get("followers") or []) if isinstance(f, dict) and f.get("discord_id")}
     broadcast_ticket_update(
         ticket_id,
         target_msg,
         messages,
         target_ticket.get("discord_id"),
-        target_ticket.get("anonymous")
+        target_ticket.get("anonymous"),
+        follower_ids=follower_ids
     )
 
     d_msg_id = target_msg.get("discord_message_id")
@@ -2510,15 +2539,16 @@ def edit_ticket_message_api(ticket_id, message_id):
         discussion_thread_id = target_ticket.get("discussion_thread_id")
         channels_to_sync = [c for c in [discord_channel_id, discussion_thread_id] if c]
         if channels_to_sync:
-            def _edit_discord(chs, d_id, text, s_name):
+            is_adm_msg = target_msg.get("sender_type") == "admin"
+            def _edit_discord(chs, d_id, text, s_name, adm_flag):
                 try:
-                    edit_ticket_reply_in_discord(chs, d_id, text, s_name, True)
+                    edit_ticket_reply_in_discord(chs, d_id, text, s_name, adm_flag)
                 except Exception as ex:
                     logger.warning(f"[Disnake Edit Forward] Failed to edit message in Discord: {ex}")
 
             threading.Thread(
                 target=_edit_discord,
-                args=(channels_to_sync, d_msg_id, new_text, target_msg.get("sender_name", "Administrator")),
+                args=(channels_to_sync, d_msg_id, new_text, target_msg.get("sender_name", "User"), is_adm_msg),
                 daemon=True
             ).start()
 

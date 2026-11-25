@@ -58,11 +58,11 @@
                 <p>
                     I am the sole developer of RBWR Utility (including the downloadable <a
                         href="https://github.com/Hotment/RBWR-Utility" target="_blank" rel="noopener"
-                        class="text-blue-400 hover:underline">RBWR Utility</a> .NET 8 / Avalonia desktop application,
-                    the RBWR Utility web platform &amp; public REST API, and the RBWR Utility Discord Bot). This
-                    Privacy Policy explains what data is processed when you use these services and how your privacy is
-                    protected. By using our services, you also agree to our <a href="/terms"
-                        class="text-blue-400 hover:underline">Terms of Service</a>.
+                        class="text-blue-400 hover:underline">RBWR Utility</a> .NET 8 / Avalonia desktop applications
+                    (RBWR APRM Calculator and RBWR Theme Creator), the RBWR Utility web platform &amp; public REST API,
+                    and the RBWR Utility Discord Bot). This Privacy Policy explains what data is processed when you use
+                    these services and how your privacy is protected. By using our services, you also agree to our <a
+                        href="/terms" class="text-blue-400 hover:underline">Terms of Service</a>.
                 </p>
             </div>
 
@@ -107,15 +107,24 @@
                             OAuth2</h3>
                         <p class="text-zinc-400">
                             When you submit a support ticket, bug report, feature suggestion, or private contact message,
-                            the server stores your submission details (title, description, category, and any replies)
-                            along with an optional contact handle. If you choose to sign in with Discord OAuth2, we
-                            receive and store your Discord user ID, username, and avatar to associate you with your
-                            tickets or authorized admin sessions. Public tickets and replies may be displayed on the
-                            website and synced to configured community Discord channels. If an administrator merges a
-                            duplicate ticket into another ticket, your Discord ID and display name may be recorded on
-                            the target ticket as a follower so you remain linked to the merged thread. We also process
-                            IP addresses and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse
-                            bans.
+                            the server stores your submission details (title, description, optional environment details,
+                            category, and any replies) along with an optional contact handle. If you choose to sign in
+                            with Discord OAuth2, we receive and store your Discord user ID, username, and avatar to
+                            associate you with your tickets or authorized admin sessions. If a signed-in Discord user
+                            chooses to submit a ticket anonymously, their username and avatar are hidden publicly while
+                            their Discord ID is retained privately so they can still view and participate in private
+                            developer discussions and receive ticket notifications. Public ticket details may be
+                            displayed on the website, while private ticket discussions are restricted to the ticket
+                            author, merged-ticket followers, and authorized administrators, and are synced to staff
+                            Discord ticket channels. If an administrator merges a duplicate ticket into a root ticket,
+                            your Discord ID and display name are recorded on the root ticket as a follower so you
+                            receive status and developer note update notifications for that ticket (followers are not
+                            notified of private messages on the root ticket). When you reply to a ticket notification DM
+                            from the Discord bot (using the Reply button, Discord's native Reply, a <code
+                                class="text-blue-300 font-mono">#&lt;id&gt;</code> prefix, or a direct message when you
+                            have a single open ticket), your reply text and any attached file/image URLs are stored in
+                            that ticket's conversation and forwarded to staff channels. We also process IP addresses
+                            and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse bans.
                         </p>
                     </div>
 
@@ -126,23 +135,25 @@
                             processes Discord identifiers (user IDs, server/guild IDs, channel IDs, message IDs, and
                             role IDs) as needed to run commands, enforce server-configured moderation, automod,
                             autorole, welcome, FAQ, and role-based command permission settings, dispatch notification
-                            DMs, and sync ticket or operational alert threads. When moderation or community features are
-                            enabled by server administrators, the bot also stores moderation records (warnings, private
-                            moderator notes, temporary ban expiration timers, channel lock states, and a rolling
-                            moderation action log), starboard post mappings (message IDs, channel IDs, and reaction
-                            counts), and server statistics channel configurations (including public member/channel
-                            counts and latest GitHub release version numbers).
+                            DMs, route direct-message replies to your open tickets (storing recent DM notification
+                            message IDs per ticket to match native Discord replies), record unmatched direct messages
+                            for staff review, and sync ticket or operational alert threads. When moderation or community
+                            features are enabled by server administrators, the bot also stores moderation records
+                            (warnings, private moderator notes, temporary ban expiration timers, channel lock states,
+                            and a rolling moderation action log), starboard post mappings (message IDs, channel IDs, and
+                            reaction counts), and server statistics channel configurations (including public
+                            member/channel counts and latest GitHub release version numbers).
                         </p>
                     </div>
 
                     <div>
                         <h3 class="font-semibold text-zinc-200 mb-1">Desktop Application Error Reports</h3>
                         <p class="text-zinc-400">
-                            If the .NET 8 / Avalonia desktop overlay application encounters an unhandled crash and you
-                            explicitly choose to click <strong class="text-white">"Send Report"</strong>, an anonymous
-                            error payload containing the application version, .NET runtime exception traceback, and
-                            sanitized local log output is submitted. Reports contain no personal files or private system
-                            data and are used exclusively to diagnose and fix software bugs.
+                            If the .NET 8 / Avalonia desktop overlay or RBWR Theme Creator encounters an unhandled crash
+                            and you explicitly choose to click <strong class="text-white">"Send Report"</strong>, an
+                            anonymous error payload containing the application version, .NET runtime exception
+                            traceback, and sanitized local log output is submitted. Reports contain no personal files or
+                            private system data and are used exclusively to diagnose and fix software bugs.
                         </p>
                     </div>
 
