@@ -274,16 +274,102 @@ app.logger.handlers = [stream_handler, file_handler]
 app.logger.propagate = False
 app.logger.setLevel(logging.INFO)
 
+_muted_ip_log_filter = core.MutedBannedIPFilter()
+stream_handler.addFilter(_muted_ip_log_filter)
+file_handler.addFilter(_muted_ip_log_filter)
+
 gunicorn_error_logger = logging.getLogger('gunicorn.error')
 if gunicorn_error_logger.handlers:
     gunicorn_error_logger.addHandler(file_handler)
 
+gunicorn_access_logger = logging.getLogger('gunicorn.access')
+gunicorn_access_logger.addFilter(_muted_ip_log_filter)
+
 werkzeug_logger = logging.getLogger('werkzeug')
 werkzeug_logger.handlers = [stream_handler, file_handler]
 werkzeug_logger.setLevel(logging.INFO)
+werkzeug_logger.addFilter(_muted_ip_log_filter)
 
 logger = app.logger.getChild("main")
+
+SITE_BAN_TIMEOUT_SECONDS = float(os.environ.get("SITE_BAN_TIMEOUT_SECONDS", "65"))
+SITE_BAN_MAX_HELD_CONNECTIONS = int(os.environ.get("SITE_BAN_MAX_HELD_CONNECTIONS", "32"))
+_site_ban_tarpit_sem = threading.BoundedSemaphore(max(1, SITE_BAN_MAX_HELD_CONNECTIONS))
+
+
+class SilentBanWSGIMiddleware:
+    """
+    Holds connections from site-banned IPs/prefixes silently without sending any HTTP response
+    so the client times out, then drops the socket cleanly. Respects hide_logs per ban rule.
+    """
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    @staticmethod
+    def _extract_ip(environ) -> str:
+        xff = (environ.get("HTTP_X_FORWARDED_FOR") or "").strip()
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return first
+        return (environ.get("REMOTE_ADDR") or "unknown").strip()
+
+    @staticmethod
+    def _close_raw_socket(environ) -> bool:
+        sock = environ.get("gunicorn.socket") or environ.get("werkzeug.socket")
+        if sock is None:
+            raw = environ.get("wsgi.input")
+            sock = getattr(getattr(raw, "raw", None), "_sock", None) or getattr(raw, "_sock", None)
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                sock.close()
+                return True
+            except Exception:
+                pass
+        return False
+
+    def __call__(self, environ, start_response):
+        client_ip = self._extract_ip(environ)
+        matched = core.match_ip_ban(client_ip, scope="site")
+        if matched is None:
+            return self.wsgi_app(environ, start_response)
+
+        rule_key, ban_info = matched
+        hits = core.record_ip_ban_hit(rule_key)
+        if not ban_info.get("hide_logs"):
+            path = environ.get("PATH_INFO") or "/"
+            method = environ.get("REQUEST_METHOD") or "GET"
+            logger.info(
+                f'{client_ip} - - "{method} {path}" SILENT_TIMEOUT (rule={rule_key}, hits={hits})'
+            )
+
+        acquired = _site_ban_tarpit_sem.acquire(blocking=False)
+        if acquired:
+            try:
+                deadline = time.monotonic() + max(0.0, SITE_BAN_TIMEOUT_SECONDS)
+                while time.monotonic() < deadline:
+                    remaining = deadline - time.monotonic()
+                    time.sleep(min(1.0, remaining))
+                    if core.match_ip_ban(client_ip, scope="site") is None:
+                        break
+            finally:
+                _site_ban_tarpit_sem.release()
+
+        if self._close_raw_socket(environ):
+            return []
+
+        # Fallback for WSGI servers/test clients without an exposed raw socket: empty body, close connection.
+        start_response("408 Request Timeout", [("Connection", "close"), ("Content-Length", "0")])
+        return [b""]
+
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1, x_host=1, x_prefix=1)
+app.wsgi_app = SilentBanWSGIMiddleware(app.wsgi_app)
 
 @app.template_filter("hex_to_int")
 def hex_to_int_filter(val, default=3900150):
@@ -821,24 +907,6 @@ app.config.update(
 )
 
 CURRENT_SESSION_VERSION = 2
-
-@app.before_request
-def enforce_site_ip_bans():
-    client_ip = get_client_ip()
-    matched = core.match_ip_ban(client_ip, scope="site")
-    if matched is None:
-        return None
-    _, ban_info = matched
-    expires_at = ban_info.get("expires_at")
-    msg = (
-        f"Access denied: your IP address or network prefix is blocked until {expires_at}."
-        if expires_at
-        else "Access denied: your IP address or network prefix is blocked."
-    )
-    if request.path.startswith("/api") or request.accept_mimetypes.best == "application/json":
-        return jsonify({"success": False, "detail": msg}), 403
-    return msg, 403
-
 
 @app.before_request
 def enforce_session_version():
@@ -4654,26 +4722,35 @@ def start_console_handler():
             for idx, item in enumerate(res["hotspots"], 1):
                 safe_print(f"  {idx:>2}. {item['percent']:5.1f}% ({item['hits']} hits) - {item['location']}")
 
-        @handler.command(name="ban", description="Block an IP or IPv4/IPv6 prefix site-wide: ban <ip|prefix|cidr> <duration> [reason...]")
-        @handler.command(name="block", description="Alias for ban: block <ip|prefix|cidr> <duration> [reason...]")
-        @handler.command(name="ip_ban", description="Alias for ban: ip_ban <ip|prefix|cidr> <duration> [reason...]")
+        @handler.command(name="ban", description="Silently time out an IP or IPv4/IPv6 prefix site-wide: ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
+        @handler.command(name="block", description="Alias for ban: block <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
+        @handler.command(name="ip_ban", description="Alias for ban: ip_ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
         def ban_ip_cmd(target: str = "", duration: str = "", *reason_parts):
             target = (target or "").strip()
             duration = (duration or "").strip()
             if not target or not duration:
-                safe_print("Usage: ban <ip|prefix|cidr> <duration> [reason...]")
+                safe_print("Usage: ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
                 safe_print("  Examples: ban 2a03:2880:f814 2h scraper spam")
+                safe_print("            ban 2a03:2880:f814 2h --hide-logs log flooder")
                 safe_print("            ban 198.51.100 30m abuse | ban 203.0.113.5 perm")
                 return
+            hide_logs = False
+            filtered_reason: list[str] = []
+            for part in reason_parts:
+                if part.strip().lower() in ("--hide-logs", "--hidelogs", "--quiet", "--silent", "-q"):
+                    hide_logs = True
+                else:
+                    filtered_reason.append(part)
             try:
                 dur_sec, dur_label = core.parse_ban_duration(duration)
-                reason = " ".join(reason_parts).strip() or "Blocked via CLI"
+                reason = " ".join(filtered_reason).strip() or "Blocked via CLI"
                 canonical_key, entry = core.add_ip_ban(
                     target,
                     dur_sec,
                     reason=reason,
                     banned_by="cli",
                     scope="site",
+                    hide_logs=hide_logs,
                 )
             except ValueError as exc:
                 safe_print(f"[BAN] Error: {exc}")
@@ -4693,13 +4770,44 @@ def start_console_handler():
                     "original_input": target,
                     "scope": "site",
                     "duration_seconds": dur_sec,
+                    "hide_logs": hide_logs,
                     "reason": reason,
                 },
                 username="cli",
             )
             prefix_note = " (all matching IPs in prefix)" if entry.get("is_prefix") else ""
             exp_note = f"expires {entry['expires_at']}" if entry.get("expires_at") else "permanent"
-            safe_print(f"[BAN] Blocked {canonical_key}{prefix_note} for {dur_label} ({exp_note}) | reason: {reason}")
+            log_note = " | logs=HIDDEN" if hide_logs else ""
+            safe_print(f"[BAN] Silently timing out {canonical_key}{prefix_note} for {dur_label} ({exp_note}){log_note} | reason: {reason}")
+
+        @handler.command(name="ban_mute", description="Hide all server/access logs for a banned IP or prefix: ban_mute <ip|prefix|cidr>")
+        @handler.command(name="ban_hidelogs", description="Alias for ban_mute: ban_hidelogs <ip|prefix|cidr>")
+        @handler.command(name="ban_quiet", description="Alias for ban_mute: ban_quiet <ip|prefix|cidr>")
+        def mute_ban_logs_cmd(target: str = ""):
+            target = (target or "").strip()
+            if not target:
+                safe_print("Usage: ban_mute <ip|prefix|cidr>")
+                return
+            res = core.set_ip_ban_hide_logs(target, True)
+            if not res:
+                safe_print(f"[BAN] No active ban matched '{target}'.")
+                return
+            matched_key, _ = res
+            safe_print(f"[BAN] Logs are now HIDDEN for banned rule {matched_key}.")
+
+        @handler.command(name="ban_unmute", description="Re-enable server/access logs for a banned IP or prefix: ban_unmute <ip|prefix|cidr>")
+        @handler.command(name="ban_showlogs", description="Alias for ban_unmute: ban_showlogs <ip|prefix|cidr>")
+        def unmute_ban_logs_cmd(target: str = ""):
+            target = (target or "").strip()
+            if not target:
+                safe_print("Usage: ban_unmute <ip|prefix|cidr>")
+                return
+            res = core.set_ip_ban_hide_logs(target, False)
+            if not res:
+                safe_print(f"[BAN] No active ban matched '{target}'.")
+                return
+            matched_key, _ = res
+            safe_print(f"[BAN] Logs are now VISIBLE again for banned rule {matched_key}.")
 
         @handler.command(name="unban", description="Unblock an active IP or prefix ban: unban <ip|prefix|cidr>")
         @handler.command(name="unblock", description="Alias for unban: unblock <ip|prefix|cidr>")
@@ -4752,8 +4860,10 @@ def start_console_handler():
                 for idx, item in enumerate(active, 1):
                     orig = f" (input: {item['original_input']})" if item["original_input"] != item["target"] else ""
                     rem = f"remaining={item['remaining_str']}" if item["expires_at"] else "permanent"
+                    muted = " | logs=HIDDEN" if item.get("hide_logs") else ""
+                    hits = f" | hits={item['hits']}" if item.get("hits") else ""
                     safe_print(
-                        f"  {idx:>2}. {item['target']}{orig} | scope={item['scope']} | {rem} | "
+                        f"  {idx:>2}. {item['target']}{orig} | scope={item['scope']} | {rem}{muted}{hits} | "
                         f"by={item['banned_by']} | reason={item['reason']}"
                     )
 
@@ -4782,9 +4892,10 @@ def start_console_handler():
                 return
             rule_key, info = matched
             exp = info.get("expires_at") or "permanent"
+            muted = " | logs=HIDDEN" if info.get("hide_logs") else ""
             safe_print(
                 f"[BAN] {ip_str} IS BLOCKED by rule {rule_key} | scope={info.get('scope', 'tickets')} | "
-                f"expires={exp} | reason={info.get('reason', '')}"
+                f"expires={exp}{muted} | reason={info.get('reason', '')}"
             )
 
         handler.start()

@@ -180,26 +180,90 @@ def _extract_client_ip(request: Request) -> str:
         return request.client.host
     return "unknown"
 
+_muted_ip_log_filter = core.MutedBannedIPFilter()
+logging.getLogger("uvicorn.access").addFilter(_muted_ip_log_filter)
+logging.getLogger("uvicorn.error").addFilter(_muted_ip_log_filter)
+
+API_SITE_BAN_TIMEOUT_SECONDS = float(os.environ.get("SITE_BAN_TIMEOUT_SECONDS", "65"))
+API_SITE_BAN_MAX_HELD = int(os.environ.get("API_SITE_BAN_MAX_HELD_CONNECTIONS", "256"))
+_api_held_ban_count = 0
+
+
+class SilentBanASGIMiddleware:
+    """
+    Pure ASGI middleware that silently holds connections from site-banned IPs/prefixes without
+    sending any HTTP response or body so the client times out, using zero worker threads.
+    """
+
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    @staticmethod
+    def _extract_ip_from_scope(scope: dict) -> str:
+        for k, v in scope.get("headers") or ():
+            if k.lower() == b"x-forwarded-for":
+                first = v.decode("latin-1", errors="ignore").split(",")[0].strip()
+                if first:
+                    return first
+        client = scope.get("client")
+        if client and client[0]:
+            return str(client[0])
+        return "unknown"
+
+    async def __call__(self, scope, receive, send):
+        global _api_held_ban_count
+        if scope.get("type") != "http":
+            return await self.asgi_app(scope, receive, send)
+
+        client_ip = self._extract_ip_from_scope(scope)
+        matched = core.match_ip_ban(client_ip, scope="site")
+        if matched is None:
+            return await self.asgi_app(scope, receive, send)
+
+        rule_key, ban_info = matched
+        hits = core.record_ip_ban_hit(rule_key)
+        if not ban_info.get("hide_logs"):
+            path = scope.get("path") or "/"
+            method = scope.get("method") or "GET"
+            logging.getLogger("uvicorn.error").info(
+                f'{client_ip} - "{method} {path}" SILENT_TIMEOUT (rule={rule_key}, hits={hits})'
+            )
+
+        if _api_held_ban_count < API_SITE_BAN_MAX_HELD:
+            _api_held_ban_count += 1
+            try:
+                import asyncio
+                deadline = time.monotonic() + max(0.0, API_SITE_BAN_TIMEOUT_SECONDS)
+                while time.monotonic() < deadline:
+                    remaining = min(1.0, deadline - time.monotonic())
+                    try:
+                        msg = await asyncio.wait_for(receive(), timeout=remaining)
+                        if msg.get("type") == "http.disconnect":
+                            return
+                    except asyncio.TimeoutError:
+                        if core.match_ip_ban(client_ip, scope="site") is None:
+                            break
+            finally:
+                _api_held_ban_count = max(0, _api_held_ban_count - 1)
+
+        # Client still connected after hold (or over concurrency cap): send empty 408 with Connection: close
+        await send({
+            "type": "http.response.start",
+            "status": 408,
+            "headers": [(b"connection", b"close"), (b"content-length", b"0")],
+        })
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+
+app.add_middleware(SilentBanASGIMiddleware)
+
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    if request.method == "OPTIONS":
+    if request.method == "OPTIONS" or request.url.path in _RATE_EXEMPT_PATHS:
         return await call_next(request)
 
     client_ip = _extract_client_ip(request)
-    site_ban = core.match_ip_ban(client_ip, scope="site")
-    if site_ban is not None:
-        rule_key, ban_info = site_ban
-        detail = "Access denied: your IP address or network prefix is temporarily blocked."
-        if ban_info.get("expires_at"):
-            detail = f"Access denied: your IP address or network prefix is blocked until {ban_info['expires_at']}."
-        return JSONResponse(
-            status_code=403,
-            content={"success": False, "detail": detail},
-        )
-
-    if request.url.path in _RATE_EXEMPT_PATHS:
-        return await call_next(request)
-
     allowed, retry_after, rem_sec, rem_min = _rate_limiter.check(client_ip)
 
     rl_headers = {

@@ -3118,7 +3118,12 @@ _ip_ban_lock = threading.RLock()
 _ip_ban_cache: dict[str, Any] = {
     "sig": None,
     "rules": [],  # list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network, dict]]
+    "has_muted": False,
 }
+_ip_ban_hits: dict[str, int] = {}
+_LOG_IP_CANDIDATE_RE = re.compile(
+    r"(?:\d{1,3}\.){3}\d{1,3}|(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}"
+)
 
 _DURATION_PART_RE = re.compile(r"(\d+)\s*([smhdw])", re.IGNORECASE)
 _DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
@@ -3354,6 +3359,7 @@ def _append_ban_history(
         "banned_at": ban_info.get("banned_at"),
         "expires_at": ban_info.get("expires_at"),
         "reason": ban_info.get("reason") or "No reason provided",
+        "hide_logs": bool(ban_info.get("hide_logs", False)),
         "ended_at": ended_at or datetime.now(timezone.utc).isoformat(),
         "end_reason": end_reason,
         "ended_by": ended_by,
@@ -3409,7 +3415,89 @@ def _get_compiled_ban_rules() -> list[tuple[str, ipaddress.IPv4Network | ipaddre
                 continue
         _ip_ban_cache["sig"] = sig
         _ip_ban_cache["rules"] = rules
+        _ip_ban_cache["has_muted"] = any(bool(info.get("hide_logs")) for _, _, info in rules)
         return rules
+
+
+def record_ip_ban_hit(rule_key: str) -> int:
+    with _ip_ban_lock:
+        count = _ip_ban_hits.get(rule_key, 0) + 1
+        _ip_ban_hits[rule_key] = count
+        return count
+
+
+def get_ip_ban_hits(rule_key: str) -> int:
+    with _ip_ban_lock:
+        return _ip_ban_hits.get(rule_key, 0)
+
+
+def has_muted_ip_bans() -> bool:
+    _get_compiled_ban_rules()
+    return bool(_ip_ban_cache.get("has_muted", False))
+
+
+def should_hide_logs_for_ip(ip: str) -> bool:
+    if not has_muted_ip_bans():
+        return False
+    matched = match_ip_ban(ip)
+    return bool(matched and matched[1].get("hide_logs"))
+
+
+def set_ip_ban_hide_logs(raw_target: str, hide_logs: bool) -> tuple[str, dict[str, Any]] | None:
+    cleaned = (raw_target or "").strip()
+    if not cleaned:
+        return None
+    normalized_key: str | None = None
+    try:
+        normalized_key, _, _ = normalize_ip_ban_target(cleaned)
+    except ValueError:
+        normalized_key = None
+
+    with _ip_ban_lock:
+        data = load_banned_ips_data()
+        pruned = prune_expired_bans(data)
+        banned = data.setdefault("banned", {})
+
+        match_key: str | None = None
+        if cleaned in banned:
+            match_key = cleaned
+        elif normalized_key and normalized_key in banned:
+            match_key = normalized_key
+        else:
+            for k, info in banned.items():
+                if isinstance(info, dict) and str(info.get("original_input") or "").strip().lower() == cleaned.lower():
+                    match_key = k
+                    break
+
+        if not match_key or not isinstance(banned.get(match_key), dict):
+            if pruned:
+                save_banned_ips_data(data)
+            return None
+
+        banned[match_key]["hide_logs"] = bool(hide_logs)
+        save_banned_ips_data(data)
+        return match_key, banned[match_key]
+
+
+class MutedBannedIPFilter(logging.Filter):
+    """Suppresses log records mentioning an IP that matches an active ban with hide_logs=True."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not has_muted_ip_bans():
+            return True
+        client_ip = getattr(record, "client_ip", None)
+        if client_ip and should_hide_logs_for_ip(str(client_ip)):
+            return False
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        if msg.startswith("[BAN]"):
+            return True
+        for token in _LOG_IP_CANDIDATE_RE.findall(msg):
+            if should_hide_logs_for_ip(token):
+                return False
+        return True
 
 
 def add_ip_ban(
@@ -3419,6 +3507,7 @@ def add_ip_ban(
     reason: str = "",
     banned_by: str = "cli",
     scope: str = "site",
+    hide_logs: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     canonical_key, _, is_prefix = normalize_ip_ban_target(raw_target)
     now = datetime.now(timezone.utc)
@@ -3446,8 +3535,10 @@ def add_ip_ban(
             "scope": scope,
             "is_prefix": is_prefix,
             "original_input": raw_target.strip(),
+            "hide_logs": bool(hide_logs),
         }
         banned[canonical_key] = entry
+        _ip_ban_hits[canonical_key] = 0
         save_banned_ips_data(data)
         return canonical_key, entry
 
@@ -3564,6 +3655,8 @@ def list_ip_bans(history_limit: int = 25) -> dict[str, list[dict[str, Any]]]:
                 "remaining_seconds": rem_sec,
                 "remaining_str": format_duration_short(rem_sec),
                 "reason": info.get("reason") or "No reason provided",
+                "hide_logs": bool(info.get("hide_logs", False)),
+                "hits": _ip_ban_hits.get(key, 0),
             })
         active.sort(key=lambda x: x.get("banned_at") or "", reverse=True)
 
