@@ -182,10 +182,24 @@ def _extract_client_ip(request: Request) -> str:
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    if request.method == "OPTIONS" or request.url.path in _RATE_EXEMPT_PATHS:
+    if request.method == "OPTIONS":
         return await call_next(request)
 
     client_ip = _extract_client_ip(request)
+    site_ban = core.match_ip_ban(client_ip, scope="site")
+    if site_ban is not None:
+        rule_key, ban_info = site_ban
+        detail = "Access denied: your IP address or network prefix is temporarily blocked."
+        if ban_info.get("expires_at"):
+            detail = f"Access denied: your IP address or network prefix is blocked until {ban_info['expires_at']}."
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "detail": detail},
+        )
+
+    if request.url.path in _RATE_EXEMPT_PATHS:
+        return await call_next(request)
+
     allowed, retry_after, rem_sec, rem_min = _rate_limiter.check(client_ip)
 
     rl_headers = {

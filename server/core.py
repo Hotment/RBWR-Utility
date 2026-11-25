@@ -3,9 +3,11 @@ from __future__ import annotations
 import ctypes
 import gc
 import gzip
+import ipaddress
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -3103,3 +3105,471 @@ def fetch_or_get_public_servers(public_only: bool = False) -> tuple[dict, int]:
 load_server_meta()
 load_archives_meta()
 load_archive_server_index()
+
+
+# ==============================================================================
+# IP & Prefix Ban Engine (IPv4 / IPv6 / CIDR / Bare Prefix + Ban History)
+# ==============================================================================
+
+BANNED_FILE = os.path.join(BASE_DIR, "banned_ips.json")
+MAX_BAN_HISTORY = 500
+
+_ip_ban_lock = threading.RLock()
+_ip_ban_cache: dict[str, Any] = {
+    "sig": None,
+    "rules": [],  # list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network, dict]]
+}
+
+_DURATION_PART_RE = re.compile(r"(\d+)\s*([smhdw])", re.IGNORECASE)
+_DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
+
+def format_duration_short(seconds: float | int | None) -> str:
+    if seconds is None:
+        return "permanent"
+    total = max(0, int(round(seconds)))
+    if total == 0:
+        return "0s"
+    parts: list[str] = []
+    for unit_name, unit_sec in (("w", 604800), ("d", 86400), ("h", 3600), ("m", 60), ("s", 1)):
+        if total >= unit_sec:
+            qty, total = divmod(total, unit_sec)
+            parts.append(f"{qty}{unit_name}")
+            if len(parts) >= 2:
+                break
+    return "".join(parts) or "0s"
+
+
+def parse_ban_duration(raw: str) -> tuple[int | None, str]:
+    """
+    Parses a ban duration string into (duration_seconds | None, human_label).
+    Accepts: '30m', '2h', '7d', '1w', '1h30m', '90s', bare integer (minutes), or 'perm'/'permanent'/'0'.
+    """
+    token = (raw or "").strip().lower()
+    if not token:
+        raise ValueError("Duration is required (e.g. 30m, 2h, 7d, 1h30m, or perm).")
+    if token in ("perm", "permanent", "forever", "inf", "infinite", "none", "0"):
+        return None, "permanent"
+    if token.isdigit():
+        mins = int(token)
+        if mins <= 0:
+            return None, "permanent"
+        return mins * 60, format_duration_short(mins * 60)
+
+    matches = list(_DURATION_PART_RE.finditer(token))
+    if not matches or "".join(m.group(0) for m in matches).replace(" ", "") != token.replace(" ", ""):
+        raise ValueError(f"Invalid duration '{raw}'. Use formats like 30m, 2h, 7d, 1h30m, or perm.")
+
+    total_seconds = 0
+    for m in matches:
+        total_seconds += int(m.group(1)) * _DURATION_UNITS[m.group(2).lower()]
+    if total_seconds <= 0:
+        raise ValueError("Duration must be greater than zero (or 'perm').")
+    return total_seconds, format_duration_short(total_seconds)
+
+
+def _parse_client_ip_obj(raw_ip: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    s = (raw_ip or "").strip()
+    if not s or s.lower() == "unknown":
+        return None
+    if s.startswith("["):
+        end = s.find("]")
+        if end > 1:
+            s = s[1:end]
+    elif s.count(":") == 1 and "." in s:
+        # IPv4 with port, e.g. 1.2.3.4:5678
+        s = s.split(":", 1)[0]
+    if "%" in s:
+        # IPv6 zone index, e.g. fe80::1%eth0
+        s = s.split("%", 1)[0]
+    try:
+        addr = ipaddress.ip_address(s)
+        if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+            return addr.ipv4_mapped
+        return addr
+    except ValueError:
+        return None
+
+
+def normalize_ip_ban_target(raw: str) -> tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network, bool]:
+    """
+    Normalizes an IPv4/IPv6 address, CIDR, or bare prefix (e.g. '2a03:2880:f814' -> '2a03:2880:f814::/48',
+    '198.51.100' -> '198.51.100.0/24') into (canonical_key, ip_network, is_prefix).
+    """
+    s = (raw or "").strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1].strip()
+    if not s or s.lower() in ("unknown", "localhost"):
+        raise ValueError(f"Invalid or protected IP/prefix target: '{raw}'.")
+
+    net: ipaddress.IPv4Network | ipaddress.IPv6Network
+    is_prefix = False
+
+    if "/" in s:
+        try:
+            net = ipaddress.ip_network(s, strict=False)
+        except ValueError as exc:
+            raise ValueError(f"Invalid CIDR network '{raw}': {exc}") from exc
+        if net.prefixlen == 0:
+            raise ValueError("Refusing to block /0 (entire internet).")
+        if (isinstance(net, ipaddress.IPv4Network) and net.prefixlen == 32) or (
+            isinstance(net, ipaddress.IPv6Network) and net.prefixlen == 128
+        ):
+            canonical_key = str(net.network_address)
+            is_prefix = False
+        else:
+            canonical_key = str(net)
+            is_prefix = True
+    elif ":" in s:
+        # IPv6 exact address OR bare prefix like '2a03:2880:f814', '2a03:2880:f814:', '2a03:2880:f814::'
+        if s.endswith("::") and s != "::":
+            lead = s[:-2]
+            groups = [g for g in lead.split(":") if g != ""]
+            if 1 <= len(groups) <= 7 and all(re.fullmatch(r"[0-9a-fA-F]{1,4}", g) for g in groups):
+                prefix_len = len(groups) * 16
+                net = ipaddress.IPv6Network(f"{':'.join(groups)}::/{prefix_len}", strict=False)
+                canonical_key = str(net)
+                is_prefix = True
+            else:
+                raise ValueError(f"Invalid IPv6 prefix '{raw}'.")
+        elif "::" not in s:
+            trimmed = s.rstrip(":")
+            groups = trimmed.split(":")
+            if 1 <= len(groups) <= 7 and all(re.fullmatch(r"[0-9a-fA-F]{1,4}", g) for g in groups):
+                prefix_len = len(groups) * 16
+                net = ipaddress.IPv6Network(f"{':'.join(groups)}::/{prefix_len}", strict=False)
+                canonical_key = str(net)
+                is_prefix = True
+            else:
+                try:
+                    addr6 = ipaddress.IPv6Address(s)
+                except ValueError as exc:
+                    raise ValueError(f"Invalid IPv6 address or prefix '{raw}': {exc}") from exc
+                if addr6.ipv4_mapped is not None:
+                    addr4 = addr6.ipv4_mapped
+                    net = ipaddress.IPv4Network(f"{addr4}/32", strict=False)
+                    canonical_key = str(addr4)
+                else:
+                    net = ipaddress.IPv6Network(f"{addr6}/128", strict=False)
+                    canonical_key = str(addr6)
+                is_prefix = False
+        else:
+            try:
+                addr6 = ipaddress.IPv6Address(s)
+            except ValueError as exc:
+                raise ValueError(f"Invalid IPv6 address '{raw}': {exc}") from exc
+            if addr6.ipv4_mapped is not None:
+                addr4 = addr6.ipv4_mapped
+                net = ipaddress.IPv4Network(f"{addr4}/32", strict=False)
+                canonical_key = str(addr4)
+            else:
+                net = ipaddress.IPv6Network(f"{addr6}/128", strict=False)
+                canonical_key = str(addr6)
+            is_prefix = False
+    else:
+        # IPv4 exact address OR bare prefix like '198.51.100' or '198.51.100.'
+        try:
+            addr4 = ipaddress.IPv4Address(s)
+            net = ipaddress.IPv4Network(f"{addr4}/32", strict=False)
+            canonical_key = str(addr4)
+            is_prefix = False
+        except ValueError:
+            trimmed = s.rstrip(".")
+            parts = trimmed.split(".")
+            if 1 <= len(parts) <= 3 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+                padded = parts + ["0"] * (4 - len(parts))
+                prefix_len = len(parts) * 8
+                net = ipaddress.IPv4Network(f"{'.'.join(padded)}/{prefix_len}", strict=False)
+                canonical_key = str(net)
+                is_prefix = True
+            else:
+                raise ValueError(f"Invalid IP address or prefix '{raw}'.")
+
+    # Never allow blocking loopback addresses
+    if isinstance(net, ipaddress.IPv4Network) and ipaddress.IPv4Address("127.0.0.1") in net:
+        raise ValueError("Refusing to block loopback address 127.0.0.1.")
+    if isinstance(net, ipaddress.IPv6Network) and ipaddress.IPv6Address("::1") in net:
+        raise ValueError("Refusing to block loopback address ::1.")
+
+    return canonical_key, net, is_prefix
+
+
+def _banned_file_sig() -> tuple[int, int] | None:
+    try:
+        st = os.stat(BANNED_FILE)
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
+def load_banned_ips_data() -> dict[str, Any]:
+    with _ip_ban_lock:
+        if not os.path.exists(BANNED_FILE):
+            return {"banned": {}, "history": []}
+        try:
+            with open(BANNED_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return {"banned": {}, "history": []}
+            if not isinstance(data.get("banned"), dict):
+                data["banned"] = {}
+            if not isinstance(data.get("history"), list):
+                data["history"] = []
+            return data
+        except Exception:
+            return {"banned": {}, "history": []}
+
+
+def save_banned_ips_data(data: dict[str, Any]) -> None:
+    with _ip_ban_lock:
+        if not isinstance(data.get("banned"), dict):
+            data["banned"] = {}
+        if not isinstance(data.get("history"), list):
+            data["history"] = []
+        if len(data["history"]) > MAX_BAN_HISTORY:
+            data["history"] = data["history"][-MAX_BAN_HISTORY:]
+        tmp_path = f"{BANNED_FILE}.tmp.{os.getpid()}"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        os.replace(tmp_path, BANNED_FILE)
+        _ip_ban_cache["sig"] = None
+
+
+def _append_ban_history(
+    data: dict[str, Any],
+    target_key: str,
+    ban_info: dict[str, Any],
+    *,
+    end_reason: str,
+    ended_by: str,
+    ended_at: str | None = None,
+) -> None:
+    history = data.setdefault("history", [])
+    history.append({
+        "target": target_key,
+        "original_input": ban_info.get("original_input") or target_key,
+        "is_prefix": bool(ban_info.get("is_prefix", "/" in target_key)),
+        "scope": ban_info.get("scope") or "tickets",
+        "banned_by": ban_info.get("banned_by") or "unknown",
+        "banned_at": ban_info.get("banned_at"),
+        "expires_at": ban_info.get("expires_at"),
+        "reason": ban_info.get("reason") or "No reason provided",
+        "ended_at": ended_at or datetime.now(timezone.utc).isoformat(),
+        "end_reason": end_reason,
+        "ended_by": ended_by,
+    })
+    if len(history) > MAX_BAN_HISTORY:
+        del history[:-MAX_BAN_HISTORY]
+
+
+def _is_entry_expired(ban_info: dict[str, Any], now: datetime) -> bool:
+    expires_at_str = ban_info.get("expires_at")
+    if not expires_at_str:
+        return False
+    try:
+        expires_at = datetime.fromisoformat(str(expires_at_str))
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return now >= expires_at
+    except Exception:
+        return False
+
+
+def prune_expired_bans(data: dict[str, Any], now: datetime | None = None) -> list[str]:
+    now_dt = now or datetime.now(timezone.utc)
+    banned = data.setdefault("banned", {})
+    expired_keys = [k for k, info in list(banned.items()) if isinstance(info, dict) and _is_entry_expired(info, now_dt)]
+    for k in expired_keys:
+        info = banned.pop(k)
+        _append_ban_history(
+            data,
+            k,
+            info,
+            end_reason="expired",
+            ended_by="system",
+            ended_at=info.get("expires_at") or now_dt.isoformat(),
+        )
+    return expired_keys
+
+
+def _get_compiled_ban_rules() -> list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network, dict[str, Any]]]:
+    sig = _banned_file_sig()
+    with _ip_ban_lock:
+        if _ip_ban_cache["sig"] == sig and sig is not None:
+            return _ip_ban_cache["rules"]
+        data = load_banned_ips_data()
+        rules: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network, dict[str, Any]]] = []
+        for raw_key, info in data.get("banned", {}).items():
+            if not isinstance(info, dict):
+                continue
+            try:
+                _, net, _ = normalize_ip_ban_target(raw_key)
+                rules.append((raw_key, net, info))
+            except ValueError:
+                continue
+        _ip_ban_cache["sig"] = sig
+        _ip_ban_cache["rules"] = rules
+        return rules
+
+
+def add_ip_ban(
+    raw_target: str,
+    duration_seconds: int | None,
+    *,
+    reason: str = "",
+    banned_by: str = "cli",
+    scope: str = "site",
+) -> tuple[str, dict[str, Any]]:
+    canonical_key, _, is_prefix = normalize_ip_ban_target(raw_target)
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(seconds=duration_seconds)).isoformat() if duration_seconds else None
+
+    with _ip_ban_lock:
+        data = load_banned_ips_data()
+        prune_expired_bans(data, now)
+        banned = data.setdefault("banned", {})
+        if canonical_key in banned and isinstance(banned[canonical_key], dict):
+            _append_ban_history(
+                data,
+                canonical_key,
+                banned[canonical_key],
+                end_reason="replaced",
+                ended_by=banned_by,
+                ended_at=now.isoformat(),
+            )
+        entry = {
+            "banned_by": banned_by,
+            "banned_at": now.isoformat(),
+            "expires_at": expires_at,
+            "duration_seconds": duration_seconds,
+            "reason": (reason or "").strip() or "No reason provided",
+            "scope": scope,
+            "is_prefix": is_prefix,
+            "original_input": raw_target.strip(),
+        }
+        banned[canonical_key] = entry
+        save_banned_ips_data(data)
+        return canonical_key, entry
+
+
+def remove_ip_ban(raw_target: str, *, ended_by: str = "cli") -> tuple[str, dict[str, Any]] | None:
+    cleaned = (raw_target or "").strip()
+    if not cleaned:
+        return None
+    normalized_key: str | None = None
+    try:
+        normalized_key, _, _ = normalize_ip_ban_target(cleaned)
+    except ValueError:
+        normalized_key = None
+
+    with _ip_ban_lock:
+        data = load_banned_ips_data()
+        pruned = prune_expired_bans(data)
+        banned = data.setdefault("banned", {})
+
+        match_key: str | None = None
+        if cleaned in banned:
+            match_key = cleaned
+        elif normalized_key and normalized_key in banned:
+            match_key = normalized_key
+        else:
+            for k, info in banned.items():
+                if isinstance(info, dict) and str(info.get("original_input") or "").strip().lower() == cleaned.lower():
+                    match_key = k
+                    break
+
+        if not match_key:
+            if pruned:
+                save_banned_ips_data(data)
+            return None
+
+        removed = banned.pop(match_key)
+        if isinstance(removed, dict):
+            _append_ban_history(data, match_key, removed, end_reason="unbanned", ended_by=ended_by)
+        save_banned_ips_data(data)
+        return match_key, removed
+
+
+def match_ip_ban(ip: str, *, scope: str | None = None) -> tuple[str, dict[str, Any]] | None:
+    """
+    Returns (matched_rule_key, ban_info) if `ip` matches an active ban rule (exact IP or IPv4/IPv6 prefix/CIDR).
+    When `scope` is 'site', only site-wide bans match; when `scope` is None, all active bans match.
+    """
+    addr = _parse_client_ip_obj(ip)
+    if addr is None or addr.is_loopback:
+        return None
+
+    rules = _get_compiled_ban_rules()
+    if not rules:
+        return None
+
+    now = datetime.now(timezone.utc)
+    found_expired = False
+
+    for key, net, info in rules:
+        if addr.version != net.version:
+            continue
+        if addr not in net:
+            continue
+        if _is_entry_expired(info, now):
+            found_expired = True
+            continue
+        rule_scope = info.get("scope") or "tickets"
+        if scope is not None and rule_scope != scope:
+            continue
+        if found_expired:
+            with _ip_ban_lock:
+                data = load_banned_ips_data()
+                if prune_expired_bans(data, now):
+                    save_banned_ips_data(data)
+        return key, info
+
+    if found_expired:
+        with _ip_ban_lock:
+            data = load_banned_ips_data()
+            if prune_expired_bans(data, now):
+                save_banned_ips_data(data)
+    return None
+
+
+def list_ip_bans(history_limit: int = 25) -> dict[str, list[dict[str, Any]]]:
+    """Prunes expired bans into history and returns current active bans + recent previous bans."""
+    now = datetime.now(timezone.utc)
+    with _ip_ban_lock:
+        data = load_banned_ips_data()
+        if prune_expired_bans(data, now):
+            save_banned_ips_data(data)
+
+        active: list[dict[str, Any]] = []
+        for key, info in data.get("banned", {}).items():
+            if not isinstance(info, dict):
+                continue
+            rem_sec: int | None = None
+            if info.get("expires_at"):
+                try:
+                    exp = datetime.fromisoformat(str(info["expires_at"]))
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=timezone.utc)
+                    rem_sec = max(0, int((exp - now).total_seconds()))
+                except Exception:
+                    rem_sec = None
+            active.append({
+                "target": key,
+                "original_input": info.get("original_input") or key,
+                "is_prefix": bool(info.get("is_prefix", "/" in key)),
+                "scope": info.get("scope") or "tickets",
+                "banned_by": info.get("banned_by") or "unknown",
+                "banned_at": info.get("banned_at") or "",
+                "expires_at": info.get("expires_at"),
+                "remaining_seconds": rem_sec,
+                "remaining_str": format_duration_short(rem_sec),
+                "reason": info.get("reason") or "No reason provided",
+            })
+        active.sort(key=lambda x: x.get("banned_at") or "", reverse=True)
+
+        history_raw = [h for h in data.get("history", []) if isinstance(h, dict)]
+        history_raw.sort(key=lambda x: x.get("ended_at") or x.get("banned_at") or "", reverse=True)
+        if history_limit > 0:
+            history_raw = history_raw[:history_limit]
+
+        return {"active": active, "history": history_raw}

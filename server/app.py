@@ -823,6 +823,24 @@ app.config.update(
 CURRENT_SESSION_VERSION = 2
 
 @app.before_request
+def enforce_site_ip_bans():
+    client_ip = get_client_ip()
+    matched = core.match_ip_ban(client_ip, scope="site")
+    if matched is None:
+        return None
+    _, ban_info = matched
+    expires_at = ban_info.get("expires_at")
+    msg = (
+        f"Access denied: your IP address or network prefix is blocked until {expires_at}."
+        if expires_at
+        else "Access denied: your IP address or network prefix is blocked."
+    )
+    if request.path.startswith("/api") or request.accept_mimetypes.best == "application/json":
+        return jsonify({"success": False, "detail": msg}), 403
+    return msg, 403
+
+
+@app.before_request
 def enforce_session_version():
     has_auth_session = (
         session.get("admin_logged_in")
@@ -1366,40 +1384,13 @@ def save_crashes(data):
         json.dump(data, f, indent=4)
 
 def load_banned_ips():
-    if not os.path.exists(BANNED_FILE):
-        return {"banned": {}}
-    with open(BANNED_FILE, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except Exception:
-            return {"banned": {}}
+    return core.load_banned_ips_data()
 
 def save_banned_ips(data):
-    with open(BANNED_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    core.save_banned_ips_data(data)
 
 def is_ip_banned(ip: str) -> bool:
-    if ip == "unknown":
-        return False
-    data = load_banned_ips()
-    banned = data.get("banned", {})
-    if ip not in banned:
-        return False
-    
-    ban_info = banned[ip]
-    expires_at_str = ban_info.get("expires_at")
-    if expires_at_str is None:
-        return True
-    
-    try:
-        expires_at = datetime.fromisoformat(expires_at_str)
-        if datetime.now(timezone.utc) > expires_at:
-            del banned[ip]
-            save_banned_ips(data)
-            return False
-        return True
-    except Exception:
-        return True
+    return core.match_ip_ban(ip) is not None
 
 class SuggestionPayload(BaseModel):
     name: str = Field(default="", max_length=50)
@@ -3150,23 +3141,24 @@ def ban_ip(username):
     if not ip_to_ban or ip_to_ban == "unknown":
         return jsonify({"detail": "Invalid IP address."}), 400
 
-    data = load_banned_ips()
-    banned = data.setdefault("banned", {})
-    
-    expires_at = None
+    duration_seconds = None
     if payload.duration_minutes is not None and payload.duration_minutes > 0:
-        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=payload.duration_minutes)).isoformat()
+        duration_seconds = int(payload.duration_minutes) * 60
 
-    banned[ip_to_ban] = {
-        "banned_by": username,
-        "banned_at": datetime.now(timezone.utc).isoformat(),
-        "expires_at": expires_at,
-        "reason": payload.reason.strip() or "No reason provided"
-    }
-    save_banned_ips(data)
+    try:
+        canonical_key, _ = core.add_ip_ban(
+            ip_to_ban,
+            duration_seconds,
+            reason=payload.reason.strip() or "No reason provided",
+            banned_by=username,
+            scope="tickets",
+        )
+    except ValueError as exc:
+        return jsonify({"detail": str(exc)}), 400
+
     broadcast_update("dashboard")
-    log_audit_event("bans.ban_ip", "bans", f"Banned IP {ip_to_ban}: {payload.reason.strip() or 'No reason provided'}", target=f"IP {ip_to_ban}", details={"ip": ip_to_ban, "reason": payload.reason.strip(), "duration_minutes": payload.duration_minutes}, username=username)
-    return jsonify({"message": f"IP {ip_to_ban} has been banned.", "ip": ip_to_ban})
+    log_audit_event("bans.ban_ip", "bans", f"Banned IP {canonical_key}: {payload.reason.strip() or 'No reason provided'}", target=f"IP {canonical_key}", details={"ip": canonical_key, "original_input": ip_to_ban, "reason": payload.reason.strip(), "duration_minutes": payload.duration_minutes}, username=username)
+    return jsonify({"message": f"IP {canonical_key} has been banned.", "ip": canonical_key})
 
 @app.route("/admin/tickets/unban", methods=["POST"])
 @admin_required
@@ -3181,14 +3173,12 @@ def unban_ip(username):
     except ValidationError as e:
         return jsonify({"detail": e.errors()}), 400
 
-    data = load_banned_ips()
-    banned = data.get("banned", {})
-    if payload.ip in banned:
-        del banned[payload.ip]
-        save_banned_ips(data)
+    removed = core.remove_ip_ban(payload.ip, ended_by=username)
+    if removed is not None:
+        removed_key, _ = removed
         broadcast_update("dashboard")
-        log_audit_event("bans.unban_ip", "bans", f"Unbanned IP {payload.ip}", target=f"IP {payload.ip}", details={"ip": payload.ip}, username=username)
-        return jsonify({"message": f"IP {payload.ip} unbanned successfully.", "ip": payload.ip})
+        log_audit_event("bans.unban_ip", "bans", f"Unbanned IP {removed_key}", target=f"IP {removed_key}", details={"ip": removed_key}, username=username)
+        return jsonify({"message": f"IP {removed_key} unbanned successfully.", "ip": removed_key})
     return jsonify({"detail": f"IP {payload.ip} is not currently banned."}), 404
 
 @app.route("/admin/overview-stats", methods=["GET"])
@@ -4663,6 +4653,139 @@ def start_console_handler():
             safe_print(f"[CPU] Top {len(res['hotspots'])} thread frames ({res['total_samples']} samples over {res['duration_s']}s):")
             for idx, item in enumerate(res["hotspots"], 1):
                 safe_print(f"  {idx:>2}. {item['percent']:5.1f}% ({item['hits']} hits) - {item['location']}")
+
+        @handler.command(name="ban", description="Block an IP or IPv4/IPv6 prefix site-wide: ban <ip|prefix|cidr> <duration> [reason...]")
+        @handler.command(name="block", description="Alias for ban: block <ip|prefix|cidr> <duration> [reason...]")
+        @handler.command(name="ip_ban", description="Alias for ban: ip_ban <ip|prefix|cidr> <duration> [reason...]")
+        def ban_ip_cmd(target: str = "", duration: str = "", *reason_parts):
+            target = (target or "").strip()
+            duration = (duration or "").strip()
+            if not target or not duration:
+                safe_print("Usage: ban <ip|prefix|cidr> <duration> [reason...]")
+                safe_print("  Examples: ban 2a03:2880:f814 2h scraper spam")
+                safe_print("            ban 198.51.100 30m abuse | ban 203.0.113.5 perm")
+                return
+            try:
+                dur_sec, dur_label = core.parse_ban_duration(duration)
+                reason = " ".join(reason_parts).strip() or "Blocked via CLI"
+                canonical_key, entry = core.add_ip_ban(
+                    target,
+                    dur_sec,
+                    reason=reason,
+                    banned_by="cli",
+                    scope="site",
+                )
+            except ValueError as exc:
+                safe_print(f"[BAN] Error: {exc}")
+                return
+            except Exception as exc:
+                safe_print(f"[BAN] Failed to save ban: {exc}")
+                return
+
+            broadcast_update("dashboard")
+            log_audit_event(
+                "bans.ban_ip",
+                "bans",
+                f"CLI site-blocked {canonical_key} for {dur_label}: {reason}",
+                target=f"IP {canonical_key}",
+                details={
+                    "ip": canonical_key,
+                    "original_input": target,
+                    "scope": "site",
+                    "duration_seconds": dur_sec,
+                    "reason": reason,
+                },
+                username="cli",
+            )
+            prefix_note = " (all matching IPs in prefix)" if entry.get("is_prefix") else ""
+            exp_note = f"expires {entry['expires_at']}" if entry.get("expires_at") else "permanent"
+            safe_print(f"[BAN] Blocked {canonical_key}{prefix_note} for {dur_label} ({exp_note}) | reason: {reason}")
+
+        @handler.command(name="unban", description="Unblock an active IP or prefix ban: unban <ip|prefix|cidr>")
+        @handler.command(name="unblock", description="Alias for unban: unblock <ip|prefix|cidr>")
+        @handler.command(name="ip_unban", description="Alias for unban: ip_unban <ip|prefix|cidr>")
+        def unban_ip_cmd(target: str = ""):
+            target = (target or "").strip()
+            if not target:
+                safe_print("Usage: unban <ip|prefix|cidr>")
+                return
+            removed = core.remove_ip_ban(target, ended_by="cli")
+            if not removed:
+                safe_print(f"[BAN] No active ban matched '{target}'.")
+                return
+            removed_key, _ = removed
+            broadcast_update("dashboard")
+            log_audit_event(
+                "bans.unban_ip",
+                "bans",
+                f"CLI unblocked {removed_key}",
+                target=f"IP {removed_key}",
+                details={"ip": removed_key, "original_input": target},
+                username="cli",
+            )
+            safe_print(f"[BAN] Unblocked {removed_key} (archived to ban history).")
+
+        @handler.command(name="bans", description="Lists current and previous IP/prefix bans: bans [active|history|all] [limit]")
+        @handler.command(name="ban_list", description="Alias for bans: ban_list [active|history|all] [limit]")
+        @handler.command(name="ip_bans", description="Alias for bans: ip_bans [active|history|all] [limit]")
+        def list_bans_cmd(mode: str = "all", limit_str: str = "25"):
+            clean_mode = (mode or "all").strip().lower()
+            if clean_mode.isdigit():
+                limit_str = clean_mode
+                clean_mode = "all"
+            if clean_mode not in ("all", "active", "current", "history", "previous", "past"):
+                safe_print("Usage: bans [active|history|all] [limit]")
+                return
+            try:
+                limit = max(1, min(200, int(limit_str)))
+            except ValueError:
+                limit = 25
+
+            snap = core.list_ip_bans(history_limit=limit)
+            active = snap["active"]
+            history = snap["history"]
+
+            if clean_mode in ("all", "active", "current"):
+                safe_print(f"[BAN] Current Active Bans ({len(active)}):")
+                if not active:
+                    safe_print("  (none)")
+                for idx, item in enumerate(active, 1):
+                    orig = f" (input: {item['original_input']})" if item["original_input"] != item["target"] else ""
+                    rem = f"remaining={item['remaining_str']}" if item["expires_at"] else "permanent"
+                    safe_print(
+                        f"  {idx:>2}. {item['target']}{orig} | scope={item['scope']} | {rem} | "
+                        f"by={item['banned_by']} | reason={item['reason']}"
+                    )
+
+            if clean_mode in ("all", "history", "previous", "past"):
+                safe_print(f"[BAN] Previous Bans ({len(history)} shown):")
+                if not history:
+                    safe_print("  (none)")
+                for idx, item in enumerate(history, 1):
+                    orig = f" (input: {item.get('original_input')})" if item.get("original_input") and item.get("original_input") != item.get("target") else ""
+                    ended = (item.get("ended_at") or "?")[:19].replace("T", " ")
+                    safe_print(
+                        f"  {idx:>2}. {item.get('target')}{orig} | {item.get('end_reason', 'ended')} at {ended}Z "
+                        f"(by {item.get('ended_by', '?')}) | scope={item.get('scope', 'tickets')} | reason={item.get('reason', '')}"
+                    )
+
+        @handler.command(name="ban_check", description="Checks if an IP matches any active ban rule: ban_check <ip>")
+        @handler.command(name="ip_check", description="Alias for ban_check: ip_check <ip>")
+        def check_ban_cmd(ip_str: str = ""):
+            ip_str = (ip_str or "").strip()
+            if not ip_str:
+                safe_print("Usage: ban_check <ip>")
+                return
+            matched = core.match_ip_ban(ip_str)
+            if not matched:
+                safe_print(f"[BAN] {ip_str} is NOT currently blocked.")
+                return
+            rule_key, info = matched
+            exp = info.get("expires_at") or "permanent"
+            safe_print(
+                f"[BAN] {ip_str} IS BLOCKED by rule {rule_key} | scope={info.get('scope', 'tickets')} | "
+                f"expires={exp} | reason={info.get('reason', '')}"
+            )
 
         handler.start()
     except Exception:
