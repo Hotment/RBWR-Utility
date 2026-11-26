@@ -4475,20 +4475,33 @@ def is_singleton():
     except Exception:
         return False
 
+_console_handler = None
+
+
 def start_console_handler():
+    global _console_handler
     if not is_singleton():
         return
-        
+
     try:
         from cli_ih import InputHandler, safe_print
         import subprocess
         import signal
         import sys
         import time
-        
-        handler = InputHandler(logger=app.logger)
-        
-        @handler.command(name="update", description="Updates the web server and pulls latest code from origin.")
+
+        handler = InputHandler(
+            logger=app.logger,
+            on_exit=close_singleton_socket,
+        )
+        _console_handler = handler
+        atexit.register(lambda: handler.stop(join=True, timeout=0.5))
+
+        @handler.command(
+            name="update",
+            category="Server",
+            description="Pulls latest server/bot code from origin and restarts the web server.",
+        )
         def update_cmd():
             safe_print("Updating the web server and pulling changes...")
             try:
@@ -4499,11 +4512,11 @@ def start_console_handler():
                     os.makedirs(os.path.dirname(sparse_file), exist_ok=True)
                     with open(sparse_file, "w", encoding="utf-8") as f:
                         f.write("server/*\nbot/*\n")
-                    
+
                     subprocess.run("git fetch origin main", shell=True, check=False)
                     subprocess.run("git checkout origin/main -- server bot", shell=True, check=False)
                     subprocess.run("git pull origin main", shell=True, check=False)
-                
+
                 if os.path.exists("server"):
                     safe_print("Copying server files...")
                     subprocess.run("cp -a server/. . && rm -rf server", shell=True, check=False)
@@ -4513,9 +4526,10 @@ def start_console_handler():
                         subprocess.run("cp -a bot/bot.py .", shell=True, check=False)
             except Exception as e:
                 safe_print(f"Error during git pull/copy: {e}")
-                
+
             try:
                 is_gunicorn = "gunicorn" in os.environ.get("SERVER_SOFTWARE", "").lower()
+                handler.stop()
                 close_singleton_socket()
                 if is_gunicorn:
                     safe_print("Sending SIGHUP to Gunicorn master process...")
@@ -4527,20 +4541,27 @@ def start_console_handler():
             except Exception as e:
                 safe_print(f"Error restarting server: {e}")
 
-        @handler.command(name="test_notification", description="Sends a test notification DM to a user: test_notification <user_id> [message]")
-        @handler.command(name="test_notify", description="Alias for test_notification: test_notify <user_id> [message]")
-        @handler.command(name="notify", description="Alias for test_notification: notify <user_id> [message]")
-        def test_notification_cmd(user_id: str = "", *args):
-            user_id = user_id.strip()
-            if not user_id:
-                safe_print("Usage: test_notification <user_id> [optional message]")
+        @handler.command(
+            name="test_notification",
+            aliases=["test_notify", "notify"],
+            category="Server",
+            usage="test_notification <user_id> [message...]",
+            description="Sends a test notification DM to a Discord user.",
+        )
+        def test_notification_cmd(user_id: str, *message: str):
+            """Sends a test DM via the Discord bot.
+            Example: test_notification 123456789012345678 "Hello from CLI"
+            """
+            clean_uid = user_id.strip()
+            if not clean_uid:
+                safe_print(f"Usage: {handler.format_usage('test_notification')}")
                 return
 
-            custom_msg = " ".join(args).strip() if args else None
-            safe_print(f"Sending test notification to Discord user {user_id}...")
+            custom_msg = " ".join(message).strip() if message else None
+            safe_print(f"Sending test notification to Discord user {clean_uid}...")
 
             try:
-                success, info = send_test_notification_dm(user_id, custom_msg)
+                success, info = send_test_notification_dm(clean_uid, custom_msg)
                 if success:
                     safe_print(f"[SUCCESS] {info}")
                 else:
@@ -4548,7 +4569,11 @@ def start_console_handler():
             except Exception as ex:
                 safe_print(f"[ERROR] Failed to execute test notification: {ex}")
 
-        @handler.command(name="api_status", description="Shows status, PID, port, and live health of the FastAPI subservice.")
+        @handler.command(
+            name="api_status",
+            category="API",
+            description="Shows status, PID, port, and live health of the FastAPI subservice.",
+        )
         def api_status_cmd():
             st = get_api_subservice_status(probe_http=True)
             mode = "managed" if st["managed_process_running"] else ("external" if st["port_open"] else "stopped")
@@ -4564,7 +4589,11 @@ def start_console_handler():
             elif st["health_error"]:
                 safe_print(f"[API] health_error={st['health_error']}")
 
-        @handler.command(name="api_health", description="Probes /api/status, /api/grid/summary, and /api/openapi.json with latency.")
+        @handler.command(
+            name="api_health",
+            category="API",
+            description="Probes /api/status, /api/grid/summary, and /api/openapi.json with latency.",
+        )
         def api_health_cmd():
             port = _get_api_port()
             for ep in ("/api/status", "/api/grid/summary", "/api/openapi.json"):
@@ -4577,22 +4606,38 @@ def start_console_handler():
                     ms = round((time.perf_counter() - t0) * 1000, 1)
                     safe_print(f"[API] GET {ep} -> ERROR ({ms} ms): {ex}")
 
-        @handler.command(name="api_start", description="Starts the managed FastAPI subservice if not already running.")
+        @handler.command(
+            name="api_start",
+            category="API",
+            description="Starts the managed FastAPI subservice if not already running.",
+        )
         def api_start_cmd():
             ok, msg = start_api_subservice()
             safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
 
-        @handler.command(name="api_stop", description="Stops the managed FastAPI subservice and pauses auto-restart.")
+        @handler.command(
+            name="api_stop",
+            category="API",
+            description="Stops the managed FastAPI subservice and pauses auto-restart.",
+        )
         def api_stop_cmd():
             ok, msg = stop_api_subservice()
             safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
 
-        @handler.command(name="api_restart", description="Restarts the managed FastAPI subservice.")
+        @handler.command(
+            name="api_restart",
+            category="API",
+            description="Restarts the managed FastAPI subservice.",
+        )
         def api_restart_cmd():
             ok, msg = restart_api_subservice()
             safe_print(f"[{'OK' if ok else 'WARN'}] {msg}")
 
-        @handler.command(name="api_refresh", description="Triggers POST /api/servers/refresh using API_REFRESH_KEY.")
+        @handler.command(
+            name="api_refresh",
+            category="API",
+            description="Triggers POST /api/servers/refresh using API_REFRESH_KEY.",
+        )
         def api_refresh_cmd():
             port = _get_api_port()
             key = (os.environ.get("API_REFRESH_KEY") or os.environ.get("RBWR_API_KEY") or "").strip()
@@ -4609,7 +4654,11 @@ def start_console_handler():
             except Exception as ex:
                 safe_print(f"[ERROR] Failed to reach API refresh endpoint: {ex}")
 
-        @handler.command(name="mem", description="Shows memory usage (RSS), GC stats, and in-memory cache sizes.")
+        @handler.command(
+            name="mem",
+            category="Diagnostics",
+            description="Shows memory usage (RSS), GC stats, and in-memory cache sizes.",
+        )
         def mem_status_cmd():
             rep = core.get_memory_report()
             rss_str = f"{rep['rss_mb']:.2f} MiB" if rep["rss_mb"] is not None else "unavailable"
@@ -4638,7 +4687,11 @@ def start_console_handler():
                     f"peak={rep['tracemalloc_peak_mb']:.2f} MiB"
                 )
 
-        @handler.command(name="mem_gc", description="Runs full Python garbage collection and trims unused OS heap pages.")
+        @handler.command(
+            name="mem_gc",
+            category="Diagnostics",
+            description="Runs full Python garbage collection and trims unused OS heap pages.",
+        )
         def mem_gc_cmd():
             pruned_ips = prune_login_attempts()
             res = core.trim_process_memory(run_gc=True)
@@ -4650,11 +4703,16 @@ def start_console_handler():
                 f"malloc_trim={res['malloc_trimmed']} | RSS: {before} -> {after} MiB (delta {freed})"
             )
 
-        @handler.command(name="mem_clear", description="Clears in-memory caches and runs GC: mem_clear [all|archives|cards|files]")
+        @handler.command(
+            name="mem_clear",
+            category="Diagnostics",
+            usage="mem_clear [all|archives|cards|files]",
+            description="Clears in-memory caches and runs garbage collection.",
+        )
         def mem_clear_cmd(scope: str = "all"):
             clean_scope = (scope or "all").strip().lower()
             if clean_scope not in ("all", "archives", "cards", "files"):
-                safe_print("Usage: mem_clear [all|archives|cards|files]")
+                safe_print(f"Usage: {handler.format_usage('mem_clear')}")
                 return
             pruned_ips = prune_login_attempts(clear_all=(clean_scope == "all"))
             res = core.clear_memory_caches(scope=clean_scope, run_gc=True)
@@ -4666,8 +4724,14 @@ def start_console_handler():
                 f"GC={res['gc_collected']} | RSS: {before} -> {after} MiB (delta {freed})"
             )
 
-        @handler.command(name="mem_top", description="Profiles top Python allocations via tracemalloc: mem_top [count|stop]")
+        @handler.command(
+            name="mem_top",
+            category="Diagnostics",
+            usage="mem_top [count|stop]",
+            description="Profiles top Python memory allocations via tracemalloc.",
+        )
         def mem_top_cmd(arg: str = "10"):
+            """Starts tracemalloc on first call, prints top N allocations on subsequent calls, or stops with 'mem_top stop'."""
             import tracemalloc
             token = (arg or "10").strip().lower()
             if token == "stop":
@@ -4684,7 +4748,8 @@ def start_console_handler():
             try:
                 limit = max(1, min(30, int(token)))
             except ValueError:
-                limit = 10
+                safe_print(f"Usage: {handler.format_usage('mem_top')}")
+                return
             snap = tracemalloc.take_snapshot()
             stats = snap.statistics("lineno")[:limit]
             cur, peak = tracemalloc.get_traced_memory()
@@ -4692,18 +4757,18 @@ def start_console_handler():
             for idx, st in enumerate(stats, 1):
                 safe_print(f"  {idx:>2}. {st}")
 
-        @handler.command(name="cpu", description="Shows CPU usage (%), core count, load avg, and thread count for Web & API.")
-        @handler.command(name="cpu_status", description="Alias for cpu.")
-        def cpu_status_cmd(sample_s: str = "0.25"):
-            try:
-                dur = float(sample_s)
-            except ValueError:
-                dur = 0.25
+        @handler.command(
+            name="cpu",
+            aliases=["cpu_status"],
+            category="Diagnostics",
+            description="Shows CPU usage (%), core count, load avg, and thread count for Web & API.",
+        )
+        def cpu_status_cmd(sample_s: float = 0.25):
             extra = {}
             api_proc = _api_process
             if api_proc is not None and api_proc.poll() is None:
                 extra["api"] = api_proc.pid
-            rep = core.get_cpu_report(sample_seconds=dur, extra_pids=extra)
+            rep = core.get_cpu_report(sample_seconds=sample_s, extra_pids=extra)
             web = rep["processes"]["web"]
             web_pct = f"{web['cpu_percent']:.1f}%" if web["cpu_percent"] is not None else "n/a"
             web_time = f"{web['cpu_time_s']:.1f}s" if web["cpu_time_s"] is not None else "n/a"
@@ -4720,7 +4785,11 @@ def start_console_handler():
                 f"cores={rep['cpu_count']} | threads={rep['thread_count']}{load_str}"
             )
 
-        @handler.command(name="cpu_threads", description="Lists all active Python threads and their current executing frame.")
+        @handler.command(
+            name="cpu_threads",
+            category="Diagnostics",
+            description="Lists all active Python threads and their current executing frame.",
+        )
         def cpu_threads_cmd():
             stacks = core.get_thread_stacks()
             safe_print(f"[CPU] Active threads ({len(stacks)}):")
@@ -4728,34 +4797,35 @@ def start_console_handler():
                 kind = "daemon" if th["daemon"] else "main"
                 safe_print(f"  - {th['name']} ({kind}) -> {th['location']}")
 
-        @handler.command(name="cpu_top", description="Samples all Python threads to find hot code paths: cpu_top [seconds] [count]")
-        def cpu_top_cmd(seconds: str = "2.0", count: str = "10"):
-            try:
-                dur = float(seconds)
-            except ValueError:
-                dur = 2.0
-            try:
-                limit = int(count)
-            except ValueError:
-                limit = 10
-            safe_print(f"[CPU] Sampling threads for {max(0.5, min(15.0, dur)):.1f}s...")
-            res = core.sample_hot_threads(duration=dur, top_n=limit)
+        @handler.command(
+            name="cpu_top",
+            category="Diagnostics",
+            description="Samples all Python threads to find hot code paths.",
+        )
+        def cpu_top_cmd(seconds: float = 2.0, count: int = 10):
+            safe_print(f"[CPU] Sampling threads for {max(0.5, min(15.0, seconds)):.1f}s...")
+            res = core.sample_hot_threads(duration=seconds, top_n=count)
             safe_print(f"[CPU] Top {len(res['hotspots'])} thread frames ({res['total_samples']} samples over {res['duration_s']}s):")
             for idx, item in enumerate(res["hotspots"], 1):
                 safe_print(f"  {idx:>2}. {item['percent']:5.1f}% ({item['hits']} hits) - {item['location']}")
 
-        @handler.command(name="ban", description="Silently time out an IP or IPv4/IPv6 prefix site-wide: ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
-        @handler.command(name="block", description="Alias for ban: block <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
-        @handler.command(name="ip_ban", description="Alias for ban: ip_ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
-        def ban_ip_cmd(target: str = "", duration: str = "", *reason_parts):
-            target = (target or "").strip()
-            duration = (duration or "").strip()
-            if not target or not duration:
-                safe_print("Usage: ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]")
-                safe_print("  Examples: ban 2a03:2880:f814 2h scraper spam")
-                safe_print("            ban 2a03:2880:f814 2h --hide-logs log flooder")
-                safe_print("            ban 198.51.100 30m abuse | ban 203.0.113.5 perm")
-                return
+        @handler.command(
+            name="ban",
+            aliases=["block", "ip_ban"],
+            category="Security",
+            usage="ban <ip|prefix|cidr> <duration> [--hide-logs] [reason...]",
+            description="Silently times out an IP or IPv4/IPv6 prefix site-wide.",
+        )
+        def ban_ip_cmd(target: str, duration: str, *reason_parts: str):
+            """Supports single IPs, CIDR ranges, and shorthand prefixes (e.g. 2a03:2880:f814 -> /48).
+            Examples:
+              ban 2a03:2880:f814 2h scraper spam
+              ban 2a03:2880:f814 2h --hide-logs "log flooder"
+              ban 198.51.100 30m abuse
+              ban 203.0.113.5 perm
+            """
+            clean_target = target.strip()
+            clean_duration = duration.strip()
             hide_logs = False
             filtered_reason: list[str] = []
             for part in reason_parts:
@@ -4764,10 +4834,10 @@ def start_console_handler():
                 else:
                     filtered_reason.append(part)
             try:
-                dur_sec, dur_label = core.parse_ban_duration(duration)
+                dur_sec, dur_label = core.parse_ban_duration(clean_duration)
                 reason = " ".join(filtered_reason).strip() or "Blocked via CLI"
                 canonical_key, entry = core.add_ip_ban(
-                    target,
+                    clean_target,
                     dur_sec,
                     reason=reason,
                     banned_by="cli",
@@ -4789,7 +4859,7 @@ def start_console_handler():
                 target=f"IP {canonical_key}",
                 details={
                     "ip": canonical_key,
-                    "original_input": target,
+                    "original_input": clean_target,
                     "scope": "site",
                     "duration_seconds": dur_sec,
                     "hide_logs": hide_logs,
@@ -4802,46 +4872,48 @@ def start_console_handler():
             log_note = " | logs=HIDDEN" if hide_logs else ""
             safe_print(f"[BAN] Silently timing out {canonical_key}{prefix_note} for {dur_label} ({exp_note}){log_note} | reason: {reason}")
 
-        @handler.command(name="ban_mute", description="Hide all server/access logs for a banned IP or prefix: ban_mute <ip|prefix|cidr>")
-        @handler.command(name="ban_hidelogs", description="Alias for ban_mute: ban_hidelogs <ip|prefix|cidr>")
-        @handler.command(name="ban_quiet", description="Alias for ban_mute: ban_quiet <ip|prefix|cidr>")
-        def mute_ban_logs_cmd(target: str = ""):
-            target = (target or "").strip()
-            if not target:
-                safe_print("Usage: ban_mute <ip|prefix|cidr>")
-                return
-            res = core.set_ip_ban_hide_logs(target, True)
+        @handler.command(
+            name="ban_mute",
+            aliases=["ban_hidelogs", "ban_quiet"],
+            category="Security",
+            usage="ban_mute <ip|prefix|cidr>",
+            description="Hides all server/access logs for an active banned IP or prefix.",
+        )
+        def mute_ban_logs_cmd(target: str):
+            res = core.set_ip_ban_hide_logs(target.strip(), True)
             if not res:
-                safe_print(f"[BAN] No active ban matched '{target}'.")
+                safe_print(f"[BAN] No active ban matched '{target.strip()}'.")
                 return
             matched_key, _ = res
             safe_print(f"[BAN] Logs are now HIDDEN for banned rule {matched_key}.")
 
-        @handler.command(name="ban_unmute", description="Re-enable server/access logs for a banned IP or prefix: ban_unmute <ip|prefix|cidr>")
-        @handler.command(name="ban_showlogs", description="Alias for ban_unmute: ban_showlogs <ip|prefix|cidr>")
-        def unmute_ban_logs_cmd(target: str = ""):
-            target = (target or "").strip()
-            if not target:
-                safe_print("Usage: ban_unmute <ip|prefix|cidr>")
-                return
-            res = core.set_ip_ban_hide_logs(target, False)
+        @handler.command(
+            name="ban_unmute",
+            aliases=["ban_showlogs"],
+            category="Security",
+            usage="ban_unmute <ip|prefix|cidr>",
+            description="Re-enables server/access logs for an active banned IP or prefix.",
+        )
+        def unmute_ban_logs_cmd(target: str):
+            res = core.set_ip_ban_hide_logs(target.strip(), False)
             if not res:
-                safe_print(f"[BAN] No active ban matched '{target}'.")
+                safe_print(f"[BAN] No active ban matched '{target.strip()}'.")
                 return
             matched_key, _ = res
             safe_print(f"[BAN] Logs are now VISIBLE again for banned rule {matched_key}.")
 
-        @handler.command(name="unban", description="Unblock an active IP or prefix ban: unban <ip|prefix|cidr>")
-        @handler.command(name="unblock", description="Alias for unban: unblock <ip|prefix|cidr>")
-        @handler.command(name="ip_unban", description="Alias for unban: ip_unban <ip|prefix|cidr>")
-        def unban_ip_cmd(target: str = ""):
-            target = (target or "").strip()
-            if not target:
-                safe_print("Usage: unban <ip|prefix|cidr>")
-                return
-            removed = core.remove_ip_ban(target, ended_by="cli")
+        @handler.command(
+            name="unban",
+            aliases=["unblock", "ip_unban"],
+            category="Security",
+            usage="unban <ip|prefix|cidr>",
+            description="Unblocks an active IP or prefix ban and archives it to history.",
+        )
+        def unban_ip_cmd(target: str):
+            clean_target = target.strip()
+            removed = core.remove_ip_ban(clean_target, ended_by="cli")
             if not removed:
-                safe_print(f"[BAN] No active ban matched '{target}'.")
+                safe_print(f"[BAN] No active ban matched '{clean_target}'.")
                 return
             removed_key, _ = removed
             broadcast_update("dashboard")
@@ -4850,26 +4922,27 @@ def start_console_handler():
                 "bans",
                 f"CLI unblocked {removed_key}",
                 target=f"IP {removed_key}",
-                details={"ip": removed_key, "original_input": target},
+                details={"ip": removed_key, "original_input": clean_target},
                 username="cli",
             )
             safe_print(f"[BAN] Unblocked {removed_key} (archived to ban history).")
 
-        @handler.command(name="bans", description="Lists current and previous IP/prefix bans: bans [active|history|all] [limit]")
-        @handler.command(name="ban_list", description="Alias for bans: ban_list [active|history|all] [limit]")
-        @handler.command(name="ip_bans", description="Alias for bans: ip_bans [active|history|all] [limit]")
-        def list_bans_cmd(mode: str = "all", limit_str: str = "25"):
+        @handler.command(
+            name="bans",
+            aliases=["ban_list", "ip_bans"],
+            category="Security",
+            usage="bans [active|history|all] [limit]",
+            description="Lists current active and previous IP/prefix bans.",
+        )
+        def list_bans_cmd(mode: str = "all", limit: int = 25):
             clean_mode = (mode or "all").strip().lower()
             if clean_mode.isdigit():
-                limit_str = clean_mode
+                limit = int(clean_mode)
                 clean_mode = "all"
             if clean_mode not in ("all", "active", "current", "history", "previous", "past"):
-                safe_print("Usage: bans [active|history|all] [limit]")
+                safe_print(f"Usage: {handler.format_usage('bans')}")
                 return
-            try:
-                limit = max(1, min(200, int(limit_str)))
-            except ValueError:
-                limit = 25
+            limit = max(1, min(200, limit))
 
             snap = core.list_ip_bans(history_limit=limit)
             active = snap["active"]
@@ -4901,28 +4974,30 @@ def start_console_handler():
                         f"(by {item.get('ended_by', '?')}) | scope={item.get('scope', 'tickets')} | reason={item.get('reason', '')}"
                     )
 
-        @handler.command(name="ban_check", description="Checks if an IP matches any active ban rule: ban_check <ip>")
-        @handler.command(name="ip_check", description="Alias for ban_check: ip_check <ip>")
-        def check_ban_cmd(ip_str: str = ""):
-            ip_str = (ip_str or "").strip()
-            if not ip_str:
-                safe_print("Usage: ban_check <ip>")
-                return
-            matched = core.match_ip_ban(ip_str)
+        @handler.command(
+            name="ban_check",
+            aliases=["ip_check"],
+            category="Security",
+            usage="ban_check <ip>",
+            description="Checks if an IP address matches any active ban rule.",
+        )
+        def check_ban_cmd(ip_str: str):
+            clean_ip = ip_str.strip()
+            matched = core.match_ip_ban(clean_ip)
             if not matched:
-                safe_print(f"[BAN] {ip_str} is NOT currently blocked.")
+                safe_print(f"[BAN] {clean_ip} is NOT currently blocked.")
                 return
             rule_key, info = matched
             exp = info.get("expires_at") or "permanent"
             muted = " | logs=HIDDEN" if info.get("hide_logs") else ""
             safe_print(
-                f"[BAN] {ip_str} IS BLOCKED by rule {rule_key} | scope={info.get('scope', 'tickets')} | "
+                f"[BAN] {clean_ip} IS BLOCKED by rule {rule_key} | scope={info.get('scope', 'tickets')} | "
                 f"expires={exp}{muted} | reason={info.get('reason', '')}"
             )
 
         handler.start()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"[CLI] Console handler failed to initialize: {exc}")
 
 # ==============================================================================
 # Standalone FastAPI REST Service Supervisor & /api/* Reverse Proxy
