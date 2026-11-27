@@ -10,7 +10,7 @@
     <Border x:Name="DetailedShell"
             Classes="overlay-shell"
             Width="470"
-            Height="455">
+            Height="505">
 
         <Grid x:Name="DetailedRootGrid" RowDefinitions="Auto,Auto,*">
 
@@ -296,7 +296,7 @@
                     <Grid x:Name="MonitorMetricsGrid"
                           Grid.Row="3"
                           ColumnDefinitions="*,*"
-                          RowDefinitions="*,*"
+                          RowDefinitions="Auto,*,*"
                           Margin="0,0,0,8">
 
                         <Border x:Name="DemandInputCard"
@@ -335,10 +335,10 @@
                         <Border x:Name="GenLoadCard"
                                 Classes="hud-card metric-card"
                                 Grid.Row="1" Grid.Column="0"
-                                Padding="8,6"
+                                Padding="8,5"
                                 behaviors:TooltipBehaviors.Item="{Binding DetailedLoadTooltip}"
-                                Margin="0,4,4,0">
-                            <StackPanel Spacing="2">
+                                Margin="0,4,4,4">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding DetailedLoadLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <TextBlock Text="{Binding DetailedLoadValueText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
                             </StackPanel>
@@ -347,12 +347,42 @@
                         <Border x:Name="FlowCard"
                                 Classes="hud-card metric-card"
                                 Grid.Row="1" Grid.Column="1"
-                                Padding="8,6"
+                                Padding="8,5"
                                 behaviors:TooltipBehaviors.Item="{Binding DetailedFlowTooltip}"
-                                Margin="4,4,0,0">
-                            <StackPanel Spacing="2">
+                                Margin="4,4,0,4">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding DetailedFlowLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <TextBlock Text="{Binding FeedwaterFlowText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="13" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="DeaeratorValveCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="2" Grid.Column="0"
+                                Padding="8,5"
+                                behaviors:TooltipBehaviors.Key="DeaeratorInletValve"
+                                Margin="0,4,4,0">
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="DEAERATOR INLET VALVE" Foreground="{DynamicResource TextMuted}" FontSize="8.5" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DeaeratorInletValveText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="11.5" VerticalAlignment="Center" />
+                                </Grid>
+                                <ProgressBar Classes="cyber-power" Height="4" Minimum="0" Maximum="100" Value="{Binding DeaeratorInletValvePercent}" Foreground="{DynamicResource NeonGreen}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="TurbineValveCard"
+                                Classes="hud-card metric-card"
+                                Grid.Row="2" Grid.Column="1"
+                                Padding="8,5"
+                                behaviors:TooltipBehaviors.Key="TurbineControlValve"
+                                Margin="4,4,0,0">
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="TURBINE CONTROL VALVE" Foreground="{DynamicResource TextMuted}" FontSize="8.5" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding TurbineControlValveText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonPurple}" FontWeight="Bold" FontSize="11.5" VerticalAlignment="Center" />
+                                </Grid>
+                                <ProgressBar Classes="cyber-power" Height="4" Minimum="0" Maximum="100" Value="{Binding TurbineControlValvePercent}" Foreground="{DynamicResource NeonPurple}" />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -384,7 +414,7 @@
                             <TextBlock Grid.Column="2"
                                        Text="{Binding DetailedBottomRightText}" FontFamily="{DynamicResource AppMonoFontFamily}"
                                        behaviors:TooltipBehaviors.Item="{Binding DetailedBottomRightTooltip}"
-                                       Foreground="{DynamicResource TextMuted}"
+                                       Foreground="{Binding DetailedBottomRightBrush}"
                                        FontSize="9"
                                        VerticalAlignment="Center" />
                         </Grid>

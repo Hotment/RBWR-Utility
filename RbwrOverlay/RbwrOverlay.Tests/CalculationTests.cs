@@ -100,6 +100,28 @@ public class CalculationTests
     }
 
     [Fact]
+    public void TestDeaeratorInletAndTurbineControlValves()
+    {
+        var u1 = new Calculator(61.32) { SelectedUnit = 1 };
+        double u1Dio50 = u1.CalcDeaeratorInletValve(50.0);
+        double u1Tcv50 = u1.CalcTurbineControlValve(50.0);
+        Assert.InRange(u1Dio50, 38.0, 40.0);
+        Assert.InRange(u1Tcv50, 49.0, 50.5);
+        Assert.InRange(u1.CalcDeaeratorInletValve(100.0), 13.5, 15.0);
+        Assert.InRange(u1.CalcTurbineControlValve(100.0), 87.0, 88.5);
+        Assert.Equal(100.0, u1.CalcTurbineControlValve(120.0));
+
+        var u2 = new Calculator(61.32) { SelectedUnit = 2 };
+        double u2Dio50 = u2.CalcDeaeratorInletValve(50.0);
+        double u2Tcv50 = u2.CalcTurbineControlValve(50.0);
+        Assert.InRange(u2Dio50, 37.0, 38.5);
+        Assert.InRange(u2Tcv50, 50.0, 51.5);
+        Assert.InRange(u2.CalcDeaeratorInletValve(100.0), 14.5, 16.0);
+        Assert.InRange(u2.CalcTurbineControlValve(100.0), 89.5, 91.0);
+        Assert.Equal(100.0, u2.CalcTurbineControlValve(120.0));
+    }
+
+    [Fact]
     public void TestPastedPythonRegressionModelsAreParsedAndUsed()
     {
         Assert.True(Calculator.DefaultUnit1Models.ContainsKey("FWF"));

@@ -389,6 +389,16 @@ UNIT_2_REGRESSION_MODELS: dict[str, dict[str, Any]] = {
         return CalcParam("OCL", thermal);
     }
 
+    public double CalcDeaeratorInletValve(double thermal)
+    {
+        return Math.Clamp(CalcParam("DIO Intake", thermal), 0.0, 100.0);
+    }
+
+    public double CalcTurbineControlValve(double thermal)
+    {
+        return Math.Clamp(CalcParam("TCV", thermal), 0.0, 100.0);
+    }
+
     private double SolveThermalFromLoad(double targetGross)
     {
         if (targetGross <= 0.0) return 0.0;

@@ -105,7 +105,7 @@
                            FontSize="10"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding CompactSubLoadText}" FontFamily="{DynamicResource AppMonoFontFamily}"
-                           Foreground="{DynamicResource TextMuted}"
+                           Foreground="{Binding CompactSubLoadBrush}"
                            FontSize="8"
                            HorizontalAlignment="Center" />
             </StackPanel>

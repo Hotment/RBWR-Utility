@@ -145,6 +145,14 @@ public static class TooltipCatalog
             Title: "MAIN STEAM FLOW",
             Description: "Estimated mass flow rate (kg/s) of steam/feedwater at the current Unit 2 thermal power level."
         ),
+        ["DeaeratorInletValve"] = new(
+            Title: "DEAERATOR INLET VALVE (DIO)",
+            Description: "Estimated Deaerator Intake (DIO) valve opening percentage for the active unit and target thermal power."
+        ),
+        ["TurbineControlValve"] = new(
+            Title: "TURBINE CONTROL VALVE (TCV)",
+            Description: "Estimated Turbine Control Valve (TCV) opening percentage for the active unit and target thermal power."
+        ),
         ["UpcomingDemand"] = new(
             Title: "UPCOMING GRID DEMAND",
             Description: "Displays the next scheduled grid demand or special event (Maint, LOOP, RST, Evac) reported by live server sync."
@@ -154,8 +162,8 @@ public static class TooltipCatalog
             Description: "Estimated internal plant power consumption (MWe) drawn by feedwater, condenser, and core recirculation pumps."
         ),
         ["DetailedBottomTcr"] = new(
-            Title: "GROSS GENERATOR LOAD",
-            Description: "Required gross electrical output (MWe) for Unit 2 at the current demand setpoint."
+            Title: "LIVE TURBINE HEALTH",
+            Description: "Displays live turbine health (%) from the synced RBWR server. Turns red when at or below your alert threshold."
         ),
         ["CompactPrimaryReactor"] = new(
             Title: "CORE POWER & FLOW",
@@ -170,8 +178,8 @@ public static class TooltipCatalog
             Description: "Top: Required gross generator load (MWe). Bottom: Estimated station auxiliary power usage (MWe)."
         ),
         ["CompactSecondaryTcr"] = new(
-            Title: "OCL & GROSS MWe",
-            Description: "Top: Oil Cooling difference (Cold Water - Hot Water %, e.g. -40% = Hot Water at 40%). Bottom: Required gross generator load (MWe)."
+            Title: "OCL & TURBINE HEALTH",
+            Description: "Top: Oil Cooling difference (Cold Water - Hot Water %, e.g. -40% = Hot Water at 40%). Bottom: Live synced turbine health (%)."
         ),
 
         // --- Compact Sync Counter States ---

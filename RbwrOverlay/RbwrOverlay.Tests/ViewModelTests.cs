@@ -123,19 +123,39 @@ public class ViewModelTests
         Assert.True(vm.IsTcrActive);
         Assert.EndsWith("% MSS", vm.CompactRtpText);
         Assert.EndsWith("% OCL", vm.CompactLoadText);
-        Assert.Equal(vm.GeneratorLoadText, vm.CompactSubLoadText);
-        Assert.DoesNotContain("Aux", vm.CompactSubLoadText);
+        Assert.Equal("Turb --%", vm.CompactSubLoadText);
+        Assert.DoesNotContain("MWe", vm.CompactSubLoadText);
         Assert.EndsWith(" kg/s]", vm.CompactFlowText);
         Assert.Contains("% MSS / ", vm.MainStatusPowerText);
         Assert.EndsWith("% OCL", vm.MainStatusPowerText);
         Assert.Equal("GENERATOR LOAD", vm.DetailedLoadLabelText);
         Assert.EndsWith(" MWe", vm.DetailedLoadValueText);
+        Assert.Equal("Turbine Health: --%", vm.DetailedBottomRightText);
+        Assert.EndsWith("%", vm.DeaeratorInletValveText);
+        Assert.EndsWith("%", vm.TurbineControlValveText);
+        Assert.InRange(vm.DeaeratorInletValvePercent, 0.0, 100.0);
+        Assert.InRange(vm.TurbineControlValvePercent, 0.0, 100.0);
+
+        vm.OnServerConnected(new ServerInfo
+        {
+            JobId = "1111-2222",
+            Unit1 = new UnitState { Demand = 900, NextDemand = 950, DemandTimeLeft = 120, TurbineHealth = 92.4 },
+            Unit2 = new UnitState { Demand = 950, NextDemand = 1000, DemandTimeLeft = 120, TurbineHealth = 84.7 }
+        });
+        Assert.Equal("Turb 84.7%", vm.CompactSubLoadText);
+        Assert.Equal("Turbine Health: 84.7%", vm.DetailedBottomRightText);
+
+        vm.SelectUnit("1");
+        Assert.StartsWith("Aux ", vm.CompactSubLoadText);
         Assert.StartsWith("Aux Usage: ", vm.DetailedBottomRightText);
 
+        vm.SelectUnit("3");
         vm.SetPresetDemand("0");
         Assert.StartsWith("-", vm.CompactRtpText);
         Assert.StartsWith("-", vm.CompactLoadText);
         Assert.StartsWith("-", vm.MainStatusPowerText);
+        Assert.Equal("Turb 84.7%", vm.CompactSubLoadText);
+        Assert.Equal("Turbine Health: 84.7%", vm.DetailedBottomRightText);
     }
 
     [Fact]

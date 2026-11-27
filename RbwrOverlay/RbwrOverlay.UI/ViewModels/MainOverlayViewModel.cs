@@ -60,6 +60,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private bool _zeroSecRefetchDone;
     private DateTime _lastServerPollTime = DateTime.MinValue;
     private bool _turbineAlertTriggered;
+    private double? _liveTurbineHealth;
     private readonly HashSet<int> _triggeredDemandNotifications = new();
     private double? _lastNotifiedNextDemand;
     private const long RbwrPlaceId = RobloxLogReader.RbwrPlaceId;
@@ -120,6 +121,18 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _oclText = "0.00% OCL";
 
     [ObservableProperty]
+    private double _deaeratorInletValvePercent;
+
+    [ObservableProperty]
+    private string _deaeratorInletValveText = "0.0%";
+
+    [ObservableProperty]
+    private double _turbineControlValvePercent;
+
+    [ObservableProperty]
+    private string _turbineControlValveText = "0.0%";
+
+    [ObservableProperty]
     private string _mainStatusPowerText = "0.00% APRM";
 
     [ObservableProperty]
@@ -155,6 +168,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private string _compactSubLoadText = "Aux 61.32 MWe";
 
     [ObservableProperty]
+    private IBrush _compactSubLoadBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
+
+    [ObservableProperty]
     private string _detailedLoadLabelText = "GENERATOR LOAD";
 
     [ObservableProperty]
@@ -165,6 +181,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _detailedBottomRightText = "Aux Usage: 61.32 MWe";
+
+    [ObservableProperty]
+    private IBrush _detailedBottomRightBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
 
     [ObservableProperty]
     private TooltipItem? _mainBannerTooltip;
@@ -679,12 +698,18 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
         double mss = _calc.CalcMss(thermal);
         double ocl = _calc.CalcOcl(thermal);
+        double dioValve = _calc.CalcDeaeratorInletValve(thermal);
+        double tcvValve = _calc.CalcTurbineControlValve(thermal);
 
         GeneratorLoadText = $"{genLoad:F2} MWe";
         FeedwaterFlowText = $"{flow:F2} kg/s";
         AuxUsageText = $"{_calc.Usage:F2} MWe";
         MssText = $"{mss:F2}% MSS";
         OclText = $"{ocl:F2}% OCL";
+        DeaeratorInletValvePercent = dioValve;
+        DeaeratorInletValveText = $"{dioValve:F1}%";
+        TurbineControlValvePercent = tcvValve;
+        TurbineControlValveText = $"{tcvValve:F1}%";
         CompactFlowText = $"[{Math.Round(flow):F0} kg/s]";
 
         if (isTcr)
@@ -692,11 +717,9 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             MainStatusPowerText = $"{mss:F2}% MSS / {ocl:F2}% OCL";
             CompactRtpText = $"{mss:F1}% MSS";
             CompactLoadText = $"{ocl:F1}% OCL";
-            CompactSubLoadText = $"{genLoad:F2} MWe";
             DetailedLoadLabelText = "GENERATOR LOAD";
             DetailedLoadValueText = $"{genLoad:F2} MWe";
             DetailedFlowLabelText = "STEAM FLOW";
-            DetailedBottomRightText = $"Aux Usage: {_calc.Usage:F2} MWe";
         }
         else
         {
@@ -709,6 +732,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             DetailedFlowLabelText = "FEEDWATER FLOW";
             DetailedBottomRightText = $"Aux Usage: {_calc.Usage:F2} MWe";
         }
+
+        UpdateTcrTurbineHealthReadouts();
 
         ThermalPowerPercent = Math.Clamp(thermal, 0.0, 120.0);
 
@@ -747,14 +772,22 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         AuxUsageText = "---";
         MssText = "ERROR";
         OclText = "ERROR";
+        DeaeratorInletValvePercent = 0;
+        DeaeratorInletValveText = "ERROR";
+        TurbineControlValvePercent = 0;
+        TurbineControlValveText = "ERROR";
         MainStatusPowerText = "ERR";
         MainStatusSubText = "VALUE OUT OF RANGE";
         CompactRtpText = "ERR";
         CompactFlowText = "[---]";
         CompactLoadText = "ERROR";
-        CompactSubLoadText = isTcr ? "--- MWe" : "Aux ---";
         DetailedLoadValueText = "ERROR";
-        DetailedBottomRightText = "Aux Usage: ---";
+        if (!isTcr)
+        {
+            CompactSubLoadText = "Aux ---";
+            DetailedBottomRightText = "Aux Usage: ---";
+        }
+        UpdateTcrTurbineHealthReadouts();
         ThermalPowerPercent = 0;
         MainPowerBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
         PowerBarBrush = ThemeService.ResolveBrush("NeonRed", "#ff003c");
@@ -1239,6 +1272,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         }
 
         double? tHealth = server.Unit2?.TurbineHealth ?? server.Unit1?.TurbineHealth;
+        _liveTurbineHealth = tHealth;
         if (tHealth.HasValue)
         {
             TurbineHealthValue = Math.Clamp(tHealth.Value, 0.0, 100.0);
@@ -1260,6 +1294,14 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
                     true);
             }
         }
+        else
+        {
+            TurbineHealthValue = 100.0;
+            TurbineHealthText = "Turbine Health: --%";
+            TurbineHealthBrush = ThemeService.ResolveBrush("TextMuted", "#73839c");
+        }
+
+        UpdateTcrTurbineHealthReadouts();
 
         TickDtlCountdown();
         SetSyncStatus(syncStatus ?? "Server Synced Successfully", "#39ff14");
@@ -1742,6 +1784,13 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         {
             _settings.TurbineHealthThreshold = Math.Clamp(thresh, 0.0, 100.0);
             _settingsService.SaveSettings(_settings);
+            if (_liveTurbineHealth.HasValue)
+            {
+                TurbineHealthBrush = _liveTurbineHealth.Value > _settings.TurbineHealthThreshold
+                    ? ThemeService.ResolveBrush("NeonGreen", "#39ff14")
+                    : ThemeService.ResolveBrush("NeonRed", "#ff003c");
+                UpdateTcrTurbineHealthReadouts();
+            }
         }
     }
 
@@ -2083,9 +2132,37 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         MainBannerTooltip = TooltipCatalog.Get(isTcr ? "MainBannerTcr" : "MainBannerReactor");
         DetailedLoadTooltip = TooltipCatalog.Get("DetailedLoadReactor");
         DetailedFlowTooltip = TooltipCatalog.Get(isTcr ? "DetailedFlowTcr" : "DetailedFlowReactor");
-        DetailedBottomRightTooltip = TooltipCatalog.Get("DetailedBottomReactor");
+        DetailedBottomRightTooltip = TooltipCatalog.Get(isTcr ? "DetailedBottomTcr" : "DetailedBottomReactor");
         CompactPrimaryTooltip = TooltipCatalog.Get(isTcr ? "CompactPrimaryTcr" : "CompactPrimaryReactor");
         CompactSecondaryTooltip = TooltipCatalog.Get(isTcr ? "CompactSecondaryTcr" : "CompactSecondaryReactor");
+        UpdateTcrTurbineHealthReadouts();
+    }
+
+    private void UpdateTcrTurbineHealthReadouts()
+    {
+        var muted = ThemeService.ResolveBrush("TextMuted", "#73839c");
+        if (_calc.SelectedUnit == 3)
+        {
+            if (_liveTurbineHealth.HasValue)
+            {
+                CompactSubLoadText = $"Turb {_liveTurbineHealth.Value:F1}%";
+                CompactSubLoadBrush = TurbineHealthBrush;
+                DetailedBottomRightText = $"Turbine Health: {_liveTurbineHealth.Value:F1}%";
+                DetailedBottomRightBrush = TurbineHealthBrush;
+            }
+            else
+            {
+                CompactSubLoadText = "Turb --%";
+                CompactSubLoadBrush = muted;
+                DetailedBottomRightText = "Turbine Health: --%";
+                DetailedBottomRightBrush = muted;
+            }
+        }
+        else
+        {
+            CompactSubLoadBrush = muted;
+            DetailedBottomRightBrush = muted;
+        }
     }
 
     private void UpdateSettingsVisuals()
@@ -2266,7 +2343,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             _ => IsSyncError ? red : muted
         };
 
-        TurbineHealthBrush = TurbineHealthValue > _settings.TurbineHealthThreshold ? green : red;
+        TurbineHealthBrush = _liveTurbineHealth.HasValue
+            ? (_liveTurbineHealth.Value > _settings.TurbineHealthThreshold ? green : red)
+            : muted;
+        UpdateTcrTurbineHealthReadouts();
         SyncStatusBrush = ThemeService.ResolveBrushForHex(_lastSyncStatusHex);
 
         if (!string.IsNullOrWhiteSpace(FeedbackStatusMessage))
