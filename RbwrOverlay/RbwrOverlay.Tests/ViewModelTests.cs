@@ -118,6 +118,8 @@ public class ViewModelTests
         Assert.EndsWith(" MWe", vm.CompactLoadText);
         Assert.StartsWith("Aux ", vm.CompactSubLoadText);
         Assert.EndsWith(" kg/s]", vm.CompactFlowText);
+        Assert.Equal("DEAERATOR INLET VALVE", vm.DetailedValveLeftLabelText);
+        Assert.Equal(vm.DeaeratorInletValveText, vm.DetailedValveLeftValueText);
 
         vm.SelectUnit("3");
         Assert.True(vm.IsTcrActive);
@@ -130,10 +132,11 @@ public class ViewModelTests
         Assert.EndsWith("% OCL", vm.MainStatusPowerText);
         Assert.Equal("GENERATOR LOAD", vm.DetailedLoadLabelText);
         Assert.EndsWith(" MWe", vm.DetailedLoadValueText);
-        Assert.Equal("Turbine Health: --%", vm.DetailedBottomRightText);
-        Assert.EndsWith("%", vm.DeaeratorInletValveText);
+        Assert.StartsWith("Aux Usage: ", vm.DetailedBottomRightText);
+        Assert.Equal("TURBINE HEALTH", vm.DetailedValveLeftLabelText);
+        Assert.Equal("--%", vm.DetailedValveLeftValueText);
+        Assert.Equal(0.0, vm.DetailedValveLeftPercent);
         Assert.EndsWith("%", vm.TurbineControlValveText);
-        Assert.InRange(vm.DeaeratorInletValvePercent, 0.0, 100.0);
         Assert.InRange(vm.TurbineControlValvePercent, 0.0, 100.0);
 
         vm.OnServerConnected(new ServerInfo
@@ -143,11 +146,15 @@ public class ViewModelTests
             Unit2 = new UnitState { Demand = 950, NextDemand = 1000, DemandTimeLeft = 120, TurbineHealth = 84.7 }
         });
         Assert.Equal("Turb 84.7%", vm.CompactSubLoadText);
-        Assert.Equal("Turbine Health: 84.7%", vm.DetailedBottomRightText);
+        Assert.Equal("TURBINE HEALTH", vm.DetailedValveLeftLabelText);
+        Assert.Equal("84.7%", vm.DetailedValveLeftValueText);
+        Assert.Equal(84.7, vm.DetailedValveLeftPercent, 1);
 
         vm.SelectUnit("1");
         Assert.StartsWith("Aux ", vm.CompactSubLoadText);
         Assert.StartsWith("Aux Usage: ", vm.DetailedBottomRightText);
+        Assert.Equal("DEAERATOR INLET VALVE", vm.DetailedValveLeftLabelText);
+        Assert.Equal(vm.DeaeratorInletValveText, vm.DetailedValveLeftValueText);
 
         vm.SelectUnit("3");
         vm.SetPresetDemand("0");
@@ -155,7 +162,7 @@ public class ViewModelTests
         Assert.StartsWith("-", vm.CompactLoadText);
         Assert.StartsWith("-", vm.MainStatusPowerText);
         Assert.Equal("Turb 84.7%", vm.CompactSubLoadText);
-        Assert.Equal("Turbine Health: 84.7%", vm.DetailedBottomRightText);
+        Assert.Equal("84.7%", vm.DetailedValveLeftValueText);
     }
 
     [Fact]

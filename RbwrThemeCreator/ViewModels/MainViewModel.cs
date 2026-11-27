@@ -21,7 +21,7 @@ public sealed class PreviewReadyEventArgs(Styles? styles, List<Bitmap> bitmaps) 
 
 public partial class MainViewModel : ObservableObject
 {
-    public const string AppVersion = "1.1.0";
+    public const string AppVersion = "1.1.1";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionBadge => $"v{AppVersion}";
     public string AppVersionText => $"RBWR Theme Creator v{AppVersion}";

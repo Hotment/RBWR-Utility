@@ -360,14 +360,14 @@
                                 Classes="hud-card metric-card"
                                 Grid.Row="2" Grid.Column="0"
                                 Padding="8,5"
-                                behaviors:TooltipBehaviors.Key="DeaeratorInletValve"
+                                behaviors:TooltipBehaviors.Item="{Binding DetailedValveLeftTooltip}"
                                 Margin="0,4,4,0">
                             <StackPanel Spacing="4" VerticalAlignment="Center">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="DEAERATOR INLET VALVE" Foreground="{DynamicResource TextMuted}" FontSize="8.5" FontWeight="Bold" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding DeaeratorInletValveText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="11.5" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0" Text="{Binding DetailedValveLeftLabelText}" Foreground="{DynamicResource TextMuted}" FontSize="8.5" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DetailedValveLeftValueText}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{Binding DetailedValveLeftBrush}" FontWeight="Bold" FontSize="11.5" VerticalAlignment="Center" />
                                 </Grid>
-                                <ProgressBar Classes="cyber-power" Height="4" Minimum="0" Maximum="100" Value="{Binding DeaeratorInletValvePercent}" Foreground="{DynamicResource NeonGreen}" />
+                                <ProgressBar Classes="cyber-power" Height="4" Minimum="0" Maximum="100" Value="{Binding DetailedValveLeftPercent}" Foreground="{Binding DetailedValveLeftBrush}" />
                             </StackPanel>
                         </Border>
 

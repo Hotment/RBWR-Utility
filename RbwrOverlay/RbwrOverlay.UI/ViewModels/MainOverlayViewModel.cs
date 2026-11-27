@@ -25,7 +25,7 @@ public enum HudTab
 
 public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 {
-    public const string AppVersion = "2.3.1";
+    public const string AppVersion = "2.3.2";
     public string GlobalAppVersion => AppVersion;
     public string AppVersionText => $"RBWR Overlay v{AppVersion}";
     public string VersionText => $"RBWR Overlay v{AppVersion}";
@@ -125,6 +125,21 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _deaeratorInletValveText = "0.0%";
+
+    [ObservableProperty]
+    private string _detailedValveLeftLabelText = "DEAERATOR INLET VALVE";
+
+    [ObservableProperty]
+    private string _detailedValveLeftValueText = "0.0%";
+
+    [ObservableProperty]
+    private double _detailedValveLeftPercent;
+
+    [ObservableProperty]
+    private IBrush _detailedValveLeftBrush = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+
+    [ObservableProperty]
+    private TooltipItem? _detailedValveLeftTooltip;
 
     [ObservableProperty]
     private double _turbineControlValvePercent;
@@ -720,6 +735,7 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
             DetailedLoadLabelText = "GENERATOR LOAD";
             DetailedLoadValueText = $"{genLoad:F2} MWe";
             DetailedFlowLabelText = "STEAM FLOW";
+            DetailedBottomRightText = $"Aux Usage: {_calc.Usage:F2} MWe";
         }
         else
         {
@@ -782,10 +798,10 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         CompactFlowText = "[---]";
         CompactLoadText = "ERROR";
         DetailedLoadValueText = "ERROR";
+        DetailedBottomRightText = "Aux Usage: ---";
         if (!isTcr)
         {
             CompactSubLoadText = "Aux ---";
-            DetailedBottomRightText = "Aux Usage: ---";
         }
         UpdateTcrTurbineHealthReadouts();
         ThermalPowerPercent = 0;
@@ -2132,7 +2148,8 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
         MainBannerTooltip = TooltipCatalog.Get(isTcr ? "MainBannerTcr" : "MainBannerReactor");
         DetailedLoadTooltip = TooltipCatalog.Get("DetailedLoadReactor");
         DetailedFlowTooltip = TooltipCatalog.Get(isTcr ? "DetailedFlowTcr" : "DetailedFlowReactor");
-        DetailedBottomRightTooltip = TooltipCatalog.Get(isTcr ? "DetailedBottomTcr" : "DetailedBottomReactor");
+        DetailedValveLeftTooltip = TooltipCatalog.Get(isTcr ? "DetailedBottomTcr" : "DeaeratorInletValve");
+        DetailedBottomRightTooltip = TooltipCatalog.Get("DetailedBottomReactor");
         CompactPrimaryTooltip = TooltipCatalog.Get(isTcr ? "CompactPrimaryTcr" : "CompactPrimaryReactor");
         CompactSecondaryTooltip = TooltipCatalog.Get(isTcr ? "CompactSecondaryTcr" : "CompactSecondaryReactor");
         UpdateTcrTurbineHealthReadouts();
@@ -2141,27 +2158,37 @@ public partial class MainOverlayViewModel : ViewModelBase, IDisposable
     private void UpdateTcrTurbineHealthReadouts()
     {
         var muted = ThemeService.ResolveBrush("TextMuted", "#73839c");
+        var green = ThemeService.ResolveBrush("NeonGreen", "#39ff14");
+        DetailedBottomRightBrush = muted;
+
         if (_calc.SelectedUnit == 3)
         {
+            DetailedValveLeftLabelText = "TURBINE HEALTH";
             if (_liveTurbineHealth.HasValue)
             {
+                double clamped = Math.Clamp(_liveTurbineHealth.Value, 0.0, 100.0);
                 CompactSubLoadText = $"Turb {_liveTurbineHealth.Value:F1}%";
                 CompactSubLoadBrush = TurbineHealthBrush;
-                DetailedBottomRightText = $"Turbine Health: {_liveTurbineHealth.Value:F1}%";
-                DetailedBottomRightBrush = TurbineHealthBrush;
+                DetailedValveLeftValueText = $"{_liveTurbineHealth.Value:F1}%";
+                DetailedValveLeftPercent = clamped;
+                DetailedValveLeftBrush = TurbineHealthBrush;
             }
             else
             {
                 CompactSubLoadText = "Turb --%";
                 CompactSubLoadBrush = muted;
-                DetailedBottomRightText = "Turbine Health: --%";
-                DetailedBottomRightBrush = muted;
+                DetailedValveLeftValueText = "--%";
+                DetailedValveLeftPercent = 0.0;
+                DetailedValveLeftBrush = muted;
             }
         }
         else
         {
             CompactSubLoadBrush = muted;
-            DetailedBottomRightBrush = muted;
+            DetailedValveLeftLabelText = "DEAERATOR INLET VALVE";
+            DetailedValveLeftValueText = DeaeratorInletValveText;
+            DetailedValveLeftPercent = DeaeratorInletValvePercent;
+            DetailedValveLeftBrush = green;
         }
     }
 
