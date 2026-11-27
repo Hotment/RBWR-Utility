@@ -50,6 +50,7 @@
                                    VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding Usage, StringFormat='{}{0:F2}'}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
                                    Foreground="{DynamicResource NeonCyan}"
                                    FontWeight="Bold"
                                    FontSize="13" />
@@ -69,6 +70,7 @@
                                    VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
                                    Foreground="{DynamicResource NeonCyan}"
                                    FontWeight="Bold" />
                     </Grid>

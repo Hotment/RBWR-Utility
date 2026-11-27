@@ -71,6 +71,7 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="{Binding DemandTimeLeftText}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
                                    Foreground="{DynamicResource NeonGold}"
                                    FontWeight="Bold"
                                    FontSize="12" />
@@ -85,6 +86,7 @@
 
                             <Button Grid.Column="1"
                                     Classes="cyber"
+                                    FontFamily="{DynamicResource AppMonoFontFamily}"
                                     Content="-1s"
                                     Command="{Binding CalibrateMinusOneCommand}"
                                     Padding="6,2"
@@ -92,6 +94,7 @@
 
                             <Button Grid.Column="2"
                                     Classes="cyber"
+                                    FontFamily="{DynamicResource AppMonoFontFamily}"
                                     Content="+1s"
                                     Command="{Binding CalibratePlusOneCommand}"
                                     Padding="6,2"

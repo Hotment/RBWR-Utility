@@ -53,7 +53,7 @@
                         <Border x:Name="PowerBanner" Classes="hud-card power-banner" Grid.Row="1"
                                 Padding="12,8" Margin="0,0,0,8">
                             <StackPanel Spacing="4">
-                                <TextBlock x:Name="MainPowerReadout" Classes="power-readout" Text="82.40% APRM"
+                                <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" x:Name="MainPowerReadout" Classes="power-readout" Text="82.40% APRM"
                                            FontWeight="Bold" FontSize="24" HorizontalAlignment="Center" />
                                 <ProgressBar x:Name="MainPowerBar" Classes="cyber-power" Value="82" Minimum="0" Maximum="120"
                                              Foreground="{DynamicResource NeonCyan}" Margin="10,2" />
@@ -66,7 +66,7 @@
                             <StackPanel Spacing="3">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Column="0" Text="DEMAND PRESET" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="950 MW" Foreground="{DynamicResource NeonCyan}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="1" Text="950 MW" Foreground="{DynamicResource NeonCyan}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
                                 </Grid>
                                 <Slider x:Name="DemandPresetSlider" Minimum="0" Maximum="1200" Value="950" Margin="0,-2" />
                                 <Grid ColumnDefinitions="300*,300*,350*,150*,100*" Margin="6,0,6,0">
@@ -85,11 +85,11 @@
                                 <StackPanel Spacing="3">
                                     <TextBlock Text="DEMAND LOAD (MWe)" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                     <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
-                                        <Button Grid.Column="0" Classes="cyber" Content="-50" FontSize="9" Padding="4,2" Margin="0,0,2,0" />
-                                        <Button Grid.Column="1" Classes="cyber" Content="-10" FontSize="9" Padding="4,2" Margin="0,0,2,0" />
+                                        <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="0" Classes="cyber" Content="-50" FontSize="9" Padding="4,2" Margin="0,0,2,0" />
+                                        <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="1" Classes="cyber" Content="-10" FontSize="9" Padding="4,2" Margin="0,0,2,0" />
                                         <TextBox x:Name="DemandTextBox" Grid.Column="2" Classes="cyber" Text="950" FontSize="12" Padding="2,0" />
-                                        <Button Grid.Column="3" Classes="cyber" Content="+10" FontSize="9" Padding="4,2" Margin="2,0,0,0" />
-                                        <Button Grid.Column="4" Classes="cyber" Content="+50" FontSize="9" Padding="4,2" Margin="2,0,0,0" />
+                                        <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="3" Classes="cyber" Content="+10" FontSize="9" Padding="4,2" Margin="2,0,0,0" />
+                                        <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="4" Classes="cyber" Content="+50" FontSize="9" Padding="4,2" Margin="2,0,0,0" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -98,20 +98,20 @@
                                     <TextBlock Text="CORE POWER (APRM%)" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
                                         <TextBox Classes="cyber" Text="98.4" Width="74" FontSize="12" Padding="2,0" />
-                                        <TextBlock Text="%" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
+                                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="%" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                             <Border x:Name="GenLoadCard" Classes="hud-card metric-card" Grid.Row="1" Grid.Column="0" Padding="8,6" Margin="0,4,4,0">
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="GENERATOR LOAD" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
-                                    <TextBlock x:Name="GenLoadValue" Text="948.37 MWe" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
+                                    <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" x:Name="GenLoadValue" Text="948.37 MWe" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="13" />
                                 </StackPanel>
                             </Border>
                             <Border x:Name="FlowCard" Classes="hud-card metric-card" Grid.Row="1" Grid.Column="1" Padding="8,6" Margin="4,4,0,0">
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="FEEDWATER FLOW" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
-                                    <TextBlock x:Name="FlowValue" Text="1842.56 kg/s" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="13" />
+                                    <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" x:Name="FlowValue" Text="1842.56 kg/s" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="13" />
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -120,10 +120,10 @@
                             <Grid ColumnDefinitions="Auto,*,Auto">
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                                     <TextBlock Text="UPCOMING DEMAND:" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="DtlText" Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                                    <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" x:Name="DtlText" Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Classes="cyber" Content="Open Tablet" HorizontalAlignment="Center" Padding="8,1" FontSize="9" />
-                                <TextBlock Grid.Column="2" Text="Aux Usage: 26.44 MWe" Foreground="{DynamicResource TextMuted}" FontSize="9" VerticalAlignment="Center" />
+                                <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="2" Text="Aux Usage: 26.44 MWe" Foreground="{DynamicResource TextMuted}" FontSize="9" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
                     </Grid>
@@ -186,15 +186,15 @@
                         <StackPanel Spacing="2">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="UI Scale (Full HUD):" VerticalAlignment="Center" FontSize="11" />
-                                <TextBlock Grid.Column="1" Text="125%" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" />
+                                <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="1" Text="125%" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" />
                             </Grid>
                             <Slider x:Name="UiScaleSlider" Minimum="0.75" Maximum="2" Value="1.25" Margin="0,-2" />
                             <Grid ColumnDefinitions="*,*,*,*,*" Margin="0,0,0,4">
-                                <Button Grid.Column="0" Classes="cyber-preset" Content="75%" Margin="0,0,2,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                                <Button Grid.Column="1" Classes="cyber-preset" Content="100%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                                <Button Grid.Column="2" Classes="cyber-preset active" Content="125%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                                <Button Grid.Column="3" Classes="cyber-preset" Content="150%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                                <Button Grid.Column="4" Classes="cyber-preset" Content="200%" Margin="2,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="0" Classes="cyber-preset" Content="75%" Margin="0,0,2,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="1" Classes="cyber-preset" Content="100%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="2" Classes="cyber-preset active" Content="125%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="3" Classes="cyber-preset" Content="150%" Margin="1,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                                <Button FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="4" Classes="cyber-preset" Content="200%" Margin="2,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -214,7 +214,7 @@
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Text="DEMAND TIME LEFT (DTL)" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
-                                <TextBlock Grid.Column="1" Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
+                                <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Grid.Column="1" Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
                             </Grid>
                             <ProgressBar Classes="cyber-power" Value="64" Foreground="{DynamicResource NeonGold}" />
                             <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
@@ -253,15 +253,15 @@
                     </StackPanel>
                     <TextBox x:Name="CompactDemandInput" Grid.Column="2" Classes="cyber" Text="950" Width="42" FontSize="11" Padding="2,0" Margin="0,0,6,0" />
                     <StackPanel x:Name="CompactPrimaryPanel" Grid.Column="3" VerticalAlignment="Center" Margin="2,0,6,0">
-                        <TextBlock Text="98.4% APRM" Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" />
-                        <TextBlock Text="[1843 kg/s]" Foreground="{DynamicResource TextMuted}" FontSize="8" HorizontalAlignment="Center" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="98.4% APRM" Foreground="{DynamicResource NeonGreen}" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="[1843 kg/s]" Foreground="{DynamicResource TextMuted}" FontSize="8" HorizontalAlignment="Center" />
                     </StackPanel>
                     <StackPanel x:Name="CompactSecondaryPanel" Grid.Column="4" VerticalAlignment="Center" Margin="2,0,6,0">
-                        <TextBlock Text="948.37 MWe" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" />
-                        <TextBlock Text="Aux 26.44 MWe" Foreground="{DynamicResource TextMuted}" FontSize="8" HorizontalAlignment="Center" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="948.37 MWe" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="10" HorizontalAlignment="Center" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="Aux 26.44 MWe" Foreground="{DynamicResource TextMuted}" FontSize="8" HorizontalAlignment="Center" />
                     </StackPanel>
                     <Button x:Name="CompactCounterButton" Grid.Column="5" Classes="cyber" FontSize="10" Padding="6,2" Margin="0,0,6,0">
-                        <TextBlock Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="02:41" Foreground="{DynamicResource NeonGold}" FontWeight="Bold" FontSize="10" />
                     </Button>
                     <StackPanel x:Name="CompactWindowControls" Grid.Column="6" Orientation="Horizontal" Spacing="3">
                         <Button Classes="cyber-header-btn" Content="□" FontSize="11" Padding="5,2" />
@@ -292,7 +292,7 @@
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock Text="OPERATOR TABLET" Foreground="{DynamicResource NeonCyan}" FontWeight="Bold" FontSize="11" LetterSpacing="1" />
                             <Border Classes="status-pill" Padding="6,1">
-                                <TextBlock Text="SYNCED · d638-4385" Foreground="{DynamicResource NeonGreen}" FontSize="9" FontWeight="Bold" />
+                                <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="SYNCED · d638-4385" Foreground="{DynamicResource NeonGreen}" FontSize="9" FontWeight="Bold" />
                             </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
@@ -318,7 +318,7 @@
                 <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="10,8,10,0">
                     <TextBox Grid.Column="0" Classes="cyber-search" Text="" PlaceholderText="Filter parameters..." />
                     <Border Grid.Column="1" Classes="status-pill" Padding="8,4" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="DTL: 02:41" Foreground="{DynamicResource NeonGold}" FontSize="9.5" FontWeight="Bold" />
+                        <TextBlock FontFamily="{DynamicResource AppMonoFontFamily}" Text="DTL: 02:41" Foreground="{DynamicResource NeonGold}" FontSize="9.5" FontWeight="Bold" />
                     </Border>
                 </Grid>
 
