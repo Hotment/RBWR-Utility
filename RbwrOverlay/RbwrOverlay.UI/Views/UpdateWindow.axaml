@@ -85,6 +85,7 @@
                                            FontWeight="Bold"
                                            LetterSpacing="0.7" />
                                 <TextBlock Text="{Binding CurrentVersion, StringFormat='v{0}'}"
+                                           FontFamily="{DynamicResource AppMonoFontFamily}"
                                            Foreground="{DynamicResource TextMuted}"
                                            FontWeight="Bold"
                                            FontSize="16" />
@@ -116,6 +117,7 @@
                                                LetterSpacing="0.7"
                                                HorizontalAlignment="Right" />
                                     <TextBlock Text="{Binding LatestVersion, StringFormat='v{0}'}"
+                                               FontFamily="{DynamicResource AppMonoFontFamily}"
                                                Foreground="{DynamicResource TextLight}"
                                                FontWeight="Bold"
                                                FontSize="19"
@@ -136,6 +138,7 @@
                                        LetterSpacing="0.8" />
                             <TextBlock Grid.Column="1"
                                        Text="{Binding LatestVersion, StringFormat='CHANGELOG • v{0}'}"
+                                       FontFamily="{DynamicResource AppMonoFontFamily}"
                                        Foreground="{DynamicResource TextMuted}"
                                        FontSize="8.5" />
                         </Grid>
@@ -168,6 +171,7 @@
                                            TextWrapping="Wrap" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                           FontFamily="{DynamicResource AppMonoFontFamily}"
                                            Foreground="{DynamicResource TextLight}"
                                            FontSize="9.5"
                                            FontWeight="Bold"

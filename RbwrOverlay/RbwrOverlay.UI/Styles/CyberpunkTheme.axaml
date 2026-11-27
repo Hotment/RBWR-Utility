@@ -325,7 +325,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppMonoFontFamily}" />
         <Setter Property="FontSize" Value="8" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="2,1" />

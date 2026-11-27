@@ -217,6 +217,7 @@
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding DemandSliderText}"
+                                           FontFamily="{DynamicResource AppMonoFontFamily}"
                                            Foreground="{DynamicResource NeonCyan}"
                                            FontSize="10"
                                            FontWeight="Bold"
@@ -326,7 +327,7 @@
                                 <TextBlock Text="{Binding UnitSuffix, StringFormat='CORE POWER ({0}%)'}" Foreground="{DynamicResource TextMuted}" FontSize="9" FontWeight="Bold" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" VerticalAlignment="Center">
                                     <TextBox Classes="cyber" Text="{Binding RtpInput}" behaviors:TooltipBehaviors.Key="RtpInput" Width="74" FontSize="12" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
-                                    <TextBlock Text="%" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
+                                    <TextBlock Text="%" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" FontWeight="Bold" FontSize="11" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -638,6 +639,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="x:Int32">
                                             <Button Classes="cyber"
+                                                    FontFamily="{DynamicResource AppMonoFontFamily}"
                                                     Content="{Binding StringFormat='{}{0}s  X'}"
                                                     Command="{Binding $parent[UserControl].((vm:MainOverlayViewModel)DataContext).RemoveDemandNotifyTimeCommand}"
                                                     CommandParameter="{Binding}"
@@ -675,7 +677,7 @@
                         </Border>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,2,0,4">
-                            <TextBlock Text="{Binding GlobalAppVersion, StringFormat='RBWR Overlay v{0}'}" Foreground="{DynamicResource TextMuted}" FontSize="9" />
+                            <TextBlock Text="{Binding GlobalAppVersion, StringFormat='RBWR Overlay v{0}'}" FontFamily="{DynamicResource AppMonoFontFamily}" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                             <TextBlock Text="•" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                             <TextBlock Text="MIT License" Foreground="{DynamicResource TextMuted}" FontSize="9" />
                         </StackPanel>
