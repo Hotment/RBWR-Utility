@@ -938,6 +938,65 @@
 
                             <Border Classes="card">
                                 <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="MCP SERVER" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Classes="pill" Classes.ready="{Binding Mcp.ServerRunning}" Classes.muted-pill="{Binding !Mcp.ServerRunning}">
+                                            <TextBlock Text="{Binding Mcp.StatusBadgeText}" FontSize="9" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Mcp.ServerStatusText}" />
+                                    <TextBlock Classes="faint" TextWrapping="Wrap" Text="{Binding Mcp.CapabilitiesSummary}" />
+
+                                    <CheckBox Content="Enable built-in MCP server (localhost only)" IsChecked="{Binding Mcp.ServerEnabled}" FontSize="12" />
+
+                                    <Grid ColumnDefinitions="Auto,96,Auto,Auto,*" Margin="0,2,0,0">
+                                        <TextBlock Classes="muted" Text="Port" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <TextBox Grid.Column="1" Classes="hud num-input" Text="{Binding Mcp.PortInput}" PlaceholderText="3917">
+                                            <TextBox.KeyBindings>
+                                                <KeyBinding Gesture="Enter" Command="{Binding Mcp.ApplyPortCommand}" />
+                                            </TextBox.KeyBindings>
+                                        </TextBox>
+                                        <Button Grid.Column="2" Classes="hud-blue" Content="APPLY PORT" Command="{Binding Mcp.ApplyPortCommand}" Margin="6,0,0,0" />
+                                        <Button Grid.Column="3" Classes="hud" Content="COPY URL" Command="{Binding Mcp.CopyUrlCommand}" Margin="6,0,0,0" />
+                                        <TextBlock Grid.Column="4" Classes="faint" Text="{Binding Mcp.ServerUrl}" VerticalAlignment="Center" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" Margin="8,0,0,0" />
+                                    </Grid>
+
+                                    <Border Classes="divider" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CLAUDE CODE" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Mcp.CopySnippetCommand}" CommandParameter="claude" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Mcp.ClaudeCodeSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="VS CODE / COPILOT (.vscode/mcp.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Mcp.CopySnippetCommand}" CommandParameter="vscode" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Mcp.VsCodeSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CURSOR / WINDSURF / ANTIGRAVITY (mcp.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Mcp.CopySnippetCommand}" CommandParameter="cursor" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Mcp.CursorSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CODEX (config.toml)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Mcp.CopySnippetCommand}" CommandParameter="codex" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Mcp.CodexSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CLAUDE DESKTOP (claude_desktop_config.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Mcp.CopySnippetCommand}" CommandParameter="desktop" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Mcp.ClaudeDesktopSnippet, Mode=OneWay}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="UPDATES" />
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Classes="muted" Text="{Binding UpdateStatusText}" VerticalAlignment="Center" TextWrapping="Wrap" />

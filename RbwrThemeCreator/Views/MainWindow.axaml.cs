@@ -45,6 +45,7 @@ public partial class MainWindow : Window, IDialogHost
         Closing += OnClosing;
         Closed += (_, _) =>
         {
+            _vm?.Mcp.Shutdown();
             foreach (var b in _activeBitmaps)
             {
                 try { b.Dispose(); } catch { }
@@ -124,6 +125,7 @@ public partial class MainWindow : Window, IDialogHost
         vm.RequestWarningToast += (title, message) => ShowToast(title, message, warning: true);
         vm.Shortcuts.Changed += (_, _) => UpdateShortcutHints();
         UpdateShortcutHints();
+        _ = vm.Mcp; // Initialize MCP server (auto-starts if enabled in Settings)
         ApplyBackdrop(vm.PreviewBackdrop);
         Preview.SetMode(vm.PreviewMode);
         vm.Refresh();
@@ -360,25 +362,27 @@ public partial class MainWindow : Window, IDialogHost
 
     private void ApplyBackdrop(int index)
     {
-        Backdrop.Background = index switch
-        {
-            1 => new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops =
-                {
-                    new GradientStop(Color.Parse("#5d7f9e"), 0),
-                    new GradientStop(Color.Parse("#a9b8a0"), 0.45),
-                    new GradientStop(Color.Parse("#6b6b5a"), 0.7),
-                    new GradientStop(Color.Parse("#2d3330"), 1),
-                },
-            },
-            2 => new SolidColorBrush(Color.Parse("#e9ecf1")),
-            3 => CreateCheckerBrush(),
-            _ => new SolidColorBrush(Color.Parse("#0b0e14")),
-        };
+        Backdrop.Background = CreateBackdropBrush(index);
     }
+
+    private static IBrush CreateBackdropBrush(int index) => index switch
+    {
+        1 => new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+            EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+            GradientStops =
+            {
+                new GradientStop(Color.Parse("#5d7f9e"), 0),
+                new GradientStop(Color.Parse("#a9b8a0"), 0.45),
+                new GradientStop(Color.Parse("#6b6b5a"), 0.7),
+                new GradientStop(Color.Parse("#2d3330"), 1),
+            },
+        },
+        2 => new SolidColorBrush(Color.Parse("#e9ecf1")),
+        3 => CreateCheckerBrush(),
+        _ => new SolidColorBrush(Color.Parse("#0b0e14")),
+    };
 
     private static IBrush CreateCheckerBrush()
     {
@@ -568,6 +572,18 @@ public partial class MainWindow : Window, IDialogHost
     /// screen (see MainWindow.Thumbnails.cs), so the live preview is never switched or redrawn.
     /// </summary>
     public byte[]? RenderThumbnailPng() => _vm == null ? null : RenderThemeThumbnail(_vm.BuildState());
+
+    public void HighlightPreviewTokens(IReadOnlyList<string> tokenKeys)
+    {
+        var names = new List<string>();
+        foreach (string key in tokenKeys)
+        {
+            if (TokenLocations.TryGet(key, out _, out var elementNames))
+                names.AddRange(elementNames);
+        }
+        if (names.Count > 0)
+            Preview.Highlight(names.Distinct(StringComparer.Ordinal));
+    }
 
     // ===================== FIND COLOUR (click an element in the preview) =====================
 

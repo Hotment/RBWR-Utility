@@ -45,6 +45,13 @@ public sealed class CreatorSettings
     /// <summary>Changed keyboard shortcuts: action id -> gesture ("" = none). Missing = default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = new();
 
+    // ---------- Built-in MCP Server ----------
+    /// <summary>Whether the localhost MCP server is enabled (off by default).</summary>
+    public bool McpServerEnabled { get; set; }
+
+    /// <summary>Localhost TCP port for the built-in MCP server.</summary>
+    public int McpServerPort { get; set; } = 3917;
+
     /// <summary>Folder that holds settings.json (SETTINGS → Open settings folder).</summary>
     public static string FolderPath => Path.GetDirectoryName(SettingsPath)!;
 

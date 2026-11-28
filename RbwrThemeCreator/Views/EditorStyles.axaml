@@ -351,6 +351,14 @@
         <Setter Property="Padding" Value="7,1" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <Style Selector="Border.pill.ready">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Border.pill.muted-pill">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdFaint}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdMuted}" />
+    </Style>
     <Style Selector="Button.pill-btn">
         <Setter Property="Background" Value="{DynamicResource EdPanel}" />
         <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />

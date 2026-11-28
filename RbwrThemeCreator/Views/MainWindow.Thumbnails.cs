@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -22,47 +23,79 @@ public partial class MainWindow
     private int _toastVersion;
 
     /// <summary>preview.png bytes for <paramref name="state"/> (MONITOR view, overlay window only), or null.</summary>
-    private byte[]? RenderThemeThumbnail(ThemeState state)
+    private byte[]? RenderThemeThumbnail(ThemeState state) =>
+        RenderPreviewPng(state, OverlayPreview.ModeMonitor, ThumbnailScale, backdrop: null)?.PngBytes;
+
+    /// <summary>
+    /// Renders any preview mode (0=MONITOR, 1=CONFIG, 2=COMPACT, 3=TABLET, 4=ALL) off-screen
+    /// using the theme's own styles without disturbing the live preview viewport.
+    /// </summary>
+    public PreviewRenderResult? RenderPreviewPng(ThemeState state, int mode, double scale = 1.5, int? backdrop = null)
     {
         List<Bitmap>? bitmaps = null;
         var host = new Border();
+        var zoomHost = new LayoutTransformControl();
+        double safeScale = Math.Clamp(double.IsFinite(scale) ? scale : 1.5, 0.5, 2.5);
+        int safeMode = Math.Clamp(mode, OverlayPreview.ModeMonitor, OverlayPreview.ModeAll);
+        bool hasBackdrop = backdrop is >= 0 and <= 3;
+
         try
         {
             string xaml = ThemeXamlGenerator.Generate(state);
             (Styles styles, bitmaps) = ThemeValidator.Load(xaml, rel => ResolveStateFile(state, rel));
 
             var preview = new OverlayPreview();
-            preview.SetMode(OverlayPreview.ModeMonitor);
+            preview.SetMode(safeMode);
+            if (!hasBackdrop && preview.FindControl<Grid>("PreviewRoot") is { } previewRoot)
+                previewRoot.Margin = new Thickness(0);
+
             host.Child = preview;
+            if (hasBackdrop)
+            {
+                host.Background = CreateBackdropBrush(backdrop!.Value);
+                host.Padding = new Thickness(18);
+            }
+
             // Same stack as the live preview: overlay base styles, then the theme on top.
             if (_baseStyles != null)
                 host.Styles.Add(BuiltInThemes.LoadPreviewBaseStyles());
             host.Styles.Add(styles);
             preview.ApplyAprmBoxOverride(styles);
 
-            ThumbRenderHost.Children.Add(host);
+            // Scale via LayoutTransformControl and render at 96 DPI: passing a non-96 DPI to
+            // RenderTargetBitmap causes Avalonia 11 to double-scale BoxShadow child layers when
+            // ShellGlow is enabled.
+            zoomHost.LayoutTransform = Math.Abs(safeScale - 1.0) > 0.001
+                ? new ScaleTransform(safeScale, safeScale)
+                : null;
+            zoomHost.Child = host;
+
+            ThumbRenderHost.Children.Add(zoomHost);
             UpdateLayout();
 
-            Control target = preview.FindControl<Control>("DetailedShell") is { Bounds.Width: >= 1 } shell ? shell : host;
-            var size = target.Bounds.Size;
+            var size = zoomHost.Bounds.Size;
+            if (size.Width < 1 || size.Height < 1)
+                size = zoomHost.DesiredSize;
             if (size.Width < 1 || size.Height < 1)
                 return null;
 
-            using var rtb = new RenderTargetBitmap(
-                new PixelSize((int)Math.Ceiling(size.Width * ThumbnailScale), (int)Math.Ceiling(size.Height * ThumbnailScale)),
-                new Vector(96 * ThumbnailScale, 96 * ThumbnailScale));
-            rtb.Render(target);
+            int pxW = Math.Max(1, (int)Math.Ceiling(size.Width));
+            int pxH = Math.Max(1, (int)Math.Ceiling(size.Height));
+
+            using var rtb = new RenderTargetBitmap(new PixelSize(pxW, pxH), new Vector(96, 96));
+            rtb.Render(zoomHost);
             using var ms = new MemoryStream();
             rtb.Save(ms, new PngBitmapEncoderOptions());
-            return ms.ToArray();
+            return new PreviewRenderResult(ms.ToArray(), pxW, pxH);
         }
         catch
         {
-            return null; // e.g. a theme the creator cannot preview: it simply gets no thumbnail
+            return null;
         }
         finally
         {
-            ThumbRenderHost.Children.Remove(host);
+            ThumbRenderHost.Children.Remove(zoomHost);
+            zoomHost.Child = null;
             host.Child = null;
             if (bitmaps != null)
             {
