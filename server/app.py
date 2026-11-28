@@ -5864,6 +5864,7 @@ def proxy_api_request(subpath: str = ""):
     )
 
 start_console_handler()
+core.start_auto_mem_gc_worker(before_gc=prune_login_attempts, log_label="WebServer")
 
 if __name__ == "__main__":
     import sys

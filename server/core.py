@@ -657,26 +657,125 @@ def get_process_rss_mb(pid: Optional[int] = None) -> Optional[float]:
             return None
     return None
 
+_trim_memory_lock = threading.Lock()
+_auto_mem_gc_lock = threading.Lock()
+_auto_mem_gc_started = False
+_auto_mem_gc_thread: Optional[threading.Thread] = None
+
 def trim_process_memory(run_gc: bool = True) -> dict[str, Any]:
     """Run Python GC and ask the OS allocator to release unused heap pages."""
-    rss_before = get_process_rss_mb()
-    collected = gc.collect() if run_gc else 0
-    trimmed = False
-    if sys.platform.startswith("linux"):
+    with _trim_memory_lock:
+        rss_before = get_process_rss_mb()
+        collected = gc.collect() if run_gc else 0
+        trimmed = False
+        if sys.platform.startswith("linux"):
+            try:
+                libc = ctypes.CDLL("libc.so.6")
+                trimmed = bool(libc.malloc_trim(0))
+            except Exception:
+                trimmed = False
+        rss_after = get_process_rss_mb()
+        freed = round(rss_before - rss_after, 2) if (rss_before is not None and rss_after is not None) else None
+        return {
+            "rss_before_mb": rss_before,
+            "rss_after_mb": rss_after,
+            "freed_mb": freed,
+            "gc_collected": collected,
+            "malloc_trimmed": trimmed,
+        }
+
+def start_auto_mem_gc_worker(
+    *,
+    interval_seconds: Optional[float] = None,
+    check_interval_seconds: float = 60.0,
+    rss_threshold_mb: Optional[float] = None,
+    before_gc: Optional[Any] = None,
+    log_label: str = "WebServer",
+) -> Optional[threading.Thread]:
+    global _auto_mem_gc_started, _auto_mem_gc_thread
+    with _auto_mem_gc_lock:
+        if _auto_mem_gc_started:
+            return _auto_mem_gc_thread
+        if os.environ.get("DISABLE_AUTO_MEM_GC") == "1" or "unittest" in sys.modules:
+            return None
+        is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
+        if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+            return None
+
         try:
-            libc = ctypes.CDLL("libc.so.6")
-            trimmed = bool(libc.malloc_trim(0))
-        except Exception:
-            trimmed = False
-    rss_after = get_process_rss_mb()
-    freed = round(rss_before - rss_after, 2) if (rss_before is not None and rss_after is not None) else None
-    return {
-        "rss_before_mb": rss_before,
-        "rss_after_mb": rss_after,
-        "freed_mb": freed,
-        "gc_collected": collected,
-        "malloc_trimmed": trimmed,
-    }
+            env_interval = float(os.environ.get("AUTO_MEM_GC_INTERVAL_SECONDS", "300"))
+        except ValueError:
+            env_interval = 300.0
+        eff_interval = max(60.0, float(interval_seconds if interval_seconds is not None else env_interval))
+
+        try:
+            env_threshold = float(os.environ.get("AUTO_MEM_GC_RSS_THRESHOLD_MB", "2560"))
+        except ValueError:
+            env_threshold = 2560.0
+        eff_threshold = float(rss_threshold_mb if rss_threshold_mb is not None else env_threshold)
+
+        try:
+            min_log_freed = float(os.environ.get("AUTO_MEM_GC_MIN_LOG_FREED_MB", "25"))
+        except ValueError:
+            min_log_freed = 25.0
+
+        eff_check = max(15.0, min(float(check_interval_seconds), eff_interval))
+
+        def _worker():
+            last_run = time.monotonic()
+            while True:
+                time.sleep(eff_check)
+                try:
+                    mono_now = time.monotonic()
+                    elapsed = mono_now - last_run
+                    rss_now = get_process_rss_mb() if eff_threshold > 0 else None
+                    threshold_hit = bool(
+                        eff_threshold > 0
+                        and rss_now is not None
+                        and rss_now >= eff_threshold
+                        and elapsed >= 60.0
+                    )
+                    if elapsed < eff_interval and not threshold_hit:
+                        continue
+
+                    last_run = mono_now
+                    evicted = evict_stale_caches()
+                    extra_note = ""
+                    if callable(before_gc):
+                        try:
+                            before_res = before_gc()
+                            if before_res:
+                                extra_note = f" | pruned={before_res}"
+                        except Exception as cb_err:
+                            logger.debug(f"[Auto MEM_GC:{log_label}] before_gc error: {cb_err}")
+
+                    res = trim_process_memory(run_gc=True)
+                    freed = res.get("freed_mb")
+                    if threshold_hit or (freed is not None and freed >= min_log_freed) or evicted["archives"] or evicted["files"]:
+                        reason = f"rss>={eff_threshold:.0f}MiB" if threshold_hit else f"periodic({int(eff_interval)}s)"
+                        before_s = f"{res['rss_before_mb']:.2f}" if res["rss_before_mb"] is not None else "?"
+                        after_s = f"{res['rss_after_mb']:.2f}" if res["rss_after_mb"] is not None else "?"
+                        freed_s = f"{freed:+.2f} MiB" if freed is not None else "n/a"
+                        logger.info(
+                            f"[Auto MEM_GC:{log_label}] ({reason}) collected={res['gc_collected']} objs | "
+                            f"evicted={evicted}{extra_note} | malloc_trim={res['malloc_trimmed']} | "
+                            f"RSS: {before_s} -> {after_s} MiB (delta {freed_s})"
+                        )
+                except Exception as exc:
+                    logger.warning(f"[Auto MEM_GC:{log_label}] Sweep error: {exc}")
+
+        _auto_mem_gc_started = True
+        _auto_mem_gc_thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"AutoMemGCThread-{log_label}",
+        )
+        _auto_mem_gc_thread.start()
+        logger.info(
+            f"[Auto MEM_GC:{log_label}] Started periodic memory GC worker "
+            f"(interval={int(eff_interval)}s, rss_threshold={eff_threshold:.0f} MiB)."
+        )
+        return _auto_mem_gc_thread
 
 def evict_stale_caches(max_idle_seconds: float = COLD_CACHE_IDLE_SECONDS) -> dict[str, int]:
     """Evict idle decompressed archives and large cold files from in-memory caches."""

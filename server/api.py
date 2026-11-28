@@ -34,6 +34,8 @@ logger = logging.getLogger("rbwr.api")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s | %(levelname)s | %(name)s]: %(message)s")
 
+core.start_auto_mem_gc_worker(log_label="REST API")
+
 RATE_LIMIT_PER_MINUTE = int(os.environ.get("API_RATE_LIMIT_PER_MINUTE", "400"))
 RATE_LIMIT_PER_SECOND = int(os.environ.get("API_RATE_LIMIT_PER_SECOND", "10"))
 
