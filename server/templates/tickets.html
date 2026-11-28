@@ -117,9 +117,9 @@
     <div id="url-error-banner"
         class="hidden p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="grid {% if is_admin %}grid-cols-2 sm:grid-cols-3 lg:grid-cols-6{% else %}grid-cols-2 sm:grid-cols-3 lg:grid-cols-5{% endif %} gap-3">
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-gray-500 whitespace-nowrap">Total
+            <span class="text-[10px] font-mono uppercase tracking-wider text-gray-500 whitespace-nowrap">Active
                 Tickets</span>
             <span id="stat-total" class="text-xl font-bold font-display text-white">0</span>
         </div>
@@ -134,17 +134,21 @@
             <span id="stat-bugs" class="text-xl font-bold font-display text-rose-400">0</span>
         </div>
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80 whitespace-nowrap">Pending</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-500/80 whitespace-nowrap">Open / Pending</span>
             <span id="stat-pending" class="text-xl font-bold font-display text-amber-400">0</span>
         </div>
         <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">Considering</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">In Progress</span>
             <span id="stat-considering" class="text-xl font-bold font-display text-indigo-400">0</span>
         </div>
-        <div class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-500/80 whitespace-nowrap">Implemented</span>
-            <span id="stat-accepted" class="text-xl font-bold font-display text-emerald-400">0</span>
-        </div>
+        {% if is_admin %}
+        <button type="button" onclick="switchTypeTab('archive')"
+            class="premium-glass p-3 rounded-xl flex flex-col gap-0.5 border border-white/5 hover:border-slate-400/30 transition text-left"
+            title="Open the Admin Ticket Archive">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 whitespace-nowrap">Archived</span>
+            <span id="stat-archived" class="text-xl font-bold font-display text-slate-300">0</span>
+        </button>
+        {% endif %}
     </div>
 
     <div
@@ -164,7 +168,7 @@
             </button>
             <button onclick="switchTypeTab('all')" id="tab-type-all"
                 class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
-                <span>All Tickets</span>
+                <span>All Active</span>
                 <span id="badge-count-all"
                     class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/10 text-gray-300 font-mono">0</span>
             </button>
@@ -176,6 +180,14 @@
                     class="px-1.5 py-0.2 rounded-full text-[10px] bg-[#5865F2]/20 text-[#5865F2] font-mono">0</span>
             </button>
             {% endif %}
+            {% if is_admin %}
+            <button onclick="switchTypeTab('archive')" id="tab-type-archive"
+                class="px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">
+                <span>Archive</span>
+                <span id="badge-count-archive"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/10 text-gray-300 font-mono">0</span>
+            </button>
+            {% endif %}
         </div>
 
         <div class="text-xs font-mono text-gray-500 flex items-center gap-2 shrink-0">
@@ -183,26 +195,38 @@
         </div>
     </div>
 
-    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-            <div class="premium-glass p-1 rounded-xl flex flex-wrap items-center gap-1 max-w-full text-xs font-medium border border-white/5">
-                <button onclick="filterStatus('all')" id="tab-status-all"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase bg-white/10 text-white whitespace-nowrap">All Status</button>
-                <button onclick="filterStatus('pending')" id="tab-status-pending"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Pending</button>
-                <button onclick="filterStatus('considering')" id="tab-status-considering"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Considering</button>
-                <button onclick="filterStatus('planned')" id="tab-status-planned"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Planned</button>
-                <button onclick="filterStatus('accepted')" id="tab-status-accepted"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Accepted</button>
-                <button onclick="filterStatus('declined')" id="tab-status-declined"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Declined</button>
-                <button onclick="filterStatus('invalid')" id="tab-status-invalid"
-                    class="px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap">Invalid</button>
+    {% if is_admin %}
+    <div id="archive-info-banner"
+        class="hidden p-3.5 rounded-xl bg-slate-800/40 border border-slate-600/30 text-slate-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 font-mono">
+        <span>Browsing the <strong class="text-white">Admin Ticket Archive</strong> — closed and completed tickets hidden from public visitors.</span>
+        <button type="button" onclick="switchTypeTab('all')"
+            class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 rounded-lg font-medium transition shrink-0 text-xs whitespace-nowrap">
+            &larr; Back to Active Tickets
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+            <div class="relative min-w-[150px] flex-1 sm:flex-none">
+                <select id="status-select" onchange="handleStatusChange()"
+                    class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="considering">Considering</option>
+                    <option value="planned">Planned</option>
+                    <option value="accepted">Implemented</option>
+                    <option value="declined">Declined</option>
+                    <option value="invalid">Invalid</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                    </svg>
+                </div>
             </div>
 
-            <div class="relative min-w-[140px] flex-1 sm:flex-none">
+            <div class="relative min-w-[150px] flex-1 sm:flex-none">
                 <select id="category-select" onchange="handleCategoryChange()"
                     class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="all">All Categories</option>
@@ -236,6 +260,7 @@
                 <select id="sort-select" onchange="handleSortChange()"
                     class="premium-input appearance-none -webkit-appearance-none pl-3 pr-8 py-1.5 rounded-xl text-xs font-mono outline-none cursor-pointer w-full text-gray-200 border border-white/10 hover:border-white/20 transition-all bg-[#121217]">
                     <option value="desc">Newest First</option>
+                    <option value="votes">Most Voted</option>
                     <option value="asc">Oldest First</option>
                     <option value="replies">Most Replies</option>
                 </select>
@@ -245,10 +270,16 @@
                     </svg>
                 </div>
             </div>
+
+            <button type="button" id="group-toggle-btn" onclick="toggleGroupedView()"
+                class="px-3 py-1.5 rounded-xl text-xs font-mono bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 transition whitespace-nowrap"
+                title="Toggle grouping tickets into status sections">
+                Grouped View
+            </button>
         </div>
     </div>
 
-    <div id="tickets-feed" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    <div id="tickets-feed" class="flex flex-col gap-6"></div>
 
     <div id="empty-state"
         class="hidden text-center py-16 flex flex-col items-center gap-3 border border-white/5 rounded-2xl bg-surface/50">
@@ -257,6 +288,10 @@
                 d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"></path>
         </svg>
         <p class="text-sm text-gray-400 font-mono">No tickets found matching the current filters.</p>
+        <button type="button" onclick="resetTicketFilters()"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-mono bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition">
+            Reset Filters
+        </button>
     </div>
 
     <div id="submit-section" class="mt-4 border-t border-white/5 pt-6 flex flex-col gap-4">
@@ -267,6 +302,14 @@
 
         <div class="premium-glass p-4 sm:p-5 md:p-6 rounded-2xl border border-white/5">
             <form id="public-ticket-form" class="flex flex-col gap-4">
+                <div id="draft-restored-banner"
+                    class="hidden p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span id="draft-restored-text">Your saved ticket draft has been restored.</span>
+                    <button type="button" onclick="clearTicketDraft(true)"
+                        class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 text-[11px] transition shrink-0">
+                        Clear Draft
+                    </button>
+                </div>
                 {% if discord_user %}
                 <div
                     class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-lg shadow-[#5865F2]/5">
@@ -334,7 +377,8 @@
                         </div>
                     </div>
 
-                    <a href="/auth/discord/login?next=/tickets"
+                    <a href="/auth/discord/login?next=%2Ftickets%3Frestore_draft%3D1%23submit-section"
+                        onclick="saveTicketDraftBeforeLogin()"
                         class="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/25 text-xs tracking-wide shrink-0 whitespace-nowrap">
                         <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg">
@@ -427,7 +471,7 @@
                     <label for="submit-title" class="text-xs font-medium text-gray-400">
                         Ticket Title / Short Summary <span class="text-gray-500 font-mono">(Optional)</span>
                     </label>
-                    <input type="text" id="submit-title" oninput="updateSimilarTickets()"
+                    <input type="text" id="submit-title" oninput="scheduleSimilarTickets()"
                         placeholder="e.g. Add dark mode graph toggle or APRM reading mismatch on unit 2"
                         class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none">
                     <div id="similar-tickets-box"
@@ -463,9 +507,21 @@
                         class="text-xs font-medium text-gray-400 group-focus-within:text-blue-400 transition-colors">
                         Ticket Details
                     </label>
-                    <textarea id="submit-description" required rows="4"
+                    <textarea id="submit-description" required rows="4" oninput="scheduleSimilarTickets()"
                         placeholder="Describe your suggestion or feature idea..."
                         class="premium-input px-3.5 py-2.5 rounded-xl text-xs font-mono resize-none"></textarea>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label for="submit-media-urls" class="text-xs font-medium text-gray-400">
+                        Screenshot / Media URLs <span class="text-gray-500 font-mono">(Optional, up to 5 links — one per line)</span>
+                    </label>
+                    <textarea id="submit-media-urls" rows="2"
+                        placeholder="https://cdn.discordapp.com/attachments/... or https://i.imgur.com/..."
+                        class="premium-input px-3.5 py-2 rounded-xl text-xs font-mono resize-y"></textarea>
+                    <p class="text-[11px] text-gray-500 font-mono">
+                        Images are embedded directly from external URLs (no files uploaded to our server). Discord attachment links are refreshed automatically if they expire.
+                    </p>
                 </div>
 
                 {% if turnstile_enabled and not is_authenticated_user %}
@@ -483,6 +539,40 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="discord-login-prompt-modal"
+        class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="premium-glass max-w-md w-full rounded-2xl border border-[#5865F2]/40 p-6 flex flex-col gap-4 shadow-2xl">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex flex-col gap-1">
+                    <span class="text-[10px] font-mono uppercase tracking-wider text-[#9aa3ff] font-bold">Optional Account Link</span>
+                    <h3 class="text-lg font-display font-semibold text-white">Get Live Updates on Your Ticket</h3>
+                </div>
+                <button type="button" onclick="closeLoginPromptModal()"
+                    class="text-gray-400 hover:text-white text-xs font-mono px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5 transition">Close</button>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                You are not signed in with Discord. Signing in lets you receive <strong class="text-white">Discord DM status alerts</strong>,
+                chat directly with the developer, and export ticket transcripts — and you can still hide your username publicly using the Anonymous option.
+            </p>
+            <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-mono text-emerald-300">
+                Your form draft will be saved automatically in your browser and restored right after you sign in.
+            </div>
+            <div class="flex flex-col gap-2 pt-1">
+                <button type="button" onclick="loginWithDiscordAndKeepDraft()"
+                    class="w-full px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium rounded-xl transition text-xs tracking-wide shadow-lg shadow-[#5865F2]/25 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                    </svg>
+                    <span>Log in with Discord &amp; Keep Draft</span>
+                </button>
+                <button type="button" onclick="dismissLoginPromptAndSubmit()"
+                    class="w-full px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 font-mono rounded-xl transition text-xs">
+                    Continue &amp; Submit Without Logging In
+                </button>
+            </div>
         </div>
     </div>
 </main>
@@ -503,6 +593,30 @@
     let currentCategoryFilter = 'all';
     let searchQuery = '';
     let sortOrder = 'desc';
+    let isGroupedView = true;
+
+    function toggleGroupedView() {
+        isGroupedView = !isGroupedView;
+        const btn = document.getElementById('group-toggle-btn');
+        if (btn) {
+            btn.innerText = isGroupedView ? 'Grouped View' : 'Flat Grid';
+            btn.className = isGroupedView
+                ? 'px-3 py-1.5 rounded-xl text-xs font-mono bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 transition whitespace-nowrap'
+                : 'px-3 py-1.5 rounded-xl text-xs font-mono bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 transition whitespace-nowrap';
+        }
+        renderTickets();
+    }
+
+    function resetTicketFilters() {
+        currentStatusFilter = 'all';
+        currentCategoryFilter = 'all';
+        searchQuery = '';
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        const catSel = document.getElementById('category-select');
+        if (catSel) catSel.value = 'all';
+        filterStatus('all');
+    }
 
     function getCombinedUrlParams() {
         const params = new URLSearchParams(window.location.search);
@@ -537,8 +651,10 @@
         if (tabParam) {
             if (['bugs', 'bug', 'bug_report', 'bug_reports'].includes(tabParam.toLowerCase())) {
                 currentTypeFilter = 'bug_report';
-            } else if (['all', 'all_tickets'].includes(tabParam.toLowerCase())) {
+            } else if (['all', 'all_tickets', 'active'].includes(tabParam.toLowerCase())) {
                 currentTypeFilter = 'all';
+            } else if (['archive', 'archived'].includes(tabParam.toLowerCase()) && IS_ADMIN) {
+                currentTypeFilter = 'archive';
             } else if (['my', 'my_tickets'].includes(tabParam.toLowerCase()) && LOGGED_IN_DISCORD_USER) {
                 currentTypeFilter = 'my_tickets';
             } else {
@@ -548,8 +664,10 @@
             const typeParam = urlParams.get('type').toLowerCase();
             if (['bugs', 'bug', 'bug_report', 'bug_reports', 'defect', 'issue'].includes(typeParam)) {
                 currentTypeFilter = 'bug_report';
-            } else if (['all', 'all_tickets'].includes(typeParam)) {
+            } else if (['all', 'all_tickets', 'active'].includes(typeParam)) {
                 currentTypeFilter = 'all';
+            } else if (['archive', 'archived'].includes(typeParam) && IS_ADMIN) {
+                currentTypeFilter = 'archive';
             } else if (['my', 'my_tickets'].includes(typeParam) && LOGGED_IN_DISCORD_USER) {
                 currentTypeFilter = 'my_tickets';
             } else if (['suggestion', 'suggestions', 'feature', 'features', 'idea'].includes(typeParam)) {
@@ -660,7 +778,9 @@
             }
         }
 
-        if (window.location.hash.includes('submit-section') || urlParams.get('submit') === 'true' || urlParams.get('action') === 'new' || urlParams.get('action') === 'create') {
+        restoreTicketDraftIfPresent(urlParams);
+
+        if (window.location.hash.includes('submit-section') || urlParams.get('restore_draft') === '1' || urlParams.get('submit') === 'true' || urlParams.get('action') === 'new' || urlParams.get('action') === 'create') {
             const submitSection = document.getElementById('submit-section');
             if (submitSection) {
                 setTimeout(() => {
@@ -689,11 +809,11 @@
     });
 
     function jumpToTicket(ticketId) {
-        const target = allTickets.find(t => Number(t.id) === Number(ticketId));
+        const target = allTickets.find(t => Number(t.id) === Number(ticketId) && !t.hidden && (!t.archived || IS_ADMIN));
         if (!target) return;
         const cardAlreadyVisible = document.getElementById(`ticket-card-${ticketId}`);
         if (!cardAlreadyVisible) {
-            currentTypeFilter = 'all';
+            currentTypeFilter = target.archived ? 'archive' : 'all';
             currentStatusFilter = 'all';
             currentCategoryFilter = 'all';
             searchQuery = '';
@@ -728,15 +848,242 @@
         }
     }
 
+    const TICKET_DRAFT_KEY = 'rbwr_ticket_draft_v1';
+    let skipLoginPromptOnce = false;
+    let similarDebounceTimer = null;
+
+    const DUPE_STOP_WORDS = new Set([
+        'the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'when', 'where', 'what',
+        'into', 'your', 'about', 'there', 'their', 'would', 'could', 'should', 'does', 'dont',
+        'cant', 'just', 'like', 'some', 'more', 'very', 'please', 'make', 'add', 'fix', 'bug',
+        'issue', 'error', 'problem', 'suggestion', 'feature', 'ticket', 'rbwr', 'overlay'
+    ]);
+
+    function collectTicketFormDraft() {
+        const typeRadio = document.querySelector('input[name="submit-type"]:checked');
+        const targetRadio = document.querySelector('input[name="submit-target"]:checked');
+        return {
+            type: typeRadio ? typeRadio.value : 'suggestion',
+            target: targetRadio ? targetRadio.value : 'overlay',
+            title: (document.getElementById('submit-title')?.value || ''),
+            description: (document.getElementById('submit-description')?.value || ''),
+            app_version: (document.getElementById('submit-app-version')?.value || ''),
+            platform: (document.getElementById('submit-platform')?.value || ''),
+            media_urls: (document.getElementById('submit-media-urls')?.value || ''),
+            savedAt: Date.now()
+        };
+    }
+
+    function saveTicketDraft() {
+        try {
+            const draft = collectTicketFormDraft();
+            if (draft.title.trim() || draft.description.trim() || draft.media_urls.trim()) {
+                localStorage.setItem(TICKET_DRAFT_KEY, JSON.stringify(draft));
+            }
+        } catch (e) { }
+    }
+
+    function saveTicketDraftBeforeLogin() {
+        saveTicketDraft();
+    }
+
+    function clearTicketDraft(clearFields = false) {
+        try { localStorage.removeItem(TICKET_DRAFT_KEY); } catch (e) { }
+        const banner = document.getElementById('draft-restored-banner');
+        if (banner) banner.classList.add('hidden');
+        if (clearFields) {
+            ['submit-title', 'submit-description', 'submit-app-version', 'submit-platform', 'submit-media-urls'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const simBox = document.getElementById('similar-tickets-box');
+            if (simBox) simBox.classList.add('hidden');
+        }
+    }
+
+    function restoreTicketDraftIfPresent(urlParams) {
+        let raw = null;
+        try { raw = localStorage.getItem(TICKET_DRAFT_KEY); } catch (e) { return; }
+        if (!raw) return;
+        let draft = null;
+        try { draft = JSON.parse(raw); } catch (e) { clearTicketDraft(false); return; }
+        if (!draft || (draft.savedAt && Date.now() - draft.savedAt > 24 * 60 * 60 * 1000)) {
+            clearTicketDraft(false);
+            return;
+        }
+        const hasContent = Boolean((draft.title || '').trim() || (draft.description || '').trim() || (draft.media_urls || '').trim());
+        if (!hasContent) {
+            clearTicketDraft(false);
+            return;
+        }
+
+        if (draft.type) {
+            const tr = document.querySelector(`input[name="submit-type"][value="${draft.type}"]`);
+            if (tr) { tr.checked = true; updateFormPlaceholders(); }
+        }
+        if (draft.target) {
+            const tg = document.querySelector(`input[name="submit-target"][value="${draft.target}"]`);
+            if (tg) tg.checked = true;
+        }
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && val && !el.value) el.value = val;
+        };
+        setVal('submit-title', draft.title);
+        setVal('submit-description', draft.description);
+        setVal('submit-app-version', draft.app_version);
+        setVal('submit-platform', draft.platform);
+        setVal('submit-media-urls', draft.media_urls);
+
+        const banner = document.getElementById('draft-restored-banner');
+        const txt = document.getElementById('draft-restored-text');
+        if (banner && txt) {
+            if (LOGGED_IN_DISCORD_USER) {
+                const uname = LOGGED_IN_DISCORD_USER.global_name || LOGGED_IN_DISCORD_USER.username || 'Discord User';
+                txt.innerText = `Draft restored and linked to your Discord account (${uname}). Review and submit when ready.`;
+            } else {
+                txt.innerText = 'Your saved ticket draft has been restored.';
+            }
+            banner.classList.remove('hidden');
+        }
+        updateSimilarTickets();
+    }
+
+    function openLoginPromptModal() {
+        const modal = document.getElementById('discord-login-prompt-modal');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeLoginPromptModal() {
+        const modal = document.getElementById('discord-login-prompt-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function loginWithDiscordAndKeepDraft() {
+        saveTicketDraft();
+        window.location.href = '/auth/discord/login?next=%2Ftickets%3Frestore_draft%3D1%23submit-section';
+    }
+
+    function dismissLoginPromptAndSubmit() {
+        closeLoginPromptModal();
+        skipLoginPromptOnce = true;
+        const form = document.getElementById('public-ticket-form');
+        if (form) {
+            if (typeof form.requestSubmit === 'function') form.requestSubmit();
+            else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+    }
+
+    function parseMediaUrlInput(raw) {
+        if (!raw) return [];
+        const parts = String(raw).split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
+        const out = [];
+        for (const u of parts) {
+            if (/^https?:\/\/\S+$/i.test(u) && !out.includes(u)) {
+                out.push(u);
+                if (out.length >= 5) break;
+            }
+        }
+        return out;
+    }
+
+    function isDiscordCdnUrl(url) {
+        try {
+            const parsed = new URL(url);
+            const host = parsed.hostname.toLowerCase();
+            return parsed.protocol === 'https:' &&
+                (host === 'cdn.discordapp.com' || host === 'media.discordapp.net') &&
+                (parsed.pathname.startsWith('/attachments/') || parsed.pathname.startsWith('/ephemeral-attachments/'));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function isLikelyImageUrl(url) {
+        return /\.(?:png|jpe?g|gif|webp|bmp|avif)(?:$|\?)/i.test(url || '');
+    }
+
+    function resolveDisplayMediaUrl(url) {
+        if (isDiscordCdnUrl(url)) {
+            return `/tickets/media/resolve?url=${encodeURIComponent(url)}`;
+        }
+        return url;
+    }
+
+    function extractInlineMediaUrls(text) {
+        if (!text) return [];
+        const matches = String(text).match(/https?:\/\/[^\s<>'"`\])]+/gi) || [];
+        const out = [];
+        for (const raw of matches) {
+            const clean = raw.replace(/[.,;:!?]+$/, '');
+            if ((isLikelyImageUrl(clean) || isDiscordCdnUrl(clean)) && !out.includes(clean)) {
+                out.push(clean);
+                if (out.length >= 5) break;
+            }
+        }
+        return out;
+    }
+
+    function renderMediaGalleryHtml(explicitUrls, textForInline = '') {
+        const combined = [];
+        (Array.isArray(explicitUrls) ? explicitUrls : []).forEach(u => {
+            if (u && !combined.includes(u)) combined.push(u);
+        });
+        extractInlineMediaUrls(textForInline).forEach(u => {
+            if (u && !combined.includes(u) && combined.length < 5) combined.push(u);
+        });
+        if (combined.length === 0) return '';
+
+        const itemsHtml = combined.map(rawUrl => {
+            const safeRaw = escapeHtml(rawUrl);
+            const displaySrc = escapeHtml(resolveDisplayMediaUrl(rawUrl));
+            const openHref = isDiscordCdnUrl(rawUrl) ? displaySrc : safeRaw;
+            if (isLikelyImageUrl(rawUrl) || isDiscordCdnUrl(rawUrl)) {
+                return `
+                    <a href="${openHref}" target="_blank" rel="noopener noreferrer"
+                        class="group relative block rounded-xl overflow-hidden border border-white/10 bg-black/40 hover:border-blue-500/40 transition max-w-xs">
+                        <img src="${displaySrc}" alt="Attached media" loading="lazy" referrerpolicy="no-referrer"
+                            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
+                            class="max-h-48 w-auto object-contain bg-black/30">
+                        <span class="hidden px-3 py-2 text-[11px] font-mono text-blue-400 underline break-all block">${safeRaw}</span>
+                    </a>
+                `;
+            }
+            return `
+                <a href="${openHref}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-mono text-blue-400 hover:text-blue-300 underline truncate max-w-full">
+                    ${safeRaw}
+                </a>
+            `;
+        }).join('');
+
+        return `<div class="flex flex-wrap gap-2 pt-1">${itemsHtml}</div>`;
+    }
+
+    function scheduleSimilarTickets() {
+        clearTimeout(similarDebounceTimer);
+        similarDebounceTimer = setTimeout(updateSimilarTickets, 180);
+    }
+
     function updateSimilarTickets() {
         const titleInput = document.getElementById('submit-title');
+        const descInput = document.getElementById('submit-description');
         const box = document.getElementById('similar-tickets-box');
         const list = document.getElementById('similar-tickets-list');
         if (!titleInput || !box || !list) return;
 
-        const raw = titleInput.value.trim().toLowerCase();
-        const words = raw.split(/\s+/).filter(w => w.length >= 3);
-        if (words.length === 0) {
+        const titleRaw = (titleInput.value || '').trim().toLowerCase();
+        const descRaw = (descInput ? descInput.value : '').trim().toLowerCase().slice(0, 300);
+        const tokenize = (str) => [...new Set(
+            str.replace(/[^a-z0-9#+._-]+/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length >= 3 && !DUPE_STOP_WORDS.has(w))
+        )];
+
+        const titleWords = tokenize(titleRaw);
+        const descWords = tokenize(descRaw).filter(w => !titleWords.includes(w));
+        const allWords = [...titleWords, ...descWords.slice(0, 8)];
+        if (allWords.length === 0) {
             box.classList.add('hidden');
             list.innerHTML = '';
             return;
@@ -744,18 +1091,29 @@
 
         const scored = [];
         for (const t of allTickets) {
-            if (t.merged_into) continue;
-            const hay = `${t.title || ''} ${t.suggestion || t.description || ''}`.toLowerCase();
-            let hits = 0;
-            for (const w of words) {
-                if (hay.includes(w)) hits++;
+            if (t.hidden || t.merged_into) continue;
+            const hayTitle = (t.title || '').toLowerCase();
+            const hayBody = (t.suggestion || t.description || '').toLowerCase();
+            let score = 0;
+            let matchedTokens = 0;
+            for (const w of titleWords) {
+                if (hayTitle.includes(w)) { score += 4; matchedTokens++; }
+                else if (hayBody.includes(w)) { score += 2; matchedTokens++; }
             }
-            if (hits > 0 && (hits >= Math.min(2, words.length))) {
-                scored.push({ ticket: t, hits });
+            for (const w of descWords.slice(0, 8)) {
+                if (hayTitle.includes(w)) { score += 2; matchedTokens++; }
+                else if (hayBody.includes(w)) { score += 1; matchedTokens++; }
+            }
+            if (titleRaw.length >= 6 && hayTitle.includes(titleRaw)) {
+                score += 6;
+            }
+            const minRequired = allWords.length === 1 ? 3 : 4;
+            if (score >= minRequired && matchedTokens >= Math.min(2, allWords.length)) {
+                scored.push({ ticket: t, score });
             }
         }
-        scored.sort((a, b) => b.hits - a.hits || (b.ticket.id - a.ticket.id));
-        const top = scored.slice(0, 3);
+        scored.sort((a, b) => b.score - a.score || ((b.ticket.upvote_count || 0) - (a.ticket.upvote_count || 0)) || (b.ticket.id - a.ticket.id));
+        const top = scored.slice(0, 4);
         if (top.length === 0) {
             box.classList.add('hidden');
             list.innerHTML = '';
@@ -764,12 +1122,26 @@
 
         list.innerHTML = top.map(({ ticket }) => {
             const label = escapeHtml(ticket.title || (ticket.suggestion || ticket.description || '').slice(0, 80));
+            const votes = Number(ticket.upvote_count || 0);
+            const archTag = ticket.archived
+                ? '<span class="px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300 border border-slate-500/30 text-[9px] uppercase">Archived</span>'
+                : '';
+            const voteLabel = (ticket.type === 'bug_report') ? 'Me Too' : '+1';
             return `
-                <button type="button" onclick="jumpToTicket(${ticket.id})"
-                    class="w-full text-left flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-black/30 hover:bg-black/50 border border-white/10 transition text-xs font-mono">
-                    <span class="truncate text-gray-200"><strong class="text-blue-400">#${ticket.id}</strong> ${label}</span>
-                    <span class="shrink-0">${getStatusBadge(ticket.status, ticket.type || 'suggestion')}</span>
-                </button>
+                <div class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/10 text-xs font-mono">
+                    <button type="button" onclick="jumpToTicket(${ticket.id})" class="text-left truncate text-gray-200 hover:text-white flex items-center gap-1.5 min-w-0 flex-1">
+                        <strong class="text-blue-400 shrink-0">#${ticket.id}</strong>
+                        <span class="truncate">${label}</span>
+                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${archTag}
+                        ${getStatusBadge(ticket.status, ticket.type || 'suggestion')}
+                        <button type="button" onclick="toggleTicketUpvote(${ticket.id}, this)"
+                            class="px-2 py-0.5 rounded border text-[10px] font-bold transition ${ticket.user_upvoted ? 'bg-blue-600/30 text-blue-200 border-blue-400/50' : 'bg-white/5 hover:bg-blue-600/20 text-gray-300 hover:text-blue-200 border-white/10'}">
+                            ${voteLabel} (${votes})
+                        </button>
+                    </div>
+                </div>
             `;
         }).join('');
         box.classList.remove('hidden');
@@ -802,6 +1174,7 @@
     }
 
     function switchTypeTab(type) {
+        if (type === 'archive' && !IS_ADMIN) return;
         currentTypeFilter = type;
         updateTypeTabsUI();
         updateStatusTabLabels();
@@ -809,73 +1182,51 @@
     }
 
     function updateStatusTabLabels() {
-        const btnAll = document.getElementById('tab-status-all');
-        const btnPending = document.getElementById('tab-status-pending');
-        const btnConsidering = document.getElementById('tab-status-considering');
-        const btnPlanned = document.getElementById('tab-status-planned');
-        const btnAccepted = document.getElementById('tab-status-accepted');
-        const btnDeclined = document.getElementById('tab-status-declined');
-        const btnInvalid = document.getElementById('tab-status-invalid');
+        const statusSelect = document.getElementById('status-select');
+        if (!statusSelect) return;
 
+        let options;
         if (currentTypeFilter === 'bug_report') {
-            if (btnAll) btnAll.innerText = 'All Status';
-            if (btnPending) btnPending.innerText = 'Open';
-            if (btnConsidering) btnConsidering.innerText = 'Investigating';
-            if (btnPlanned) btnPlanned.innerText = 'Confirmed';
-            if (btnAccepted) btnAccepted.innerText = 'Fixed';
-            if (btnDeclined) {
-                btnDeclined.style.display = 'none';
-                if (currentStatusFilter === 'declined') currentStatusFilter = 'all';
-            }
-            if (btnInvalid) {
-                btnInvalid.innerText = 'Invalid';
-                btnInvalid.style.display = '';
-            }
+            options = [
+                { value: 'all', label: 'All Status' },
+                { value: 'pending', label: 'Open' },
+                { value: 'considering', label: 'Investigating' },
+                { value: 'planned', label: 'Confirmed' },
+                { value: 'accepted', label: 'Fixed' },
+                { value: 'invalid', label: 'Invalid' },
+            ];
+            if (currentStatusFilter === 'declined') currentStatusFilter = 'all';
         } else if (currentTypeFilter === 'suggestion') {
-            if (btnAll) btnAll.innerText = 'All Status';
-            if (btnPending) btnPending.innerText = 'Pending';
-            if (btnConsidering) btnConsidering.innerText = 'Considering';
-            if (btnPlanned) btnPlanned.innerText = 'Planned';
-            if (btnAccepted) btnAccepted.innerText = 'Implemented';
-            if (btnDeclined) {
-                btnDeclined.innerText = 'Declined';
-                btnDeclined.style.display = '';
-            }
-            if (btnInvalid) {
-                btnInvalid.style.display = 'none';
-                if (currentStatusFilter === 'invalid') currentStatusFilter = 'all';
-            }
+            options = [
+                { value: 'all', label: 'All Status' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'considering', label: 'Considering' },
+                { value: 'planned', label: 'Planned' },
+                { value: 'accepted', label: 'Implemented' },
+                { value: 'declined', label: 'Declined' },
+            ];
+            if (currentStatusFilter === 'invalid') currentStatusFilter = 'all';
         } else {
-            if (btnAll) btnAll.innerText = 'All Status';
-            if (btnPending) {
-                btnPending.innerText = 'Pending';
-                btnPending.title = 'Suggestions: Pending | Bug Reports: Open';
-            }
-            if (btnConsidering) {
-                btnConsidering.innerText = 'Considering';
-                btnConsidering.title = 'Suggestions: Considering | Bug Reports: Investigating';
-            }
-            if (btnPlanned) {
-                btnPlanned.innerText = 'Planned';
-                btnPlanned.title = 'Suggestions: Planned | Bug Reports: Confirmed';
-            }
-            if (btnAccepted) {
-                btnAccepted.innerText = 'Implemented';
-                btnAccepted.title = 'Suggestions: Implemented | Bug Reports: Fixed';
-            }
-            if (btnDeclined) {
-                btnDeclined.innerText = 'Declined';
-                btnDeclined.style.display = '';
-            }
-            if (btnInvalid) {
-                btnInvalid.innerText = 'Invalid';
-                btnInvalid.style.display = '';
-            }
+            options = [
+                { value: 'all', label: 'All Status' },
+                { value: 'pending', label: 'Pending / Open' },
+                { value: 'considering', label: 'Considering / Investigating' },
+                { value: 'planned', label: 'Planned / Confirmed' },
+                { value: 'accepted', label: 'Implemented / Fixed' },
+                { value: 'declined', label: 'Declined' },
+                { value: 'invalid', label: 'Invalid' },
+            ];
         }
+
+        statusSelect.innerHTML = options
+            .map(opt => `<option value="${opt.value}">${opt.label}</option>`)
+            .join('');
+        statusSelect.value = options.some(o => o.value === currentStatusFilter) ? currentStatusFilter : 'all';
+        currentStatusFilter = statusSelect.value;
     }
 
     function updateTypeTabsUI() {
-        const tabs = ['suggestion', 'bug_report', 'all', 'my_tickets'];
+        const tabs = ['suggestion', 'bug_report', 'all', 'my_tickets', 'archive'];
         tabs.forEach(t => {
             const tabBtn = document.getElementById(`tab-type-${t}`);
             if (!tabBtn) return;
@@ -884,6 +1235,8 @@
                     tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-rose-600 text-white whitespace-nowrap shadow-md";
                 } else if (t === 'my_tickets') {
                     tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-[#5865F2] text-white whitespace-nowrap shadow-md";
+                } else if (t === 'archive') {
+                    tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-slate-700 text-white whitespace-nowrap shadow-md border border-slate-500/40";
                 } else {
                     tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 bg-blue-600 text-white whitespace-nowrap shadow-md";
                 }
@@ -891,25 +1244,37 @@
                 tabBtn.className = "px-4 py-2 rounded-xl text-xs font-semibold font-mono tracking-wide transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
             }
         });
+        const archiveBanner = document.getElementById('archive-info-banner');
+        if (archiveBanner) {
+            archiveBanner.classList.toggle('hidden', currentTypeFilter !== 'archive');
+        }
     }
 
     function updateStats() {
-        const total = allTickets.length;
-        const suggestions = allTickets.filter(t => (t.type || 'suggestion') === 'suggestion');
-        const bugs = allTickets.filter(t => (t.type || '') === 'bug_report');
-        const pending = allTickets.filter(t => ['pending', 'open'].includes((t.status || 'pending').toLowerCase()));
-        const considering = allTickets.filter(t => ['considering', 'investigating', 'in-progress'].includes((t.status || '').toLowerCase()));
-        const accepted = allTickets.filter(t => ['implemented', 'fixed', 'accepted', 'resolved', 'completed'].includes((t.status || '').toLowerCase()));
+        const visibleTickets = allTickets.filter(t => !t.hidden);
+        const activeTickets = visibleTickets.filter(t => !t.archived);
+        const archivedTickets = visibleTickets.filter(t => Boolean(t.archived));
 
-        document.getElementById('stat-total').innerText = total;
-        document.getElementById('stat-suggestions').innerText = suggestions.length;
-        document.getElementById('stat-bugs').innerText = bugs.length;
-        document.getElementById('stat-pending').innerText = pending.length;
-        document.getElementById('stat-considering').innerText = considering.length;
-        document.getElementById('stat-accepted').innerText = accepted.length;
+        const suggestions = activeTickets.filter(t => (t.type || 'suggestion') === 'suggestion');
+        const bugs = activeTickets.filter(t => (t.type || '') === 'bug_report');
+        const pending = activeTickets.filter(t => ['pending', 'open'].includes((t.status || 'pending').toLowerCase()));
+        const considering = activeTickets.filter(t => ['considering', 'investigating', 'in-progress', 'planned', 'confirmed'].includes((t.status || '').toLowerCase()));
+
+        const statTotal = document.getElementById('stat-total');
+        if (statTotal) statTotal.innerText = activeTickets.length;
+        const statSug = document.getElementById('stat-suggestions');
+        if (statSug) statSug.innerText = suggestions.length;
+        const statBugs = document.getElementById('stat-bugs');
+        if (statBugs) statBugs.innerText = bugs.length;
+        const statPending = document.getElementById('stat-pending');
+        if (statPending) statPending.innerText = pending.length;
+        const statCons = document.getElementById('stat-considering');
+        if (statCons) statCons.innerText = considering.length;
+        const statArch = document.getElementById('stat-archived');
+        if (statArch) statArch.innerText = archivedTickets.length;
 
         const badgeAll = document.getElementById('badge-count-all');
-        if (badgeAll) badgeAll.innerText = total;
+        if (badgeAll) badgeAll.innerText = activeTickets.length;
 
         const badgeSug = document.getElementById('badge-count-suggestions');
         if (badgeSug) badgeSug.innerText = suggestions.length;
@@ -917,8 +1282,11 @@
         const badgeBugs = document.getElementById('badge-count-bugs');
         if (badgeBugs) badgeBugs.innerText = bugs.length;
 
+        const badgeArchive = document.getElementById('badge-count-archive');
+        if (badgeArchive) badgeArchive.innerText = archivedTickets.length;
+
         if (LOGGED_IN_DISCORD_USER) {
-            const myCount = allTickets.filter(t =>
+            const myCount = visibleTickets.filter(t =>
                 Boolean(t.is_author || t.is_follower || (t.discord_id && String(t.discord_id) === String(LOGGED_IN_DISCORD_USER.id)))
             ).length;
             const badgeMy = document.getElementById('badge-count-my');
@@ -927,18 +1295,19 @@
     }
 
     function filterStatus(status) {
-        currentStatusFilter = status;
-        const statuses = ['all', 'pending', 'considering', 'planned', 'accepted', 'declined', 'invalid'];
-        statuses.forEach(s => {
-            const btn = document.getElementById(`tab-status-${s}`);
-            if (!btn) return;
-            if (s === status) {
-                btn.className = "px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase bg-blue-600 text-white whitespace-nowrap";
-            } else {
-                btn.className = "px-2.5 py-1.5 rounded-lg transition-all font-mono uppercase text-gray-400 hover:text-white hover:bg-white/5 whitespace-nowrap";
-            }
-        });
+        currentStatusFilter = status || 'all';
+        const statusSelect = document.getElementById('status-select');
+        if (statusSelect) {
+            const hasOpt = Array.from(statusSelect.options).some(o => o.value === currentStatusFilter);
+            statusSelect.value = hasOpt ? currentStatusFilter : 'all';
+            currentStatusFilter = statusSelect.value;
+        }
         renderTickets();
+    }
+
+    function handleStatusChange() {
+        const statusSelect = document.getElementById('status-select');
+        filterStatus(statusSelect ? statusSelect.value : 'all');
     }
 
     function handleCategoryChange() {
@@ -1039,6 +1408,9 @@
         const countDisplay = document.getElementById('feed-results-count');
 
         let filtered = allTickets.filter(item => {
+            if (item.hidden) return false;
+            const isArchived = Boolean(item.archived);
+            if (isArchived && !IS_ADMIN) return false;
             const itemType = item.type || 'suggestion';
             const itemStatus = (item.status || 'pending').toLowerCase();
             const itemTarget = (item.target === 'point_graph' || item.target === 'points_graph') ? 'point_graph'
@@ -1046,12 +1418,16 @@
                 : (item.target === 'theme_creator' ? 'theme_creator'
                 : (item.target === 'general' ? 'general' : 'overlay')));
 
-            if (currentTypeFilter === 'suggestion' && itemType !== 'suggestion') return false;
-            if (currentTypeFilter === 'bug_report' && itemType !== 'bug_report') return false;
-            if (currentTypeFilter === 'my_tickets') {
+            if (currentTypeFilter === 'archive') {
+                if (!isArchived) return false;
+            } else if (currentTypeFilter === 'my_tickets') {
                 if (!LOGGED_IN_DISCORD_USER) return false;
                 const isMine = Boolean(item.is_author || item.is_follower || (item.discord_id && String(item.discord_id) === String(LOGGED_IN_DISCORD_USER.id)));
                 if (!isMine) return false;
+            } else {
+                if (isArchived) return false;
+                if (currentTypeFilter === 'suggestion' && itemType !== 'suggestion') return false;
+                if (currentTypeFilter === 'bug_report' && itemType !== 'bug_report') return false;
             }
 
             if (currentStatusFilter !== 'all') {
@@ -1078,6 +1454,7 @@
                 const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
                 const descMatch = (item.suggestion || item.description || '').toLowerCase().includes(searchQuery);
                 const authorMatch = (item.name || item.discord_username || '').toLowerCase().includes(searchQuery);
+                const versionMatch = (item.resolved_version || '').toLowerCase().includes(searchQuery);
                 const idMatch = String(item.id).includes(searchQuery);
 
                 let msgMatch = false;
@@ -1085,7 +1462,7 @@
                     msgMatch = item.messages.some(m => (m.message || '').toLowerCase().includes(searchQuery) || (m.sender_name || '').toLowerCase().includes(searchQuery));
                 }
 
-                if (!titleMatch && !descMatch && !authorMatch && !idMatch && !msgMatch) {
+                if (!titleMatch && !descMatch && !authorMatch && !versionMatch && !idMatch && !msgMatch) {
                     return false;
                 }
             }
@@ -1094,6 +1471,11 @@
         });
 
         filtered.sort((a, b) => {
+            if (sortOrder === 'votes') {
+                const diff = (Number(b.upvote_count || 0)) - (Number(a.upvote_count || 0));
+                if (diff !== 0) return diff;
+                return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+            }
             if (sortOrder === 'replies') {
                 const countA = (a.messages || []).length;
                 const countB = (b.messages || []).length;
@@ -1104,8 +1486,12 @@
             return sortOrder === 'asc' ? tA - tB : tB - tA;
         });
 
+        const scopeTotal = currentTypeFilter === 'archive'
+            ? allTickets.filter(t => !t.hidden && Boolean(t.archived)).length
+            : allTickets.filter(t => !t.hidden && !t.archived).length;
         if (countDisplay) {
-            countDisplay.innerText = `Showing ${filtered.length} of ${allTickets.length} tickets`;
+            const label = currentTypeFilter === 'archive' ? 'archived tickets' : 'active tickets';
+            countDisplay.innerText = `Showing ${filtered.length} of ${scopeTotal} ${label}`;
         }
 
         if (filtered.length === 0) {
@@ -1116,7 +1502,7 @@
 
         emptyState.classList.add('hidden');
 
-        feed.innerHTML = filtered.map(item => {
+        const renderCard = (item) => {
             const itemType = item.type || 'suggestion';
             const isDiscord = Boolean(item.discord_id && !item.anonymous);
             const avatarUrl = item.discord_avatar;
@@ -1132,6 +1518,34 @@
             const canViewConversation = Boolean(item.can_view_conversation || IS_ADMIN || isAuthorLoggedIn || isFollowerLoggedIn);
             const canReply = isAuthorLoggedIn || isFollowerLoggedIn || IS_ADMIN;
             const hasChat = Boolean(item.has_private_chat || item.discord_id);
+
+            const archivedBadge = item.archived ? `
+                <span class="inline-flex items-center px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-slate-500/30 rounded text-[9px] font-mono font-semibold uppercase">
+                    Archived
+                </span>
+            ` : '';
+
+            const versionBadge = item.resolved_version ? `
+                <span class="inline-flex items-center px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded text-[9px] font-mono font-semibold">
+                    ${itemType === 'bug_report' ? 'Fixed in' : 'Shipped in'} ${escapeHtml(item.resolved_version)}
+                </span>
+            ` : '';
+
+            const ticketMediaHtml = renderMediaGalleryHtml(item.media_urls, item.suggestion || item.description || '');
+            const upvoteCount = Number(item.upvote_count || 0);
+            const userUpvoted = Boolean(item.user_upvoted);
+            const upvoteLabel = itemType === 'bug_report' ? 'Me Too' : 'Upvote';
+            const upvoteBtnHtml = item.merged_into ? '' : `
+                <button type="button" onclick="toggleTicketUpvote(${item.id}, this)"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold transition ${userUpvoted ? 'bg-blue-600/25 text-blue-200 border-blue-400/50 shadow-sm shadow-blue-500/10' : 'bg-white/[0.04] hover:bg-blue-600/15 text-gray-300 hover:text-blue-200 border-white/10 hover:border-blue-500/30'}"
+                    title="${LOGGED_IN_DISCORD_USER ? (userUpvoted ? 'Remove your vote' : 'Vote for this ticket') : 'Sign in with Discord to vote'}">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"></path>
+                    </svg>
+                    <span>${upvoteLabel}</span>
+                    <span class="px-1.5 py-0.2 rounded bg-black/30 text-[10px]">${upvoteCount}</span>
+                </button>
+            `;
 
             const avatarBlock = (avatarUrl && !item.anonymous) ? `
                 <img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="w-8 h-8 rounded-full border border-white/10 shrink-0">
@@ -1233,6 +1647,7 @@
                         </div>
                         <div id="public-msg-content-${item.id}-${m.id}">
                             <p id="public-msg-text-${item.id}-${m.id}" class="text-xs text-gray-200 font-mono leading-relaxed whitespace-pre-wrap pl-7">${escapeHtml(m.message)}</p>
+                            <div class="pl-7">${renderMediaGalleryHtml(m.media_urls, m.message)}</div>
                         </div>
                         <div id="public-msg-edit-${item.id}-${m.id}" class="hidden flex flex-col gap-1.5 pt-1 pl-7">
                             <textarea id="public-msg-edit-input-${item.id}-${m.id}" rows="2" class="premium-input text-xs p-2 rounded-lg outline-none resize-none font-mono text-gray-200">${escapeHtml(m.message)}</textarea>
@@ -1298,7 +1713,15 @@
                                 </span>
                                 ${roleBadge}
                             </div>
-                            <span class="text-[10px] text-gray-400 font-mono">Visible only to you and developers</span>
+                            <div class="flex items-center gap-2 text-[10px] font-mono">
+                                <span class="text-gray-400 hidden sm:inline">Private thread</span>
+                                <a href="/tickets/${item.id}/transcript?format=txt" target="_blank"
+                                    class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition"
+                                    title="Download plain-text transcript">TXT</a>
+                                <a href="/tickets/${item.id}/transcript?format=html" target="_blank"
+                                    class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition"
+                                    title="Download HTML transcript">HTML</a>
+                            </div>
                         </div>
                         
                         <div id="thread-messages-${item.id}" class="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
@@ -1348,6 +1771,8 @@
                                         ${getTypeBadge(itemType)}
                                         ${getCategoryBadge(item.target, item.is_server_checker)}
                                         ${mergedFromBadge}
+                                        ${archivedBadge}
+                                        ${versionBadge}
                                     </div>
                                     <span class="text-[10px] text-gray-500 font-mono">${formatTimestamp(item.timestamp)}</span>
                                 </div>
@@ -1363,14 +1788,20 @@
 
                         <p class="text-sm text-gray-300 font-mono leading-relaxed bg-black/20 p-4 rounded-xl border border-white/5 whitespace-pre-wrap">${escapeHtml(item.suggestion || item.description)}</p>
 
+                        ${ticketMediaHtml}
+
                         ${legacyAdminResponseBlock}
 
                         ${threadContainer}
                     </div>
 
-                    <div class="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5 gap-2">
-                        <span>Ticket ID: #${item.id}</span>
-                        <span>Category: ${(item.target || 'overlay').toUpperCase()}</span>
+                    <div class="flex flex-wrap justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5 gap-2">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            ${upvoteBtnHtml}
+                            <span>Ticket #${item.id}</span>
+                            <span>&bull;</span>
+                            <span>${(item.target || 'overlay').toUpperCase()}</span>
+                        </div>
                         <div class="flex items-center gap-2.5">
                             <span>Status: ${(item.status || 'pending').toUpperCase()}</span>
                             <button type="button" onclick="copyTicketLink(${item.id}, this)"
@@ -1379,7 +1810,68 @@
                     </div>
                 </div>
             `;
-        }).join('');
+        };
+
+        if (!isGroupedView || currentStatusFilter !== 'all') {
+            feed.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${filtered.map(renderCard).join('')}</div>`;
+            return;
+        }
+
+        const sections = [];
+        if (currentTypeFilter === 'archive') {
+            const resolved = filtered.filter(t => ['implemented', 'fixed', 'accepted', 'resolved', 'completed'].includes((t.status || '').toLowerCase()) && !t.merged_into);
+            const otherArchived = filtered.filter(t => !resolved.includes(t));
+            if (resolved.length) sections.push({ title: 'Implemented & Fixed', accent: 'text-emerald-400 border-emerald-500/20', items: resolved });
+            if (otherArchived.length) sections.push({ title: 'Closed, Declined & Merged', accent: 'text-slate-400 border-slate-500/20', items: otherArchived });
+        } else {
+            const inProgress = filtered.filter(t => !t.merged_into && ['considering', 'investigating', 'in-progress', 'planned', 'confirmed'].includes((t.status || '').toLowerCase()));
+            const openPending = filtered.filter(t => !t.merged_into && ['pending', 'open', ''].includes((t.status || 'pending').toLowerCase()));
+            const completed = filtered.filter(t => !inProgress.includes(t) && !openPending.includes(t));
+            if (inProgress.length) sections.push({ title: 'In Progress & Planned', accent: 'text-cyan-400 border-cyan-500/20', items: inProgress });
+            if (openPending.length) sections.push({ title: 'Open & Pending Review', accent: 'text-amber-400 border-amber-500/20', items: openPending });
+            if (completed.length) sections.push({ title: 'Resolved, Closed & Merged', accent: 'text-emerald-400 border-emerald-500/20', items: completed });
+        }
+
+        feed.innerHTML = sections.map(sec => `
+            <section class="flex flex-col gap-3">
+                <div class="flex items-center justify-between border-b pb-1.5 ${sec.accent}">
+                    <h2 class="text-xs font-mono font-bold uppercase tracking-wider">${sec.title}</h2>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-gray-300 border border-white/10">${sec.items.length}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${sec.items.map(renderCard).join('')}
+                </div>
+            </section>
+        `).join('');
+    }
+
+    async function toggleTicketUpvote(ticketId, btnEl) {
+        if (!LOGGED_IN_DISCORD_USER) {
+            if (confirm('Sign in with Discord to upvote tickets and receive milestone status alerts?')) {
+                window.location.href = `/auth/discord/login?next=${encodeURIComponent('/tickets?ticket=' + ticketId)}`;
+            }
+            return;
+        }
+        if (btnEl) btnEl.disabled = true;
+        try {
+            const res = await fetch(`/tickets/${ticketId}/upvote`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                const t = allTickets.find(x => Number(x.id) === Number(ticketId));
+                if (t) {
+                    t.upvote_count = data.upvote_count;
+                    t.user_upvoted = data.upvoted;
+                }
+                renderTickets();
+                updateSimilarTickets();
+            } else {
+                alert(data.detail || 'Could not update vote.');
+            }
+        } catch (err) {
+            alert('Network error updating vote.');
+        } finally {
+            if (btnEl) btnEl.disabled = false;
+        }
     }
 
     async function handleFormSubmit(e) {
@@ -1393,10 +1885,24 @@
         const selectedTarget = targetRadio ? targetRadio.value : "overlay";
         const titleInput = document.getElementById('submit-title');
         const descInput = document.getElementById('submit-description');
+        const mediaInput = document.getElementById('submit-media-urls');
         const statusDiv = document.getElementById('submit-form-status');
         const submitBtn = document.getElementById('submit-form-btn');
 
         const isAnon = anonCheckbox ? anonCheckbox.checked : false;
+
+        if (!descInput || !descInput.value.trim()) {
+            statusDiv.className = 'text-xs font-mono p-3 rounded-xl bg-rose-950/20 text-rose-400 border border-rose-500/20';
+            statusDiv.innerText = "Error: Please enter ticket details before submitting.";
+            statusDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (!LOGGED_IN_DISCORD_USER && !IS_ADMIN && !skipLoginPromptOnce) {
+            openLoginPromptModal();
+            return;
+        }
+        skipLoginPromptOnce = false;
 
         let turnstileToken = "";
         if (TURNSTILE_REQUIRED) {
@@ -1422,11 +1928,14 @@
             }
         }
 
+        const mediaUrls = parseMediaUrlInput(mediaInput ? mediaInput.value : '');
+
         const payload = {
             type: selectedType,
             title: titleInput ? titleInput.value.trim() : '',
             description: rawDescription,
             suggestion: rawDescription,
+            media_urls: mediaUrls,
             anonymous: isAnon,
             target: selectedTarget,
             is_server_checker: selectedTarget === "server_checker",
@@ -1451,8 +1960,10 @@
                 statusDiv.innerText = "Success: Ticket created successfully!";
                 statusDiv.classList.remove('hidden');
 
+                clearTicketDraft(false);
                 descInput.value = '';
                 if (titleInput) titleInput.value = '';
+                if (mediaInput) mediaInput.value = '';
                 if (anonCheckbox) anonCheckbox.checked = false;
                 const verInput = document.getElementById('submit-app-version');
                 const osInput = document.getElementById('submit-platform');
@@ -1768,15 +2279,44 @@
             const res = await fetch('/tickets?format=json', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
-                const freshTickets = data.tickets || [];
+                const freshTickets = (data.tickets || []).filter(t => !t.hidden);
+                const freshIds = new Set(freshTickets.map(t => t.id));
+                let hasStructuralChange = false;
                 let hasChanges = false;
+
+                const beforeLen = allTickets.length;
+                allTickets = allTickets.filter(t => freshIds.has(t.id));
+                if (allTickets.length !== beforeLen) {
+                    hasStructuralChange = true;
+                    hasChanges = true;
+                }
+
                 freshTickets.forEach(fresh => {
                     const local = allTickets.find(t => t.id === fresh.id);
                     if (local) {
                         const localMsgCount = (local.messages || []).length;
                         const freshMsgCount = (fresh.messages || []).length;
-                        if (localMsgCount !== freshMsgCount || local.status !== fresh.status) {
+                        if (
+                            local.status !== fresh.status ||
+                            Boolean(local.archived) !== Boolean(fresh.archived) ||
+                            local.merged_into !== fresh.merged_into ||
+                            Number(local.upvote_count || 0) !== Number(fresh.upvote_count || 0) ||
+                            Boolean(local.user_upvoted) !== Boolean(fresh.user_upvoted) ||
+                            (local.resolved_version || '') !== (fresh.resolved_version || '')
+                        ) {
                             local.status = fresh.status;
+                            local.archived = Boolean(fresh.archived);
+                            local.archived_at = fresh.archived_at || '';
+                            local.merged_into = fresh.merged_into;
+                            local.merged_from = fresh.merged_from || [];
+                            local.upvote_count = Number(fresh.upvote_count || 0);
+                            local.user_upvoted = Boolean(fresh.user_upvoted);
+                            local.resolved_version = fresh.resolved_version || '';
+                            local.media_urls = fresh.media_urls || [];
+                            hasStructuralChange = true;
+                            hasChanges = true;
+                        }
+                        if (localMsgCount !== freshMsgCount) {
                             if (local.can_view_conversation && freshMsgCount > localMsgCount) {
                                 const newMessages = (fresh.messages || []).slice(localMsgCount);
                                 local.messages = fresh.messages;
@@ -1788,11 +2328,15 @@
                         }
                     } else {
                         allTickets.unshift(fresh);
+                        hasStructuralChange = true;
                         hasChanges = true;
                     }
                 });
                 if (hasChanges && !document.activeElement.matches('input, textarea')) {
                     updateStats();
+                    if (hasStructuralChange) {
+                        renderTickets();
+                    }
                 }
             }
         } catch (e) { }

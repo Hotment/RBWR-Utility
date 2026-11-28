@@ -85,7 +85,9 @@ if _current_dir not in sys.path:
 try:
     from bot.bot import (
         create_discord_ticket_channel,
+        close_discord_ticket_channel,
         forward_ticket_reply_to_discord,
+        forward_or_recreate_ticket_reply_to_discord,
         edit_ticket_reply_in_discord,
         delete_ticket_reply_in_discord,
         start_bot_thread,
@@ -102,7 +104,9 @@ try:
 except Exception:
     from bot import (
         create_discord_ticket_channel,  # pyright: ignore[reportAttributeAccessIssue]
+        close_discord_ticket_channel,  # pyright: ignore[reportAttributeAccessIssue]
         forward_ticket_reply_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
+        forward_or_recreate_ticket_reply_to_discord,  # pyright: ignore[reportAttributeAccessIssue]
         edit_ticket_reply_in_discord,  # pyright: ignore[reportAttributeAccessIssue]
         delete_ticket_reply_in_discord,  # pyright: ignore[reportAttributeAccessIssue]
         start_bot_thread,  # pyright: ignore[reportAttributeAccessIssue]
@@ -117,6 +121,7 @@ except Exception:
         apply_ticket_merge,  # pyright: ignore[reportAttributeAccessIssue]
     )
 import ticket_merge  # noqa: E402
+import ticket_utils  # noqa: E402
 
 try:
     send_test_notification_dm  # pyright: ignore[reportUnusedExpression]
@@ -135,6 +140,18 @@ try:
 except NameError:
     def report_crash_to_discord(*args, **kwargs) -> bool:
         return False
+
+try:
+    close_discord_ticket_channel  # pyright: ignore[reportUnusedExpression]
+except NameError:
+    def close_discord_ticket_channel(*args, **kwargs) -> tuple[bool, str]:
+        return False, "Bot module is not loaded."
+
+try:
+    forward_or_recreate_ticket_reply_to_discord  # pyright: ignore[reportUnusedExpression]
+except NameError:
+    def forward_or_recreate_ticket_reply_to_discord(*args, **kwargs) -> str|None:
+        return None
 
 import atexit
 import socket
@@ -700,12 +717,23 @@ def get_dashboard_payload_data(username=None):
                 "ip": s.get("ip", ""),
                 "timestamp": s.get("timestamp", ""),
                 "status": s.get("status", "pending"),
+                "status_updated_at": s.get("status_updated_at") or "",
+                "resolved_version": s.get("resolved_version") or "",
+                "media_urls": list(s.get("media_urls") or []),
+                "upvote_count": len({str(u) for u in (s.get("upvotes") or []) if u}),
                 "admin_comment": s.get("admin_comment", ""),
                 "comment_by": s.get("comment_by", ""),
                 "comment_timestamp": s.get("comment_timestamp", ""),
                 "target": s.get("target") or ("server_checker" if s.get("is_server_checker") else "overlay"),
                 "is_server_checker": s.get("target") == "server_checker" or bool(s.get("is_server_checker")),
                 "hidden": bool(s.get("hidden", False)),
+                "archived": bool(s.get("archived", False)),
+                "archived_at": s.get("archived_at") or "",
+                "archived_by": s.get("archived_by") or "",
+                "auto_archived": bool(s.get("auto_archived", False)),
+                "auto_archive_reason": s.get("auto_archive_reason") or "",
+                "discord_channel_id": s.get("discord_channel_id") or "",
+                "channel_closed": bool(s.get("channel_closed", False)),
                 "anonymous": bool(s.get("anonymous", False)),
                 "discord_id": s.get("discord_id") or "",
                 "discord_username": s.get("discord_username") or "",
@@ -820,6 +848,7 @@ def broadcast_ticket_update(
     ticket_discord_id: str | None = None,
     is_anonymous: bool = False,
     follower_ids: list[str] | set[str] | None = None,
+    is_hidden: bool = False,
 ):
     """
     Broadcasts real-time ticket messages to connected web users on tickets.html.
@@ -829,6 +858,9 @@ def broadcast_ticket_update(
         ws = conn[0] if isinstance(conn, tuple) else conn
         user_d_id = conn[1] if isinstance(conn, tuple) else ""
         is_admin_user = conn[2] if isinstance(conn, tuple) else False
+
+        if is_hidden and not is_admin_user:
+            continue
 
         is_author_user = bool(user_d_id and ticket_discord_id and str(user_d_id) == str(ticket_discord_id))
         is_follower_user = bool(user_d_id and str(user_d_id) in allowed_followers)
@@ -1501,9 +1533,11 @@ class TicketPayload(BaseModel):
     anonymous: bool = Field(default=False)
     target: str = Field(default="overlay", max_length=50)
     is_server_checker: bool = Field(default=False)
+    media_urls: list[str] = Field(default_factory=list)
 
 class TicketMessagePayload(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
+    media_urls: list[str] = Field(default_factory=list)
 
 class CrashPayload(BaseModel):
     version: str = Field(..., max_length=20)
@@ -1523,6 +1557,7 @@ class CrashStatusPayload(BaseModel):
 class StatusUpdatePayload(BaseModel):
     id: int
     status: str
+    resolved_version: str | None = Field(default=None, max_length=64)
 
 class CommentPayload(BaseModel):
     id: int
@@ -1938,6 +1973,73 @@ def start_server_checker_worker():
 def ensure_server_checker_worker():
     if not _sc_worker_started:
         start_server_checker_worker()
+
+
+def _run_ticket_auto_archive_once() -> list[dict]:
+    archived = ticket_utils.run_auto_archive_sweep(
+        load_fn=load_suggestions,
+        save_fn=save_suggestions,
+        close_channel_fn=close_discord_ticket_channel,
+        broadcast_fn=lambda: broadcast_update("dashboard"),
+        no_reply_days=7,
+        with_reply_days=30,
+    )
+    if archived:
+        ids = [item["id"] for item in archived]
+        logger.info(f"[Auto-Archive] Archived {len(archived)} inactive ticket(s): {ids}")
+        try:
+            log_audit_event(
+                "tickets.auto_archive",
+                "tickets",
+                f"Auto-archived {len(archived)} inactive completed ticket(s)",
+                target="Tickets",
+                details={"archived": archived[:100]},
+                username="Auto-Archive",
+            )
+        except Exception:
+            pass
+    return archived
+
+
+def ticket_auto_archive_worker():
+    time.sleep(90)
+    while True:
+        try:
+            _run_ticket_auto_archive_once()
+        except Exception as e:
+            logger.error(f"[Auto-Archive] Sweep error: {e}")
+        time.sleep(1800)
+
+
+_auto_archive_thread = None
+_auto_archive_started = False
+_auto_archive_lock = threading.Lock()
+
+
+def start_ticket_auto_archive_worker():
+    global _auto_archive_started, _auto_archive_thread
+    with _auto_archive_lock:
+        if _auto_archive_started:
+            return
+        if os.environ.get("DISABLE_AUTO_ARCHIVE_WORKER") == "1" or "unittest" in sys.modules:
+            return
+        is_reloader_active = os.environ.get("WERKZEUG_RUN_MAIN") is not None
+        if is_reloader_active and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+            return
+        _auto_archive_started = True
+        _auto_archive_thread = threading.Thread(
+            target=ticket_auto_archive_worker,
+            daemon=True,
+            name="TicketAutoArchiveThread",
+        )
+        _auto_archive_thread.start()
+        logger.info("Started background ticket auto-archive worker thread (7d no-reply / 30d with-reply).")
+
+
+@app.before_request
+def ensure_ticket_auto_archive_worker():
+    if not _auto_archive_started:
+        start_ticket_auto_archive_worker()
 
 @app.route("/servers", methods=["GET"])
 def servers_page():
@@ -2382,6 +2484,101 @@ def tickets_route():
         is_admin=bool(session.get("admin_logged_in"))
     )
 
+
+@app.route("/tickets/media/resolve", methods=["GET"])
+def resolve_ticket_media_url():
+    raw_url = (request.args.get("url") or "").strip()
+    if not ticket_utils.is_discord_attachment_url(raw_url):
+        return jsonify({"detail": "Only Discord CDN attachment URLs can be resolved via this endpoint."}), 400
+    refreshed = ticket_utils.refresh_discord_attachment_url(raw_url)
+    resp = redirect(refreshed, code=302)
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
+@app.route("/tickets/<int:ticket_id>/upvote", methods=["POST"])
+def toggle_ticket_upvote_api(ticket_id):
+    ip = request.remote_addr or "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    if is_ip_banned(ip):
+        return jsonify({"detail": "Your IP is banned from interacting with tickets."}), 403
+
+    discord_user = session.get("discord_user") or {}
+    user_discord_id = str(discord_user.get("id") or "").strip()
+    if not user_discord_id:
+        return jsonify({"detail": "Sign in with Discord to upvote tickets."}), 401
+
+    is_admin = bool(session.get("admin_logged_in"))
+    data = load_suggestions()
+    target_ticket = next((s for s in data.get("suggestions", []) if s.get("id") == ticket_id), None)
+    if not target_ticket or ((target_ticket.get("hidden") or target_ticket.get("archived")) and not is_admin):
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    if target_ticket.get("merged_into"):
+        return jsonify({
+            "detail": f"Ticket #{ticket_id} was merged into #{target_ticket['merged_into']}. Please upvote #{target_ticket['merged_into']} instead.",
+            "merged_into": target_ticket["merged_into"],
+        }), 400
+
+    upvotes = [str(u) for u in (target_ticket.get("upvotes") or []) if u]
+    if user_discord_id in upvotes:
+        upvotes = [u for u in upvotes if u != user_discord_id]
+        upvoted = False
+    else:
+        upvotes.append(user_discord_id)
+        upvoted = True
+
+    target_ticket["upvotes"] = upvotes
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    return jsonify({
+        "success": True,
+        "ticket_id": ticket_id,
+        "upvoted": upvoted,
+        "upvote_count": len(upvotes),
+    })
+
+
+@app.route("/tickets/<int:ticket_id>/transcript", methods=["GET"])
+def export_ticket_transcript(ticket_id):
+    data = load_suggestions()
+    target_ticket = next((s for s in data.get("suggestions", []) if s.get("id") == ticket_id), None)
+    if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    is_admin = bool(session.get("admin_logged_in"))
+    if target_ticket.get("hidden") and not is_admin:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
+    discord_user = session.get("discord_user") or {}
+    user_discord_id = str(discord_user.get("id") or "")
+    ticket_discord_id = str(target_ticket.get("discord_id") or "")
+    follower_ids = {str(f.get("discord_id") or "") for f in (target_ticket.get("followers") or []) if isinstance(f, dict) and f.get("discord_id")}
+
+    is_author = bool(user_discord_id and ticket_discord_id and user_discord_id == ticket_discord_id)
+    is_follower = bool(user_discord_id and user_discord_id in follower_ids)
+    if not is_admin and not is_author and not is_follower:
+        return jsonify({"detail": "Transcript export is restricted to the ticket author, followers, and administrators."}), 403
+
+    fmt = (request.args.get("format") or "txt").strip().lower()
+    if fmt == "html":
+        body = ticket_utils.generate_ticket_transcript_html(target_ticket)
+        return Response(
+            body,
+            mimetype="text/html; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="ticket-{ticket_id}-transcript.html"'},
+        )
+
+    body = ticket_utils.generate_ticket_transcript_txt(target_ticket)
+    return Response(
+        body,
+        mimetype="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="ticket-{ticket_id}-transcript.txt"'},
+    )
+
 @app.route("/tickets/<int:ticket_id>/messages", methods=["GET"])
 def get_ticket_messages_api(ticket_id):
     data = load_suggestions()
@@ -2396,6 +2593,9 @@ def get_ticket_messages_api(ticket_id):
         return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
 
     is_admin = bool(session.get("admin_logged_in"))
+    if target_ticket.get("hidden") and not is_admin:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
     discord_user = session.get("discord_user") or {}
     user_discord_id = str(discord_user.get("id") or "")
     ticket_discord_id = str(target_ticket.get("discord_id") or "")
@@ -2440,6 +2640,9 @@ def add_ticket_message_api(ticket_id):
         return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
 
     is_admin = bool(session.get("admin_logged_in"))
+    if target_ticket.get("hidden") and not is_admin:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+
     discord_user = session.get("discord_user") or {}
     user_discord_id = str(discord_user.get("id") or "")
     ticket_discord_id = str(target_ticket.get("discord_id") or "")
@@ -2452,8 +2655,11 @@ def add_ticket_message_api(ticket_id):
         return jsonify({"detail": "Only the ticket author, followers, and administrators can post messages in this discussion."}), 403
 
     msg_text = payload.message.strip()
-    if not msg_text:
+    msg_media_urls = ticket_utils.sanitize_media_urls(payload.media_urls)
+    if not msg_text and not msg_media_urls:
         return jsonify({"detail": "Message content cannot be empty."}), 400
+    if not msg_text and msg_media_urls:
+        msg_text = "\n".join(msg_media_urls)
 
     messages = target_ticket.setdefault("messages", [])
     new_msg_id = (max([m.get("id", 0) for m in messages]) if messages else 0) + 1
@@ -2480,6 +2686,7 @@ def add_ticket_message_api(ticket_id):
             "sender_discord_id": admin_d_id,
             "sender_avatar": admin_avatar,
             "message": msg_text,
+            "media_urls": msg_media_urls,
             "source": "web",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -2493,11 +2700,15 @@ def add_ticket_message_api(ticket_id):
             "sender_discord_id": user_discord_id,
             "sender_avatar": discord_user.get("avatar_url"),
             "message": msg_text,
+            "media_urls": msg_media_urls,
             "source": "web",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     messages.append(msg_obj)
+    if target_ticket.get("archived"):
+        target_ticket["archived"] = False
+        target_ticket["reopened_at"] = datetime.now(timezone.utc).isoformat()
     save_suggestions(data)
     broadcast_update("dashboard")
 
@@ -2507,7 +2718,8 @@ def add_ticket_message_api(ticket_id):
         messages,
         target_ticket.get("discord_id"),
         target_ticket.get("anonymous"),
-        follower_ids=follower_ids
+        follower_ids=follower_ids,
+        is_hidden=bool(target_ticket.get("hidden", False)),
     )
 
     if is_admin:
@@ -2523,36 +2735,42 @@ def add_ticket_message_api(ticket_id):
         except Exception as dm_err:
             logger.warning(f"[Ticket Message] Failed to notify author via DM: {dm_err}")
 
-    discord_channel_id = target_ticket.get("discord_channel_id")
     discussion_thread_id = target_ticket.get("discussion_thread_id")
-    channels_to_fwd = [c for c in [discord_channel_id, discussion_thread_id] if c]
-    if channels_to_fwd:
-        def _fwd_to_discord(chs, m_text, s_name, is_adm, current_msg_id):
-            try:
-                d_id = forward_ticket_reply_to_discord(
-                    channel_id=chs,
-                    message_text=m_text,
-                    sender_name=s_name,
-                    is_admin=is_adm,
-                )
-                if d_id:
-                    d = load_suggestions()
-                    for s in d.get("suggestions", []):
-                        if s.get("id") == ticket_id:
-                            for m in s.get("messages", []):
-                                if m.get("id") == current_msg_id:
-                                    m["discord_message_id"] = d_id
-                                    break
-                            break
-                    save_suggestions(d)
-            except Exception as ex:
-                logger.warning(f"[Disnake Forward] Failed to forward message to Discord: {ex}")
 
-        threading.Thread(
-            target=_fwd_to_discord,
-            args=(channels_to_fwd, msg_text, msg_obj.get("sender_name", "User"), is_admin, msg_obj.get("id")),
-            daemon=True
-        ).start()
+    def _fwd_to_discord(t_id, m_text, s_name, is_adm, current_msg_id, disc_tid):
+        try:
+            d_id = forward_or_recreate_ticket_reply_to_discord(
+                ticket_id=t_id,
+                message_text=m_text,
+                sender_name=s_name,
+                is_admin=is_adm,
+                source="web",
+                discussion_thread_id=disc_tid,
+            )
+            if d_id:
+                d = load_suggestions()
+                for s in d.get("suggestions", []):
+                    if s.get("id") == t_id:
+                        for m in s.get("messages", []):
+                            if m.get("id") == current_msg_id:
+                                m["discord_message_id"] = d_id
+                                break
+                        break
+                save_suggestions(d)
+        except Exception as ex:
+            logger.warning(f"[Disnake Forward] Failed to forward/recreate message in Discord: {ex}")
+
+    fwd_msg_text = msg_text
+    if msg_media_urls:
+        extra_urls = [u for u in msg_media_urls if u not in fwd_msg_text]
+        if extra_urls:
+            fwd_msg_text = (fwd_msg_text + "\n" + "\n".join(extra_urls)).strip()
+
+    threading.Thread(
+        target=_fwd_to_discord,
+        args=(ticket_id, fwd_msg_text, msg_obj.get("sender_name", "User"), is_admin, msg_obj.get("id"), discussion_thread_id),
+        daemon=True
+    ).start()
 
     return jsonify({
         "message": "Reply posted successfully.",
@@ -2585,6 +2803,8 @@ def edit_ticket_message_api(ticket_id, message_id):
             break
 
     if not target_ticket:
+        return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
+    if target_ticket.get("hidden") and not is_admin:
         return jsonify({"detail": f"Ticket #{ticket_id} not found."}), 404
 
     messages = target_ticket.setdefault("messages", [])
@@ -2781,6 +3001,8 @@ def submit_ticket():
     
     ticket_type = "bug_report" if payload.type in ["bug_report", "bug", "issue"] else "suggestion"
     initial_status = "open" if ticket_type == "bug_report" else "pending"
+    media_urls = ticket_utils.sanitize_media_urls(payload.media_urls)
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     new_sug = {
         "id": new_id,
@@ -2789,9 +3011,13 @@ def submit_ticket():
         "name": name,
         "suggestion": content,
         "description": content,
+        "media_urls": media_urls,
+        "upvotes": [],
+        "resolved_version": "",
         "ip": ip,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_iso,
         "status": initial_status,
+        "status_updated_at": now_iso,
         "target": target_val,
         "is_server_checker": target_val == "server_checker",
         "anonymous": is_anon,
@@ -2799,6 +3025,8 @@ def submit_ticket():
         "discord_username": discord_username,
         "discord_avatar": discord_avatar,
         "hidden": False,
+        "archived": False,
+        "channel_closed": False,
         "messages": [],
         "discord_channel_id": None
     }
@@ -3042,14 +3270,17 @@ def update_suggestion_status(username):
 
             prev_status = str(s.get("status") or ("open" if is_bug else "pending"))
             s["status"] = norm_status
+            s["status_updated_at"] = datetime.now(timezone.utc).isoformat()
+            if payload.resolved_version is not None:
+                s["resolved_version"] = payload.resolved_version.strip()[:64]
             save_suggestions(data)
             broadcast_update("dashboard")
-            log_audit_event("tickets.status_update", "tickets", f"Updated status of {ticket_type} #{payload.id} to '{norm_status}'", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "prev_status": prev_status, "new_status": norm_status}, username=username)
+            log_audit_event("tickets.status_update", "tickets", f"Updated status of {ticket_type} #{payload.id} to '{norm_status}'", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "prev_status": prev_status, "new_status": norm_status, "resolved_version": s.get("resolved_version") or ""}, username=username)
             try:
                 notify_ticket_author_dm(
                     s,
                     "status",
-                    {"changed_by": username, "status": norm_status}
+                    {"changed_by": username, "status": norm_status, "resolved_version": s.get("resolved_version") or ""}
                 )
             except Exception as dm_err:
                 logger.warning(f"Failed to notify author of status change via DM: {dm_err}")
@@ -3156,6 +3387,247 @@ def update_suggestion_visibility(username):
             log_audit_event("tickets.visibility", "tickets", f"Set ticket #{payload.id} visibility to {'hidden' if payload.hidden else 'public'}", target=f"Ticket #{payload.id}", details={"ticket_id": payload.id, "hidden": payload.hidden}, username=username)
             return jsonify({"message": f"Ticket #{payload.id} visibility updated.", "id": payload.id, "hidden": payload.hidden})
     return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
+
+
+class ArchiveTicketPayload(BaseModel):
+    id: int
+    archived: bool
+    close_channel: bool = False
+
+
+class CloseTicketChannelPayload(BaseModel):
+    id: int
+    archive: bool = True
+
+
+class BulkArchiveCompletedPayload(BaseModel):
+    close_channels: bool = False
+
+
+@app.route("/admin/tickets/archive", methods=["POST"])
+@admin_required
+def archive_ticket_route(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
+        payload = ArchiveTicketPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    suggestions = data.get("suggestions", [])
+    target = next((s for s in suggestions if s.get("id") == payload.id), None)
+    if not target:
+        return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    target["archived"] = payload.archived
+    if payload.archived:
+        target["archived_at"] = now_iso
+        target["archived_by"] = username
+    else:
+        target["archived_at"] = None
+        target["archived_by"] = None
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    channel_closed_note = ""
+    if payload.archived and payload.close_channel and target.get("discord_channel_id"):
+        ok, msg = close_discord_ticket_channel(payload.id, closed_by=f"{username} (via Website)", archive=True)
+        channel_closed_note = " and Discord channel deleted" if ok else f" (channel close note: {msg})"
+
+    log_audit_event(
+        "tickets.archive",
+        "tickets",
+        f"{'Archived' if payload.archived else 'Unarchived'} ticket #{payload.id}{channel_closed_note}",
+        target=f"Ticket #{payload.id}",
+        details={"ticket_id": payload.id, "archived": payload.archived, "close_channel": payload.close_channel},
+        username=username,
+    )
+    return jsonify({
+        "message": f"Ticket #{payload.id} {'archived' if payload.archived else 'restored to active'}{channel_closed_note}.",
+        "id": payload.id,
+        "archived": payload.archived,
+    })
+
+
+@app.route("/admin/tickets/close_channel", methods=["POST"])
+@admin_required
+def close_ticket_channel_route(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
+        payload = CloseTicketChannelPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    target = next((s for s in data.get("suggestions", []) if s.get("id") == payload.id), None)
+    if not target:
+        return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
+
+    ok, msg = close_discord_ticket_channel(payload.id, closed_by=f"{username} (via Website)", archive=payload.archive)
+    if not ok:
+        # Fallback if bot is offline: still update ticket metadata cleanly so it is marked closed/archived.
+        now_iso = datetime.now(timezone.utc).isoformat()
+        target["channel_closed"] = True
+        target["channel_closed_at"] = now_iso
+        target["channel_closed_by"] = f"{username} (via Website)"
+        target["discord_channel_id"] = None
+        target["discord_message_id"] = None
+        target["panel_message_id"] = None
+        if payload.archive:
+            target["archived"] = True
+            target["archived_at"] = now_iso
+            target["archived_by"] = username
+        save_suggestions(data)
+        broadcast_update("dashboard")
+
+    log_audit_event(
+        "tickets.close_channel",
+        "tickets",
+        f"Closed Discord channel for ticket #{payload.id} (archive={payload.archive})",
+        target=f"Ticket #{payload.id}",
+        details={"ticket_id": payload.id, "archive": payload.archive, "bot_result": msg},
+        username=username,
+    )
+    return jsonify({
+        "message": f"Closed channel for Ticket #{payload.id}. It will be recreated with full history if a new reply arrives.",
+        "id": payload.id,
+        "archived": payload.archive,
+        "bot_ok": ok,
+        "detail": msg if not ok else None,
+    })
+
+
+@app.route("/admin/tickets/archive_completed", methods=["POST"])
+@admin_required
+def archive_completed_tickets_route(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    try:
+        req_json = request.get_json(silent=True) or {}
+        if not isinstance(req_json, dict):
+            req_json = {}
+        payload = BulkArchiveCompletedPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    completed_statuses = {"fixed", "resolved", "implemented", "accepted", "declined", "invalid", "closed"}
+    data = load_suggestions()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    archived_ids: list[int] = []
+    channels_to_close: list[int] = []
+
+    for s in data.get("suggestions", []):
+        if s.get("archived"):
+            continue
+        st = str(s.get("status") or "").strip().lower()
+        if st in completed_statuses or s.get("merged_into"):
+            s["archived"] = True
+            s["archived_at"] = now_iso
+            s["archived_by"] = username
+            tid = s.get("id")
+            if tid is not None:
+                archived_ids.append(int(tid))
+                if payload.close_channels and s.get("discord_channel_id"):
+                    channels_to_close.append(int(tid))
+
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    if channels_to_close:
+        def _close_many(tids):
+            for tid in tids:
+                try:
+                    close_discord_ticket_channel(tid, closed_by=f"{username} (bulk archive)", archive=True)
+                except Exception as ex:
+                    logger.warning(f"[Bulk Archive] Could not close channel for ticket #{tid}: {ex}")
+
+        threading.Thread(target=_close_many, args=(channels_to_close,), daemon=True).start()
+
+    log_audit_event(
+        "tickets.archive_completed",
+        "tickets",
+        f"Bulk-archived {len(archived_ids)} completed ticket(s)",
+        target="Tickets",
+        details={"count": len(archived_ids), "ids": archived_ids[:100], "close_channels": payload.close_channels},
+        username=username,
+    )
+    return jsonify({
+        "message": f"Archived {len(archived_ids)} completed ticket(s).",
+        "count": len(archived_ids),
+        "ids": archived_ids,
+    })
+
+
+class SetTicketVersionPayload(BaseModel):
+    id: int
+    resolved_version: str = Field(default="", max_length=64)
+
+
+@app.route("/admin/tickets/version", methods=["POST"])
+@admin_required
+def set_ticket_version_route(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    try:
+        req_json = request.get_json() or {}
+        if not isinstance(req_json, dict):
+            return jsonify({"detail": "Invalid request body."}), 400
+        payload = SetTicketVersionPayload(**req_json)
+    except ValidationError as e:
+        return jsonify({"detail": e.errors()}), 400
+
+    data = load_suggestions()
+    target = next((s for s in data.get("suggestions", []) if s.get("id") == payload.id), None)
+    if not target:
+        return jsonify({"detail": f"Ticket with ID {payload.id} not found."}), 404
+
+    clean_ver = payload.resolved_version.strip()[:64]
+    target["resolved_version"] = clean_ver
+    save_suggestions(data)
+    broadcast_update("dashboard")
+
+    try:
+        update_ticket_channel_message(target, changed_by=f"{username} (via Website)")
+    except Exception as ex:
+        logger.warning(f"Failed to update ticket channel message for version tag: {ex}")
+
+    log_audit_event(
+        "tickets.version",
+        "tickets",
+        f"Set release version tag on ticket #{payload.id} to '{clean_ver or '(cleared)'}'",
+        target=f"Ticket #{payload.id}",
+        details={"ticket_id": payload.id, "resolved_version": clean_ver},
+        username=username,
+    )
+    return jsonify({
+        "message": f"Release version updated for Ticket #{payload.id}." if clean_ver else f"Release version cleared for Ticket #{payload.id}.",
+        "id": payload.id,
+        "resolved_version": clean_ver,
+    })
+
+
+@app.route("/admin/tickets/run_auto_archive", methods=["POST"])
+@admin_required
+def run_auto_archive_route(username):
+    if not has_permission(username, "suggestions"):
+        return jsonify({"detail": "Permission denied for tickets section"}), 403
+    archived = _run_ticket_auto_archive_once()
+    ids = [item["id"] for item in archived]
+    return jsonify({
+        "message": f"Auto-archive sweep complete: archived {len(archived)} ticket(s)." if archived else "Auto-archive sweep complete: no tickets qualified (7d no-reply / 30d with-reply).",
+        "count": len(archived),
+        "ids": ids,
+        "archived": archived,
+    })
 
 @app.route("/admin/tickets/delete", methods=["POST"])
 @admin_required
@@ -5405,5 +5877,6 @@ if __name__ == "__main__":
         port = 8400
         
     start_server_checker_worker()
+    start_ticket_auto_archive_worker()
     start_api_subprocess()
     app.run(host=host, port=port, debug=False)

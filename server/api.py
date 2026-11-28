@@ -619,6 +619,9 @@ class TicketItem(BaseModel):
     title: Optional[str] = None
     category: Optional[str] = None
     status: Optional[str] = None
+    archived: Optional[bool] = False
+    upvote_count: Optional[int] = 0
+    resolved_version: Optional[str] = None
     created_at: Optional[str] = None
 
 class TicketsResponse(BaseModel):

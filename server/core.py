@@ -275,6 +275,8 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
     for s in sorted(suggestions, key=lambda x: x.get("timestamp", ""), reverse=True):
         if s.get("hidden"):
             continue
+        if s.get("archived") and not is_admin:
+            continue
         is_anon = bool(s.get("anonymous")) or (s.get("name") or "").lower() == "anonymous"
         pub_name = "Anonymous" if is_anon else (s.get("name") or "Anonymous")
         pub_avatar = None if is_anon else s.get("discord_avatar")
@@ -289,6 +291,9 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
         can_view_conversation = is_admin or is_author or is_follower
         ticket_messages = s.get("messages", []) if can_view_conversation else []
         messages_count = len(s.get("messages", [])) if can_view_conversation else 0
+        raw_upvotes = [str(u) for u in (s.get("upvotes") or []) if u]
+        upvote_set = set(raw_upvotes)
+        user_upvoted = bool(current_discord_id and str(current_discord_id) in upvote_set)
 
         public_list.append({
             "id": s.get("id"),
@@ -299,6 +304,11 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
             "description": raw_text,
             "timestamp": s.get("timestamp", ""),
             "status": s.get("status", "pending"),
+            "status_updated_at": s.get("status_updated_at") or "",
+            "resolved_version": s.get("resolved_version") or "",
+            "media_urls": list(s.get("media_urls") or []),
+            "upvote_count": len(upvote_set),
+            "user_upvoted": user_upvoted,
             "admin_comment": s.get("admin_comment", ""),
             "comment_by": s.get("comment_by", ""),
             "comment_timestamp": s.get("comment_timestamp", ""),
@@ -317,6 +327,9 @@ def get_public_tickets(is_admin: bool = False, current_discord_id: Optional[str]
             "messages_count": messages_count,
             "merged_into": s.get("merged_into"),
             "merged_from": s.get("merged_from", []),
+            "archived": bool(s.get("archived", False)),
+            "archived_at": s.get("archived_at") or "",
+            "channel_closed": bool(s.get("channel_closed", False)),
         })
     return public_list
 

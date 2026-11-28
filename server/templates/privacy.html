@@ -123,8 +123,18 @@
                             from the Discord bot (using the Reply button, Discord's native Reply, a <code
                                 class="text-blue-300 font-mono">#&lt;id&gt;</code> prefix, or a direct message when you
                             have a single open ticket), your reply text and any attached file/image URLs are stored in
-                            that ticket's conversation and forwarded to staff channels. We also process IP addresses
-                            and/or anonymized IP hashes for rate limiting, spam prevention, and anti-abuse bans.
+                            that ticket's conversation and forwarded to staff channels. Signed-in Discord users can also
+                            upvote public tickets (your Discord ID is stored on the ticket to prevent duplicate votes and
+                            to send milestone status notifications without granting access to private conversations).
+                            Optional screenshot or media URLs attached to tickets or replies are embedded directly from
+                            their external source without storing image files on our server; for Discord CDN attachment
+                            URLs, the server may call Discord's official attachment URL refresh endpoint using the bot
+                            token so expired links remain viewable. Resolved or closed tickets may be tagged with a
+                            release version, exported as plain-text or HTML transcripts by authorized participants
+                            (and sent as a transcript DM upon channel closure), and automatically archived with their
+                            Discord channels removed after 7 days of inactivity (no replies) or 30 days of inactivity
+                            (with replies). We also process IP addresses and/or anonymized IP hashes for rate limiting,
+                            spam prevention, and anti-abuse bans.
                         </p>
                     </div>
 
@@ -171,8 +181,9 @@
                         <p class="text-zinc-400">
                             The web applications use browser <code class="text-cyan-300 font-mono">localStorage</code>
                             to remember preferences locally on your device (such as your last entered Job ID or selected
-                            reactor unit). This data remains on your device and is never transmitted to tracking
-                            servers.
+                            reactor unit) and, if you choose to sign in with Discord while composing a ticket, to
+                            temporarily preserve your ticket draft across the login redirect until it is submitted or
+                            cleared. This data remains on your device and is never transmitted to tracking servers.
                         </p>
                     </div>
                 </div>

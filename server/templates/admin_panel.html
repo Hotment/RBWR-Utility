@@ -681,7 +681,7 @@
                     <p class="text-xs text-slate-500 font-mono mt-1">Review feedback, bug reports, and chat directly
                         with authors.</p>
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 flex-wrap justify-end">
                     <div
                         class="flex gap-4 text-xs font-bold text-slate-400 bg-black/40 px-4 py-2.5 rounded-lg border border-white/5 shrink-0 font-mono whitespace-nowrap">
                         <div>TOTAL: <span id="sug-stat-total-entries" class="text-blue-400">0</span></div>
@@ -690,6 +690,15 @@
                         <div class="w-px bg-white/5 self-stretch"></div>
                         <div>SUGGESTIONS: <span id="sug-stat-suggestions" class="text-emerald-400">0</span></div>
                     </div>
+                    <button type="button" onclick="openReleaseChangelogModal()"
+                        class="px-3.5 py-2 border border-emerald-500/30 hover:border-emerald-400 text-emerald-300 hover:text-white rounded-lg bg-emerald-500/10 hover:bg-emerald-600 tracking-wide font-mono font-bold text-xs uppercase transition shrink-0 whitespace-nowrap"
+                        title="Generate markdown changelog bullets from release-version tagged tickets">Release Changelog</button>
+                    <button type="button" onclick="runAdminAutoArchive()"
+                        class="px-3.5 py-2 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white rounded-lg bg-cyan-500/10 hover:bg-cyan-600 tracking-wide font-mono font-bold text-xs uppercase transition shrink-0 whitespace-nowrap"
+                        title="Run auto-archive sweep now (7d inactive without replies, 30d inactive with replies, deletes Discord channels)">Auto-Archive Sweep</button>
+                    <button type="button" onclick="bulkArchiveCompleted()"
+                        class="px-3.5 py-2 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-white rounded-lg bg-amber-500/10 hover:bg-amber-600 tracking-wide font-mono font-bold text-xs uppercase transition shrink-0 whitespace-nowrap"
+                        title="Archive all completed, implemented, fixed, declined, closed, invalid, or merged tickets">Archive Completed</button>
                     <a href="/tickets" target="_blank"
                         class="px-4 py-2 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 tracking-wide font-mono font-medium text-xs transition shrink-0 whitespace-nowrap">Public
                         Portal &rarr;</a>
@@ -700,6 +709,30 @@
 
             <div class="flex flex-col gap-3">
                 <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div
+                        class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
+                        <button type="button" onclick="filterAdminScope('active')" id="admin-scope-active"
+                            class="px-3.5 py-2 bg-blue-600 text-white transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5">
+                            <span>Active</span>
+                            <span id="admin-scope-count-active" class="px-1.5 py-0.2 rounded-full bg-black/25 text-[10px]">0</span>
+                        </button>
+                        <button type="button" onclick="filterAdminScope('archived')" id="admin-scope-archived"
+                            class="px-3.5 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5">
+                            <span>Archived</span>
+                            <span id="admin-scope-count-archived" class="px-1.5 py-0.2 rounded-full bg-white/10 text-[10px]">0</span>
+                        </button>
+                        <button type="button" onclick="filterAdminScope('hidden')" id="admin-scope-hidden"
+                            class="px-3.5 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5">
+                            <span>Hidden</span>
+                            <span id="admin-scope-count-hidden" class="px-1.5 py-0.2 rounded-full bg-white/10 text-[10px]">0</span>
+                        </button>
+                        <button type="button" onclick="filterAdminScope('all')" id="admin-scope-all"
+                            class="px-3.5 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5">
+                            <span>All</span>
+                            <span id="admin-scope-count-all" class="px-1.5 py-0.2 rounded-full bg-white/10 text-[10px]">0</span>
+                        </button>
+                    </div>
+
                     <div
                         class="cyber-panel p-1.5 rounded-xl flex flex-wrap border border-white/5 gap-1 text-xs font-bold font-mono bg-black/20 w-fit">
                         <button onclick="filterTicketType('all')" id="ticket-type-all"
@@ -768,6 +801,7 @@
                         <select id="admin-ticket-sort" onchange="rerenderSortedAdminSuggestions()"
                             class="premium-input px-3 py-2 rounded-xl text-xs font-mono outline-none cursor-pointer bg-[#121217] text-slate-200 border border-white/10">
                             <option value="newest">Newest First</option>
+                            <option value="votes">Most Voted</option>
                             <option value="activity">Latest Activity</option>
                             <option value="needs_reply">Needs Reply First</option>
                             <option value="oldest">Oldest First</option>
@@ -778,6 +812,31 @@
 
                 <div id="feed-container" class="flex flex-col gap-4">
                     <p class="text-sm text-slate-500 italic font-mono">Loading tickets...</p>
+                </div>
+                <div id="admin-tickets-empty-filter" class="hidden cyber-panel rounded-xl p-6 border border-white/5 text-center font-mono">
+                    <p class="text-sm text-slate-400">No tickets match the current scope and filter settings.</p>
+                    <button type="button" onclick="resetAdminTicketFilters()" class="mt-3 px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase bg-white/10 hover:bg-white/20 text-white border border-white/10 transition">Reset Filters</button>
+                </div>
+
+                <div id="admin-changelog-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div class="cyber-panel max-w-2xl w-full rounded-2xl border border-emerald-500/30 p-6 flex flex-col gap-4 shadow-2xl font-mono">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-bold text-white font-display">Release Changelog Builder</h3>
+                                <p class="text-[11px] text-slate-400">Auto-group tagged tickets by release version into ready-to-paste release notes bullets.</p>
+                            </div>
+                            <button type="button" onclick="closeReleaseChangelogModal()" class="px-2.5 py-1 rounded-lg text-xs bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition">Close</button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <label for="admin-changelog-version-select" class="text-xs text-slate-400 uppercase font-bold">Version:</label>
+                            <select id="admin-changelog-version-select" onchange="renderReleaseChangelogPreview()"
+                                class="premium-input px-3 py-1.5 rounded-lg text-xs bg-[#121217] text-slate-200 border border-white/10 outline-none flex-1 min-w-[180px]"></select>
+                            <button type="button" onclick="copyReleaseChangelog()"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase bg-emerald-600 hover:bg-emerald-700 text-white transition">Copy Markdown</button>
+                        </div>
+                        <textarea id="admin-changelog-output" rows="14" readonly
+                            class="premium-input p-3 rounded-xl text-xs text-slate-200 bg-black/50 border border-white/10 outline-none resize-y"></textarea>
+                    </div>
                 </div>
         </main>
 
@@ -2475,8 +2534,39 @@
             applyFilter();
         }
 
+        let currentAdminScope = 'active';
         let adminNeedsReplyOnly = false;
         let latestAdminSuggestions = [];
+
+        function filterAdminScope(scope) {
+            currentAdminScope = scope;
+            const styles = {
+                active: 'bg-blue-600 text-white',
+                archived: 'bg-amber-600 text-white',
+                hidden: 'bg-purple-600 text-white',
+                all: 'bg-slate-600 text-white'
+            };
+            ['active', 'archived', 'hidden', 'all'].forEach(sc => {
+                const tab = document.getElementById('admin-scope-' + sc);
+                if (tab) {
+                    const activeCls = styles[sc] || 'bg-blue-600 text-white';
+                    tab.className = (sc === scope)
+                        ? `px-3.5 py-2 ${activeCls} transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5`
+                        : 'px-3.5 py-2 text-slate-400 hover:text-white hover:bg-white/5 transition rounded-lg uppercase whitespace-nowrap flex items-center gap-1.5';
+                }
+            });
+            applyFilter();
+        }
+
+        function resetAdminTicketFilters() {
+            const searchEl = document.getElementById('admin-ticket-search');
+            if (searchEl) searchEl.value = '';
+            if (adminNeedsReplyOnly) toggleAdminNeedsReply();
+            filterAdminScope('active');
+            filterTicketType('all');
+            filterTarget('all');
+            filterStatus('all');
+        }
 
         const ADMIN_CANNED_REPLIES = [
             { label: "Quick Reply...", text: "" },
@@ -2540,12 +2630,20 @@
             const searchEl = document.getElementById('admin-ticket-search');
             const query = (searchEl ? searchEl.value : '').trim().toLowerCase();
             const cards = document.querySelectorAll('.suggestion-card');
+            let visibleCount = 0;
             cards.forEach(card => {
                 const cardType = card.getAttribute('data-type') || 'suggestion';
                 const cardStatus = (card.getAttribute('data-status') || 'pending').toLowerCase();
                 const cardTarget = card.getAttribute('data-target') || 'overlay';
                 const cardReplyState = card.getAttribute('data-reply-state') || 'replied';
                 const cardSearch = card.getAttribute('data-search') || '';
+                const isArchived = card.getAttribute('data-archived') === 'true';
+                const isHidden = card.getAttribute('data-hidden') === 'true';
+
+                let scopeMatch = true;
+                if (currentAdminScope === 'active') scopeMatch = (!isArchived && !isHidden);
+                else if (currentAdminScope === 'archived') scopeMatch = (isArchived && !isHidden);
+                else if (currentAdminScope === 'hidden') scopeMatch = isHidden;
 
                 const typeMatch = (currentTicketTypeFilter === 'all' || cardType === currentTicketTypeFilter);
 
@@ -2564,12 +2662,19 @@
                 const needsReplyMatch = !adminNeedsReplyOnly || (cardReplyState === 'awaiting' || cardReplyState === 'unanswered');
                 const searchMatch = !query || cardSearch.includes(query);
 
-                if (typeMatch && statusMatch && targetMatch && needsReplyMatch && searchMatch) {
+                if (scopeMatch && typeMatch && statusMatch && targetMatch && needsReplyMatch && searchMatch) {
                     card.style.display = 'flex';
+                    visibleCount++;
                 } else {
                     card.style.display = 'none';
                 }
             });
+
+            const emptyBanner = document.getElementById('admin-tickets-empty-filter');
+            if (emptyBanner) {
+                if (cards.length > 0 && visibleCount === 0) emptyBanner.classList.remove('hidden');
+                else emptyBanner.classList.add('hidden');
+            }
         }
 
         const ADMIN_PAGE_SIZE = 20;
@@ -3239,7 +3344,22 @@
             const container = document.getElementById('feed-container');
             if (!container) return;
 
+            const activeCount = latestAdminSuggestions.filter(s => !s.archived && !s.hidden).length;
+            const archivedCount = latestAdminSuggestions.filter(s => Boolean(s.archived) && !s.hidden).length;
+            const hiddenCount = latestAdminSuggestions.filter(s => Boolean(s.hidden)).length;
+            const allCount = latestAdminSuggestions.length;
+
+            const elActive = document.getElementById('admin-scope-count-active');
+            const elArchived = document.getElementById('admin-scope-count-archived');
+            const elHidden = document.getElementById('admin-scope-count-hidden');
+            const elAll = document.getElementById('admin-scope-count-all');
+            if (elActive) elActive.innerText = activeCount;
+            if (elArchived) elArchived.innerText = archivedCount;
+            if (elHidden) elHidden.innerText = hiddenCount;
+            if (elAll) elAll.innerText = allCount;
+
             const needsReplyCount = latestAdminSuggestions.filter(s => {
+                if (s.archived || s.hidden) return false;
                 const rs = getTicketReplyState(s);
                 return rs === 'awaiting' || rs === 'unanswered';
             }).length;
@@ -3248,12 +3368,19 @@
 
             if (latestAdminSuggestions.length === 0) {
                 container.innerHTML = '<p class="text-sm text-slate-500 italic font-mono">No tickets or feedback submitted yet.</p>';
+                const emptyBanner = document.getElementById('admin-tickets-empty-filter');
+                if (emptyBanner) emptyBanner.classList.add('hidden');
                 return;
             }
 
             const sortMode = (document.getElementById('admin-ticket-sort')?.value) || 'newest';
             const ordered = [...latestAdminSuggestions];
             ordered.sort((a, b) => {
+                if (sortMode === 'votes') {
+                    const diff = Number(b.upvote_count || 0) - Number(a.upvote_count || 0);
+                    if (diff !== 0) return diff;
+                    return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+                }
                 if (sortMode === 'oldest') {
                     return new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime();
                 }
@@ -3324,9 +3451,27 @@
                     ? '<span class="px-2 py-0.5 bg-purple-950/50 text-purple-300 text-[10px] rounded font-bold uppercase border border-purple-500/30 font-mono">Hidden</span>'
                     : '';
 
+                const archivedTag = s.archived
+                    ? `<span class="px-2 py-0.5 bg-amber-950/50 text-amber-300 text-[10px] rounded font-bold uppercase border border-amber-500/30 font-mono" title="${s.archived_at ? 'Archived ' + formatTimestamp(s.archived_at) : 'Archived ticket'}">Archived</span>`
+                    : '';
+
+                const channelTag = s.discord_channel_id
+                    ? '<span class="px-2 py-0.5 bg-[#5865F2]/15 text-[#9aa3ff] text-[10px] rounded font-bold uppercase border border-[#5865F2]/30 font-mono">Channel Active</span>'
+                    : (s.channel_closed
+                        ? '<span class="px-2 py-0.5 bg-zinc-800/80 text-zinc-400 text-[10px] rounded font-bold uppercase border border-zinc-700 font-mono" title="Discord channel deleted; automatically recreates with full history on next reply">Channel Closed</span>'
+                        : '');
+
                 const visibilityBtn = s.hidden
                     ? `<button onclick="toggleVisibility(${s.id}, false)" class="px-3 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-purple-500/30 transition">Unhide</button>`
                     : `<button onclick="toggleVisibility(${s.id}, true)" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Hide</button>`;
+
+                const archiveBtn = s.archived
+                    ? `<button onclick="toggleTicketArchive(${s.id}, false)" class="px-3 py-1 bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-amber-500/30 transition">Unarchive</button>`
+                    : `<button onclick="toggleTicketArchive(${s.id}, true)" class="px-3 py-1 bg-amber-600/10 hover:bg-amber-600 text-amber-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-amber-500/20 transition" title="Move ticket to the Archive tab">Archive</button>`;
+
+                const closeChannelBtn = s.discord_channel_id
+                    ? `<button onclick="closeTicketChannel(${s.id})" class="px-3 py-1 bg-[#5865F2]/15 hover:bg-[#5865F2] text-[#9aa3ff] hover:text-white text-xs rounded-lg font-medium uppercase border border-[#5865F2]/30 transition" title="Delete Discord channel and archive ticket (auto-recreates with full message history on next reply)">Close Channel</button>`
+                    : '';
 
                 const banBtn = isBanned
                     ? `<button onclick="unbanIP('${s.ip}')" class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg font-medium uppercase border border-zinc-700 transition">Unban IP</button>`
@@ -3409,6 +3554,7 @@
                             </div>
                             <div id="ticket-msg-content-${s.id}-${m.id}">
                                 <p id="ticket-msg-text-${s.id}-${m.id}" class="text-xs text-slate-200 font-mono whitespace-pre-wrap pl-1">${escapeHtml(m.message)}</p>
+                                ${renderAdminMediaGalleryHtml(m.media_urls, m.message)}
                             </div>
                             <div id="ticket-msg-edit-${s.id}-${m.id}" class="hidden flex flex-col gap-1.5 pt-1">
                                 <textarea id="ticket-msg-edit-input-${s.id}-${m.id}" rows="2" class="premium-input text-xs p-2 rounded-lg outline-none resize-none font-mono text-slate-200">${escapeHtml(m.message)}</textarea>
@@ -3480,26 +3626,42 @@
                         : '');
 
                 const searchBlob = escapeHtml(
-                    `#${s.id} ${s.id} ${s.title || ''} ${s.suggestion || s.description || ''} ${s.name || ''} ${s.discord_username || ''} ${s.discord_id || ''} ${messages.map(m => m.message || '').join(' ')}`
+                    `#${s.id} ${s.id} ${s.title || ''} ${s.suggestion || s.description || ''} ${s.resolved_version || ''} ${s.name || ''} ${s.discord_username || ''} ${s.discord_id || ''} ${messages.map(m => m.message || '').join(' ')}`
                 ).toLowerCase();
 
+                const upvoteBadge = Number(s.upvote_count || 0) > 0
+                    ? `<span class="px-2 py-0.5 bg-blue-950/50 text-blue-300 text-[10px] rounded font-bold uppercase border border-blue-500/30 font-mono">Upvotes: ${Number(s.upvote_count)}</span>`
+                    : '';
+
+                const versionTagBadge = s.resolved_version
+                    ? `<span class="px-2 py-0.5 bg-emerald-950/50 text-emerald-300 text-[10px] rounded font-bold border border-emerald-500/30 font-mono">${escapeHtml(s.resolved_version)}</span>`
+                    : '';
+
+                const adminTicketMediaHtml = renderAdminMediaGalleryHtml(s.media_urls, s.suggestion || s.description || '');
+
                 html += `
-                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3.5" data-type="${itemType}" data-status="${s.status || 'pending'}" data-target="${targetAttr}" data-reply-state="${replyState}" data-search="${searchBlob}">
+                    <div class="suggestion-card premium-glass p-5 rounded-xl border border-white/5 flex flex-col gap-3.5" data-type="${itemType}" data-status="${s.status || 'pending'}" data-target="${targetAttr}" data-reply-state="${replyState}" data-archived="${s.archived ? 'true' : 'false'}" data-hidden="${s.hidden ? 'true' : 'false'}" data-search="${searchBlob}">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 ${authorHtml}
                                 ${typeBadge}
                                 ${targetTag}
+                                ${archivedTag}
                                 ${hiddenTag}
+                                ${channelTag}
+                                ${versionTagBadge}
+                                ${upvoteBadge}
                                 ${replyStateBadge}
                                 ${s.merged_into ? `<span class="px-2 py-0.5 bg-cyan-950/50 text-cyan-300 text-[10px] rounded font-bold uppercase border border-cyan-500/30 font-mono" title="Merged by ${escapeHtml(s.merged_by || 'an admin')}">Merged into #${Number(s.merged_into)}</span>` : ''}
                                 ${(s.merged_from || []).length ? `<span class="px-2 py-0.5 bg-cyan-950/30 text-cyan-400 text-[10px] rounded font-bold uppercase border border-cyan-500/20 font-mono">Merged in: ${s.merged_from.map(i => '#' + Number(i)).join(', ')}</span>` : ''}
                                 <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${badgeClass}">${s.status}</span>
                             </div>
-                            <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
+                            <div class="text-[11px] text-slate-400 flex items-center gap-2 font-mono flex-wrap">
                                 <span>Ticket #${s.id}</span>
                                 <a href="/tickets?ticket=${s.id}" target="_blank" class="text-blue-400 hover:text-blue-300 underline text-[10px]">Public Link</a>
+                                <a href="/tickets/${s.id}/transcript?format=txt" target="_blank" class="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[10px] transition" title="Download plain-text transcript">TXT</a>
+                                <a href="/tickets/${s.id}/transcript?format=html" target="_blank" class="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[10px] transition" title="Download HTML transcript">HTML</a>
                                 ${bannedTag}
                             </div>
                         </div>
@@ -3507,6 +3669,7 @@
                         ${titleDisplay}
 
                         <p class="text-sm text-slate-300 bg-black/20 p-4 rounded-lg border border-white/5 leading-relaxed font-mono whitespace-pre-wrap">${escapeHtml(s.suggestion || s.description)}</p>
+                        ${adminTicketMediaHtml}
                         
                         ${commentDisplay}
 
@@ -3523,13 +3686,21 @@
                         </div>
 
                         <div class="flex flex-wrap justify-between items-center gap-4 mt-1 border-t border-white/5 pt-3 font-mono">
-                            <div class="flex flex-wrap gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
                                 ${statusActionButtons}
                                 <button onclick="toggleCommentBox(${s.id})" class="px-3 py-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-indigo-500/20 transition flex items-center gap-1">
                                     <span></span> ${hasComment ? 'Edit Note' : 'Add Note'}
                                 </button>
                                 ${visibilityBtn}
+                                ${archiveBtn}
+                                ${closeChannelBtn}
                                 ${s.merged_into ? '' : `<button onclick="mergeSuggestion(${s.id})" class="px-3 py-1 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-300 hover:text-white text-xs rounded-lg font-medium uppercase border border-cyan-500/20 transition" title="Merge this ticket into another one about the same thing">Merge</button>`}
+                                <div class="inline-flex items-center gap-1 bg-black/30 px-2 py-0.5 rounded-lg border border-white/10">
+                                    <input type="text" id="ticket-version-input-${s.id}" value="${escapeHtml(s.resolved_version || '')}" placeholder="v2.3.3"
+                                        onkeydown="if(event.key==='Enter'){event.preventDefault();saveTicketVersion(${s.id});}"
+                                        class="bg-transparent text-xs text-emerald-300 placeholder-slate-500 outline-none w-24 font-mono">
+                                    <button type="button" onclick="saveTicketVersion(${s.id})" class="px-2 py-0.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] rounded font-bold uppercase transition">Set Ver</button>
+                                </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="deleteSuggestion(${s.id})" class="px-3 py-1 bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white text-xs rounded-lg font-medium uppercase border border-red-500/20 transition">Delete Ticket</button>
@@ -3642,6 +3813,222 @@
                 }
             } catch (err) {
                 alert('Network error updating visibility.');
+            }
+        }
+
+        async function toggleTicketArchive(id, archived) {
+            try {
+                const response = await fetch('/admin/tickets/archive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, archived, close_channel: false })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    alert(data.detail || 'Failed to update archive state.');
+                }
+            } catch (err) {
+                alert('Network error updating archive state.');
+            }
+        }
+
+        async function closeTicketChannel(id) {
+            if (!confirm(`Close and delete the Discord channel for Ticket #${id}?\n\nAll conversation messages stay saved, the ticket moves to Archive, and the Discord channel will automatically recreate with full message history if a new reply arrives.`)) {
+                return;
+            }
+            try {
+                const response = await fetch('/admin/tickets/close_channel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, archive: true })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    alert(data.detail || 'Failed to close Discord channel.');
+                }
+            } catch (err) {
+                alert('Network error closing Discord channel.');
+            }
+        }
+
+        function isAdminDiscordCdnUrl(url) {
+            try {
+                const parsed = new URL(url);
+                const host = parsed.hostname.toLowerCase();
+                return parsed.protocol === 'https:' &&
+                    (host === 'cdn.discordapp.com' || host === 'media.discordapp.net') &&
+                    (parsed.pathname.startsWith('/attachments/') || parsed.pathname.startsWith('/ephemeral-attachments/'));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function renderAdminMediaGalleryHtml(explicitUrls, textForInline = '') {
+            const combined = [];
+            (Array.isArray(explicitUrls) ? explicitUrls : []).forEach(u => {
+                if (u && !combined.includes(u)) combined.push(u);
+            });
+            const matches = String(textForInline || '').match(/https?:\/\/[^\s<>'"`\])]+/gi) || [];
+            for (const raw of matches) {
+                const clean = raw.replace(/[.,;:!?]+$/, '');
+                const isImg = /\.(?:png|jpe?g|gif|webp|bmp|avif)(?:$|\?)/i.test(clean);
+                if ((isImg || isAdminDiscordCdnUrl(clean)) && !combined.includes(clean) && combined.length < 5) {
+                    combined.push(clean);
+                }
+            }
+            if (combined.length === 0) return '';
+            return '<div class="flex flex-wrap gap-2 pt-1">' + combined.map(rawUrl => {
+                const safeRaw = escapeHtml(rawUrl);
+                const isDisc = isAdminDiscordCdnUrl(rawUrl);
+                const src = escapeHtml(isDisc ? `/tickets/media/resolve?url=${encodeURIComponent(rawUrl)}` : rawUrl);
+                return `
+                    <a href="${src}" target="_blank" rel="noopener noreferrer"
+                        class="block rounded-lg overflow-hidden border border-white/10 bg-black/40 hover:border-blue-500/40 transition max-w-xs">
+                        <img src="${src}" alt="Ticket media" loading="lazy" referrerpolicy="no-referrer"
+                            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
+                            class="max-h-40 w-auto object-contain bg-black/30">
+                        <span class="hidden px-2.5 py-1.5 text-[10px] font-mono text-blue-400 underline break-all block">${safeRaw}</span>
+                    </a>
+                `;
+            }).join('') + '</div>';
+        }
+
+        async function saveTicketVersion(id) {
+            const input = document.getElementById(`ticket-version-input-${id}`);
+            if (!input) return;
+            const resolved_version = input.value.trim();
+            try {
+                const response = await fetch('/admin/tickets/version', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, resolved_version })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    alert(data.detail || 'Failed to update release version tag.');
+                }
+            } catch (err) {
+                alert('Network error updating release version tag.');
+            }
+        }
+
+        async function runAdminAutoArchive() {
+            if (!confirm('Run the auto-archive sweep now?\n\nCompleted/closed/merged tickets inactive for 7 days (no replies) or 30 days (with replies) will be archived and their Discord channels deleted.')) {
+                return;
+            }
+            try {
+                const response = await fetch('/admin/tickets/run_auto_archive', { method: 'POST' });
+                const data = await response.json().catch(() => ({}));
+                alert(response.ok ? (data.message || 'Auto-archive sweep completed.') : (data.detail || 'Auto-archive failed.'));
+            } catch (err) {
+                alert('Network error running auto-archive sweep.');
+            }
+        }
+
+        function openReleaseChangelogModal() {
+            const modal = document.getElementById('admin-changelog-modal');
+            const select = document.getElementById('admin-changelog-version-select');
+            if (!modal || !select) return;
+            const versions = [...new Set(
+                latestAdminSuggestions
+                    .map(s => (s.resolved_version || '').trim())
+                    .filter(Boolean)
+            )].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+
+            if (versions.length === 0) {
+                select.innerHTML = '<option value="">No tickets tagged with a release version yet</option>';
+            } else {
+                select.innerHTML = versions.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('') +
+                    '<option value="__ALL__">All Tagged Versions</option>';
+            }
+            renderReleaseChangelogPreview();
+            modal.classList.remove('hidden');
+        }
+
+        function closeReleaseChangelogModal() {
+            const modal = document.getElementById('admin-changelog-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function renderReleaseChangelogPreview() {
+            const select = document.getElementById('admin-changelog-version-select');
+            const output = document.getElementById('admin-changelog-output');
+            if (!select || !output) return;
+            const ver = select.value;
+            if (!ver) {
+                output.value = 'Tag tickets with a release version (e.g. v2.3.3) on any ticket card or via /version in Discord to generate changelog notes here.';
+                return;
+            }
+
+            const renderVersionGroup = (targetVer) => {
+                const items = latestAdminSuggestions.filter(s => (s.resolved_version || '').trim() === targetVer);
+                const bugs = items.filter(s => s.type === 'bug_report');
+                const features = items.filter(s => s.type !== 'bug_report');
+                const lines = [`## ${targetVer}`, ''];
+                if (features.length) {
+                    lines.push('### Features & Improvements');
+                    features.forEach(t => {
+                        const title = (t.title || (t.suggestion || t.description || '').slice(0, 80)).trim();
+                        lines.push(`- **${title}** (Ticket #${t.id})`);
+                    });
+                    lines.push('');
+                }
+                if (bugs.length) {
+                    lines.push('### Bug Fixes');
+                    bugs.forEach(t => {
+                        const title = (t.title || (t.description || t.suggestion || '').slice(0, 80)).trim();
+                        lines.push(`- **${title}** (Ticket #${t.id})`);
+                    });
+                    lines.push('');
+                }
+                return lines.join('\n');
+            };
+
+            if (ver === '__ALL__') {
+                const versions = [...new Set(
+                    latestAdminSuggestions.map(s => (s.resolved_version || '').trim()).filter(Boolean)
+                )].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+                output.value = versions.map(renderVersionGroup).join('\n---\n\n').trim();
+            } else {
+                output.value = renderVersionGroup(ver).trim();
+            }
+        }
+
+        function copyReleaseChangelog() {
+            const output = document.getElementById('admin-changelog-output');
+            if (!output || !output.value) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(output.value).then(() => alert('Changelog markdown copied to clipboard.')).catch(() => {
+                    output.select();
+                    document.execCommand('copy');
+                });
+            }
+        }
+
+        async function bulkArchiveCompleted() {
+            const eligible = latestAdminSuggestions.filter(s => !s.archived && (s.merged_into || isTicketClosedStatus(s.status)));
+            if (eligible.length === 0) {
+                alert('There are no unarchived completed, resolved, declined, invalid, or merged tickets.');
+                return;
+            }
+            const withChannels = eligible.filter(s => Boolean(s.discord_channel_id)).length;
+            const channelNote = withChannels > 0
+                ? `\n\n${withChannels} of them still have active Discord channels. Also delete those Discord channels? (Channels will auto-recreate with full history if a new reply arrives.)`
+                : '';
+            if (!confirm(`Archive ${eligible.length} completed ticket(s)?`)) {
+                return;
+            }
+            const closeChannels = withChannels > 0 ? confirm(`Also close and delete ${withChannels} active Discord channel(s) for those archived tickets?${channelNote}`) : false;
+            try {
+                const response = await fetch('/admin/tickets/archive_completed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ close_channels: closeChannels })
+                });
+                const data = await response.json().catch(() => ({}));
+                alert(response.ok ? (data.message || 'Completed tickets archived.') : (data.detail || 'Failed to archive completed tickets.'));
+            } catch (err) {
+                alert('Network error archiving completed tickets.');
             }
         }
 
