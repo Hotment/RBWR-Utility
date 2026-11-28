@@ -6,6 +6,9 @@ namespace RbwrThemeCreator.Services;
 
 public static class FontTools
 {
+    public static bool IsFontFile(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".ttf" or ".otf" or ".ttc";
+
     public static readonly string TempRootDir = Path.Combine(Path.GetTempPath(), "RbwrThemeCreator");
     private static readonly string PreviewCacheDir = Path.Combine(TempRootDir, "preview-files");
 

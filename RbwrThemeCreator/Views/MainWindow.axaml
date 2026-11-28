@@ -4,6 +4,7 @@
         xmlns:models="using:RbwrThemeCreator.Models"
         xmlns:services="using:RbwrThemeCreator.Services"
         xmlns:views="using:RbwrThemeCreator.Views"
+        xmlns:ai="using:RbwrThemeCreator.Services.Ai"
         x:Class="RbwrThemeCreator.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="{Binding WindowTitle}"
@@ -876,6 +877,207 @@
                     </ScrollViewer>
                 </TabItem>
 
+                <!-- AI -->
+                <TabItem x:Name="AiTab">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Classes="icon" Text="&#xE99A;" /><TextBlock Text="AI" VerticalAlignment="Center" /></StackPanel>
+                    </TabItem.Header>
+                    <Panel>
+                        <ScrollViewer IsVisible="{Binding Ai.ShowPicker}">
+                            <StackPanel Margin="18,16">
+                                <TextBlock Classes="page-title" Text="AI" />
+                                <TextBlock Classes="page-sub" Text="Pick an AI, then chat. It can read and change this theme, look at screenshots and files, and use your MCP servers. Type / in the chat for commands." />
+                                <ItemsControl ItemsSource="{Binding Ai.Providers}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AiProviderItem">
+                                            <Button Classes="hud-list" Margin="0,0,8,8" Padding="12,10" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                    Command="{Binding ChooseCommand}">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <Border Width="34" Height="34" CornerRadius="17" BorderThickness="1" BorderBrush="{DynamicResource EdCyan}" Background="{DynamicResource EdPanel}">
+                                                        <Panel>
+                                                            <PathIcon Data="{Binding Logo}" Foreground="{Binding LogoBrush}" Width="18" Height="18" IsVisible="{Binding HasLogo}" />
+                                                            <TextBlock Text="{Binding Glyph}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource EdCyan}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       IsVisible="{Binding !HasLogo}" />
+                                                        </Panel>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" />
+                                                        <TextBlock Classes="muted" Text="{Binding Tagline}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Classes="faint" Text="{Binding Features}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center" Classes.ready="{Binding IsReady}">
+                                                        <TextBlock Text="{Binding StatusText}" FontSize="9" FontWeight="Bold" />
+                                                    </Border>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border Classes="card" Margin="0,8,0,0">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center"
+                                                   Text="Keys, the MCP server for Claude Code / Copilot / Codex and extra MCP servers are in SETTINGS." />
+                                        <Button Grid.Column="1" Classes="hud-blue" Content="AI SETTINGS" Command="{Binding Ai.OpenAiSettingsCommand}" Margin="8,0,0,0" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <DockPanel Margin="18,16" IsVisible="{Binding Ai.HasProvider}">
+                            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
+                                <Button Classes="hud" Content="‹ BACK" Command="{Binding Ai.BackCommand}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Classes="section-title" Text="{Binding Ai.ProviderTitle}" VerticalAlignment="Center" Margin="10,0" TextTrimming="CharacterEllipsis" />
+                                <ComboBox Grid.Column="2" Classes="hud" Width="210" IsEditable="True" ItemsSource="{Binding Ai.Models}" Text="{Binding Ai.Model}"
+                                          ToolTip.Tip="Model — pick one or type any model name" />
+                                <DropDownButton Grid.Column="3" Classes="hud" Content="MODELS" Margin="6,0,0,0" ToolTip.Tip="Models with descriptions; load the full list from the provider">
+                                    <DropDownButton.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedRight">
+                                            <StackPanel Width="340" Spacing="4">
+                                                <Grid ColumnDefinitions="*,Auto" Margin="4,2,0,6">
+                                                    <TextBlock Classes="section-title" Text="CHOOSE A MODEL" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="1" Classes="hud" Content="LOAD FROM API" Command="{Binding Ai.RefreshModelsCommand}" IsEnabled="{Binding !Ai.IsLoadingModels}" />
+                                                </Grid>
+                                                <ScrollViewer MaxHeight="380">
+                                                    <ItemsControl x:Name="ModelList" ItemsSource="{Binding Ai.ModelInfos}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="ai:AiModelInfo">
+                                                                <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,1"
+                                                                        Command="{Binding #ModelList.((vm:MainViewModel)DataContext).Ai.PickModelCommand}" CommandParameter="{Binding}">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Id}" FontWeight="Bold" Foreground="{DynamicResource EdCyan}" />
+                                                                        <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                                    </StackPanel>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </StackPanel>
+                                        </Flyout>
+                                    </DropDownButton.Flyout>
+                                </DropDownButton>
+                            </Grid>
+                            <WrapPanel DockPanel.Dock="Top" ItemSpacing="12" LineSpacing="4" Margin="0,0,0,8">
+                                <CheckBox Content="Theme tools" IsChecked="{Binding Ai.UseThemeTools}" FontSize="12" ToolTip.Tip="Let the AI read and edit this theme" />
+                                <CheckBox Content="MCP servers" IsChecked="{Binding Ai.UseMcpServers}" FontSize="12" ToolTip.Tip="Offer tools from the MCP servers in SETTINGS" />
+                                <CheckBox Content="1 h cache" IsChecked="{Binding Ai.LongCache}" FontSize="12" IsVisible="{Binding Ai.IsClaude}"
+                                          ToolTip.Tip="Cache lives 1 hour instead of 5 minutes (writing it costs 2× instead of 1.25×)" />
+                                <CheckBox Content="Keep cache warm" IsChecked="{Binding Ai.KeepWarm}" FontSize="12" IsVisible="{Binding Ai.IsClaude}"
+                                          ToolTip.Tip="Sends a tiny ping before the cache expires (stops after 30 min idle, 3 h with 1 h cache). Each ping costs 10% of the cached input." />
+                                <Button Classes="guide-link" Content="CLEAR CHAT" Command="{Binding Ai.ClearCommand}" />
+                            </WrapPanel>
+                            <TextBlock DockPanel.Dock="Top" Classes="faint" Text="{Binding Ai.CacheInfo}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <Border DockPanel.Dock="Top" Classes="card" IsVisible="{Binding Ai.NeedsKeyWarning}" BorderBrush="{DynamicResource EdGold}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Classes="muted" Text="No key for this AI yet. Add it in SETTINGS → AI ACCOUNTS." VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Classes="hud-blue" Content="ADD KEY" Command="{Binding Ai.OpenAiSettingsCommand}" Margin="8,0,0,0" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
+                                <Border Classes="card" Padding="6" Margin="0" IsVisible="{Binding Ai.HasCommandSuggestions}">
+                                    <ItemsControl x:Name="CommandList" ItemsSource="{Binding Ai.CommandSuggestions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ChatCommand">
+                                                <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,4" Margin="0,1"
+                                                        Command="{Binding #CommandList.((vm:MainViewModel)DataContext).Ai.UseCommandCommand}" CommandParameter="{Binding}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{DynamicResource EdCyan}" />
+                                                        <TextBlock Classes="faint" Text="{Binding Args}" />
+                                                        <TextBlock Classes="muted" Text="{Binding Help}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Ai.Pending}" IsVisible="{Binding Ai.HasPending}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AttachmentItem">
+                                            <Border Classes="pill ready" Padding="4">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Image Source="{Binding Thumbnail}" MaxHeight="40" MaxWidth="70" IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                    <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center" MaxWidth="200" TextTrimming="CharacterEllipsis" />
+                                                    <Button Classes="guide-link" Content="✕" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox x:Name="ChatInput" Classes="hud" Text="{Binding Ai.Input}" TextWrapping="Wrap" MaxHeight="120"
+                                             PlaceholderText="Ask for a change, type / for commands, Ctrl+V pastes screenshots…">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding Ai.SendCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0" VerticalAlignment="Top">
+                                        <Button Classes="hud-green" Content="SEND" Command="{Binding Ai.SendCommand}" IsVisible="{Binding Ai.IsIdle}" />
+                                        <Button Classes="hud-red" Content="STOP" Command="{Binding Ai.StopCommand}" IsVisible="{Binding Ai.IsBusy}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="hud" Content="FILE" Command="{Binding Ai.AttachFileCommand}" Padding="8,4" ToolTip.Tip="Attach images, PDF, text or font files (or drop them here). Fonts are added to the theme." />
+                                        <Button Classes="hud" Content="SCREENSHOT" Command="{Binding Ai.AttachScreenshotCommand}" Padding="8,4" ToolTip.Tip="Hides the creator and captures the whole screen" />
+                                        <Button Classes="hud" Content="PREVIEW" Command="{Binding Ai.AttachPreviewCommand}" Padding="8,4" ToolTip.Tip="Attach a picture of the live preview" />
+                                        <Button Classes="hud" Content="PASTE" Command="{Binding Ai.AttachClipboardCommand}" Padding="8,4" ToolTip.Tip="Attach the image in the clipboard (e.g. after Win+Shift+S)" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Classes="faint" Text="{Binding Ai.UsageText}" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+
+                            <Border Classes="card" Padding="0">
+                                <Panel>
+                                    <StackPanel Margin="16" Spacing="6" IsVisible="{Binding !Ai.HasMessages}">
+                                        <TextBlock Classes="section-title" Text="TRY" />
+                                        <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Make this theme feel like a neon synthwave night"
+                                                Command="{Binding Ai.UsePromptCommand}" CommandParameter="Make this theme feel like a neon synthwave night" />
+                                        <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Check the text contrast and fix anything hard to read"
+                                                Command="{Binding Ai.UsePromptCommand}" CommandParameter="Check the text contrast and fix anything hard to read" />
+                                        <Button Classes="hud-list" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Rounder corners and a soft glow around the window"
+                                                Command="{Binding Ai.UsePromptCommand}" CommandParameter="Rounder corners and a soft glow around the window" />
+                                    </StackPanel>
+                                    <ScrollViewer x:Name="ChatScroll" IsVisible="{Binding Ai.HasMessages}">
+                                        <ItemsControl ItemsSource="{Binding Ai.Messages}" Margin="12,10">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ChatMessageItem">
+                                                    <Border Classes="chat-msg" Classes.user="{Binding IsUser}" Classes.tool="{Binding IsTool}" Classes.error="{Binding IsError}">
+                                                        <StackPanel Spacing="3">
+                                                            <TextBlock Classes="faint" Text="{Binding Author}" FontWeight="Bold" IsVisible="{Binding !IsTool}" />
+                                                            <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="12" />
+                                                            <ItemsControl ItemsSource="{Binding Attachments}" IsVisible="{Binding HasAttachments}">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="ai:ChatAttachment">
+                                                                        <StackPanel Spacing="2">
+                                                                            <Image Source="{Binding Thumbnail}" MaxHeight="120" MaxWidth="200" HorizontalAlignment="Left"
+                                                                                   IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                                            <TextBlock Classes="faint" Text="{Binding Label}" />
+                                                                        </StackPanel>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Panel>
+                            </Border>
+                        </DockPanel>
+                    </Panel>
+                </TabItem>
+
                 <!-- Settings -->
                 <TabItem x:Name="SettingsTab">
                     <TabItem.Header>
@@ -952,6 +1154,124 @@
                                         <TextBlock Classes="muted" Text="{Binding SkippedVersionText}" VerticalAlignment="Center" />
                                         <Button Grid.Column="1" Classes="hud" Content="OFFER IT AGAIN" Command="{Binding UnskipVersionCommand}"
                                                 IsVisible="{Binding HasSkippedVersion}" ToolTip.Tip="Forget the skipped update so it is offered again" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card" x:Name="AiAccountsCard">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section-title" Text="AI ACCOUNTS" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Paste a key for each AI you want in the AI tab, then click SAVE. Copilot uses GitHub Models: create a fine-grained GitHub token with Models: read. Keys are stored only in settings.json on this PC. Base URL is optional (proxies, Azure, LM Studio…)." />
+                                    <ItemsControl ItemsSource="{Binding Ai.Providers}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:AiProviderItem">
+                                                <Border Classes="token-row">
+                                                    <Grid ColumnDefinitions="100,*,Auto,Auto" RowDefinitions="Auto,Auto">
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" />
+                                                            <TextBlock Classes="faint" Text="{Binding StatusText}" />
+                                                        </StackPanel>
+                                                        <TextBox Grid.Column="1" Classes="hud" Text="{Binding KeyInput}" PasswordChar="•" PlaceholderText="{Binding KeyHint}" IsEnabled="{Binding NeedsKey}">
+                                                            <TextBox.KeyBindings>
+                                                                <KeyBinding Gesture="Enter" Command="{Binding SaveKeyCommand}" />
+                                                            </TextBox.KeyBindings>
+                                                        </TextBox>
+                                                        <Button Grid.Column="2" Classes="hud-blue" Content="SAVE" Command="{Binding SaveKeyCommand}" Margin="6,0,0,0" />
+                                                        <Button Grid.Column="3" Classes="hud" Content="GET KEY" Command="{Binding GetKeyCommand}" Margin="6,0,0,0" />
+                                                        <TextBox Grid.Row="1" Grid.Column="1" Classes="hud" Text="{Binding BaseUrlInput}" Margin="0,4,0,0" FontSize="11"
+                                                                 PlaceholderText="{Binding Provider.BaseUrl}" ToolTip.Tip="Optional base URL (empty = default)" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Grid ColumnDefinitions="Auto,*,40" Margin="0,4,0,0">
+                                        <TextBlock Classes="muted" Text="Chat memory (messages sent)" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <Slider Grid.Column="1" Minimum="2" Maximum="60" TickFrequency="2" IsSnapToTickEnabled="True" Value="{Binding Ai.HistoryLimit}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Ai.HistoryLimit}" Foreground="{DynamicResource EdCyan}" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Fewer messages = fewer tokens per reply. The theme itself is only sent when the AI asks for it." />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section-title" Text="MCP SERVER — CONNECT CLAUDE, COPILOT, CODEX" />
+                                    <StackPanel Spacing="2">
+                                        <CheckBox Content="Run the RBWR Theme Creator MCP server" IsChecked="{Binding Ai.ServerEnabled}" FontSize="12" />
+                                        <TextBlock Classes="muted" Margin="28,0,0,0" TextWrapping="Wrap" Text="{Binding Ai.ServerStatusText}" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="Auto,90,Auto">
+                                        <TextBlock Classes="muted" Text="Port" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <TextBox Grid.Column="1" Classes="hud" Text="{Binding Ai.McpPortInput}" />
+                                        <Button Grid.Column="2" Classes="hud" Content="APPLY" Command="{Binding Ai.ApplyPortCommand}" Margin="6,0,0,0" />
+                                    </Grid>
+                                    <Border Classes="divider" />
+                                    <TextBlock Classes="muted" Text="Paste one of these into the app you use. Keep the creator open while it works." TextWrapping="Wrap" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CLAUDE CODE (terminal)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Ai.CopySnippetCommand}" CommandParameter="claude" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Ai.ClaudeCodeSnippet, Mode=OneWay}" TextWrapping="Wrap" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="GITHUB COPILOT (VS Code · .vscode/mcp.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Ai.CopySnippetCommand}" CommandParameter="vscode" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Ai.VsCodeSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CHATGPT CODEX (~/.codex/config.toml)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Ai.CopySnippetCommand}" CommandParameter="codex" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Ai.CodexSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CLAUDE DESKTOP (claude_desktop_config.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Ai.CopySnippetCommand}" CommandParameter="desktop" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Ai.ClaudeDesktopSnippet, Mode=OneWay}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="label" Text="CURSOR / WINDSURF / OTHER (mcp.json)" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="COPY" Command="{Binding Ai.CopySnippetCommand}" CommandParameter="cursor" />
+                                    </Grid>
+                                    <TextBox Classes="hud code" IsReadOnly="True" Text="{Binding Ai.CursorSnippet, Mode=OneWay}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="MCP SERVERS FOR THE AI CHAT" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="hud" Content="RECONNECT" Command="{Binding Ai.ReconnectMcpCommand}" />
+                                    </Grid>
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Extra tools for the AI tab. Use a URL (http://…/mcp) or a command that starts a stdio server, e.g. npx -y @modelcontextprotocol/server-filesystem C:\Themes" />
+                                    <ItemsControl ItemsSource="{Binding Ai.McpServers}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:McpServerItem">
+                                                <Border Classes="token-row">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                                        <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" />
+                                                            <TextBlock Classes="faint" Text="{Binding Target}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="faint" Text="{Binding State}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Classes="faint" Text="{Binding Kind}" VerticalAlignment="Center" Margin="8,0" />
+                                                        <Button Grid.Column="3" Classes="hud-red" Content="REMOVE" Command="{Binding RemoveCommand}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Grid ColumnDefinitions="140,*,Auto">
+                                        <TextBox Classes="hud" Text="{Binding Ai.NewMcpName}" PlaceholderText="Name" />
+                                        <TextBox Grid.Column="1" Classes="hud" Text="{Binding Ai.NewMcpTarget}" PlaceholderText="URL or command" Margin="6,0,0,0" />
+                                        <Button Grid.Column="2" Classes="hud-green" Content="ADD" Command="{Binding Ai.AddMcpServerCommand}" Margin="6,0,0,0" />
                                     </Grid>
                                 </StackPanel>
                             </Border>

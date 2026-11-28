@@ -3,6 +3,13 @@ using System.Text.Json;
 namespace RbwrThemeCreator.Services;
 
 /// <summary>Small per-user settings file in %AppData%/RbwrThemeCreator/settings.json.</summary>
+public sealed class McpServerConfig
+{
+    public string Name { get; set; } = string.Empty;
+    public string Target { get; set; } = string.Empty;
+    public bool Enabled { get; set; } = true;
+}
+
 public sealed class CreatorSettings
 {
     public string OverlayThemesDirectory { get; set; } = string.Empty;
@@ -44,6 +51,18 @@ public sealed class CreatorSettings
 
     /// <summary>Changed keyboard shortcuts: action id -> gesture ("" = none). Missing = default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = new();
+
+    // ---------- AI ----------
+    public Dictionary<string, string> AiKeys { get; set; } = new();
+    public Dictionary<string, string> AiModels { get; set; } = new();
+    public Dictionary<string, string> AiBaseUrls { get; set; } = new();
+    public string LastAiProvider { get; set; } = string.Empty;
+    public int AiHistoryLimit { get; set; } = 12;
+    public bool AiLongCache { get; set; }
+    public bool AiKeepWarm { get; set; }
+    public bool McpServerEnabled { get; set; }
+    public int McpServerPort { get; set; } = 3917;
+    public List<McpServerConfig> McpServers { get; set; } = new();
 
     /// <summary>Folder that holds settings.json (SETTINGS → Open settings folder).</summary>
     public static string FolderPath => Path.GetDirectoryName(SettingsPath)!;

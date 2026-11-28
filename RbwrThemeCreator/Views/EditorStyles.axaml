@@ -344,6 +344,41 @@
     <Style Selector="Border.guide-tr:pointerover">
         <Setter Property="Background" Value="#0affffff" />
     </Style>
+    <!-- AI chat -->
+    <Style Selector="Border.pill.ready">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdGreen}" />
+    </Style>
+    <Style Selector="Border.pill:not(.ready)">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdFaint}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdMuted}" />
+    </Style>
+    <Style Selector="Border.chat-msg">
+        <Setter Property="Background" Value="{DynamicResource EdPanel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="Margin" Value="0,0,48,8" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.chat-msg.user">
+        <Setter Property="Background" Value="{DynamicResource EdActive}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource EdCyan}" />
+        <Setter Property="Margin" Value="48,0,0,8" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Border.chat-msg.tool">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdFaint}" />
+    </Style>
+    <Style Selector="Border.chat-msg.error">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
+    </Style>
+
     <Style Selector="Border.pill">
         <Setter Property="Background" Value="{DynamicResource EdPanel}" />
         <Setter Property="BorderThickness" Value="1" />

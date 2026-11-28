@@ -124,6 +124,7 @@ public partial class MainWindow : Window, IDialogHost
         vm.RequestWarningToast += (title, message) => ShowToast(title, message, warning: true);
         vm.Shortcuts.Changed += (_, _) => UpdateShortcutHints();
         UpdateShortcutHints();
+        WireAiChat(vm);
         ApplyBackdrop(vm.PreviewBackdrop);
         Preview.SetMode(vm.PreviewMode);
         vm.Refresh();
@@ -502,7 +503,8 @@ public partial class MainWindow : Window, IDialogHost
             .ToList();
         if (paths.Count > 0)
         {
-            await _vm.HandleDroppedPathsAsync(paths);
+            if (!TryAttachDroppedToChat(paths))
+                await _vm.HandleDroppedPathsAsync(paths);
             e.Handled = true;
         }
     }
