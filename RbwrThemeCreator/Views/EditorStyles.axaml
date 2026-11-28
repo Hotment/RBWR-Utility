@@ -349,7 +349,11 @@
         <Setter Property="BorderBrush" Value="{DynamicResource EdGreen}" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource EdGreen}" />
     </Style>
-    <Style Selector="Border.pill:not(.ready)">
+    <Style Selector="Border.pill.error">
+        <Setter Property="BorderBrush" Value="{DynamicResource EdRed}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource EdRed}" />
+    </Style>
+    <Style Selector="Border.pill:not(.ready):not(.error)">
         <Setter Property="BorderBrush" Value="{DynamicResource EdFaint}" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource EdMuted}" />
     </Style>

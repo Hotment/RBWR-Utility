@@ -25,6 +25,12 @@ public sealed record AiUsage(int Input, int Output, int CacheRead = 0, int Cache
         new(a.Input + b.Input, a.Output + b.Output, a.CacheRead + b.CacheRead, a.CacheWrite + b.CacheWrite);
 }
 
+public sealed record AiLimit(string Label, long Remaining, long Limit, string Reset)
+{
+    public double Fraction => Limit <= 0 ? 0 : Math.Clamp((double)Remaining / Limit, 0, 1);
+    public string Text => $"{Label}: {Remaining:N0}/{Limit:N0}{(Reset.Length > 0 ? $" · resets in {Reset}" : "")}";
+}
+
 public sealed record AiRequest(AiProvider Provider, string Key, string Model, string BaseUrl, string System, bool LongCache);
 
 public static class AiChatClient
@@ -160,7 +166,7 @@ public static class AiChatClient
         using var req = new HttpRequestMessage(HttpMethod.Post, r.BaseUrl.TrimEnd('/') + "/chat/completions");
         if (!string.IsNullOrWhiteSpace(r.Key)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", r.Key.Trim());
         req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        var json = await SendJsonAsync(req, ct);
+        var json = await SendJsonAsync(req, ct, r.Provider.Id);
 
         var msg = json["choices"]?[0]?["message"];
         var calls = new List<ToolCall>();
@@ -256,7 +262,7 @@ public static class AiChatClient
         using var req = new HttpRequestMessage(HttpMethod.Post, r.BaseUrl.TrimEnd('/') + "/messages");
         AddAnthropicHeaders(req, r.Key);
         req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        var json = await SendJsonAsync(req, ct);
+        var json = await SendJsonAsync(req, ct, r.Provider.Id);
 
         var sb = new StringBuilder();
         var calls = new List<ToolCall>();
@@ -296,7 +302,7 @@ public static class AiChatClient
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         if (p.Style == AiApiStyle.Anthropic) AddAnthropicHeaders(req, key);
         else if (!string.IsNullOrWhiteSpace(key)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
-        var json = await SendJsonAsync(req, ct);
+        var json = await SendJsonAsync(req, ct, p.Id);
 
         var items = json as JsonArray ?? json["data"] as JsonArray ?? json["models"] as JsonArray ?? [];
         var list = new List<AiModelInfo>();
@@ -312,14 +318,82 @@ public static class AiChatClient
     }
 
     // =====================================================================
+    // Rate limits and balance
+    // =====================================================================
+
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<AiLimit>> Limits = new();
+
+    private static readonly (string Prefix, string Label)[] AnthropicLimits =
+        [("requests", "Requests/min"), ("input-tokens", "Input tokens/min"), ("output-tokens", "Output tokens/min"), ("tokens", "Tokens/min")];
+
+    private static readonly (string Suffix, string Label)[] OpenAiLimits = [("requests", "Requests"), ("tokens", "Tokens")];
+
+    private static List<AiLimit> ReadLimits(HttpResponseMessage res)
+    {
+        string? H(string name) => res.Headers.TryGetValues(name, out var v) ? v.FirstOrDefault() : null;
+        var list = new List<AiLimit>();
+        foreach (var (prefix, label) in AnthropicLimits)
+            if (long.TryParse(H($"anthropic-ratelimit-{prefix}-limit"), out long lim) && long.TryParse(H($"anthropic-ratelimit-{prefix}-remaining"), out long rem))
+            {
+                if (prefix == "tokens" && list.Any(l => l.Label.StartsWith("Input"))) continue;
+                list.Add(new AiLimit(label, rem, lim, ResetText(H($"anthropic-ratelimit-{prefix}-reset"))));
+            }
+        foreach (var (suffix, label) in OpenAiLimits)
+            if (long.TryParse(H($"x-ratelimit-limit-{suffix}"), out long lim) && long.TryParse(H($"x-ratelimit-remaining-{suffix}"), out long rem))
+                list.Add(new AiLimit(label, rem, lim, ResetText(H($"x-ratelimit-reset-{suffix}"))));
+        return list;
+    }
+
+    private static string ResetText(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        if (DateTimeOffset.TryParse(raw, out var at))
+        {
+            var left = at - DateTimeOffset.UtcNow;
+            return left <= TimeSpan.Zero ? "now" : FormatSpan(left);
+        }
+        if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double secs))
+            return FormatSpan(TimeSpan.FromSeconds(secs));
+        return raw;
+    }
+
+    private static string FormatSpan(TimeSpan t) =>
+        t.TotalHours >= 1 ? $"{(int)t.TotalHours}h {t.Minutes}m" : t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes}m {t.Seconds}s" : $"{Math.Max(1, (int)t.TotalSeconds)}s";
+
+    public static async Task<string?> GetBalanceAsync(AiProvider p, string key, string baseUrl, CancellationToken ct)
+    {
+        string? url = p.Id switch
+        {
+            "openrouter" => baseUrl.TrimEnd('/') + "/key",
+            "deepseek" => "https://api.deepseek.com/user/balance",
+            _ => null,
+        };
+        if (url == null || string.IsNullOrWhiteSpace(key)) return null;
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
+        var json = await SendJsonAsync(req, ct);
+        if (p.Id == "deepseek")
+        {
+            var b = json["balance_infos"]?[0];
+            return b == null ? null : $"Balance: {b["total_balance"]} {b["currency"]}";
+        }
+        var d = json["data"];
+        if (d == null) return null;
+        string free = d["is_free_tier"]?.ToString() == "true" ? " (free tier)" : string.Empty;
+        string left = d["limit_remaining"] is JsonValue lr ? $"${lr} left" : "no credit limit";
+        return $"Credits used: ${d["usage"]} · {left}{free}";
+    }
+
+    // =====================================================================
     // HTTP
     // =====================================================================
 
     private static int Int(JsonNode? n) => n is JsonValue v && v.TryGetValue<int>(out int i) ? i : 0;
 
-    private static async Task<JsonNode> SendJsonAsync(HttpRequestMessage req, CancellationToken ct)
+    private static async Task<JsonNode> SendJsonAsync(HttpRequestMessage req, CancellationToken ct, string? providerId = null)
     {
         using var res = await Http.SendAsync(req, ct);
+        if (providerId != null && ReadLimits(res) is { Count: > 0 } limits) Limits[providerId] = limits;
         string raw = await res.Content.ReadAsStringAsync(ct);
         JsonNode? json = null;
         try { json = JsonNode.Parse(raw); } catch (JsonException) { }

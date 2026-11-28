@@ -47,8 +47,45 @@ public sealed partial class AiProviderItem : ObservableObject
     public Avalonia.Media.IBrush LogoBrush { get; }
     public string KeyHint => Provider.KeyHint;
     public bool NeedsKey => Provider.NeedsKey;
-    public bool IsReady => !Provider.NeedsKey || !string.IsNullOrWhiteSpace(CreatorSettings.Current.AiKeys.GetValueOrDefault(Provider.Id));
-    public string StatusText => IsReady ? "READY" : "NO KEY";
+    public bool HasKey => !Provider.NeedsKey || !string.IsNullOrWhiteSpace(CreatorSettings.Current.AiKeys.GetValueOrDefault(Provider.Id));
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady), nameof(IsError), nameof(StatusText))]
+    private string _state = "NOT CHECKED";
+
+    [ObservableProperty] private string _stateDetail = string.Empty;
+
+    public bool IsReady => State == "READY";
+    public bool IsError => State is "KEY ERROR" or "OFFLINE" or "ERROR";
+    public string StatusText => State;
+
+    public async Task CheckAsync()
+    {
+        if (!HasKey) { State = "NO KEY"; StateDetail = "Add a key in SETTINGS → AI ACCOUNTS."; return; }
+        State = "CHECKING…";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        try
+        {
+            await AiChatClient.ListModelsAsync(Provider, CreatorSettings.Current.AiKeys.GetValueOrDefault(Provider.Id, string.Empty), BaseUrl, cts.Token);
+            State = "READY";
+            StateDetail = "The key works.";
+        }
+        catch (HttpRequestException ex)
+        {
+            State = Provider.NeedsKey ? "ERROR" : "OFFLINE";
+            StateDetail = Provider.NeedsKey ? ex.Message : "Ollama is not running on this PC.";
+        }
+        catch (OperationCanceledException)
+        {
+            State = "ERROR";
+            StateDetail = "No answer in 15 s.";
+        }
+        catch (Exception ex)
+        {
+            State = ex.Message.StartsWith("401") || ex.Message.StartsWith("403") ? "KEY ERROR" : ex.Message.StartsWith("429") ? "RATE LIMITED" : "ERROR";
+            StateDetail = ex.Message;
+        }
+    }
     public string Features => string.Join(" · ", new[]
     {
         Provider.Vision ? "images" : null,
@@ -71,9 +108,9 @@ public sealed partial class AiProviderItem : ObservableObject
         if (string.IsNullOrWhiteSpace(BaseUrlInput)) s.AiBaseUrls.Remove(Provider.Id);
         else s.AiBaseUrls[Provider.Id] = BaseUrlInput.Trim();
         s.Save();
-        OnPropertyChanged(nameof(IsReady));
-        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(HasKey));
         _owner.RefreshKeyState();
+        _ = CheckAsync();
         _owner.Main.SetStatus($"{Name}: saved.");
     }
 
@@ -94,6 +131,26 @@ public sealed class ChatMessageItem
     public bool IsError { get; init; }
     public IReadOnlyList<ChatAttachment> Attachments { get; init; } = [];
     public bool HasAttachments => Attachments.Count > 0;
+}
+
+public sealed partial class ChatSessionItem(ChatSession session, AiProviderItem? provider, AiChatViewModel owner) : ObservableObject
+{
+    public ChatSession Session { get; } = session;
+    public AiProviderItem? Provider { get; } = provider;
+    public string Title => Session.Title;
+    public string ProviderName => Provider?.Name ?? Session.ProviderId;
+    public string Model => Session.Model;
+    public string Details => $"{ProviderName} · {Session.Model} · {Session.Updated:g}";
+    public Avalonia.Media.Geometry? Logo => Provider?.Logo;
+    public bool HasLogo => Logo != null;
+    public Avalonia.Media.IBrush? LogoBrush => Provider?.LogoBrush;
+    public string Glyph => Provider?.Glyph ?? "?";
+
+    [RelayCommand]
+    private void Open() => owner.OpenSession(this);
+
+    [RelayCommand]
+    private void Delete() => owner.DeleteSession(this);
 }
 
 public sealed record ChatCommand(string Name, string Args, string Help);
@@ -151,7 +208,7 @@ public sealed partial class AiChatViewModel : ObservableObject
     public static readonly IReadOnlyList<ChatCommand> AllCommands =
     [
         new("/help", "", "List the commands"),
-        new("/clear", "", "Clear the chat (and its memory)"),
+        new("/clear", "", "Start a new chat (the old one stays in history)"),
         new("/model", "[name]", "Show or change the model"),
         new("/models", "", "Load the model list from the provider"),
         new("/compact", "", "Summarise the chat to save tokens"),
@@ -189,6 +246,8 @@ public sealed partial class AiChatViewModel : ObservableObject
         _warmTimer.Tick += async (_, _) => await WarmTickAsync();
         Pending.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasPending));
         if (CreatorSettings.Current.McpServerEnabled) StartServer();
+        RefreshRecentChats();
+        _ = CheckProvidersAsync();
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Shutdown();
     }
 
@@ -216,7 +275,7 @@ public sealed partial class AiChatViewModel : ObservableObject
     public bool ShowPicker => Selected == null;
     public bool IsClaude => Selected?.Provider.Cache == AiCacheKind.Explicit;
     public string ProviderTitle => Selected == null ? "AI" : $"{Selected.Name} · {Selected.Features}";
-    public bool NeedsKeyWarning => Selected is { IsReady: false };
+    public bool NeedsKeyWarning => Selected is { HasKey: false };
     public string CacheInfo => Selected?.Provider.CacheNote ?? string.Empty;
 
     public void RefreshKeyState() => OnPropertyChanged(nameof(NeedsKeyWarning));
@@ -224,15 +283,121 @@ public sealed partial class AiChatViewModel : ObservableObject
     [ObservableProperty] private string _model = string.Empty;
     [ObservableProperty] private bool _isLoadingModels;
 
+    public ObservableCollection<ChatSessionItem> RecentChats { get; } = new();
+    public bool HasRecentChats => RecentChats.Count > 0;
+    public ObservableCollection<AiLimit> LimitItems { get; } = new();
+    [ObservableProperty] private string _balanceText = string.Empty;
+    [ObservableProperty] private string _limitsNote = string.Empty;
+    public bool HasLimits => LimitItems.Count > 0 || BalanceText.Length > 0 || LimitsNote.Length > 0;
+    public bool HasBalance => BalanceText.Length > 0;
+
+    [RelayCommand]
+    private async Task CheckProvidersAsync() => await Task.WhenAll(Providers.Select(p => p.CheckAsync()));
+
     public void Select(AiProviderItem item)
     {
+        SaveSession();
         Selected = item;
+        ResetChat();
         SetModelList(item.Provider.Models);
         Model = CreatorSettings.Current.AiModels.GetValueOrDefault(item.Provider.Id) ?? item.Provider.Models[0].Id;
         CreatorSettings.Current.LastAiProvider = item.Provider.Id;
         CreatorSettings.Current.Save();
         OnPropertyChanged(nameof(NeedsKeyWarning));
         UpdateUsageText();
+        _ = UpdateLimitsAsync();
+    }
+
+    // =====================================================================
+    // Chat history
+    // =====================================================================
+
+    private ChatSession? _chat;
+
+    private void RefreshRecentChats()
+    {
+        RecentChats.Clear();
+        foreach (var s in ChatStore.LoadAll())
+            RecentChats.Add(new ChatSessionItem(s, Providers.FirstOrDefault(p => p.Provider.Id == s.ProviderId), this));
+        OnPropertyChanged(nameof(HasRecentChats));
+    }
+
+    private void SaveSession()
+    {
+        if (Selected == null || _history.Count == 0) return;
+        _chat ??= new ChatSession { ProviderId = Selected.Provider.Id };
+        _chat.Model = Model;
+        if (_chat.Title == "New chat" && _history.FirstOrDefault(t => t.Role == ChatRole.User) is { } first)
+        {
+            string title = first.Text.Split('\n')[0].Trim();
+            _chat.Title = title.Length == 0 ? "Attachments" : title.Length > 60 ? title[..60] + "…" : title;
+        }
+        _chat.Turns = _history.Select(ChatStore.ToStored).ToList();
+        _chat.Messages = Messages.Select(m => new StoredMessage
+        {
+            Author = m.Author, Text = m.Text, Attachments = m.Attachments.Select(a => a.Name).ToList(),
+            Kind = m.IsUser ? "user" : m.IsError ? "error" : m.IsTool ? "tool" : "assistant",
+        }).ToList();
+        ChatStore.Save(_chat);
+        RefreshRecentChats();
+    }
+
+    public void OpenSession(ChatSessionItem item)
+    {
+        var provider = item.Provider;
+        if (provider == null) { Main.SetStatus($"Unknown AI '{item.Session.ProviderId}'.", isError: true); return; }
+        Select(provider);
+        _chat = item.Session;
+        Model = item.Session.Model;
+        foreach (var t in item.Session.Turns) _history.Add(ChatStore.FromStored(t));
+        foreach (var m in item.Session.Messages)
+            Messages.Add(new ChatMessageItem
+            {
+                Author = m.Author, Text = m.Text + (m.Attachments.Count > 0 ? "\n[" + string.Join(", ", m.Attachments) + "]" : ""),
+                IsUser = m.Kind == "user", IsTool = m.Kind == "tool", IsError = m.Kind == "error", IsAssistant = m.Kind == "assistant",
+            });
+        OnPropertyChanged(nameof(HasMessages));
+        MessageAdded?.Invoke();
+    }
+
+    public void DeleteSession(ChatSessionItem item)
+    {
+        ChatStore.Delete(item.Session.Id);
+        if (_chat?.Id == item.Session.Id) _chat = null;
+        RecentChats.Remove(item);
+        OnPropertyChanged(nameof(HasRecentChats));
+    }
+
+    [RelayCommand]
+    private void NewChat()
+    {
+        SaveSession();
+        ResetChat();
+    }
+
+    // =====================================================================
+    // Limits
+    // =====================================================================
+
+    private async Task UpdateLimitsAsync()
+    {
+        if (Selected == null) return;
+        var item = Selected;
+        LimitItems.Clear();
+        if (AiChatClient.Limits.TryGetValue(item.Provider.Id, out var limits))
+            foreach (var l in limits) LimitItems.Add(l);
+        LimitsNote = item.Provider.Id switch
+        {
+            "anthropic" => "API key limits. Claude.ai Pro/Max 5-hour and weekly limits belong to the subscription and are not available with an API key.",
+            "openai" => "API key limits. ChatGPT Free/Plus message limits are separate and not available to apps.",
+            "gemini" => "Gemini does not send limits; check the free tier at aistudio.google.com.",
+            "ollama" => "Runs on this PC — no limits.",
+            _ => LimitItems.Count == 0 ? "Limits appear after the first reply." : string.Empty,
+        };
+        try { BalanceText = await AiChatClient.GetBalanceAsync(item.Provider, KeyFor(item), item.BaseUrl, CancellationToken.None) ?? string.Empty; }
+        catch { BalanceText = string.Empty; }
+        OnPropertyChanged(nameof(HasLimits));
+        OnPropertyChanged(nameof(HasBalance));
     }
 
     private void SetModelList(IEnumerable<AiModelInfo> models)
@@ -286,7 +451,8 @@ public sealed partial class AiChatViewModel : ObservableObject
     private void Back()
     {
         _cts?.Cancel();
-        _warmTimer.Stop();
+        SaveSession();
+        ResetChat();
         Selected = null;
     }
 
@@ -378,6 +544,8 @@ public sealed partial class AiChatViewModel : ObservableObject
         AddMessage(new ChatMessageItem { Author = "YOU", Text = text, IsUser = true, Attachments = attachments });
         TrimHistory();
         await RunModelAsync(item, _history, showTurns: true);
+        SaveSession();
+        _ = UpdateLimitsAsync();
     }
 
     private async Task<bool> RunModelAsync(AiProviderItem item, List<ChatTurn> history, bool showTurns, bool withTools = true)
@@ -452,8 +620,11 @@ public sealed partial class AiChatViewModel : ObservableObject
     private void Stop() => _cts?.Cancel();
 
     [RelayCommand]
-    private void Clear()
+    private void Clear() => NewChat();
+
+    private void ResetChat()
     {
+        _chat = null;
         _history.Clear();
         Messages.Clear();
         Pending.Clear();

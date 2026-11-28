@@ -908,7 +908,8 @@
                                                         <TextBlock Classes="muted" Text="{Binding Tagline}" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Classes="faint" Text="{Binding Features}" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
-                                                    <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center" Classes.ready="{Binding IsReady}">
+                                                    <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center" Classes.ready="{Binding IsReady}" Classes.error="{Binding IsError}"
+                                                            ToolTip.Tip="{Binding StateDetail}">
                                                         <TextBlock Text="{Binding StatusText}" FontSize="9" FontWeight="Bold" />
                                                     </Border>
                                                 </Grid>
@@ -916,6 +917,40 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                    <TextBlock Classes="faint" Text="Status is checked with a free model-list request (no tokens)." VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Classes="hud" Content="RECHECK" Command="{Binding Ai.CheckProvidersCommand}" />
+                                </Grid>
+
+                                <Border Classes="card" Margin="0,10,0,0" IsVisible="{Binding Ai.HasRecentChats}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="section-title" Text="CHAT HISTORY" />
+                                        <ItemsControl ItemsSource="{Binding Ai.RecentChats}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ChatSessionItem">
+                                                    <Border Classes="token-row">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                                            <Border Width="28" Height="28" CornerRadius="14" BorderThickness="1" BorderBrush="{DynamicResource EdBorder}" Background="{DynamicResource EdPanel}">
+                                                                <Panel>
+                                                                    <PathIcon Data="{Binding Logo}" Foreground="{Binding LogoBrush}" Width="15" Height="15" IsVisible="{Binding HasLogo}" />
+                                                                    <TextBlock Text="{Binding Glyph}" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource EdCyan}"
+                                                                               HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasLogo}" />
+                                                                </Panel>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Classes="faint" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="2" Classes="hud-blue" Content="OPEN" Command="{Binding OpenCommand}" />
+                                                            <Button Grid.Column="3" Classes="hud-red" Content="DELETE" Command="{Binding DeleteCommand}" Margin="6,0,0,0" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="card" Margin="0,8,0,0">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center"
@@ -967,9 +1002,26 @@
                                           ToolTip.Tip="Cache lives 1 hour instead of 5 minutes (writing it costs 2× instead of 1.25×)" />
                                 <CheckBox Content="Keep cache warm" IsChecked="{Binding Ai.KeepWarm}" FontSize="12" IsVisible="{Binding Ai.IsClaude}"
                                           ToolTip.Tip="Sends a tiny ping before the cache expires (stops after 30 min idle, 3 h with 1 h cache). Each ping costs 10% of the cached input." />
-                                <Button Classes="guide-link" Content="CLEAR CHAT" Command="{Binding Ai.ClearCommand}" />
+                                <Button Classes="guide-link" Content="NEW CHAT" Command="{Binding Ai.NewChatCommand}" ToolTip.Tip="The current chat is kept in CHAT HISTORY" />
                             </WrapPanel>
                             <TextBlock DockPanel.Dock="Top" Classes="faint" Text="{Binding Ai.CacheInfo}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <Border DockPanel.Dock="Top" Classes="card" Padding="10,8" Margin="0,0,0,8" IsVisible="{Binding Ai.HasLimits}">
+                                <StackPanel Spacing="5">
+                                    <TextBlock Classes="section-title" Text="LIMITS" />
+                                    <ItemsControl ItemsSource="{Binding Ai.LimitItems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="ai:AiLimit">
+                                                <Grid ColumnDefinitions="*,120" Margin="0,2">
+                                                    <TextBlock Classes="muted" Text="{Binding Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="6" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Ai.BalanceText}" Foreground="{DynamicResource EdGreen}" FontSize="11" IsVisible="{Binding Ai.HasBalance}" />
+                                    <TextBlock Classes="faint" Text="{Binding Ai.LimitsNote}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                             <Border DockPanel.Dock="Top" Classes="card" IsVisible="{Binding Ai.NeedsKeyWarning}" BorderBrush="{DynamicResource EdGold}">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Classes="muted" Text="No key for this AI yet. Add it in SETTINGS → AI ACCOUNTS." VerticalAlignment="Center" TextWrapping="Wrap" />
@@ -1162,7 +1214,7 @@
                                 <StackPanel Spacing="8">
                                     <TextBlock Classes="section-title" Text="AI ACCOUNTS" />
                                     <TextBlock Classes="muted" TextWrapping="Wrap"
-                                               Text="Paste a key for each AI you want in the AI tab, then click SAVE. Copilot uses GitHub Models: create a fine-grained GitHub token with Models: read. Keys are stored only in settings.json on this PC. Base URL is optional (proxies, Azure, LM Studio…)." />
+                                               Text="Paste a key for each AI you want in the AI tab, then click SAVE. Copilot uses GitHub Models: create a fine-grained GitHub token with Models: read. Keys are stored only in settings.json on this PC. Leave API address empty unless you use a proxy, Azure, LM Studio or Ollama on another PC." />
                                     <ItemsControl ItemsSource="{Binding Ai.Providers}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:AiProviderItem">
@@ -1179,8 +1231,10 @@
                                                         </TextBox>
                                                         <Button Grid.Column="2" Classes="hud-blue" Content="SAVE" Command="{Binding SaveKeyCommand}" Margin="6,0,0,0" />
                                                         <Button Grid.Column="3" Classes="hud" Content="GET KEY" Command="{Binding GetKeyCommand}" Margin="6,0,0,0" />
+                                                        <TextBlock Grid.Row="1" Classes="faint" Text="API address" VerticalAlignment="Center" Margin="0,4,0,0" />
                                                         <TextBox Grid.Row="1" Grid.Column="1" Classes="hud" Text="{Binding BaseUrlInput}" Margin="0,4,0,0" FontSize="11"
-                                                                 PlaceholderText="{Binding Provider.BaseUrl}" ToolTip.Tip="Optional base URL (empty = default)" />
+                                                                 PlaceholderText="{Binding Provider.BaseUrl}"
+                                                                 ToolTip.Tip="Leave empty. Only change it for a proxy, Azure OpenAI, LM Studio or Ollama on another PC." />
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
